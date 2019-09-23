@@ -1,6 +1,6 @@
 {
   "name": "@server/next",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "An experimental Server.js reimplementation",
   "main": "index.js",
   "type": "module",
@@ -14,7 +14,11 @@
     "node": ">=12.0.0"
   },
   "engineStrict": true,
-  "keywords": ["server", "node", "server.js"],
+  "keywords": [
+    "server",
+    "node",
+    "server.js"
+  ],
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
