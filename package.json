@@ -1,0 +1,49 @@
+{
+  "name": "@server/next",
+  "version": "0.10.2",
+  "description": "An experimental Server.js reimplementation",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "rollup src/index.js --output.format es --name server --output.file index.js && npm run size",
+    "start": "npm run test -- --watch",
+    "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
+    "test": "jest index.test.js --detectOpenHandles"
+  },
+  "keywords": ["server", "node", "server.js"],
+  "files": [],
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.4.4",
+    "@babel/plugin-syntax-dynamic-import": "^7.2.0",
+    "@babel/preset-env": "^7.4.4",
+    "jest": "^24.8.0",
+    "rollup": "^1.21.4"
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          }
+        }
+      ]
+    ],
+    "plugins": [
+      [
+        "@babel/plugin-syntax-dynamic-import"
+      ]
+    ],
+    "env": {
+      "test": {
+        "plugins": [
+          "dynamic-import-node"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@server/next-demo",
+  "version": "0.0.0",
+  "private-comment": "Not really private, but it's just a test/demo folder so",
+  "private": true,
+  "description": "An experimental Server.js reimplementation",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "npm run rollup && npm run size",
+    "rollup": "rollup index.js --output.format es --output.file index.min.js",
+    "start": "node --experimental-modules ./index.js",
+    "size": "echo \"$(gzip -c index.min.js | wc -c) bytes\" # Only for Unix"
+  },
+  "keywords": [],
+  "files": [],
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.4.4",
+    "@babel/preset-env": "^7.4.4",
+    "rollup": "^1.21.4"
+  },
+  "babel": {
+    "presets": [["@babel/preset-env", { "targets": { "node": "current" } }]],
+    "plugins": [["@babel/plugin-syntax-dynamic-import"]]
+  }
+}
