@@ -1,3 +1,7 @@
+> **VERY EARLY WORK IN PROGRESS**
+>
+> **I don't know what will come out of this, if anything!**
+
 # Server.js
 
 New implementation from scratch. This version has these changes when compared with the 1.0 (WIP):
