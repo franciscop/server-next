@@ -10,10 +10,18 @@
     "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
     "test": "jest index.test.js --detectOpenHandles"
   },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "engineStrict": true,
   "keywords": ["server", "node", "server.js"],
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franciscop/server-next"
+  },
   "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.4.4",

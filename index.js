@@ -227,17 +227,25 @@ var cloudflare = (handler, options = {}) => {
   return Promise.resolve({ options, handler, runtime: runtime$1, close: () => {} });
 };
 
-// Loosely find which one is the correct runtime through ducktyping
-var getEngine = () => {
+// Cloudflare has to be detected and launched immediately, so no async/await
+const detectEngineSync = () => {
   if (typeof addEventListener !== "undefined" && typeof fetch !== "undefined") {
     return cloudflare;
   }
-  return import('http')
-    .then(() => node)
-    .catch(() => {
-      throw new Error("Could not find engine automatically");
-    });
 };
+
+// Everything else can be detected async
+const detectEngineAsync = async () => {
+  try {
+    await import('http');
+    return node;
+  } catch (error) {
+    throw new Error("Could not find engine automatically");
+  }
+};
+
+// Loosely find which one is the correct runtime through ducktyping
+var getEngine = () => detectEngineSync() || detectEngineAsync();
 
 var index = (...cbs) => async ctx => {
   const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
