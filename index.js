@@ -1,26 +1,39 @@
 var params = (query, path) => {
+  // They are different and there's no matching in the query
   if (!/\:/.test(query) && query !== path) return;
 
-  return query.split("/").reduce((params, part, i) => {
-    if (!/^\:/.test(part)) return params;
-    const name = part.replace(/^\:/, "");
-    params[name] = path.split("/")[i];
-    return params;
-  }, {});
+  // If one fails, fail it all
+  return (
+    query.split("/").reduce((params, part, i) => {
+      if (!params) return;
+      const value = path.split("/")[i];
+
+      // If there's no param in this segment, value has to match exactly
+      if (!/^\:/.test(part)) return part === value ? params : false;
+
+      const name = part.replace(/^\:/, "");
+      if (!value) return;
+      params[name] = value;
+      return params;
+    }, {}) || false
+  );
 };
 
 // Put an undetermined number of callbacks together
 // Stops when one of them returns something
-var reduce = (...cbs) => async ctx => {
-  for (let cb of cbs) {
+var reduce = (...cbs) => {
+  const handlers = cbs.flat(Infinity);
+
+  return async ctx => {
     try {
-      const data = await cb(ctx);
-      if (data) return data;
+      for (let cb of handlers) {
+        const data = await cb(ctx);
+        if (data) return data;
+      }
     } catch (error) {
-      return { body: error.message, status: 500 };
+      return error;
     }
-  }
-  return { body: "Not Found", status: 404 };
+  };
 };
 
 // Normalize the reply to return always an object in the same format
@@ -44,6 +57,7 @@ var reply = async (handler, ctx) => {
     }
   }
 
+  // Did no throw, but did not resolve === not found
   if (!data) return { body: "Not found", headers, status: 404 };
 
   // The function means the hanlder knows what it's doing and wants a raw reply
@@ -156,7 +170,6 @@ var urlParser = async ctx => {
   ctx.origin = url.origin;
   ctx.path = url.pathname;
   ctx.query = parseQuery(url.search);
-  ctx.href = url.href;
 };
 
 var middle = [urlParser, bodyParser];
@@ -210,6 +223,8 @@ var node = async (handler, options = {}) => {
 
 const runtime$1 = "cloudflare";
 
+const getUrl$1 = ({ url }) => decodeURI(url);
+
 const getIp$1 = req => req.headers.get("CF-Connecting-IP");
 
 // At least one header has to be read first so that .entries() works
@@ -225,7 +240,7 @@ const getHeaders = ({ headers }) => {
 var cloudflare = (handler, options = {}) => {
   addEventListener("fetch", e => {
     const response = handler({
-      url: e.request.url,
+      url: getUrl$1(e.request),
       method: e.request.method,
       headers: getHeaders(e.request),
       ip: getIp$1(e.request),
@@ -259,63 +274,155 @@ const detectEngineAsync = async () => {
 // Loosely find which one is the correct runtime through ducktyping
 var getEngine = () => detectEngineSync() || detectEngineAsync();
 
-var index = (...cbs) => async ctx => {
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
+var index = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
 
-  ctx.params = params(path, ctx.path);
-  if (!ctx.params) return;
-  return reduce(...all)(ctx);
+  return ctx => {
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$1 = (...cbs) => async ctx => {
-  if (ctx.method !== "GET") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
+var index$1 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
 
-  ctx.params = params(path, ctx.path);
-  if (!ctx.params) return;
-  return reduce(...all)(ctx);
+  return ctx => {
+    if (ctx.method !== "GET") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$2 = (...cbs) => async ctx => {
-  if (ctx.method !== "POST") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$2 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "POST") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$3 = (...cbs) => async ctx => {
-  if (ctx.method !== "PUT") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$3 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "PUT") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$4 = (...cbs) => async ctx => {
-  if (ctx.method !== "PATCH") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$4 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "PATCH") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$5 = (...cbs) => async ctx => {
-  if (ctx.method !== "DELETE") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$5 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "DELETE") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$6 = (...cbs) => async ctx => {
-  if (ctx.method !== "HEAD") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$6 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "HEAD") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
-var index$7 = (...cbs) => async ctx => {
-  if (ctx.method !== "OPTIONS") return;
-  const [path, ...all] = typeof cbs[0] === "string" ? cbs : [ctx.path, ...cbs];
-  if (path !== ctx.path) return;
-  return reduce(...all)(ctx);
+var index$7 = (path, ...cbs) => {
+  // Accept a path first and then a list of callbacks
+  if (typeof path !== "string") {
+    cbs.unshift(path);
+    path = "*";
+  }
+  const handler = reduce(cbs);
+
+  return ctx => {
+    if (ctx.method !== "OPTIONS") return;
+    if (path === "*") return handler(ctx);
+
+    // Make sure the URL matches
+    ctx.params = params(path, ctx.path);
+    if (!ctx.params) return;
+    return handler(ctx);
+  };
 };
 
 // Some other, non-HTTP methods but routers nonetheless
@@ -342,7 +449,7 @@ var index$8 = async (options = {}, ...middleware) => {
   };
 
   // Generate a single callback with all the middleware
-  const callback = reduce(addOptions, ...middle, ...middleware);
+  const callback = reduce(addOptions, middle, middleware);
 
   return runEngine(ctx => reply(callback, ctx), options);
 };

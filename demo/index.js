@@ -5,21 +5,21 @@ server(
   { port: 3002 },
   get("/", ctx => "Hello world"),
   get("/error", () => new Error("World's on fire")),
-  get("/:id", ctx => {
-    console.log("Full:", {
-      url: ctx.url,
-      protocol: ctx.protocol,
-      host: ctx.host,
-      hostname: ctx.hostname,
-      port: ctx.port,
-      params: ctx.params,
-      query: ctx.query,
-      body: ctx.body
-    });
+  get("/abc/:id", ctx => {
+    // console.log("Full:", {
+    //   url: ctx.url,
+    //   protocol: ctx.protocol,
+    //   host: ctx.host,
+    //   hostname: ctx.hostname,
+    //   port: ctx.port,
+    //   params: ctx.params,
+    //   query: ctx.query,
+    //   body: ctx.body
+    // });
     return `It works! ID: ${ctx.params.id}`;
   }),
   post(({ body, query, path, url }) => {
-    console.log(body, query, path, url);
+    // console.log(body, query, path, url);
     return "OK!";
   })
 ).then(ctx => {

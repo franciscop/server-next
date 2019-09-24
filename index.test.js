@@ -6,7 +6,14 @@ const engine = (handler, options = {}) => {
   const mockAnyMethod = (target, method) => {
     if (method === "then") return target.then;
     if (target[method]) return target[method];
-    return (path, extra) => handler({ path, method, headers: {}, options });
+    return (path = "/", extra) =>
+      handler({
+        url: `http://localhost:3000/${path.replace(/^\//, "")}`,
+        method,
+        headers: {},
+        ip: "1.1.1.1",
+        runtime: "test"
+      });
   };
 
   // To be able to dynamically mock methods

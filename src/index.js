@@ -30,7 +30,7 @@ export default async (options = {}, ...middleware) => {
   };
 
   // Generate a single callback with all the middleware
-  const callback = reduce(addOptions, ...middle, ...middleware);
+  const callback = reduce(addOptions, middle, middleware);
 
   return runEngine(ctx => reply(callback, ctx), options);
 };

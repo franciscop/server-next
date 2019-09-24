@@ -1,5 +1,7 @@
 const runtime = "cloudflare";
 
+const getUrl = ({ url }) => decodeURI(url);
+
 const getIp = req => req.headers.get("CF-Connecting-IP");
 
 // At least one header has to be read first so that .entries() works
@@ -15,7 +17,7 @@ const getHeaders = ({ headers }) => {
 export default (handler, options = {}) => {
   addEventListener("fetch", e => {
     const response = handler({
-      url: e.request.url,
+      url: getUrl(e.request),
       method: e.request.method,
       headers: getHeaders(e.request),
       ip: getIp(e.request),

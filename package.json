@@ -8,7 +8,7 @@
     "build": "rollup src/index.js --output.format es --name server --output.file index.js && npm run size",
     "start": "npm run test -- --watch",
     "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
-    "test": "jest index.test.js --detectOpenHandles"
+    "test": "jest --detectOpenHandles"
   },
   "engines": {
     "node": ">=12.0.0"

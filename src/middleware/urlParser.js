@@ -23,5 +23,4 @@ export default async ctx => {
   ctx.origin = url.origin;
   ctx.path = url.pathname;
   ctx.query = parseQuery(url.search);
-  ctx.href = url.href;
 };

@@ -19,6 +19,7 @@ export default async (handler, ctx) => {
     }
   }
 
+  // Did no throw, but did not resolve === not found
   if (!data) return { body: "Not found", headers, status: 404 };
 
   // The function means the hanlder knows what it's doing and wants a raw reply
