@@ -1,5 +1,3 @@
-import parseUrl from "../helpers/parseUrl.js";
-
 const runtime = "node";
 
 const getUrl = ({ protocol = "http", headers, url = "/" }) => {
@@ -18,26 +16,24 @@ const getIp = req => {
 
 // Launch the server for the Node.js environment
 export default async (handler, options = {}) => {
-  const http = await import("http");
-  const server = http.createServer(async (req, res) => {
-    const ip = getIp(req);
-    const url = getUrl(req);
-    const ctx = {
-      ...parseUrl(req.url),
-      url,
+  const { createServer } = await import("http");
+
+  const server = createServer(async (req, res) => {
+    // Handle each of the API calls here:
+    const reply = await handler({
+      url: getUrl(req),
       method: req.method,
       headers: req.headers,
-      req,
+      ip: getIp(req),
       runtime,
-      ip
-    };
-    const reply = await handler(ctx);
-    const { status = 200, body, headers = {} } = reply;
-    res.statusCode = status;
-    for (let key in headers) {
-      res.setHeader(key, headers[key]);
+      req
+    });
+
+    res.statusCode = reply.status || 200;
+    for (let key in reply.headers) {
+      res.setHeader(key, reply.headers[key]);
     }
-    res.write(body);
+    res.write(reply.body);
     res.end();
   });
 

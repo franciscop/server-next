@@ -1,5 +1,5 @@
 import { reduce, reply } from "./helpers/index.js";
-import bodyParser from "./helpers/bodyParser.js";
+import middle from "./middleware/index.js";
 
 import getEngine from "./engine/index.js";
 
@@ -30,7 +30,7 @@ export default async (options = {}, ...middleware) => {
   };
 
   // Generate a single callback with all the middleware
-  const callback = reduce(addOptions, bodyParser, ...middleware);
+  const callback = reduce(addOptions, ...middle, ...middleware);
 
   return runEngine(ctx => reply(callback, ctx), options);
 };

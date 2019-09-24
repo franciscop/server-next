@@ -23,7 +23,20 @@
     "rollup": "^1.21.4"
   },
   "babel": {
-    "presets": [["@babel/preset-env", { "targets": { "node": "current" } }]],
-    "plugins": [["@babel/plugin-syntax-dynamic-import"]]
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          }
+        }
+      ]
+    ],
+    "plugins": [
+      [
+        "@babel/plugin-syntax-dynamic-import"
+      ]
+    ]
   }
 }

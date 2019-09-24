@@ -131,21 +131,35 @@ var bodyParser = async ctx => {
   ctx.body = await parseBody(ctx.req);
 };
 
-// Decode the url element
 const decode = decodeURIComponent;
 
 // Parse the query from the url (without the `?`)
-const parseQuery = query => {
+const parseQuery = (query = "") => {
   return query
+    .replace(/^\?/, "")
     .split("&")
+    .filter(Boolean)
     .map(p => p.split("="))
-    .reduce((all, [key, val]) => ({ ...all, [decode(key)]: decode(val) }));
+    .reduce((all, [key, val]) => ({ ...all, [decode(key)]: decode(val) }), {});
 };
 
-var parseUrl = url => {
-  const [path, query = ""] = url.split("?");
-  return { path, query: query ? parseQuery(query) : {} };
+// Available in Node since 10.0.0
+// https://nodejs.org/api/globals.html#globals_url
+var urlParser = async ctx => {
+  const url = new URL(ctx.url);
+  ctx.protocol = url.protocol;
+  ctx.host = url.host;
+  ctx.port = url.port;
+  ctx.hostname = url.hostname;
+  ctx.password = url.password;
+  ctx.username = url.username;
+  ctx.origin = url.origin;
+  ctx.path = url.pathname;
+  ctx.query = parseQuery(url.search);
+  ctx.href = url.href;
 };
+
+var middle = [urlParser, bodyParser];
 
 const runtime = "node";
 
@@ -165,26 +179,24 @@ const getIp = req => {
 
 // Launch the server for the Node.js environment
 var node = async (handler, options = {}) => {
-  const http = await import('http');
-  const server = http.createServer(async (req, res) => {
-    const ip = getIp(req);
-    const url = getUrl(req);
-    const ctx = {
-      ...parseUrl(req.url),
-      url,
+  const { createServer } = await import('http');
+
+  const server = createServer(async (req, res) => {
+    // Handle each of the API calls here:
+    const reply = await handler({
+      url: getUrl(req),
       method: req.method,
       headers: req.headers,
-      req,
+      ip: getIp(req),
       runtime,
-      ip
-    };
-    const reply = await handler(ctx);
-    const { status = 200, body, headers = {} } = reply;
-    res.statusCode = status;
-    for (let key in headers) {
-      res.setHeader(key, headers[key]);
+      req
+    });
+
+    res.statusCode = reply.status || 200;
+    for (let key in reply.headers) {
+      res.setHeader(key, reply.headers[key]);
     }
-    res.write(body);
+    res.write(reply.body);
     res.end();
   });
 
@@ -198,28 +210,28 @@ var node = async (handler, options = {}) => {
 
 const runtime$1 = "cloudflare";
 
+const getIp$1 = req => req.headers.get("CF-Connecting-IP");
+
+// At least one header has to be read first so that .entries() works
+const getHeaders = ({ headers }) => {
+  const plain = {};
+  for (let entry of headers.entries()) {
+    headers[entry[0]] = entry[1];
+  }
+  return plain;
+};
+
 // Launch the server in a Cloudflare Worker
 var cloudflare = (handler, options = {}) => {
   addEventListener("fetch", e => {
-    const req = e.request;
-    const path = new URL(req.url).pathname;
-    // At least one header has to be read first so that .entries() works
-    const ip = req.headers.get("CF-Connecting-IP");
-    const headers = {};
-    for (let entry of req.headers.entries()) {
-      headers[entry[0]] = entry[1];
-    }
-    const ctx = {
-      ...parseUrl(path),
-      url: path,
-      method: req.method,
-      headers,
-      options,
+    const response = handler({
+      url: e.request.url,
+      method: e.request.method,
+      headers: getHeaders(e.request),
+      ip: getIp$1(e.request),
       runtime: runtime$1,
-      ip,
-      req
-    };
-    const response = handler(ctx).then(({ status, body, headers }) => {
+      req: e.request
+    }).then(({ status, body, headers }) => {
       return new Response(body, { status, headers });
     });
     return e.respondWith(response);
@@ -234,7 +246,7 @@ const detectEngineSync = () => {
   }
 };
 
-// Everything else can be detected async
+// Node.js can be detected async by the presence of `http`
 const detectEngineAsync = async () => {
   try {
     await import('http');
@@ -330,7 +342,7 @@ var index$8 = async (options = {}, ...middleware) => {
   };
 
   // Generate a single callback with all the middleware
-  const callback = reduce(addOptions, bodyParser, ...middleware);
+  const callback = reduce(addOptions, ...middle, ...middleware);
 
   return runEngine(ctx => reply(callback, ctx), options);
 };

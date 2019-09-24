@@ -42,6 +42,20 @@ Some of the context for user code will be derived from these through internal mi
 
 Every middleware inside `handler()` **might mutate the context**, so make sure each request creates a new deep context.
 
+### Reply
+
+The function `handler()` will return 3 parts:
+
+- `status`: the status code for the response.
+- `headers`: the headers to set on the response.
+- `body`: the string to put in the body of the response.
+
+Again, please see the Node.js example to see how this is implemented.
+
+### Listening
+
+When the server, function, etc is launched, it will
+
 ### Options
 
 The user options. So far, no much info here, assume they are the same as the old ones.
