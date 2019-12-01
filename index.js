@@ -69,7 +69,7 @@ var reply = async (handler, ctx) => {
   // A plain string response
   if (typeof data === "string") return { body: data, headers, status: 200 };
 
-  // A plain string response
+  // A status number response
   if (typeof data === "number") return { body: "", headers, status: data };
 
   // Most basic of error handling, anything higher level should be on user code
