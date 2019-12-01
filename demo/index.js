@@ -5,7 +5,7 @@ server(
   { port: 3002 },
   get("/", ctx => "Hello world"),
   get("/error", () => new Error("World's on fire")),
-  get("/abc/:id", ctx => {
+  get("/users/:id", ctx => {
     // console.log("Full:", {
     //   url: ctx.url,
     //   protocol: ctx.protocol,

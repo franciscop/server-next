@@ -31,6 +31,9 @@ export default async (handler, ctx) => {
   // A plain string response
   if (typeof data === "string") return { body: data, headers, status: 200 };
 
+  // A plain string response
+  if (typeof data === "number") return { body: "", headers, status: data };
+
   // Most basic of error handling, anything higher level should be on user code
   if (data instanceof Error) {
     return { status: data.status || 500, headers, body: data.message };

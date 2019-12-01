@@ -10,9 +10,9 @@ const parseQuery = (query = "") => {
     .reduce((all, [key, val]) => ({ ...all, [decode(key)]: decode(val) }), {});
 };
 
-// Available in Node since 10.0.0
+// Available in Node globally since 10.0.0
 // https://nodejs.org/api/globals.html#globals_url
-export default async ctx => {
+export default ctx => {
   const url = new URL(ctx.url);
   ctx.protocol = url.protocol;
   ctx.host = url.host;

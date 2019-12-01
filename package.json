@@ -24,7 +24,7 @@
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/franciscop/server-next"
+    "url": "git+https://github.com/franciscop/server-next.git"
   },
   "dependencies": {},
   "devDependencies": {
@@ -57,5 +57,9 @@
         ]
       }
     }
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/franciscop/server-next/issues"
+  },
+  "homepage": "https://github.com/franciscop/server-next#readme"
 }

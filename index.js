@@ -69,6 +69,9 @@ var reply = async (handler, ctx) => {
   // A plain string response
   if (typeof data === "string") return { body: data, headers, status: 200 };
 
+  // A plain string response
+  if (typeof data === "number") return { body: "", headers, status: data };
+
   // Most basic of error handling, anything higher level should be on user code
   if (data instanceof Error) {
     return { status: data.status || 500, headers, body: data.message };
@@ -145,6 +148,12 @@ var bodyParser = async ctx => {
   ctx.body = await parseBody(ctx.req);
 };
 
+var cookieParser = ctx => {
+  ctx.cookies = {};
+  const cookie = ctx.headers.cookie;
+  if (!cookie) return;
+};
+
 const decode = decodeURIComponent;
 
 // Parse the query from the url (without the `?`)
@@ -157,9 +166,9 @@ const parseQuery = (query = "") => {
     .reduce((all, [key, val]) => ({ ...all, [decode(key)]: decode(val) }), {});
 };
 
-// Available in Node since 10.0.0
+// Available in Node globally since 10.0.0
 // https://nodejs.org/api/globals.html#globals_url
-var urlParser = async ctx => {
+var urlParser = ctx => {
   const url = new URL(ctx.url);
   ctx.protocol = url.protocol;
   ctx.host = url.host;
@@ -172,7 +181,7 @@ var urlParser = async ctx => {
   ctx.query = parseQuery(url.search);
 };
 
-var middle = [urlParser, bodyParser];
+var middle = [urlParser, bodyParser, cookieParser];
 
 const runtime = "node";
 
@@ -254,25 +263,15 @@ var cloudflare = (handler, options = {}) => {
   return Promise.resolve({ options, handler, runtime: runtime$1, close: () => {} });
 };
 
-// Cloudflare has to be detected and launched immediately, so no async/await
-const detectEngineSync = () => {
+// Loosely find which one is the correct runtime through ducktyping
+var getEngine = () => {
   if (typeof addEventListener !== "undefined" && typeof fetch !== "undefined") {
     return cloudflare;
   }
-};
 
-// Node.js can be detected async by the presence of `http`
-const detectEngineAsync = async () => {
-  try {
-    await import('http');
-    return node;
-  } catch (error) {
-    throw new Error("Could not find engine automatically");
-  }
+  // It is Node.js by default
+  return node;
 };
-
-// Loosely find which one is the correct runtime through ducktyping
-var getEngine = () => detectEngineSync() || detectEngineAsync();
 
 var index = (path, ...cbs) => {
   // Accept a path first and then a list of callbacks
@@ -429,13 +428,6 @@ var index$7 = (path, ...cbs) => {
 // export { default as socket } from "./socket";
 // export { default as domain } from "./domain";
 
-// Cannot do async/await here because some of them MUST be launched immediately
-const runEngine = (handler, options) => {
-  return options.engine.then
-    ? options.engine.then(engine => engine(handler, options))
-    : options.engine(handler, options);
-};
-
 // The main function that runs the whole thing
 var index$8 = async (options = {}, ...middleware) => {
   if (typeof options === "function") {
@@ -451,7 +443,7 @@ var index$8 = async (options = {}, ...middleware) => {
   // Generate a single callback with all the middleware
   const callback = reduce(addOptions, middle, middleware);
 
-  return runEngine(ctx => reply(callback, ctx), options);
+  return options.engine(ctx => reply(callback, ctx), options);
 };
 
 export default index$8;

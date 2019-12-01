@@ -24,7 +24,7 @@ import server, { get, post } from "@server/next";
 server(
   get("/", () => `Homepage works! Try '/users/abc'`),
   get("/users/:id", ({ params }) => `The user is ${params.id}`),
-  post("/api/users", () => ({ id: "abc", name: "Francisco" }))
+  post("/users", () => ({ id: "abc", name: "Francisco" }))
 );
 ```
 
@@ -61,16 +61,19 @@ Modify `package.json` to add `"type": "module"` (for that nice `import` syntax) 
 
 Start it with `npm start` and visit http://localhost:3000/ 🎉
 
+
+
 ## Building for Cloudflare
 
 If you also want to build it (for example, for Cloudflare Workers) you can build it with `rollup`. Please see more info [in Cloudflare's official documentation](https://developers.cloudflare.com/workers/archive/writing-workers/using-npm-modules/).
+
 
 
 ## TODO
 
 New guides coming:
 
-- Modify all documentation to use the new ES6 syntax. Explain how to bundle and run it.
+- Modify all documentation to use the new ES6 syntax. Explain how to bundle and run it. Maybe create `npx @server/build`.
 - Consider other serverless architectures.
 - How to even test? Create a test suite that makes requests.
 
@@ -81,3 +84,4 @@ New guides coming:
 Random thoughts and ramblings:
 
 - Consider normalizing a `kv` store sorf-of, which would be very useful for both sessions and user-code. Right now we are using/supporting Redis.
+- Startup time is critical for serverless.
