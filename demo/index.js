@@ -1,4 +1,4 @@
-import server, { get, post } from "../src/index.js";
+import server, { get, post } from "../src/index.min.js";
 
 server(
   // The port will rightfully be ignored on Cloudflare

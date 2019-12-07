@@ -201,9 +201,19 @@ const getIp = req => {
 
 // Launch the server for the Node.js environment
 var node = async (handler, options = {}) => {
-  const { createServer } = await import('http');
+  const [http, zlib] = await Promise.all([import('http'), import('zlib')]);
 
-  const server = createServer(async (req, res) => {
+  const compress = data => {
+    return new Promise((done, fail) => {
+      const buffer = Buffer.from(data || "", "utf-8");
+      zlib.gzip(buffer, (error, result) => {
+        if (error) return fail(error);
+        return done(result);
+      });
+    });
+  };
+
+  const server = http.createServer(async (req, res) => {
     // Handle each of the API calls here:
     const reply = await handler({
       url: getUrl(req),
@@ -218,8 +228,11 @@ var node = async (handler, options = {}) => {
     for (let key in reply.headers) {
       res.setHeader(key, reply.headers[key]);
     }
-    res.write(reply.body);
-    res.end();
+
+    res.setHeader("Content-Encoding", "gzip");
+
+    const comp = await compress(reply.body);
+    res.end(comp);
   });
 
   return new Promise((resolve, reject) => {
