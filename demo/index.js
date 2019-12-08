@@ -1,9 +1,12 @@
-import server, { get, post } from "../src/index.min.js";
+import server, { get, post } from "../src/index.js";
+
+// Random JSON blob
+import blob from "./blob.js";
 
 server(
   // The port will rightfully be ignored on Cloudflare
   { port: 3002 },
-  get("/", ctx => "Hello world"),
+  get("/", ctx => blob),
   get("/error", () => new Error("World's on fire")),
   get("/users/:id", ctx => {
     // console.log("Full:", {

@@ -16,9 +16,16 @@ const getIp = req => {
 
 // Launch the server for the Node.js environment
 export default async (handler, options = {}) => {
+  // This code runs ONE time on the first cold start, and we know that it runs
+  // in the Node.js environment. So we can import Node.js libraries here safely
   const [http, zlib] = await Promise.all([import("http"), import("zlib")]);
 
-  const compress = data => {
+  const compress = (data, headers) => {
+    // Don't compress it if it's tiny
+    if (data.length < 1000) {
+      return data;
+    }
+    headers["Content-Encoding"] = "gzip";
     return new Promise((done, fail) => {
       const buffer = Buffer.from(data || "", "utf-8");
       zlib.gzip(buffer, (error, result) => {
@@ -30,7 +37,7 @@ export default async (handler, options = {}) => {
 
   const server = http.createServer(async (req, res) => {
     // Handle each of the API calls here:
-    const reply = await handler({
+    const { status = 200, body = "", headers = {} } = await handler({
       url: getUrl(req),
       method: req.method,
       headers: req.headers,
@@ -39,15 +46,13 @@ export default async (handler, options = {}) => {
       req
     });
 
-    res.statusCode = reply.status || 200;
-    for (let key in reply.headers) {
-      res.setHeader(key, reply.headers[key]);
+    res.statusCode = status;
+    const compressed = await compress(body, headers);
+    for (let key in headers) {
+      res.setHeader(key, headers[key]);
     }
 
-    res.setHeader("Content-Encoding", "gzip");
-
-    const comp = await compress(reply.body);
-    res.end(comp);
+    res.end(compressed);
   });
 
   return new Promise((resolve, reject) => {
