@@ -49,17 +49,17 @@ server(
 ).then(ctx => console.log(`Running on ${ctx.runtime}`));
 ```
 
-Modify `package.json` to add `"type": "module"` (for that nice `import` syntax) and a `start` script:
+Modify `package.json` to add `"type": "module"` for that nice `import` syntax:
 
 ```json
-"main": "index.js",
-"type": "module",
-"scripts": {
-  "start": "node --experimental-modules index.js"
-},
+{
+  "main": "index.js",
+  "type": "module",
+  ...
+}
 ```
 
-Start it with `npm start` and visit http://localhost:3000/ 🎉
+Start it with `node .` and visit http://localhost:3000/ 🎉
 
 
 
