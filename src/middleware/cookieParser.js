@@ -37,6 +37,5 @@ const parse = str => {
 export default ctx => {
   ctx.cookies = {};
   if (!ctx.headers.cookie) return;
-
   ctx.cookies = parse(ctx.headers.cookie);
 };

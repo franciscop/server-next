@@ -49,6 +49,8 @@ export default async (handler, options = {}) => {
     res.statusCode = status;
     const compressed = await compress(body, headers);
     for (let key in headers) {
+      // https://nodejs.org/dist/latest-v12.x/docs/api/http.html#http_request_setheader_name_value
+      // "Use an array of strings here to send multiple headers with the same name"
       res.setHeader(key, headers[key]);
     }
 

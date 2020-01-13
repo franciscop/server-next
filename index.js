@@ -44,6 +44,12 @@ const cors = {
   "Access-Control-Allow-Methods": "GET, PUT, PATCH, POST, DELETE, HEAD"
 };
 
+// https://nodejs.org/dist/latest-v12.x/docs/api/http.html#http_request_setheader_name_value
+// "Use an array of strings here to send multiple headers with the same name"
+const generateCookies = cookies => {
+  return Object.entries(cookies).map(p => p.join("="));
+};
+
 var reply = async (handler, ctx) => {
   const data = await handler(ctx);
   const headers = {};
@@ -62,8 +68,11 @@ var reply = async (handler, ctx) => {
 
   // The function means the hanlder knows what it's doing and wants a raw reply
   if (typeof data === "function") {
-    const rest = await data(ctx);
-    return { status: 200, headers, ...rest };
+    const reply = await data(ctx);
+    if (reply.cookies) {
+      headers["set-cookie"] = generateCookies(reply.cookies);
+    }
+    return { ...reply, status: 200, headers: { ...reply.headers, ...headers } };
   }
 
   // A plain string response
@@ -187,7 +196,6 @@ const parse = str => {
 var cookieParser = ctx => {
   ctx.cookies = {};
   if (!ctx.headers.cookie) return;
-
   ctx.cookies = parse(ctx.headers.cookie);
 };
 
@@ -271,6 +279,8 @@ var node = async (handler, options = {}) => {
     res.statusCode = status;
     const compressed = await compress(body, headers);
     for (let key in headers) {
+      // https://nodejs.org/dist/latest-v12.x/docs/api/http.html#http_request_setheader_name_value
+      // "Use an array of strings here to send multiple headers with the same name"
       res.setHeader(key, headers[key]);
     }
 

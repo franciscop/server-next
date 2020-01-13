@@ -6,6 +6,12 @@ const cors = {
   "Access-Control-Allow-Methods": "GET, PUT, PATCH, POST, DELETE, HEAD"
 };
 
+// https://nodejs.org/dist/latest-v12.x/docs/api/http.html#http_request_setheader_name_value
+// "Use an array of strings here to send multiple headers with the same name"
+const generateCookies = cookies => {
+  return Object.entries(cookies).map(p => p.join("="));
+};
+
 export default async (handler, ctx) => {
   const data = await handler(ctx);
   const headers = {};
@@ -24,8 +30,11 @@ export default async (handler, ctx) => {
 
   // The function means the hanlder knows what it's doing and wants a raw reply
   if (typeof data === "function") {
-    const rest = await data(ctx);
-    return { status: 200, headers, ...rest };
+    const reply = await data(ctx);
+    if (reply.cookies) {
+      headers["set-cookie"] = generateCookies(reply.cookies);
+    }
+    return { ...reply, status: 200, headers: { ...reply.headers, ...headers } };
   }
 
   // A plain string response
