@@ -3,7 +3,7 @@
 export default (...cbs) => {
   const handlers = cbs.flat(Infinity);
 
-  return async ctx => {
+  return async (ctx) => {
     try {
       for (let cb of handlers) {
         const data = await cb(ctx);

@@ -6,13 +6,13 @@ const parseQuery = (query = "") => {
     .replace(/^\?/, "")
     .split("&")
     .filter(Boolean)
-    .map(p => p.split("="))
+    .map((p) => p.split("="))
     .reduce((all, [key, val]) => ({ ...all, [decode(key)]: decode(val) }), {});
 };
 
 // Available in Node globally since 10.0.0
 // https://nodejs.org/api/globals.html#globals_url
-export default ctx => {
+export default (ctx) => {
   const url = new URL(ctx.url);
   ctx.protocol = url.protocol;
   ctx.host = url.host;

@@ -10,3 +10,5 @@ export default () => {
   // It is Node.js by default
   return node;
 };
+
+export { node, cloudflare };

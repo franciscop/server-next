@@ -3,13 +3,13 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "Authorization, Origin, X-Requested-With, Content-Type, Accept",
-  "Access-Control-Allow-Methods": "GET, PUT, PATCH, POST, DELETE, HEAD"
+  "Access-Control-Allow-Methods": "GET, PUT, PATCH, POST, DELETE, HEAD",
 };
 
 // https://nodejs.org/dist/latest-v12.x/docs/api/http.html#http_request_setheader_name_value
 // "Use an array of strings here to send multiple headers with the same name"
-const generateCookies = cookies => {
-  return Object.entries(cookies).map(p => p.join("="));
+const generateCookies = (cookies) => {
+  return Object.entries(cookies).map((p) => p.join("="));
 };
 
 export default async (handler, ctx) => {
@@ -52,6 +52,6 @@ export default async (handler, ctx) => {
   return {
     body: JSON.stringify(data),
     status: data.status || 200,
-    headers: { ...headers, "content-type": "application/json" }
+    headers: { ...headers, "content-type": "application/json" },
   };
 };

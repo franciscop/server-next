@@ -1,7 +1,7 @@
 import { reduce, reply } from "./helpers/index.js";
 import middle from "./middleware/index.js";
 
-import getEngine from "./engine/index.js";
+import { node } from "./engine/index.js";
 
 // Export all of the HTTP verbs as named constants
 export * from "./methods/index.js";
@@ -14,16 +14,13 @@ export * from "./methods/index.js";
 export default async (options = {}, ...middleware) => {
   if (typeof options === "function") {
     middleware.unshift(options);
-    options = { port: 3000 };
+    options = {};
   }
-  options.engine = options.engine || getEngine();
 
-  const addOptions = ctx => {
-    ctx.options = options;
-  };
+  const engine = options.engine || node;
 
   // Generate a single callback with all the middleware
-  const callback = reduce(addOptions, middle, middleware);
+  const handler = reduce(middle, middleware);
 
-  return options.engine(ctx => reply(callback, ctx), options);
+  return engine((ctx) => reply(handler, ctx), options);
 };

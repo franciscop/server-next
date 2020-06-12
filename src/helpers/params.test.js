@@ -9,6 +9,16 @@ describe("helpers/params", () => {
     expect(params("/:id", "/name")).toEqual({ id: "name" });
   });
 
+  it("matches an empty string", () => {
+    expect(params(false, "/name")).toEqual(false);
+    expect(params("", "/name")).toEqual(false);
+  });
+
+  it("matches an asterix", () => {
+    expect(params("/(.*)", "/name")).not.toEqual(false);
+    expect(params("/(.*)", "/name")).toEqual({ 0: "name" });
+  });
+
   it("does not match different depths", () => {
     expect(params("/abc/:id", "/name")).toEqual(false);
     expect(params("/:id/abc", "/name")).toEqual(false);
@@ -23,7 +33,7 @@ describe("helpers/params", () => {
   it("can match multiple parameters", () => {
     expect(params("/:id/:lang", "/name/español")).toEqual({
       id: "name",
-      lang: "español"
+      lang: "español",
     });
   });
 

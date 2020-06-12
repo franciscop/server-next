@@ -1,20 +1,15 @@
-import { params, reduce } from "../../helpers/index.js";
+import { params, parser } from "../../helpers/index.js";
 
-export default (path, ...cbs) => {
-  // Accept a path first and then a list of callbacks
-  if (typeof path !== "string") {
-    cbs.unshift(path);
-    path = "*";
-  }
-  const handler = reduce(cbs);
+export default (...args) => {
+  const [path, handler] = parser(...args);
 
-  return ctx => {
-    if (ctx.method !== "HEAD") return;
-    if (path === "*") return handler(ctx);
-
-    // Make sure the URL matches
+  return (ctx) => {
+    // The parameters are defined only if the path matches the query
     ctx.params = params(path, ctx.path);
-    if (!ctx.params) return;
-    return handler(ctx);
+
+    // Run this handler only if it's the right method and path
+    if (ctx.method === "HEAD" && ctx.params) {
+      return handler(ctx);
+    }
   };
 };

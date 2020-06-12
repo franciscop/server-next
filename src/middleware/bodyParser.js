@@ -1,13 +1,13 @@
 // Node native body parser
-const parseBody = async req => {
+const parseBody = async (req) => {
   return new Promise((done, fail) => {
     const type = req.headers["content-type"];
     const parser = /application\/json/.test(type)
-      ? data => JSON.parse(data)
-      : data => data;
+      ? (data) => JSON.parse(data)
+      : (data) => data;
     const data = [];
     req
-      .on("data", chunk => {
+      .on("data", (chunk) => {
         data.push(chunk);
       })
       .on("end", () => {
@@ -49,7 +49,7 @@ async function readRequestBody(request) {
   }
 }
 
-export default async ctx => {
+export default async (ctx) => {
   // No parsing for now
   if (!ctx.req) return;
 

@@ -1,3 +1,6 @@
+import http from "http";
+import zlib from "zlib";
+
 const runtime = "node";
 
 const getUrl = ({ protocol = "http", headers, url = "/" }) => {
@@ -5,7 +8,7 @@ const getUrl = ({ protocol = "http", headers, url = "/" }) => {
 };
 
 // https://stackoverflow.com/a/19524949/938236
-const getIp = req => {
+const getIp = (req) => {
   return (
     (req.headers["x-forwarded-for"] || "").split(",").pop() ||
     req.connection.remoteAddress ||
@@ -16,10 +19,6 @@ const getIp = req => {
 
 // Launch the server for the Node.js environment
 export default async (handler, options = {}) => {
-  // This code runs ONE time on the first cold start, and we know that it runs
-  // in the Node.js environment. So we can import Node.js libraries here safely
-  const [http, zlib] = await Promise.all([import("http"), import("zlib")]);
-
   const compress = (data, headers) => {
     // Don't compress it if it's tiny
     if (data.length < 1000) {
@@ -43,7 +42,8 @@ export default async (handler, options = {}) => {
       headers: req.headers,
       ip: getIp(req),
       runtime,
-      req
+      req,
+      options,
     });
 
     res.statusCode = status;
@@ -58,7 +58,7 @@ export default async (handler, options = {}) => {
   });
 
   return new Promise((resolve, reject) => {
-    server.listen(options.port, error => {
+    server.listen(options.port, (error) => {
       if (error) reject(error);
       resolve({ options, handler, runtime, close: () => server.close() });
     });

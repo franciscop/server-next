@@ -12,7 +12,8 @@ const engine = (handler, options = {}) => {
         method,
         headers: {},
         ip: "1.1.1.1",
-        runtime: "test"
+        runtime: "test",
+        options,
       });
   };
 
@@ -33,7 +34,7 @@ describe("server", () => {
   });
 
   it("can return a plain string", async () => {
-    const api = await server({ engine }, ctx => "Hello world");
+    const api = await server({ engine }, (ctx) => "Hello world");
 
     const { status, body, headers } = await api.get("/");
     expect(status).toEqual(200);

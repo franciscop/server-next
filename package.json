@@ -5,13 +5,13 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "rollup src/index.js --output.format es --name server --output.file index.js && npm run size",
-    "start": "npm run test -- --watch",
+    "build": "rollup -c && npm run size",
+    "start": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
-    "test": "jest --detectOpenHandles"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=14.0.0"
   },
   "engineStrict": true,
   "keywords": [
@@ -28,35 +28,18 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@babel/core": "^7.4.4",
-    "@babel/plugin-syntax-dynamic-import": "^7.2.0",
-    "@babel/preset-env": "^7.4.4",
-    "jest": "^24.8.0",
-    "rollup": "^1.21.4"
+    "jest": "^26.0.1",
+    "path-to-regexp": "^6.1.0",
+    "prettier": "^2.0.5",
+    "rollup": "^1.21.4",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-terser": "^6.1.0",
+    "sign": "^1.0.2"
   },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ]
-    ],
-    "plugins": [
-      [
-        "@babel/plugin-syntax-dynamic-import"
-      ]
-    ],
-    "env": {
-      "test": {
-        "plugins": [
-          "dynamic-import-node"
-        ]
-      }
-    }
+  "jest": {
+    "testEnvironment": "jest-environment-node",
+    "transform": {}
   },
   "bugs": {
     "url": "https://github.com/franciscop/server-next/issues"

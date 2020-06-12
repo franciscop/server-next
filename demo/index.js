@@ -6,10 +6,10 @@ import blob from "./blob.js";
 server(
   // The port will rightfully be ignored on Cloudflare
   { port: 3002 },
-  get("/", ctx => blob),
+  get("/", (ctx) => blob),
   get("/cookies", () => () => ({ cookies: { abc: "def", ghi: "jkl" } })),
   get("/error", () => new Error("World's on fire")),
-  get("/users/:id", ctx => {
+  get("/users/:id", (ctx) => {
     // console.log("Full:", {
     //   url: ctx.url,
     //   protocol: ctx.protocol,
@@ -26,6 +26,6 @@ server(
     // console.log(body, query, path, url);
     return "OK!";
   })
-).then(ctx => {
+).then((ctx) => {
   console.log(`Running on ${ctx.runtime} ${JSON.stringify(ctx.options)}`);
 });
