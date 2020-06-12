@@ -3,6 +3,20 @@ import server, { get, post } from "../src/index.js";
 // Random JSON blob
 import blob from "./blob.js";
 
+const form = `
+  <!DOCTYPE html>
+  <html lang="en">
+    <head><meta charset="UTF-8"><title>File Upload Demo</title></head>
+    <body>
+      <form action="/form" method="POST" enctype="multipart/form-data">
+        <input type="text" name="name" required />
+        <input type="file" name="profile" />
+        <button>Send</button>
+      </form>
+    </body>
+  </html>
+`;
+
 server(
   // The port will rightfully be ignored on Cloudflare
   { port: 3002 },
@@ -25,7 +39,11 @@ server(
   post(({ body, query, path, url }) => {
     // console.log(body, query, path, url);
     return "OK!";
-  })
+  }),
+
+  // File handling on Node.js
+  get("/form", () => form),
+  post("/form", (ctx) => ({ body: ctx.body, files: ctx.files }))
 ).then((ctx) => {
   console.log(`Running on ${ctx.runtime} ${JSON.stringify(ctx.options)}`);
 });

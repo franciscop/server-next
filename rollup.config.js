@@ -1,6 +1,6 @@
 import commonjs from "rollup-plugin-commonjs";
 import nodeResolve from "rollup-plugin-node-resolve";
-import { terser } from "rollup-plugin-terser";
+// import { terser } from "rollup-plugin-terser";
 
 export default {
   input: "src/index.js",
@@ -13,5 +13,19 @@ export default {
     nodeResolve({ preferBuiltins: true }),
     commonjs({ namedExports: { lru_map: ["LRUMap"] } }),
     // terser(),
+  ],
+  external: [
+    "http",
+    "zlib",
+    "fs",
+    "crypto",
+    "events",
+    "os",
+    "path",
+    "string_decoder",
+    "stream",
+    "querystring",
+    "domain",
+    "formidable",
   ],
 };

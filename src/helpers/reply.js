@@ -45,6 +45,7 @@ export default async (handler, ctx) => {
 
   // Most basic of error handling, anything higher level should be on user code
   if (data instanceof Error) {
+    console.error(data);
     return { status: data.status || 500, headers, body: data.message };
   }
 

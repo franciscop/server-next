@@ -1,3 +1,4 @@
+import formidable from 'formidable';
 import http from 'http';
 import zlib from 'zlib';
 
@@ -490,6 +491,7 @@ var reply = async (handler, ctx) => {
 
   // Most basic of error handling, anything higher level should be on user code
   if (data instanceof Error) {
+    console.error(data);
     return { status: data.status || 500, headers, body: data.message };
   }
 
@@ -499,69 +501,6 @@ var reply = async (handler, ctx) => {
     status: data.status || 200,
     headers: { ...headers, "content-type": "application/json" },
   };
-};
-
-// Node native body parser
-const parseBody = async (req) => {
-  return new Promise((done, fail) => {
-    const type = req.headers["content-type"];
-    const parser = /application\/json/.test(type)
-      ? (data) => JSON.parse(data)
-      : (data) => data;
-    const data = [];
-    req
-      .on("data", (chunk) => {
-        data.push(chunk);
-      })
-      .on("end", () => {
-        const raw = Buffer.concat(data).toString();
-        try {
-          done(parser(raw));
-        } catch (error) {
-          fail(error);
-        }
-      })
-      .on("error", fail);
-  });
-};
-
-// Cloudflare body parser as https://developers.cloudflare.com/workers/templates/snippets/post_data/
-async function readRequestBody(request) {
-  const { headers } = request;
-  const contentType = headers.get("content-type") || "text/html";
-  if (contentType.includes("application/json")) {
-    const body = await request.json();
-    return JSON.stringify(body);
-  } else if (contentType.includes("application/text")) {
-    const body = await request.text();
-    return body;
-  } else if (contentType.includes("text/html")) {
-    const body = await request.text();
-    return body;
-  } else if (contentType.includes("form")) {
-    const formData = await request.formData();
-    let body = {};
-    for (let entry of formData.entries()) {
-      body[entry[0]] = entry[1];
-    }
-    return JSON.stringify(body);
-  } else {
-    let myBlob = await request.blob();
-    var objectURL = URL.createObjectURL(myBlob);
-    return objectURL;
-  }
-}
-
-var bodyParser = async (ctx) => {
-  // No parsing for now
-  if (!ctx.req) return;
-
-  // Parsing it out of the request's text() method
-  if (ctx.req.text) {
-    ctx.body = await readRequestBody(ctx.req);
-    return;
-  }
-  ctx.body = await parseBody(ctx.req);
 };
 
 const decode$1 = str => {
@@ -606,6 +545,32 @@ var cookieParser = ctx => {
   ctx.cookies = parse$1(ctx.headers.cookie);
 };
 
+var fileUpload = async (ctx) => {
+  // These cannot have a body at all, so don't even attempt it
+  if (ctx.method === "GET" || ctx.method === "DELETE") return;
+
+  // Extensions by default are nice
+  const form = new formidable.IncomingForm({ keepExtensions: true });
+
+  await new Promise((done, fail) => {
+    form.parse(ctx.req, (err, fields, files) => {
+      if (err) fail(err);
+      ctx.body = fields;
+      ctx.files = {};
+      for (let file in files) {
+        ctx.files[file] = {
+          path: files[file].path,
+          name: files[file].name,
+          type: files[file].type,
+          size: files[file].size,
+          modified: files[file].lastModifiedDate,
+        };
+      }
+      done();
+    });
+  });
+};
+
 const decode$2 = decodeURIComponent;
 
 // Parse the query from the url (without the `?`)
@@ -633,7 +598,7 @@ var urlParser = (ctx) => {
   ctx.query = parseQuery(url.search);
 };
 
-var middle = [urlParser, bodyParser, cookieParser];
+var middle = [urlParser, fileUpload, cookieParser];
 
 const runtime = "node";
 

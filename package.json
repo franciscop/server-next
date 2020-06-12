@@ -26,7 +26,9 @@
     "type": "git",
     "url": "git+https://github.com/franciscop/server-next.git"
   },
-  "dependencies": {},
+  "dependencies": {
+    "formidable": "^2.0.0-canary.20200504.1"
+  },
   "devDependencies": {
     "jest": "^26.0.1",
     "path-to-regexp": "^6.1.0",
