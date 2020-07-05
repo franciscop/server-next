@@ -7,14 +7,14 @@
       <div class="flex">
         <div class="thirty">
           <aside>
-            <section class="toc">
+            <div class="scroller">
               {{#each config.docs}}
                 <h3>{{this.title}}</h3>
                 {{#each this.sections}}
                   {{> link to=this.link label=this.title }}
                 {{/each}}
               {{/each}}
-            </section>
+            </div>
           </aside>
         </div>
         <div class="seventy">

@@ -121,14 +121,26 @@ main {
 
 aside {
   background: white;
-  padding: 15px;
   margin-left: -15px;
   width: calc(100% + 30px);
   box-shadow: 2px 2px 4px -2px rgba(17, 17, 17, 0.2);
+  position: sticky;
+  top: 0;
 
-  @media (min-width: $large) {
-    padding: 20px;
-    width: auto;
+  .scroller {
+    padding: 15px 15px 50px;
+    height: 100vh;
+    overflow: auto;
+    // padding-bottom: 50px;
+
+    @media (min-width: $large) {
+      padding: 20px;
+      width: auto;
+    }
+
+    & > *:last-child {
+      margin-bottom: 50px;
+    }
   }
 
   h3 {
