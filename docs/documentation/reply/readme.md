@@ -4,299 +4,348 @@ title: Server.js - Documentation
 description: A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details.
 ---
 
-# Context
+# Reply
 
-Context is the **only** parameter that middleware receives and contains all the information available at this point of the request:
+A reply is a method **returned from a middleware** that creates the response. These are the available methods and their parameters for `server.reply`:
 
-| name                  | example                                  | type    |
-| --------------------- | ---------------------------------------- | ------- |
-| [.options](#-options) | `{ port: 3000, public: 'public' }`       | Object  |
-| [.data](#-data)       | `{ firstName: 'Francisco '}`             | Object  |
-| [.params](#-params)   | `{ id: 42 }`                             | Object  |
-| [.query](#-query)     | `{ search: '42' }`                       | Object  |
-| [.session](#-session) | `{ user: { firstName: 'Francisco' } }`   | Object  |
-| [.headers](#-headers) | `{ 'Content-Type': 'application/json' }` | Object  |
-| [.cookies](#-cookies) | `{ acceptCookieLaw: true }`              | Object  |
-| [.files](#-files)     | `{ profilepic: { ... } }`                | Object  |
-| [.ip](#-ip)           | `'192.168.1.1'`                          | String  |
-| [.url](#-url)         | `'/cats/?type=cute'`                     | String  |
-| [.method](#-method)   | `'GET'`                                  | String  |
-| [.path](#-path)       | `'/cats/'`                               | String  |
-| [.secure](#-secure)   | `true`                                   | Boolean |
-| [.xhr](#-xhr)         | `false`                                  | Boolean |
+|reply name                                 |example                     |final|
+|-------------------------------------------|----------------------------|-----|
+|[`cookie(name, value, opts)`](#cookie-)    |cookie('name', 'Francisco') |false|
+|[`download(path[, filename])`](#download-) |download('resume.pdf')      |true |
+|[`header(field[, value])`](#header-)       |header('ETag': '12345')     |false|
+|[`json([data])`](#json-)                   |json({ hello: 'world' })    |true |
+|[`jsonp([data])`](#jsonp-)                 |jsonp({ hello: 'world' })   |true |
+|[`redirect([status,] path)`](#redirect-)   |redirect(302, '/')          |true |
+|[`render(view[, locals])`](#render-)       |render('index.hbs')         |true |
+|[`send([body])`](#send-)                   |send('Hello there')         |true |
+|[`status(code)`](#status-)                 |status(200)                 |mixed|
+|[`type(type)`](#type-)                     |type('html')                |false|
 
-It can appear at several points, but the most important one is as a middleware parameter:
+Examples:
 
 ```js
-// Load the server from the dependencies
-const server = require("server");
+const { get, post } = require('server/router');
+const { render, redirect, file } = require('server/reply');
 
-// Display "Hello 世界" for any request
-const middleware = (ctx) => {
-  // ... (ctx is available here)
-  return "Hello 世界";
-};
-
-// Launch the server with a single middleware
-server(middleware);
+module.exports = [
+  get('/', ctx => render('index.hbs')),
+  post('/', processRequest, ctx => redirect('/'))
+];
 ```
 
-## .options
+<blockquote class="warning">
+  Make sure to **return** the reply that you want to use. It won't work otherwise.
+</blockquote>
 
-An object containing [all of the parsed options](/documentation/options/) used by server.js. It combines environment variables and explicit options from `server({ a: 'b' });`:
+
+
+The `ctx` argument is [explained in middleware's Context](/documentation/context). The reply methods can be imported in several ways:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.options.port).toBe(3012);
-};
+// For whenever you have previously defined `server`
+const { send, json } = server.reply;
 
-/* test */
-const res = await run({ port: 3012 }, mid, () => 200).get("/");
-expect(res.status).toBe(200);
+// For standalone files:
+const { send, json } = require('server/reply');
 ```
 
-If we have a variable set in the `.env` or through some other environment variables, it'll use that instead as [environment options take preference](/documentation/options/):
+There are many more ways of importing the reply methods, but those above are the recommended ones.
 
-```bash
-# .env
-PORT=80
-```
+
+### Chainable
+
+While most of the replies are final and they should be invoked only once, there are a handful of others that can be chained. These add something to the ongoing response:
+
+- [cookie()](#cookie-): add cookie headers
+- [header()](#header-): add any headers you want
+- [status()](#status-): set the status of the response
+- [type()](#type-): adds the header 'Content-Type'
+
+You can chain those among themselves and any of those with a final method that sends. If no final method is called in any place the request will be finished with a 404 response.
+
+The `status()` reply can be used as final or as chainable if something else is added.
+
+
+
+
+
+### Return value
+
+Both in synchronous mode or asyncrhonous mode you can just return a string to create a response:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.options.port).toBe(7693);
-};
+// Send a string
+const middle = ctx => 'Hello 世界';
 
-/* test */
-const res = await run({ port: 7693 }, mid, () => 200).get("/");
-expect(res.status).toBe(200);
+// Test it
+const res = await run(middle).get('/');
+expect(res.body).toBe('Hello 世界');
 ```
 
-## .data
-
-This is aliased as `body` as in other libraries. It is the data sent with the request. It can be part of a POST or PUT request, but it can also be set by others such as websockets:
+Returning an array or an object will stringify them as JSON:
 
 ```js
-const middle = (ctx) => {
-  expect(ctx.data).toBe("Hello 世界");
-};
-
-// Test it (csrf set to false for testing purposes)
-run(noCsrf, middle).post("/", { body: "Hello 世界" });
-run(middle).emit("message", "Hello 世界");
+server(ctx => ['life', 42]);
+// Note: extra parenthesis needed by the arrow function to return an object
+server(ctx => ({ life: 42 }));
 ```
 
-To handle forms sent normally:
-
-```pug
-//- index.pug
-form(method="POST" action="/contact")
-  input(name="email")
-  input(name="_csrf" value=csrf type="hidden")
-  input(type="submit" value="Subscribe")
-```
-
-Then to parse the data from the back-end:
+A single number will be interpreted as a status code and the corresponding body for that status will be returned:
 
 ```js
-const server = require("server");
-const { get, post } = server.router;
-const { render, redirect } = server.reply;
+server(get('/nonexisting', => 404));
+```
 
+
+You can also throw anything to trigger an error:
+
+```js
+const middle = ({ req }) => {
+  if (!req.body) {
+    throw new Error('No body provided');
+  }
+}
+
+const handler = error(ctx => ctx.error.message);
+
+// Test it
+const res = await run(middle, handler).get('/nonexisting');
+expect(res.body).toBe('No body provided');
+```
+
+
+
+
+### Multiple replies
+
+Another important thing is that the first reply used is the one that will be used. However, you should try to avoid this and we might make it more strict in the future:
+
+```js
+// I hope you speak Spanish
 server([
-  get((ctx) => render("index.pug")),
-  post((ctx) => {
-    console.log(ctx.data); // Logs the email
-    return redirect("/");
-  }),
+  ctx => 'Hola mundo',
+  ctx => 'Hello world',
+  ctx => 'こんにちは、世界'
 ]);
 ```
 
-## .params
-
-Parameters from the URL as specified [in the route](/documentation/router/):
+To avoid this, just specify the url for each request in a [router](/documentation/router):
 
 ```js
-const mid = get("/:type/:id", (ctx) => {
-  expect(ctx.params.type).toBe("dog");
-  expect(ctx.params.id).toBe("42");
-});
-
-// Test it
-run(mid).get("/dog/42");
+// I hope you speak Spanish
+server([
+  get('/es', ctx => 'Hola mundo'),
+  get('/en', ctx => 'Hello world'),
+  get('/jp', ctx => 'こんにちは、世界')
+]);
 ```
 
-They come from parsing [the `ctx.path`](#-path) with the [package `path-to-regexp`](https://www.npmjs.com/package/path-to-regexp). Go there to see more information about it.
+Then each of those URLs will use a different language.
+
+
+
+## cookie()
+
+Set a cookie on the browser. It will send the Set-Cookie headers:
 
 ```js
-const mid = del("/user/:id", (ctx) => {
-  console.log("Delete user:", ctx.params.id);
-});
-```
+const { cookie } = server.reply;
+const setCookie = ctx => cookie('foo', 'bar').send();
 
-## .query
-
-The parameters from the query when making a request. These come from the url fragment `?answer=42&...`:
-
-```js
-const mid = (ctx) => {
-  expect(ctx.query.answer).toBe("42");
-  expect(ctx.query.name).toBe("Francisco");
-};
-
-// Test it
-run(mid).get("/question?answer=42&name=Francisco");
-```
-
-## .session
-
-After following the [sessions in production tutorial](localhost:3000/tutorials/sessions-production/), sessions should be ready to get rolling. This is an object that persist among the user refreshing the page and navigation:
-
-```js
-// Count how many pages the visitor sees
-const mid = (ctx) => {
-  ctx.session.counter = (ctx.session.counter || 0) + 1;
-  return ctx.session.counter;
-};
-
-// Test that it works
-run(ctx).alive(async (ctx) => {
-  await api.get("/");
-  await api.get("/");
-  const res = await api.get("/");
-  expect(res.body).toBe("3");
+// Test
+run(setCookie).get('/').then(res => {
+  expect(res.headers['Set-Cookie:']).toMatch(/foo\=bar/);
 });
 ```
 
-## .headers
+| Key         | Default                |  Type             |
+|-------------|------------------------|-------------------|
+| `domain`    | Current domain         | String            |
+| `encode`    | `encodeURIComponent`   | Function          |
+| `expires`   | `undefined` (session)  | Date              |
+| `httpOnly`  | `false`                | Boolean           |
+| `maxAge`    | `undefined` (session)  | Number            |
+| `path`      | `"/"`                  | String            |
+| `secure`    | `false`                | Boolean           |
+| `signed`    | `false`                | Boolean           |
+| `sameSite`  | `false`                | Boolean or String |
 
-Get the headers that were sent with the request:
+See a better explanation of each one of those in [express' documentation](https://expressjs.com/en/4x/api.html#res.cookie).
 
-```js
-const mid = (ctx) => {
-  expect(ctx.headers.answer).toBe(42);
-};
 
-// Test it
-run(mid).get("/", { headers: { answer: 42 } });
-```
 
-## .cookies
+## download()
 
-Object that holds the cookies sent by the client:
-
-```js
-const mid = (ctx) => {
-  console.log(ctx.cookies);
-};
-
-run(mid).get("/");
-```
-
-## .files
-
-Contains any and all of the files sent by a request. It would normally be sent through a form with an `<input type="file">` field or through a [`FormData` in front-end javascript](https://developer.mozilla.org/en-US/docs/Web/API/FormData):
-
-```html
-<form method="POST" action="/profilepic" enctype="multipart/form-data">
-  <input name="profilepic" type="input" />
-  <input type="hidden" name="_csrf" value="{{_csrf}}" />
-  <input type="submit" value="Send picture" />
-</form>
-```
-
-Note the [csrf token](/documentation/router/#csrf-token) and the [`enctype="multipart/form-data"`](https://stackoverflow.com/q/1342506/938236), both of them needed. Then to handle it with Node.js:
+An async function that takes a local path and an optional filename. It will return the local file with the filename name for the browser to download.
 
 ```js
-const mid = post("/profilepic", (ctx) => {
-  // This comes from the "name" in the input field
-  console.log(ctx.files.profilepic);
-  return redirect("/profile");
+server(ctx => download('user-file-5674354.pdf'));
+server(ctx => download('user-file-5674354.pdf', 'report.pdf'));
+```
+
+You can handle errors for this method downstream:
+
+```js
+server([
+  ctx => download('user-file-5674354.pdf'),
+  error(ctx => { console.log(ctx.error); })
+]);
+```
+
+
+## header()
+
+Set a header to be sent with the response. It accepts two strings as key and value or an object to set multiple headers:
+
+```js
+const mid = ctx => header('Content-Type', 'text/plain');
+const mid2 = ctx => header('Content-Length', '123');
+
+// Same as above
+const mid = ctx => header({
+  'Content-Type': 'text/plain',
+  'Content-Length': '123'
 });
 ```
 
-## .ip
 
-The IP of the remote client. If it's behind a proxy that displays its proxy condition then the `ips` field will also be filled with the respective ips:
 
-```js
-const mid = (ctx) => {
-  console.log(ctx.ip, "|", ctx.ips);
-};
+## json()
 
-run(mid).get("/");
-```
-
-## .url
-
-The full cuantified URL:
+Sends a JSON response. It accepts a plain object or an array that will be stringified with `JSON.stringify`. Sets the correct `Content-Type` headers as well:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.url).toBe("/hello?answer=42");
-};
-
-run(mid).get("/hello?answer=42");
-```
-
-## .method
-
-The request method, it can be `GET`, `POST`, `PUT`, `DELETE`:
-
-```js
-const mid = (ctx) => {
-  expect(ctx.method).toBe("GET");
-};
+const mid = ctx => json({ foo: 'bar' });
 
 // Test it
-run(mid).get("/");
+run(mid).get('/').then(res => {
+  expect(res.body).toEqual(`{"foo":"bar"}`);
+});
 ```
 
-Or other methods:
+
+
+## jsonp()
+
+Same as [json()](#json) but wrapped with a callback. [Read more about JSONP](https://en.wikipedia.org/wiki/JSONP):
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.method).toBe("POST");
-};
+const mid = ctx => jsonp({ foo: 'bar' });
 
 // Test it
-run(noCsrf, mid).post("/");
+run(mid).get('/?callback=callback').then(res => {
+  expect(res.body).toMatch('callback({foo:"bar"})');
+});
 ```
 
-## .path
-
-Only the path part from the URL. It is the full URL except for the query:
+It is useful for loading data Cross-Domain. The query `?callback=foo` **is mandatory** and you should set the callback name there:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.path).toBe("/question");
-};
+const mid = ctx => jsonp({ foo: 'bar' });
 
 // Test it
-run(mid).get("/question?answer=42");
+run(mid).get('/?callback=foo').then(res => {
+  expect(res.body).toMatch('foo({foo:"bar"})');
+});
 ```
 
-## .secure
 
-Returns true if the request is made through HTTPS. Take into account that if you are behind Cloudflare or similar it might be reported as false even though your clients see `https`:
+
+## redirect()
+
+Redirects to the url specified. It can be either internal (just a path) or an external URL:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.secure).toBe(false);
-};
-
-// Test it
-run(mid).get("/");
+const mid1 = ctx => redirect('/foo');
+const mid2 = ctx => redirect('../user');
+const mid3 = ctx => redirect('https://google.com');
+const mid4 = ctx => redirect(301, 'https://google.com');
 ```
 
-## .xhr
 
-A boolean set to true if the request was done through AJAX. Specifically, if `X-Requested-With` is `“XMLHttpRequest”`:
+## render()
+
+This is the most complex method and yet the most useful one. It takes a filename and some data and renders it:
 
 ```js
-const mid = (ctx) => {
-  expect(mid.xhr).toBe(false);
-};
+const mid1 = ctx => render('index.hbs');
+const mid2 = ctx => render('index.hbs', { user: 'Francisco' });
+```
 
-run(mid).get("/");
+The filename is relative to the [views option](/documentation/options/#-views-)  (defaults to `'views'`):
+
+```js
+// Renders PROJECT/somefolder/index.hbs
+server({ views: 'somefolder' }, ctx => render('index.hbs'));
+```
+
+The extension of this filename is optional. It accepts by default `.hbs`, `.pug` and `.html` and can accept more types [installing other engines](/documentation/options/#-engine-):
+
+```js
+const mid1 = ctx => render('index.pug');
+const mid2 = ctx => render('index.hbs');
+const mid3 = ctx => render('index.html');
+```
+
+The data will be passed to the template engine. Note that some plugins might pass additional data as well.
+
+
+
+## send()
+
+Send the data to the front-end. It is the method used by default with [the raw returns](#raw-return):
+
+```js
+const mid1 = ctx => send('Hello 世界');
+const mid2 = ctx => 'Hello 世界';
+```
+
+However it supports many more data types: String, object, Array or Buffer:
+
+```js
+const mid1 = ctx => send('Hello 世界');
+const mid2 = ctx => send('<p>Hello 世界</p>');
+const mid4 = ctx => send({ foo: 'bar' });
+const mid3 = ctx => send(new Buffer('whatever'));
+```
+
+It also has the advantage that it can be chained, unlike just returning the string:
+
+```js
+const mid1 = ctx => status(201).send({ resource: 'foobar' });
+const mid2 = ctx => status(404).send('Not found');
+const mid3 = ctx => status(500).send({ error: 'our fault' });
+```
+
+
+
+## status()
+
+Sets the status of the response. If no reply is done, it will become final and send that response message as the body:
+
+```js
+const mid1 = ctx => status(404);  // The same as:
+const mid2 = ctx => status(404).send('Not found');
+```
+
+
+
+## type()
+
+Set the `Content-Type` header for the response. It can be a explicit MIME type like these:
+
+```js
+const mid1 = ctx => type('text/html').send('<p>Hello</p>');
+const mid2 = ctx => type('application/json').send(JSON.stringify({ foo: 'bar' }));
+const mid3 = ctx => type('image/png').send(...);
+```
+
+Or you can also write their more friendly names for an equivalent result:
+
+```js
+const mid1 = ctx => type('.html');
+const mid2 = ctx => type('html');
+const mid3 = ctx => type('json');
+const mid4 = ctx => type('application/json');
+const mid5 = ctx => type('png');
 ```

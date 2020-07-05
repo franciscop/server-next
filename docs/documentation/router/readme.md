@@ -4,299 +4,383 @@ title: Server.js - Documentation
 description: A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details.
 ---
 
-# Context
+# Router
 
-Context is the **only** parameter that middleware receives and contains all the information available at this point of the request:
+Available methods and their parameters for `server.router`:
 
-| name                  | example                                  | type    |
-| --------------------- | ---------------------------------------- | ------- |
-| [.options](#-options) | `{ port: 3000, public: 'public' }`       | Object  |
-| [.data](#-data)       | `{ firstName: 'Francisco '}`             | Object  |
-| [.params](#-params)   | `{ id: 42 }`                             | Object  |
-| [.query](#-query)     | `{ search: '42' }`                       | Object  |
-| [.session](#-session) | `{ user: { firstName: 'Francisco' } }`   | Object  |
-| [.headers](#-headers) | `{ 'Content-Type': 'application/json' }` | Object  |
-| [.cookies](#-cookies) | `{ acceptCookieLaw: true }`              | Object  |
-| [.files](#-files)     | `{ profilepic: { ... } }`                | Object  |
-| [.ip](#-ip)           | `'192.168.1.1'`                          | String  |
-| [.url](#-url)         | `'/cats/?type=cute'`                     | String  |
-| [.method](#-method)   | `'GET'`                                  | String  |
-| [.path](#-path)       | `'/cats/'`                               | String  |
-| [.secure](#-secure)   | `true`                                   | Boolean |
-| [.xhr](#-xhr)         | `false`                                  | Boolean |
+|route name                                 |example                          |
+|-------------------------------------------|---------------------------------|
+|[`get(PATH, FN1, FN2, ...)`](#get-)        |`get('/', ctx => { ... })`       |
+|[`post(PATH, FN1, FN2, ...)`](#post-)      |`post('/', ctx => { ... })`      |
+|[`put(PATH, FN1, FN2, ...)`](#put-)        |`put('/', ctx => { ... })`       |
+|[`del(PATH, FN1, FN2, ...)`](#del-)        |`del('/', ctx => { ... })`       |
+|[`error(NAME, FN1, FN2, ...)`](#error-)    |`error('user', ctx => { ... })`  |
+|[`sub(SUBDOMAIN, FN1, FN2, ...)`](#sub-)   |`sub('es', ctx => { ... })`      |
+|[`socket(NAME, FN1, FN2, ...)`](#socket-)  |`socket('/', ctx => { ... })`    |
 
-It can appear at several points, but the most important one is as a middleware parameter:
+A router is a function that tells the server how to handle each request. They are a specific kind of middleware that wraps your logic and acts as a gateway:
 
 ```js
-// Load the server from the dependencies
-const server = require("server");
-
-// Display "Hello 世界" for any request
-const middleware = (ctx) => {
-  // ... (ctx is available here)
-  return "Hello 世界";
-};
-
-// Launch the server with a single middleware
-server(middleware);
-```
-
-## .options
-
-An object containing [all of the parsed options](/documentation/options/) used by server.js. It combines environment variables and explicit options from `server({ a: 'b' });`:
-
-```js
-const mid = (ctx) => {
-  expect(ctx.options.port).toBe(3012);
-};
-
-/* test */
-const res = await run({ port: 3012 }, mid, () => 200).get("/");
-expect(res.status).toBe(200);
-```
-
-If we have a variable set in the `.env` or through some other environment variables, it'll use that instead as [environment options take preference](/documentation/options/):
-
-```bash
-# .env
-PORT=80
-```
-
-```js
-const mid = (ctx) => {
-  expect(ctx.options.port).toBe(7693);
-};
-
-/* test */
-const res = await run({ port: 7693 }, mid, () => 200).get("/");
-expect(res.status).toBe(200);
-```
-
-## .data
-
-This is aliased as `body` as in other libraries. It is the data sent with the request. It can be part of a POST or PUT request, but it can also be set by others such as websockets:
-
-```js
-const middle = (ctx) => {
-  expect(ctx.data).toBe("Hello 世界");
-};
-
-// Test it (csrf set to false for testing purposes)
-run(noCsrf, middle).post("/", { body: "Hello 世界" });
-run(middle).emit("message", "Hello 世界");
-```
-
-To handle forms sent normally:
-
-```pug
-//- index.pug
-form(method="POST" action="/contact")
-  input(name="email")
-  input(name="_csrf" value=csrf type="hidden")
-  input(type="submit" value="Subscribe")
-```
-
-Then to parse the data from the back-end:
-
-```js
-const server = require("server");
-const { get, post } = server.router;
-const { render, redirect } = server.reply;
+// Import methods 'get' and 'post' from the router
+const { get, post } = require('server/router');
 
 server([
-  get((ctx) => render("index.pug")),
-  post((ctx) => {
-    console.log(ctx.data); // Logs the email
-    return redirect("/");
-  }),
+  get('/', ctx => { /* ... */ }),      // Render homepage
+  get('/users', ctx => { /* ... */ }), // GET requests to /users
+  post('/users', ctx => { /* ... */ }) // POST requests to /users
 ]);
 ```
 
-## .params
-
-Parameters from the URL as specified [in the route](/documentation/router/):
+The `ctx` argument is [explained in middleware's Context](/documentation/context). The router methods can be imported in several ways:
 
 ```js
-const mid = get("/:type/:id", (ctx) => {
-  expect(ctx.params.type).toBe("dog");
-  expect(ctx.params.id).toBe("42");
-});
+// For whenever you have previously defined `server`
+const { get, post } = server.router;
 
-// Test it
-run(mid).get("/dog/42");
+// For standalone files:
+const { get, post } = require('server/router');
 ```
 
-They come from parsing [the `ctx.path`](#-path) with the [package `path-to-regexp`](https://www.npmjs.com/package/path-to-regexp). Go there to see more information about it.
+There are many more ways of importing the router methods, but those above are the recommended ones.
+
+
+
+### Complex routers
+
+If you are going to have many routes, we recommend splitting them into separated files, either in the root of the project as `routes.js` or in a different place:
 
 ```js
-const mid = del("/user/:id", (ctx) => {
-  console.log("Delete user:", ctx.params.id);
-});
+// app.js
+const server = require('server');
+const routes = require('./routes');
+
+server(routes);
 ```
-
-## .query
-
-The parameters from the query when making a request. These come from the url fragment `?answer=42&...`:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.query.answer).toBe("42");
-  expect(ctx.query.name).toBe("Francisco");
-};
+// routes.js
+const { get, post } = require('server/router');
+const ctrl = require('auto-load')('controllers');
 
-// Test it
-run(mid).get("/question?answer=42&name=Francisco");
+// You can simply export an array of routes
+module.exports = [
+  get('/', ctrl.home.index),
+  get('/users', ctrl.users.index),
+  post('/users', ctrl.users.add),
+  get('/photos', ctrl.photos.index),
+  post('/photos', ctrl.photos.add),
+  ...
+];
 ```
 
-## .session
+The `ctx` variable is [the context (documentation here)](https://serverjs.io/documentation/context). One important difference between the routes and middleware is that [**all routes are final**](#routes-are-final). This means that **each request will use one route at most**.
 
-After following the [sessions in production tutorial](localhost:3000/tutorials/sessions-production/), sessions should be ready to get rolling. This is an object that persist among the user refreshing the page and navigation:
+All of the routers reside within the `server.router` and follow this structure:
 
 ```js
-// Count how many pages the visitor sees
-const mid = (ctx) => {
-  ctx.session.counter = (ctx.session.counter || 0) + 1;
-  return ctx.session.counter;
-};
-
-// Test that it works
-run(ctx).alive(async (ctx) => {
-  await api.get("/");
-  await api.get("/");
-  const res = await api.get("/");
-  expect(res.body).toBe("3");
-});
+const server = require('server');
+const { TYPE } = server.router;
+const doSomething = TYPE(ID, fn1, [fn2], [fn3]);
+server(doSomething);
 ```
 
-## .headers
 
-Get the headers that were sent with the request:
 
-```js
-const mid = (ctx) => {
-  expect(ctx.headers.answer).toBe(42);
-};
+### CSRF token
 
-// Test it
-run(mid).get("/", { headers: { answer: 42 } });
-```
-
-## .cookies
-
-Object that holds the cookies sent by the client:
-
-```js
-const mid = (ctx) => {
-  console.log(ctx.cookies);
-};
-
-run(mid).get("/");
-```
-
-## .files
-
-Contains any and all of the files sent by a request. It would normally be sent through a form with an `<input type="file">` field or through a [`FormData` in front-end javascript](https://developer.mozilla.org/en-US/docs/Web/API/FormData):
+For POST, PUT and DELETE requests a valid [**CSRF** token](https://github.com/expressjs/csurf) with the field name of `_csrf` must be sent as well. The local variable is set by server.js so you can include it like this:
 
 ```html
-<form method="POST" action="/profilepic" enctype="multipart/form-data">
-  <input name="profilepic" type="input" />
-  <input type="hidden" name="_csrf" value="{{_csrf}}" />
-  <input type="submit" value="Send picture" />
+<form action="/" method="POST">
+ <input name="firstname">
+ <input type="submit" value="Contact us">
+ <input type="hidden" name="_csrf" value="{{csrf}}">
 </form>
 ```
 
-Note the [csrf token](/documentation/router/#csrf-token) and the [`enctype="multipart/form-data"`](https://stackoverflow.com/q/1342506/938236), both of them needed. Then to handle it with Node.js:
+If you are using an API from Javascript, such as the new `fetch()` you can handle it this way:
+
+```html
+<!-- within your main template -->
+<script>
+  window.csrf = '{{csrf}}';
+</script>
+```
 
 ```js
-const mid = post("/profilepic", (ctx) => {
-  // This comes from the "name" in the input field
-  console.log(ctx.files.profilepic);
-  return redirect("/profile");
+// Within your javascript.js/bundle.js/app.js
+fetch('/', {
+  method: 'POST',
+  body: 'hello world',
+  credentials: 'include',  // Important! to maintain the session
+  headers: { 'csrf-token': csrf }  // From 'window'
+}).then(...);
+```
+
+
+Or you could also just disable it if you know what you are doing:
+
+```js
+server({ security: { csrf: false } }, ...);
+```
+
+
+
+## get()
+
+Handle requests of the type `GET` (loading a webpage):
+
+```js
+// Create a single route for GET /
+const route = get('/', ctx => 'Hello 世界');
+
+// Testing that it actually works
+run(route).get('/').then(res => {
+  expect(res.body).toBe('Hello 世界');
 });
 ```
 
-## .ip
+> Note: Read more about the [tests in code examples](/documentation/testing/#code) or just ignore them.
 
-The IP of the remote client. If it's behind a proxy that displays its proxy condition then the `ips` field will also be filled with the respective ips:
-
-```js
-const mid = (ctx) => {
-  console.log(ctx.ip, "|", ctx.ips);
-};
-
-run(mid).get("/");
-```
-
-## .url
-
-The full cuantified URL:
+You can specify a query and param to be set:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.url).toBe("/hello?answer=42");
-};
-
-run(mid).get("/hello?answer=42");
-```
-
-## .method
-
-The request method, it can be `GET`, `POST`, `PUT`, `DELETE`:
-
-```js
-const mid = (ctx) => {
-  expect(ctx.method).toBe("GET");
-};
+const route = get('/:page', ctx => {
+  console.log(ctx.params.page);  // hello
+  console.log(ctx.query.name);   // Francisco
+  return { page: ctx.params.page, name: ctx.query.name };
+});
 
 // Test it
-run(mid).get("/");
+run(route).get('/hello?name=Francisco').then(res => {
+  expect(res.body).toEqual({ page: 'hello', name: 'Francisco' });
+});
 ```
 
-Or other methods:
+
+
+
+## post()
+
+Handle requests of the type `POST`. It needs [a csrf token](#csrf-token) to be provided:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.method).toBe("POST");
-};
+// Create a single route for POST /
+const route = post('/', ctx => {
+  console.log(ctx.data);
+});
 
-// Test it
-run(noCsrf, mid).post("/");
+// Test our route. Note: csrf disabled for testing purposes
+run(noCsrf, route).post('/', { body: 'Hello 世界' });
 ```
 
-## .path
+The [`data` property](/documentation/context/#data) can be a string or a simple object of `{name: value}` pairs.
 
-Only the path part from the URL. It is the full URL except for the query:
+Example:
 
 ```js
-const mid = (ctx) => {
-  expect(ctx.path).toBe("/question");
-};
+// index.js
+const server = require('server');
+const { get, post } = server.router;
+const { file, redirect } = server.reply;
 
-// Test it
-run(mid).get("/question?answer=42");
+server(
+  get('/', ctx => file('index.hbs')),
+  post('/', ctx => {
+    // Show the submitted data on the console:
+    console.log(ctx.data);
+    return redirect('/');
+  })
+);
 ```
 
-## .secure
+```html
+<!-- views/index.hbs (omitting <head>, <body>, etc) -->
+<form method="POST" action="/">
+  <h2>Contact us</h1>
+  <label><p>Name:</p> <input type="text" name="fullname"></label>
+  <label><p>Message:</p> <textarea name="message"></textarea></label>
 
-Returns true if the request is made through HTTPS. Take into account that if you are behind Cloudflare or similar it might be reported as false even though your clients see `https`:
-
-```js
-const mid = (ctx) => {
-  expect(ctx.secure).toBe(false);
-};
-
-// Test it
-run(mid).get("/");
+  <input type="hidden" name="_csrf" value="{{csrf}}">
+  <input type="submit" name="Contact us">
+</form>
 ```
 
-## .xhr
-
-A boolean set to true if the request was done through AJAX. Specifically, if `X-Requested-With` is `“XMLHttpRequest”`:
+Example 2: JSON API. To POST with JSON you can follow this:
 
 ```js
-const mid = (ctx) => {
-  expect(mid.xhr).toBe(false);
+fetch('/42', {
+  method: 'PUT',
+  body: JSON.stringify({ a: 'b', c: 'd' }),
+  credentials: 'include', // !important for the CSRF
+  headers: {
+    'csrf-token': csrf,
+    'Content-Type': 'application/json'
+  }
+}).then(res => res.json()).then(item => {
+  console.log(item);
+});
+```
+
+
+
+## put()
+
+Handle requests of the type "PUT". It needs [a csrf token](#csrf-token) to be provided:
+
+```js
+// Create a single route for PUT /ID
+const route = put('/:id', ctx => {
+  console.log(ctx.params.id, ctx.data);
+});
+
+// Test our route. Note: csrf disabled for testing purposes
+run(noCsrf, route).put('/42', { body: 'Hello 世界' });
+```
+
+The HTML `<form>` does not support `method="PUT"`, however we can overcome this by adding a special field called `_method` to the query:
+
+```html
+<form method="POST" action="/42?_method=PUT">
+  ...
+</form>
+```
+
+For Javascript you can just set it to `method`, for example using the new API `fetch()`:
+
+```js
+fetch('/42', {
+  method: 'PUT',
+  body: 'whatever',
+  credentials: 'include', // !important for the CSRF
+  headers: { 'csrt-token': csrf }
+});
+```
+
+
+
+## del()
+
+Handle requests of the type "DELETE". It needs [a csrf token](#csrf-token) to be provided:
+
+```js
+// Create a single route for DELETE /ID
+const route = del('/:id', ctx => {
+  console.log(ctx.params.id);
+});
+
+// Test our route. Note: csrf disabled for testing purposes
+run(noCsrf, route).del('/42');
+```
+
+The HTML `<form>` does not support `method="DELETE"`, however we can overcome this by adding a special field called `_method` to the query:
+
+```html
+<form method="POST" action="/42?_method=DELETE">
+  ...
+</form>
+```
+
+For Javascript you can just set it to `method`, for example using the new API `fetch()`:
+
+```js
+fetch('/42', {
+  method: 'DELETE',
+  credentials: 'include', // !important for the CSRF
+  headers: { 'csrt-token': csrf }
+});
+```
+
+
+
+## error()
+
+It handles an error thrown by a previous middleware:
+
+```js
+const handle = error('special', ctx => {
+  console.log(ctx.error);
+});
+
+// Test it. First let's define our error in a middleware:
+const throwsError = ctx => {
+  const err = new Error('This is a test error');
+  err.code = 'special';
+  throw err;
 };
 
-run(mid).get("/");
+// Then test it faking a request
+run(throwsError, handle).get('/');
+```
+
+It accepts an optional name and then middleware. If there's no name, it will catch all of the previously thrown errors. The name will match the **beginning** of the string name, so you can split your errors by domain:
+
+```js
+// This will be caught since 'user' === 'user'
+const mid1 = ctx => {
+  const err = new Error('No username detected');
+  err.code = 'user.noname';
+  throw err;
+};
+
+// This will be caught since 'user.noname' begins by 'user'
+const mid2 = ctx => {
+  const err = new Error('No username detected');
+  err.code = 'user.noname';
+  throw err;
+};
+
+const handleUser = error('user', ctx => {
+  console.log(ctx.error);
+});
+
+server(mid1, mid2, handleUser);
+```
+
+
+
+## sub()
+
+Handle subdomain calls:
+
+```js
+const server = require('server');
+const { sub } = server.router;
+
+server([
+  sub('es', ctx => {
+    console.log('Call to subdomain "es"!');
+  })
+]);
+```
+
+It can be a string or a Regex:
+
+```js
+const language = sub(/(en|es|jp)/, ctx => {
+  console.log('Wikipedia <3');
+});
+```
+
+
+
+## socket()
+
+> *Experimental now, coming stable in version 1.1*
+
+```js
+const server = require('server');
+const { get, socket } = server.router;
+const { render } = server.reply;
+
+server({}, [
+  get('/', ctx => render('/public/index.html')),
+
+  // Receive a message from a single socket
+  socket('message', ctx => {
+
+    // Send the message to every socket
+    io.emit('message', ctx.data);
+  })
+]);
 ```

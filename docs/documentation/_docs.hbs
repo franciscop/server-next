@@ -9,7 +9,7 @@
           <aside>
             <div class="scroller">
               {{#each config.docs}}
-                <h3>{{this.title}}</h3>
+                <h3><a href="{{this.link}}">{{this.title}}</a></h3>
                 {{#each this.sections}}
                   {{> link to=this.link label=this.title }}
                 {{/each}}
