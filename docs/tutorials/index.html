@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link
+      href="https://fonts.googleapis.com/css?family=Montserrat:400,600|Source+Code+Pro&display=swap"
+      rel="stylesheet">
+    <link rel="stylesheet" href="/style.min.css">
+  
+    <title>Server.js Tutorials</title>
+    <meta name="description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
+    <link rel="icon" type="image/png" href="/img/logo.png"/>
+  
+    <!-- Twitter -->
+    <meta name="twitter:title" content="Server.js Tutorials" />
+    <meta name="twitter:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://node-server.com/" />
+    <meta name="twitter:image" content="https://node-server.com/img/hero.png">
+  
+    <!-- Facebook & others -->
+    <meta property="og:title" content="Server.js Tutorials" />
+    <meta property="og:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://node-server.com/" />
+    <meta property="og:image" content="https://node-server.com/img/hero.png" />
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="brand">
+        <img class="logo" src="/img/logo.svg" alt="">
+        <span>Node.js Server</span>
+      </a>
+    
+      <input id="bmenub" type="checkbox" class="show">
+      <label for="bmenub" class="burger">menu</label>
+    
+      <div class="menu">
+        <a href="/documentation">Documentation</a>
+        <a href="/screencasts">Screencasts</a>
+        <a href="/tutorials">Tutorials</a>
+        <a href="https://github.com/franciscop/server">Github</a>
+      </div>
+    </nav>
+    <main>
+      <div class="flex">
+        <div class="thirty">
+          <aside>
+            <section class="toc">
+                <h3>Introduction</h3>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#getting-started">Getting started</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#basic-usage">Basic usage</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#middleware">Middleware</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#express-middleware">Express middleware</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#cors">CORS</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#routing">Routing</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/#advanced-topics">Advanced topics</a>
+                  </div>
+                <h3>Options</h3>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#port">Port</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#secret">Secret</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#public">Public</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#views">Views</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#engine">Engine</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#env">Env</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#favicon">Favicon</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#parse">Parse</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#session">Session</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#socket">Socket</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#security">Security</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/options#log">Log</a>
+                  </div>
+                <h3>Context</h3>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#options">.options</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#data">.data</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#params">.params</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#query">.query</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#session">.session</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#headers">.headers</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#cookies">.cookies</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#files">.files</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#ip">.ip</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#url">.url</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#method">.method</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#path">.path</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#secure">.secure</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/context#xhr">.xhr</a>
+                  </div>
+                <h3>Router</h3>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#options">.options</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#data">.data</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#params">.params</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#query">.query</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#session">.session</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#headers">.headers</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#cookies">.cookies</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#files">.files</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#ip">.ip</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#url">.url</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#method">.method</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#path">.path</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#secure">.secure</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/router#xhr">.xhr</a>
+                  </div>
+                <h3>Reply</h3>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#options">.options</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#data">.data</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#params">.params</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#query">.query</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#session">.session</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#headers">.headers</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#cookies">.cookies</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#files">.files</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#ip">.ip</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#url">.url</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#method">.method</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#path">.path</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#secure">.secure</a>
+                  </div>
+                  <div>
+                    <img src="/img/file.svg" /><a href="/documentation/reply#xhr">.xhr</a>
+                  </div>
+            </section>
+          </aside>
+        </div>
+        <div class="seventy">
+          <article>
+            
+    <h1 id="tutorials">
+      Tutorials
+    </h1>
+  
+    <h2 id="getting-started">
+      Getting started
+    </h2>
+  <p>There&#39;s a <a href="https://serverjs.io/tutorials/getting-started/">whole tutorial on getting started for beginners</a> but the quick version is to first install <code>server</code> as a dependency:</p>
+<pre><code class="language-bash">npm install server</code></pre>
+<p>Then you can create a file called <code>index.js</code> with this code:</p>
+<pre><code class="language-js">// Include the server in your file
+const server = require(&#39;server&#39;);
+const { get, post } = server.router;
+
+// Handle requests to the url &quot;/&quot; ( http://localhost:3000/ )
+server([
+  get(&#39;/&#39;, ctx =&gt; &#39;Hello world!&#39;)
+]);</code></pre>
+<pre><code class="language-js">import server, { get, post } from &quot;server&quot;;
+
+server(
+  get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;),
+  post(&quot;/users&quot;, ctx =&gt; {
+    console.log(ctx.body, ctx.files);
+    return &#39;ok&#39;;
+  })
+);</code></pre>
+<p>Execute this in the terminal to get the server started:</p>
+<pre><code class="language-bash">node .</code></pre>
+<p>And finally, open your browser on <a href="http://localhost:3000/">localhost:3000</a> and you should see &#39;Hello world!&#39; on your browser.</p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+    <script src="https://unpkg.com/prismjs@1.20.0/prism.js" charset="utf-8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/umbrellajs" charset="utf-8"></script>
+    <script type="text/javascript">
+      // Remove an incorrect "get" that there was highlighted
+      Prism.hooks.add('after-highlight', function(env){
+        u('span.token.keyword').each(el => {
+          if (el.innerHTML === 'get') {
+            if (el.nextElementSibling && el.nextElementSibling.innerHTML === '(') {
+              u(el).replace('<span class="token function">get</span>');
+            } else {
+              u(el).replace('get');
+            }
+          }
+          if (el.innerHTML === 'delete') {
+            if (el.previousElementSibling && el.previousElementSibling.innerHTML === '.') {
+              u(el).replace('delete');
+            }
+          }
+          if (el.innerHTML === 'public') u(el).replace('public');
+        });
+      });
+    </script>
+  </body>
+</html>

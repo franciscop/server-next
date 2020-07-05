@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  {{> head}}
+  <body>
+    {{> nav}}
+    <main>
+      <div class="flex">
+        <div class="thirty">
+          <aside>
+            <section class="toc">
+              {{#each config.docs}}
+                <h3>{{this.title}}</h3>
+                {{#each this.sections}}
+                  {{> link to=this.link label=this.title }}
+                {{/each}}
+              {{/each}}
+            </section>
+          </aside>
+        </div>
+        <div class="seventy">
+          <article>
+            {{{ body }}}
+          </article>
+        </div>
+      </div>
+    </main>
+    <script src="https://unpkg.com/prismjs@1.20.0/prism.js" charset="utf-8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/umbrellajs" charset="utf-8"></script>
+    <script type="text/javascript">
+      // Remove an incorrect "get" that there was highlighted
+      Prism.hooks.add('after-highlight', function(env){
+        u('span.token.keyword').each(el => {
+          if (el.innerHTML === 'get') {
+            if (el.nextElementSibling && el.nextElementSibling.innerHTML === '(') {
+              u(el).replace('<span class="token function">get</span>');
+            } else {
+              u(el).replace('get');
+            }
+          }
+          if (el.innerHTML === 'delete') {
+            if (el.previousElementSibling && el.previousElementSibling.innerHTML === '.') {
+              u(el).replace('delete');
+            }
+          }
+          if (el.innerHTML === 'public') u(el).replace('public');
+        });
+      });
+    </script>
+  </body>
+</html>

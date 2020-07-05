@@ -1,0 +1,8 @@
+{
+  "type": "commonjs",
+  "dependencies": {
+    "@sindresorhus/slugify": "^1.0.0",
+    "files": "^1.1.0",
+    "slugify": "^1.4.4"
+  }
+}

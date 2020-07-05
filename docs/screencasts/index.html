@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link
+      href="https://fonts.googleapis.com/css?family=Montserrat:400,600|Source+Code+Pro&display=swap"
+      rel="stylesheet">
+    <link rel="stylesheet" href="/style.min.css">
+  
+    <title></title>
+    <meta name="description" content="" />
+    <link rel="icon" type="image/png" href="/img/logo.png"/>
+  
+    <!-- Twitter -->
+    <meta name="twitter:title" content="" />
+    <meta name="twitter:description" content="" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://node-server.com/" />
+    <meta name="twitter:image" content="https://node-server.com/img/hero.png">
+  
+    <!-- Facebook & others -->
+    <meta property="og:title" content="" />
+    <meta property="og:description" content="" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://node-server.com/" />
+    <meta property="og:image" content="https://node-server.com/img/hero.png" />
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="brand">
+        <img class="logo" src="/img/logo.svg" alt="">
+        <span>Node.js Server</span>
+      </a>
+    
+      <input id="bmenub" type="checkbox" class="show">
+      <label for="bmenub" class="burger">menu</label>
+    
+      <div class="menu">
+        <a href="/documentation">Documentation</a>
+        <a href="/screencasts">Screencasts</a>
+        <a href="/tutorials">Tutorials</a>
+        <a href="https://github.com/franciscop/server">Github</a>
+      </div>
+    </nav>
+    <main>
+      <div class="flex">
+        <div class="thirty">
+          <aside>
+            <h3>Screencasts</h3>
+            <div>
+              <img src="/img/play.svg" /><a href="#434253548" data-video="434253548">Installing server.js</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#434970483" data-video="434970483">Rendering a page</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#434970506" data-video="434970506">Simple router</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#434970532" data-video="434970532">Submit a form</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866">Receive files</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">Connect middleware</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">Environment variables</a>
+            </div>
+
+            <h3>HTTP Router</h3>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">All HTTP methods</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866">URL Queries</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">URL Parameters</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">Combine routers</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866">Middleware for a router</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">Advanced parameters</a>
+            </div>
+
+            <h3>Websockets</h3>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">Connecting the front-end</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">Sending messages</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866">Using channels</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">Middleware for a router</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">Advanced parameters</a>
+            </div>
+
+            <h3>Configuration</h3>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866">Enable CORS</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315">Managing files</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139">Data validation</a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#432360866" data-video="432360866"></a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#355789315" data-video="355789315"></a>
+            </div>
+            <div>
+              <img src="/img/play.svg" /><a href="#431523139" data-video="431523139"></a>
+            </div>
+
+          </aside>
+        </div>
+        <div class="seventy">
+          <div class="embed">
+            <div>
+              <iframe src="https://player.vimeo.com/video/434253548" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/umbrellajs" charset="utf-8"></script>
+    <script type="text/javascript">
+      const $ = u;
+      const setFrame = id => {
+        $('a').removeClass('active');
+        $(`[data-video="${id}"]`).addClass('active');
+        $('iframe').replace(`
+          <iframe src="https://player.vimeo.com/video/${id}" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        `);
+      };
+      if (window.location.hash) {
+        setFrame(window.location.hash.slice(1));
+      } else {
+        $($('aside a').first()).addClass('active');
+      }
+      $('aside a').on('click', e => setFrame($(e.target).data('video')));
+    </script>
+  </body>
+</html>

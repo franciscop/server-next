@@ -1,49 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <link
-      href="https://fonts.googleapis.com/css?family=Montserrat:400,600|Source+Code+Pro&display=swap"
-      rel="stylesheet">
-    <link rel="stylesheet" href="/style.min.css">
-  
-    <title>Node.js Server</title>
-    <meta name="description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
-    <link rel="icon" type="image/png" href="/img/logo.png"/>
-  
-    <!-- Twitter -->
-    <meta name="twitter:title" content="Node.js Server" />
-    <meta name="twitter:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://node-server.com/" />
-    <meta name="twitter:image" content="https://node-server.com/img/hero.png">
-  
-    <!-- Facebook & others -->
-    <meta property="og:title" content="Node.js Server" />
-    <meta property="og:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://node-server.com/" />
-    <meta property="og:image" content="https://node-server.com/img/hero.png" />
-  </head>
+  {{> head
+    title="Node.js Server"
+    description="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
+  }}
   <body>
-    <nav>
-      <a href="/" class="brand">
-        <img class="logo" src="/img/logo.svg" alt="">
-        <span>Node.js Server</span>
-      </a>
-    
-      <input id="bmenub" type="checkbox" class="show">
-      <label for="bmenub" class="burger">menu</label>
-    
-      <div class="menu">
-        <a href="/documentation">Documentation</a>
-        <a href="/screencasts">Screencasts</a>
-        <a href="/tutorials">Tutorials</a>
-        <a href="https://github.com/franciscop/server">Github</a>
-      </div>
-    </nav>
+    {{> nav}}
     <div class="hero">
       <div style="border: 2px solid red; background: #faa; margin: 0 0 20px;border-radius: 8px; padding: 10px 20px;">WORK IN PROGRESS; WEBSITE NOT YET USABLE</div>
       <div class="flex one two-600">

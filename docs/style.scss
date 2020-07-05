@@ -1,0 +1,291 @@
+$space: 15px;
+
+$picnic-breakpoint: 700px;
+
+$picnic-primary: #f55;
+
+$middle: 800px;
+$large: 1100px;
+
+$picnic-separation: $space;
+$picnic-grid-gutter: 30px;
+
+@import "../node_modules/picnic/src/picnic.scss";
+@import "okaidia";
+
+body {
+  background: #f1f1ff;
+  box-sizing: border-box;
+  position: relative;
+  box-sizing: border-box;
+  line-height: 1.5;
+
+  font-family: "Montserrat", sans-serif;
+  color: #336;
+
+  font-size: 16px;
+  padding: 80px 15px 15px;
+
+  @media (min-width: $large) {
+    font-size: 18px;
+    padding: 100px 0 0 0;
+  }
+}
+
+nav {
+  position: absolute;
+  padding: 0 15px;
+  @media (min-width: $large) {
+    padding: 0 calc(50% - #{$large / 2});
+  }
+  .brand {
+    padding: 0;
+    @media (min-width: $large) {
+      padding: 0 15px;
+    }
+  }
+  .logo {
+    height: 30px;
+  }
+  .menu > * {
+    margin-right: $space;
+  }
+  .menu a {
+    color: #336;
+    font-size: 16px;
+    font-weight: bold;
+    opacity: 0.75;
+    &:hover {
+      opacity: 1;
+    }
+
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+
+    &:hover {
+      border-bottom: 2px solid #f55;
+    }
+  }
+}
+
+.hero {
+  max-width: $large;
+  margin: 0 auto;
+
+  @media (min-width: $large) {
+    margin: 30px auto 50px;
+  }
+
+  p {
+    margin: 5px 0;
+  }
+
+  pre {
+    margin-bottom: 0;
+  }
+
+  .install {
+    background: white;
+    width: auto;
+    display: inline-block;
+    border: none;
+    padding: 6px 20px;
+    margin: 5px 0;
+    border-radius: 0;
+  }
+
+  code {
+    font-size: 16px;
+    background: none;
+  }
+
+  img {
+    width: 100%;
+  }
+
+  .button {
+    margin: 0;
+    font-weight: bold;
+    padding: 5px 15px;
+  }
+}
+
+h1 {
+  padding: 0;
+}
+
+main {
+  max-width: $large;
+  margin: 0 auto 100px;
+}
+
+aside {
+  background: white;
+  padding: 15px;
+  margin-left: -15px;
+  width: calc(100% + 30px);
+  box-shadow: 2px 2px 4px -2px rgba(17, 17, 17, 0.2);
+
+  @media (min-width: $large) {
+    padding: 20px;
+    width: auto;
+  }
+
+  h3 {
+    font-size: 18px;
+    padding: 0;
+    margin: 20px 0 0;
+    &:first-child {
+      margin-top: -5px;
+    }
+  }
+
+  img,
+  a {
+    display: inline;
+    height: 16px;
+    line-height: 16px;
+    font-size: 16px;
+    vertical-align: middle;
+  }
+
+  a {
+    display: inline;
+    color: inherit;
+    cursor: pointer;
+    box-shadow: 0 2px transparent;
+
+    &.active,
+    &:hover {
+      box-shadow: 0 2px #f55;
+    }
+  }
+
+  img {
+    opacity: 0.6;
+    margin-right: 5px;
+  }
+}
+
+.thirty {
+  width: calc(100% + 30px);
+}
+
+.seventy {
+  width: calc(100% + 30px);
+}
+
+@media (min-width: $large) {
+  .thirty {
+    width: 30%;
+  }
+
+  .seventy {
+    width: 70%;
+  }
+}
+
+article {
+  background: white;
+  padding: 15px;
+  box-shadow: 2px 2px 4px -2px rgba(17, 17, 17, 0.2);
+
+  @media (min-width: $large) {
+    padding: 30px;
+  }
+
+  h1 {
+  }
+
+  h2 {
+    scroll-margin-top: 15px;
+  }
+}
+
+.features {
+  .feature {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 2px 2px 4px -2px rgba(17, 17, 17, 0.2);
+  }
+  img {
+    width: 40px;
+    display: inline-block;
+  }
+  h3 {
+    padding: 0;
+    display: inline-block;
+    vertical-align: top;
+    height: 40px;
+    line-height: 40px;
+    margin-left: 10px;
+  }
+  p {
+    margin: 3px;
+  }
+}
+
+pre {
+  border: 2px solid lighten($picnic-primary, 20);
+}
+
+code {
+  padding: 2px 5px;
+}
+
+pre,
+code,
+code[class*="language-"],
+pre[class*="language-"] {
+  background: #f5f2f0;
+  font-family: "Source Code Pro", serif;
+  font-size: 16px;
+}
+
+pre,
+pre[class*="language-"] {
+  margin: 0 #{-$space} $space;
+  padding: 10px $space;
+  border-radius: 0;
+}
+
+@media (min-width: $middle) {
+  pre,
+  pre[class*="language-"] {
+    margin: 0 0 $space;
+    padding: 10px 15px;
+    border-radius: 6px;
+  }
+}
+
+.embed {
+  position: sticky;
+  top: 100px;
+
+  & > div {
+    position: relative;
+    width: 100%;
+    padding-bottom: 63%;
+    height: 0;
+    overflow: hidden;
+  }
+}
+
+.embed iframe,
+.embed object,
+.embed embed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+article table th,
+article table td {
+  background: none;
+  color: #333;
+  border: 2px solid #ddd;
+  word-break: break-word;
+}
