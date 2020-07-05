@@ -282,6 +282,18 @@ pre[class*="language-"] {
   height: 100%;
 }
 
+article {
+  p {
+    margin: 10px 0;
+  }
+
+  h2,
+  h3 {
+    padding: 0;
+    margin: 40px 0 10px;
+  }
+}
+
 article table th,
 article table td {
   background: none;
