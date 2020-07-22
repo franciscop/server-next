@@ -6,7 +6,7 @@ description: A library to easily create a modern Node.js server. Handles HTTP, W
 
 # Documentation
 
-Conceptually **server** is a function that accepts options and other functions. The heavy lifting is already implemented **so you can focus on your project**:
+Server.js uses functions ([middleware](#middleware)) to handle the requests. It also accepts an options object as the first argument:
 
 ```js
 // Import the library
@@ -26,23 +26,31 @@ There's [a getting started tutorial for beginners](/tutorials/getting-started/).
 npm install server
 ```
 
+Then remember to add the `"type": "module"` to your `package.json` since we are using ESM:
+
+```json
+{
+  "name": "my-package1",
+  "type": "module",
+  ...
+}
+```
+
 Then create some demo code in your `index.js`:
 
 ```js
-// Import the library
-const server = require('server');
-
-// Answers to any request
+// Answers to any request with "Hello world"
+import server from 'server';
 server(ctx => 'Hello world');
 ```
 
-Run it from the terminal:
+Finally run the example from the terminal:
 
 ```bash
 node .
 ```
 
-And open your browser on [localhost:3000](http://localhost:3000/) to see it in action.
+Open your browser on [localhost:3000](http://localhost:3000/) to see it in action.
 
 
 
@@ -81,7 +89,7 @@ const { render, json } = require('server/reply');
 
 ## Middleware
 
-A *middleware* is plain function that will be called on each request. It receives [a context object](/documentation/context) and [returns a reply](/documentation/reply/), a [basic type](/documentation/reply/#return-value) or nothing. A couple of examples:
+A *middleware* is a plain function that will be called on each request. It receives [a context object](/documentation/context) and [returns a reply](/documentation/reply/), a [basic type](/documentation/reply/#return-value) or nothing. A couple of examples:
 
 ```js
 const setname = ctx => { ctx.user = 'Francisco'; };
@@ -162,7 +170,7 @@ const middle = async ctx => {
 };
 ```
 
-<blockquote class="warning">**Avoid callback-based functions**: error propagation is problematic and they have to be converted to promises. Strongly prefer an async/await workflow.</blockquote>
+> **Avoid callback-based functions**: error propagation is problematic and they have to be converted to promises. async/await workflows are better.
 
 
 

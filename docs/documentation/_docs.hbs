@@ -8,11 +8,22 @@
         <div class="thirty">
           <aside>
             <div class="scroller">
+              <form class="search">
+                <input name="search" placeholder="Search Documentation" />
+                <div class="results"></div>
+              </form>
               {{#each config.docs}}
-                <h3><a href="{{this.link}}">{{this.title}}</a></h3>
-                {{#each this.sections}}
-                  {{> link to=this.link label=this.title }}
-                {{/each}}
+                <section>
+                  <h3>
+                    <div class="more"><img src="/img/plus.svg" /></div>
+                    <a href="{{this.link}}">{{this.title}}</a>
+                  </h3>
+                  <div class="submenu">
+                    {{#each this.sections}}
+                      {{> link to=this.link label=this.title }}
+                    {{/each}}
+                  </div>
+                </section>
               {{/each}}
             </div>
           </aside>
@@ -26,25 +37,6 @@
     </main>
     <script src="https://unpkg.com/prismjs@1.20.0/prism.js" charset="utf-8"></script>
     <script src="https://cdn.jsdelivr.net/npm/umbrellajs" charset="utf-8"></script>
-    <script type="text/javascript">
-      // Remove an incorrect "get" that there was highlighted
-      Prism.hooks.add('after-highlight', function(env){
-        u('span.token.keyword').each(el => {
-          if (el.innerHTML === 'get') {
-            if (el.nextElementSibling && el.nextElementSibling.innerHTML === '(') {
-              u(el).replace('<span class="token function">get</span>');
-            } else {
-              u(el).replace('get');
-            }
-          }
-          if (el.innerHTML === 'delete') {
-            if (el.previousElementSibling && el.previousElementSibling.innerHTML === '.') {
-              u(el).replace('delete');
-            }
-          }
-          if (el.innerHTML === 'public') u(el).replace('public');
-        });
-      });
-    </script>
+    <script src="/documentation/script.js" charset="utf-8"></script>
   </body>
 </html>
