@@ -76,9 +76,8 @@ const searchData = (async () => {
     .nodes.map((link) => $(link).attr("href"))
     .map((url) => url.split("#").shift())
     .map((url) => url.replace(/\/$/, ""))
+    .map((url) => url + "/")
     .filter(unique);
-
-  console.log(links);
 
   const stringToHTML = function (str) {
     var parser = new DOMParser();
