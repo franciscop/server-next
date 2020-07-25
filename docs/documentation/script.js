@@ -26,7 +26,6 @@ const showSection = (section) => {
   if (!section.is) section = $(section);
   if (!section.is("section")) section = section.closest("section");
   const isActive = section.hasClass("active");
-  $("aside section").removeClass("active");
   section.toggleClass("active", !isActive);
   const menu = section.find(".submenu").first();
   const height = isActive ? 0 : menu.scrollHeight;
@@ -34,10 +33,12 @@ const showSection = (section) => {
   section.find("h3 img").attr("src", `/img/${isActive ? "plus" : "minus"}.svg`);
 };
 
-if (/^\/documentation\/?$/.test(window.location.pathname)) {
-  showSection($(".more").first());
-} else {
-  showSection($(`a[href="${window.location.pathname}"]`));
+if (window.innerWidth > 600) {
+  if (/^\/documentation\/?$/.test(window.location.pathname)) {
+    showSection($(".more").first());
+  } else {
+    showSection($(`a[href="${window.location.pathname}"]`));
+  }
 }
 
 $(".more").on("click", (e) => {
@@ -60,7 +61,6 @@ u("a").on("click", (e) => {
   }
 
   // If it is an internal link go to that part
-  console.log(url, window.location.pathname);
   if ((!url || url === window.location.pathname) && u("#" + hash).length) {
     e.preventDefault();
     u("#" + hash).scroll();
@@ -68,9 +68,80 @@ u("a").on("click", (e) => {
   }
 });
 
+// Search
+const searchData = (async () => {
+  const unique = (value, index, self) => self.indexOf(value) === index;
+
+  const links = $("aside a")
+    .nodes.map((link) => $(link).attr("href"))
+    .map((url) => url.split("#").shift())
+    .map((url) => url.replace(/\/$/, ""))
+    .filter(unique);
+
+  const stringToHTML = function (str) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(str, "text/html");
+    return doc.body.querySelector("article");
+  };
+
+  const headings = {};
+  const all = {};
+  const content = {};
+  const articles = await Promise.all(
+    links.map((link) =>
+      fetch(link)
+        .then((res) => res.text())
+        .then(stringToHTML)
+        .then((art) => {
+          $(art)
+            .find("h1, h2, h3, h4")
+            .each((el) => {
+              if (el.nodeName === "H1") {
+                headings[`${link}`] = u(el).text().trim();
+              } else {
+                headings[`${link}#${el.id}`] = u(el).text().trim();
+              }
+            });
+
+          let last;
+          $(art)
+            .children()
+            .each((el) => {
+              if (/H\d/.test(el.nodeName)) {
+                if (el.nodeName === "H1") {
+                  last = `${link}`;
+                } else {
+                  last = `${link}#${el.id}`;
+                }
+                content[last] = "";
+              }
+
+              content[last] += $(el).text().trim() + "\n";
+            });
+
+          all[link] = $(art).text().toLowerCase().trim();
+        })
+    )
+  );
+
+  return { headings, content, all };
+})();
+
+function escape(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Search focus
-(() => {
+(async () => {
   if (!$(".search").length) return;
+
+  $(".resuls").html("Loading...");
+  const { headings, content } = await searchData;
 
   window.addEventListener("keydown", (e) => {
     if (e.target.nodeName === "INPUT") {
@@ -86,6 +157,56 @@ u("a").on("click", (e) => {
   });
 
   $(".search input").on("input", (e) => {
-    $(e.target).closest("form").toggleClass("active", !!e.target.value);
+    const text = e.target.value.toLowerCase().replace(/\W/g, " ");
+    $(".results").html("");
+    $(e.target).closest("form").toggleClass("active", !!text);
+    if (!text) return;
+
+    const found = [];
+    for (let link in headings) {
+      if (!headings[link].toLowerCase().replace(/\W/g, " ").includes(text)) {
+        continue;
+      }
+      if (found.length >= 5) continue;
+      found.push(link);
+      u(".results").append(`
+        <div>
+          <a href="${link}">
+            <img src="/img/hash.svg"><span>${headings[link]}</span>
+          </a>
+        </div>
+      `);
+    }
+
+    for (let link in content) {
+      if (content[link].toLowerCase().replace(/\W/g, " ").includes(text)) {
+        if (found.includes(link)) continue;
+        if (found.length >= 5) continue;
+        found.push(link);
+        const header = content[link].split("\n").shift();
+        const index = content[link]
+          .toLowerCase()
+          .replace(/\W/g, " ")
+          .indexOf(text);
+        const from = Math.max(index - 5, 0);
+        const to = from + text.length + 15;
+        const match = [
+          escape(content[link].slice(from, from + 5)),
+          escape(content[link].slice(from + 5, from + 5 + text.length)),
+          escape(content[link].slice(from + 5 + text.length, to)),
+        ];
+        found.push(link);
+        u(".results").append(`
+          <div>
+            <a href="${link}">
+              <div>
+                <img src="/img/paragraph.svg"><span>${header}</span>
+                <div class="partial">...${match[0]}<strong>${match[1]}</strong>${match[2]}...</div>
+              </div>
+            </a>
+          </div>
+        `);
+      }
+    }
   });
 })();

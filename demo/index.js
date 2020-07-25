@@ -44,6 +44,4 @@ server(
   // File handling on Node.js
   get("/form", () => form),
   post("/form", (ctx) => ({ body: ctx.body, files: ctx.files }))
-).then((ctx) => {
-  console.log(`Running on ${ctx.runtime} ${JSON.stringify(ctx.options)}`);
-});
+);

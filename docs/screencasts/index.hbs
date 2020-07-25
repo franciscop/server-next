@@ -8,37 +8,19 @@
         <div class="thirty">
           <aside>
             <div class="scroller">
-              <h3>Screencasts</h3>
-              {{> vlink to="434253548" label="Installing server.js" }}
-              {{> vlink to="434970483" label="Rendering a page" }}
-              {{> vlink to="434970506" label="Simple router" }}
-              {{> vlink to="434970532" label="Submit a form" }}
-              {{> vlink to="432360866" label="Receive files" }}
-              {{> vlink to="355789315" label="Connect middleware" }}
-              {{> vlink to="431523139" label="Environment variables" }}
-
-              <h3>HTTP Router</h3>
-              {{> vlink to="431523139" label="All HTTP methods" }}
-              {{> vlink to="432360866" label="URL Queries" }}
-              {{> vlink to="355789315" label="URL Parameters" }}
-              {{> vlink to="431523139" label="Combine routers" }}
-              {{> vlink to="432360866" label="Middleware for a router" }}
-              {{> vlink to="355789315" label="Advanced parameters" }}
-
-              <h3>Websockets</h3>
-              {{> vlink to="355789315" label="Connecting the front-end" }}
-              {{> vlink to="431523139" label="Sending messages" }}
-              {{> vlink to="432360866" label="Using channels" }}
-              {{> vlink to="355789315" label="Middleware for a router" }}
-              {{> vlink to="431523139" label="Advanced parameters" }}
-
-              <h3>Configuration</h3>
-              {{> vlink to="432360866" label="Enable CORS" }}
-              {{> vlink to="355789315" label="Managing files" }}
-              {{> vlink to="431523139" label="Data validation" }}
-              {{> vlink to="432360866" label="" }}
-              {{> vlink to="355789315" label="" }}
-              {{> vlink to="431523139" label="" }}
+              {{#each config.videos}}
+                <section>
+                  <h3>
+                    <div class="more"><img src="/img/plus.svg" /></div>
+                    <a href="#{{this.link}}">{{this.title}}</a>
+                  </h3>
+                  <div class="submenu">
+                    {{#each this.sections}}
+                      {{> vlink to=this.link label=this.title }}
+                    {{/each}}
+                  </div>
+                </section>
+              {{/each}}
             </div>
           </aside>
         </div>
@@ -67,7 +49,30 @@
       } else {
         $($('aside a').first()).addClass('active');
       }
-      $('aside a').on('click', e => setFrame($(e.target).data('video')));
+      $('aside a').on('click', e => setFrame($(e.currentTarget).data('video')));
+
+
+      const showSection = (section) => {
+        if (!section.is) section = $(section);
+        if (!section.is("section")) section = section.closest("section");
+        const isActive = section.hasClass("active");
+        section.toggleClass("active", !isActive);
+        const menu = section.find(".submenu").first();
+        const height = isActive ? 0 : menu.scrollHeight;
+        console.log(height + "px");
+        menu.style.maxHeight = height + "px";
+        section.find("h3 img").attr("src", `/img/${isActive ? "plus" : "minus"}.svg`);
+      };
+
+      if (/^\/screencasts\/?$/.test(window.location.pathname)) {
+        showSection($(".more").first());
+      } else {
+        showSection($(`a[href="${window.location.pathname}"]`));
+      }
+
+      $(".more").on("click", (e) => {
+        showSection(e.currentTarget);
+      });
     </script>
   </body>
 </html>

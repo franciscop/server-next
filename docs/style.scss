@@ -25,7 +25,7 @@ body {
   color: #336;
 
   font-size: 16px;
-  padding: 80px 15px 15px;
+  padding: 80px 0 15px;
 
   @media (min-width: $large) {
     font-size: 18px;
@@ -110,12 +110,21 @@ nav {
   img {
     width: 100%;
   }
+}
 
-  .button {
-    margin: 0;
-    font-weight: bold;
-    padding: 5px 15px;
-  }
+.button {
+  margin: 0;
+  font-weight: bold;
+  padding: 5px 15px;
+}
+
+.pseudo {
+  background: #0001;
+}
+
+.source {
+  float: right;
+  margin: 8px;
 }
 
 h1 {
@@ -132,39 +141,41 @@ aside {
   box-shadow: 2px 2px 4px -2px rgba(17, 17, 17, 0.2);
   position: sticky;
   top: 0;
+  font-size: 16px;
+  line-height: 18px;
 
   .scroller {
-    padding: 15px 15px 50px;
-    height: 100vh;
-    overflow: auto;
-    // padding-bottom: 50px;
+    padding: 15px;
+    // Need to force it because otherwise width changes dynamically while the height is not dynamic, clipping items
+    overflow: scroll;
 
     @media (min-width: $large) {
-      padding: 20px;
+      padding: 20px 20px 50px;
+      height: 100vh;
       width: auto;
-    }
 
-    & > *:last-child {
-      margin-bottom: 50px;
+      & > *:last-child {
+        margin-bottom: 50px;
+      }
     }
   }
 
   .search {
     position: relative;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
 
     &::after {
       position: absolute;
       content: "/";
       width: 20px;
-      height: 24px;
-      top: 7px;
-      right: 8px;
+      line-height: 22px;
+      height: 22px;
+      top: 5px;
+      right: 5px;
       font-size: 14px;
       text-align: center;
       border-radius: 4px;
       background: #fff;
-      line-height: 24px;
     }
   }
 
@@ -172,6 +183,8 @@ aside {
     border-color: transparent;
     background: #f5f5f5;
     padding: 5px 8px;
+    height: 32px;
+    line-height: 32px;
 
     &:focus {
       border-color: transparent;
@@ -192,9 +205,13 @@ aside {
     transition: height 0.2s ease;
   }
 
+  .partial {
+    font-size: 12px;
+  }
+
   .active .results,
   input:focus + .results {
-    height: 200px;
+    height: 250px;
     border-top: 2px solid #eee;
   }
 
@@ -208,6 +225,7 @@ aside {
     height: 20px;
     background: #f5f5f5;
     line-height: 20px;
+    margin-top: 8px;
     margin-right: 6px;
     border-radius: 3px;
     text-align: center;
@@ -225,8 +243,8 @@ aside {
     }
 
     img {
-      margin: 2px;
       display: block;
+      margin: 2px;
     }
   }
 
@@ -246,29 +264,46 @@ aside {
 
   a {
     display: flex;
-    align-items: center;
     flex-grow: 1;
     color: inherit;
-    height: 20px;
-    line-height: 20px;
-    font-size: 18px;
-    margin-bottom: 8px;
+    line-height: inherit;
+    font-size: 16px;
+    margin-top: 8px;
     cursor: pointer;
+    align-items: center;
     box-shadow: 0 2px transparent;
 
     &.active,
     &:hover {
-      box-shadow: 0 2px #f55;
+      color: #f55;
+    }
+
+    &::after {
+      display: block;
+      content: "";
+      background: url("/img/arrow.svg");
+      background-size: 20px 20px;
+      width: 20px;
+      height: 20px;
+      opacity: 0;
+      transform: translate(-10px, 0) scale(0.5);
+      transition: all 0.2s ease;
+    }
+
+    &:hover::after {
+      opacity: 1;
+      transform: translate(0px) scale(1);
     }
   }
 
   img {
-    display: inline;
+    display: inline-block;
     height: 16px;
-    line-height: 16px;
+    line-height: inherit;
     font-size: 16px;
+    margin: 1px;
     vertical-align: middle;
-    opacity: 0.6;
+    opacity: 0.5;
     margin-right: 5px;
   }
 
@@ -278,11 +313,11 @@ aside {
 }
 
 .thirty {
-  width: calc(100% + 30px);
+  width: 100%;
 }
 
 .seventy {
-  width: calc(100% + 30px);
+  width: 100%;
 }
 
 @media (min-width: $large) {
@@ -348,6 +383,10 @@ article {
     p {
       margin: 0;
     }
+  }
+
+  img {
+    max-width: 100%;
   }
 }
 

@@ -218,73 +218,166 @@
         </div>
         <div class="seventy">
           <article>
-            
-    <h1 id="getting-started">
-      Getting started
+            <div>
+  <strong>
+    <a class="button source" href="https://github.com/franciscop/server-tutorial-todo">Source code</a>
+  </strong>
+</div>
+
+
+    <h1 id="to-do-list">
+      TO-DO list
     </h1>
-  <p>In this tutorial you will learn how to get started with Node.js development and create a project from scratch. While there are many ways of doing it, this guide is focused first on making it easy and second on using common tools.</p>
-<p>You will need some basic tools like having a git and a code editor (<a href="https://atom.io/">we recommend Atom</a>) as well as some basic knowledge around your operative system and the terminal/command line.</p>
+  <p>In this tutorial you will learn to design a basic API to create a list of items. We store them in a MongoDB database using Mongoose and it will be for a single person.</p>
+<p>Some possible uses:</p>
+<ul>
+<li>An actual TO-DO list. Some times you just need a simple list.</li>
+<li>The beginning of Hacker News, Reddit, or similar. Those are basically four glorified CRUDs: users, stories, comments, votes.</li>
+</ul>
+<p>End product:</p>
+<p><img src="img/todo_screenshot.png" alt="Screenshot of the final project"></p>
 
-    <h2 id="install-node-js">
-      Install Node.js
+    <h2 id="install-dependencies">
+      Install dependencies
     </h2>
-  <p>This will largely depend on your platform and while you can <a href="https://nodejs.org/en/">just download the binary program from the official page</a> I would recommend using Node Version Manager for mac or Linux:</p>
-<pre><code class="language-bash">curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash</code></pre>
-<p>After this, we have to <strong>close and open the terminal</strong> for it to work properly. Then we use NVM to install a current Node.js&#39; version in the terminal:</p>
-<pre><code class="language-bash">nvm install node
-nvm use node
-nvm alias default node</code></pre>
-<blockquote>
-<p>Server requires <strong>Node.js 7.6.0</strong> or newer. <strong>Node.js 8.9.x</strong> LTS is recommended for long-term support from Node.js.</p>
-</blockquote>
-<p>Great, now we should have Node.js installed and working. To test it&#39;s properly installed, execute this on the terminal:</p>
-<pre><code class="language-bash">node --version    # Should show the version number over 8.x
-npm --version     # verify this is installed as well over 5.x</code></pre>
+  <p>After <a href="/tutorials/getting-started">getting your project ready</a> you&#39;ll have to make sure that you have MongoDB installed following <a href="https://docs.mongodb.com/manual/administration/install-community/">the official guide</a> and run it (will depend on your installation process). To check that you have it on Ubuntu do:</p>
+<pre><code class="language-bash">mongod --version   # Should display a number
+mongod</code></pre>
+<p>Then we install the two libraries that we will be using <strong>within our project folder</strong>:</p>
+<pre><code class="language-bash">npm install server mongoose jest</code></pre>
 
-    <h2 id="create-your-project">
-      Create your project
+    <h2 id="code-organization">
+      Code organization
     </h2>
-  <p>Now that we have Node.js installed, let&#39;s get started with one project. Create a folder in your computer and then access it from the terminal. To access it use <code>cd</code>:</p>
-<pre><code class="language-bash">cd &quot;./projects/My Cool Project&quot;</code></pre>
-<p>From now on, all the operations from the terminal <strong>must</strong> be executed while inside your project in said terminal.</p>
-<p>Then open the project from Atom or your code editor: File &gt; Add project folder... &gt; My Cool Project.</p>
+  <p>Since this is a fairly small project focused on the back-end we will have all our server files within the root folder and won&#39;t go into detail for the front-end. The project will have these files:</p>
+<ul>
+<li><strong>public/</strong>: the folder for public assets.</li>
+<li><strong>views/</strong>: the folder for the only view.</li>
+<li><strong>index.js</strong>: the entry point and routers.</li>
+<li><strong>model.js</strong>: the definition of the database structure.</li>
+<li><strong>package.json</strong>: npm package where the dependencies and some info is.</li>
+<li><strong>test.js</strong>: integration tests to make sure everything is working.</li>
+<li><strong>todo.js</strong>: interaction with the database and main logic.</li>
+</ul>
+<p>You can see the whole working project in the repository:</p>
+<strong>
+  <a href="https://github.com/franciscop/server-tutorial-todo" class="button">
+    Github Repository
+  </a>
+</strong>
 
-    <h2 id="initialize-git-and-npm">
-      Initialize git and npm
-    </h2>
-  <p>Git will be used for handling your code, deploying it and working collaboratively. To get your git started execute this in your terminal:</p>
-<pre><code class="language-bash">git init</code></pre>
-<p>It will create a folder called <code>.git</code> with all the version history in there. We highly recommend to create a <strong>file</strong> called <strong><code>.gitignore</code></strong> (yes, a point and the name with no extension) where we add at least the following:</p>
-<pre><code>*.log
-npm-debug.log*
-node_modules
-.env</code></pre>
-<p>This is because we want these files and places to only be accessible from our computer, but we don&#39;t want to deploy them along the rest of the code.</p>
-<p>Finally we will start our npm package by doing init in the terminal:</p>
-<pre><code class="language-bash">npm init</code></pre>
-<p>It will ask some questions, just answer them or press &quot;enter&quot; to accept the default (set the &quot;main&quot; to &quot;index.js&quot;). After answering everything you should have a <code>package.json</code> file, so now you can edit the part where it says &quot;scripts&quot; to add this:</p>
-<pre><code class="language-json">  &quot;scripts&quot;: {
-    &quot;start&quot;: &quot;node index.js&quot;,
-    &quot;test&quot;: &quot;jest --coverage --forceExit&quot;
-  },</code></pre>
 
-    <h2 id="build-your-project">
-      Build your project
+
+
+    <h2 id="rest-api">
+      REST API
     </h2>
-  <p>That is great! Now you can install the packages that you want like server.js:</p>
-<pre><code class="language-bash">npm install server</code></pre>
-<p>And then create a file called <code>index.js</code> with the demo code to see how it works:</p>
-<pre><code class="language-js">// Import the library
+  <p>Let&#39;s first of all define our API. Let&#39;s keep it simple! Within index.js we write:</p>
+<pre><code class="language-js">// index.js
 const server = require(&#39;server&#39;);
+const { get, post, put, del } = server.router;
+const { render } = server.reply;
+const todo = require(&#39;./todo.js&#39;);
 
-// Launch the server to always answer &quot;Hello world&quot;
-server(ctx =&gt; &#39;Hello world!&#39;);</code></pre>
-<p>To execute it <strong>after saving it</strong>, run from the terminal:</p>
-<pre><code class="language-bash">npm start</code></pre>
-<p>And finally open <a href="http://localhost:3000/">http://localhost:3000/</a> to see it in action!</p>
-<blockquote>
-<p>Note: this guide was published originally on <a href="https://en.libre.university/lesson/V1f6Btf8g/Getting%20started">Libre University - Getting started</a> but has since been adapted better only for Node.js.</p>
-</blockquote>
+// Render the homepage for `/`
+const home = get(&#39;/&#39;, ctx =&gt; render(&#39;index.hbs&#39;));
+
+// Add some API endpoints
+const api = [
+  get(&#39;/todo&#39;, todo.read),
+  post(&#39;/todo&#39;, todo.create),
+  put(&#39;/todo/:id&#39;, todo.update),
+  del(&#39;/todo/:id&#39;, todo.delete)
+];
+
+// Launch the server with those
+server(home, api);</code></pre>
+<p>This first loads the needed library and functions, then defines few routes and finally launches the server with those routes. We are using the default settings so no options are needed.</p>
+<p>We are using the <a href="https://en.wikipedia.org/wiki/Create,_read,_update_and_delete">CRUD operation names</a>, but any of those is fairly common for the method names (just keep them consistent):</p>
+<ul>
+<li>get(): read, retrieve, all, list, select</li>
+<li>post(): create, add, insert</li>
+<li>put(): edit, update, change, modify</li>
+<li>del(): delete, remove, destroy</li>
+</ul>
+
+    <h2 id="database">
+      Database
+    </h2>
+  <p>We are using Mongoose (a layer on top of MongoDB) to implement database access. For this, we first have to create a small <code>model.js</code> where we define how our schema and model data looks like:</p>
+<pre><code class="language-js">// model.js
+const mongoose = require(&#39;mongoose&#39;);
+
+// Configure the Mongoose plugin
+mongoose.connect(process.env.MONGODB_URI || &#39;mongodb://localhost/todo&#39;);
+
+// define the Todo schema
+const TodoSchema = mongoose.Schema({
+  text: { type: String, required: true },
+  done: { type: Boolean, required: true, default: false },
+});
+
+module.exports = mongoose.model(&#39;Todo&#39;, TodoSchema);</code></pre>
+<p>This way, all of our TODOs will have two fields, the text and a boolean indicating whether or not it&#39;s done.</p>
+<p>The mongoose configuration <code>MONGODB_URI</code> <a href="https://serverjs.io/documentation/options/#environment">comes from the environment</a>.</p>
+
+    <h2 id="todos-logic">
+      Todos logic
+    </h2>
+  <p>Now, to write this code we create the file <code>todo.js</code> with this code:</p>
+<pre><code class="language-js">// todo.js
+const { json } = require(&#39;server/reply&#39;);
+const model = require(&#39;./schema&#39;);
+
+export.read = async ctx =&gt; {};
+export.create = async ctx =&gt; {};
+export.update = async ctx =&gt; {};
+export.delete = async ctx =&gt; {};</code></pre>
+<p>These are the 4 basic CRUD operations as shown before. This file will export these asynchronous functions, that will take the context argument <a href="https://serverjs.io/documentation/#middleware">as with any server.js middleware</a> and whatever they return will be used for the response.</p>
+<p>Finally, let&#39;s implement the database access logic inside each of these 4 functions:</p>
+<pre><code class="language-js">// todo.js
+const { status, json } = require(&#39;server/reply&#39;);
+const Todo = require(&#39;./model&#39;);
+
+exports.read = async (ctx) =&gt; {
+  return Todo.find().sort(&#39;done&#39;).lean().exec();
+};
+
+exports.create = async (ctx) =&gt; {
+  const item = new Todo({ text: ctx.data.text });
+  return status(201).json(await item.save());
+};
+
+exports.update = async (ctx) =&gt; {
+  const set = { $set: { done: ctx.data.done } };
+  await Todo.findByIdAndUpdate(ctx.params.id, set).exec();
+  return Todo.find().sort(&#39;done&#39;).lean().exec();
+};
+
+exports.delete = async (ctx) =&gt; {
+  return Todo.findByIdAndRemove(ctx.params.id).exec();
+};</code></pre>
+
+    <h2 id="testing">
+      Testing
+    </h2>
+  <blockquote class="error">This section describes a future API and **it is not available yet**. Now please use more traditional testing method.</blockquote>
+
+<p>We will be using <a href="https://facebook.github.io/jest/">Jest</a> for testing, but you can use any library or framework that you prefer. We have to make a small change in our main <code>index.js</code>: we export the return value from server():</p>
+<pre><code class="language-js">// ...
+module.exports = server(home, api);</code></pre>
+<p>Then we can import it from the integration tests. Let&#39;s create a <code>test.js</code>:</p>
+<pre><code class="language-js">// test.js
+const run = require(&#39;server/test/run&#39;);
+const server = require(&#39;./index.js&#39;);
+
+describe(&#39;Homepage&#39;, () =&gt; {
+  it(&#39;renders the homepage&#39;, async () =&gt; {
+    const res = await run(server).get(&#39;/&#39;);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatch(/\&lt;h1\&gt;TODO list&lt;\/h1&gt;/i);
+  });
+});</code></pre>
 
           </article>
         </div>
