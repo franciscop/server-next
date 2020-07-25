@@ -157,6 +157,8 @@ function escape(unsafe) {
     }
   });
 
+  $(".search").on("submit", (e) => e.preventDefault());
+
   $(".search input").on("input", (e) => {
     const text = e.target.value.toLowerCase().replace(/\W/g, " ");
     $(".results").html("");
