@@ -78,6 +78,8 @@ const searchData = (async () => {
     .map((url) => url.replace(/\/$/, ""))
     .filter(unique);
 
+  console.log(links);
+
   const stringToHTML = function (str) {
     var parser = new DOMParser();
     var doc = parser.parseFromString(str, "text/html");
