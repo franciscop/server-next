@@ -225,8 +225,8 @@ aside {
     height: 20px;
     background: #f5f5f5;
     line-height: 20px;
-    margin-top: 8px;
-    margin-right: 6px;
+    padding: 0;
+    margin: 8px 6px 0 0;
     border-radius: 3px;
     text-align: center;
     vertical-align: middle;
@@ -290,6 +290,7 @@ aside {
       transition: all 0.2s ease;
     }
 
+    &.active::after,
     &:hover::after {
       opacity: 1;
       transform: translate(0px) scale(1);

@@ -149,6 +149,38 @@ function escape(unsafe) {
       if (e.key === "Escape") {
         e.target.blur();
       }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        let index = null;
+        $(".results a")
+          .each((link, i, links) => {
+            if ($(link).hasClass("active")) {
+              index = (i + 1) % links.length;
+            }
+          })
+          .removeClass("active")
+          .each((link, i) => {
+            if (i === index) {
+              $(link).addClass("active");
+            }
+          });
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        let index = null;
+        $(".results a")
+          .each((link, i, links) => {
+            if ($(link).hasClass("active")) {
+              index = (links.length + i - 1) % links.length;
+            }
+          })
+          .removeClass("active")
+          .each((link, i) => {
+            if (i === index) {
+              $(link).addClass("active");
+            }
+          });
+      }
       return;
     }
     if (e.key === "/") {
@@ -157,7 +189,13 @@ function escape(unsafe) {
     }
   });
 
-  $(".search").on("submit", (e) => e.preventDefault());
+  $(".search").on("submit", (e) => {
+    e.preventDefault();
+    const link = $(".results a").first();
+    if (link) {
+      link.click();
+    }
+  });
 
   $(".search input").on("input", (e) => {
     const text = e.target.value.toLowerCase().replace(/\W/g, " ");
@@ -211,5 +249,7 @@ function escape(unsafe) {
         `);
       }
     }
+
+    $(".results > *:first-child a").addClass("active");
   });
 })();
