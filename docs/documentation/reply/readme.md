@@ -24,12 +24,13 @@ A reply is a method **returned from a middleware** that creates the response. Th
 Examples:
 
 ```js
-const { get, post } = require('server/router');
-const { render, redirect, file } = require('server/reply');
+import server from 'server';
+const { get, post } = server.router;
+const { render, redirect } = server.reply;
 
-module.exports = [
-  get('/', ctx => render('index.hbs')),
-  post('/', processRequest, ctx => redirect('/'))
+export default [
+  get('/', () => render('index.hbs')),
+  post('/', processRequest, () => redirect('/'))
 ];
 ```
 
@@ -45,11 +46,10 @@ The `ctx` argument is [explained in middleware's Context](/documentation/context
 // For whenever you have previously defined `server`
 const { send, json } = server.reply;
 
-// For standalone files:
+// [DEPRECATED] This method is no longer recommended
 const { send, json } = require('server/reply');
 ```
 
-There are many more ways of importing the reply methods, but those above are the recommended ones.
 
 
 ### Chainable

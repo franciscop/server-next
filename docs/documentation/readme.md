@@ -26,7 +26,7 @@ There's [a getting started tutorial for beginners](/tutorials/getting-started/).
 npm install server
 ```
 
-Then remember to add the `"type": "module"` to your `package.json` since we are using ESM:
+Add the `"type": "module"` to your `package.json` since we use ESM:
 
 ```json
 {
@@ -36,7 +36,7 @@ Then remember to add the `"type": "module"` to your `package.json` since we are 
 }
 ```
 
-Then create some demo code in your `index.js`:
+Create some demo code in your `index.js`:
 
 ```js
 // Answers to any request with "Hello world"
@@ -50,7 +50,7 @@ Finally run the example from the terminal:
 node .
 ```
 
-Open your browser on [localhost:3000](http://localhost:3000/) to see it in action.
+Open your browser on [localhost:3000](http://localhost:3000/) to see the response in your browser.
 
 
 
@@ -59,7 +59,7 @@ Open your browser on [localhost:3000](http://localhost:3000/) to see it in actio
 Some of the components are the main function on itself, [router](/documentation/router/) and [reply](/documentation/reply/). The main function accepts first an optional object for [the options](/documentation/options/), and then as many [middleware](#middleware) or arrays of middleware as wanted:
 
 ```js
-const server = require('server');
+import server from 'server';
 
 server({ port: 3000 }, ctx => 'Hello 世界');
 ```
@@ -67,7 +67,7 @@ server({ port: 3000 }, ctx => 'Hello 世界');
 To use the router and reply extract their methods as needed:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { get, post } = server.router;
 const { render, json } = server.reply;
 
@@ -76,13 +76,6 @@ server([
   post('/', ctx => json(ctx.data)),
   get(ctx => status(404))
 ]);
-```
-
-Then when you are splitting your files into different parts and don't have access to the global server you can import only the corresponding parts:
-
-```js
-const { get, post } = require('server/router');
-const { render, json } = require('server/reply');
 ```
 
 
@@ -100,20 +93,23 @@ server(setname, sendname);
 They can be placed as `server()` arguments, combined into an array or imported/exported from other files:
 
 ```js
+import commentsRouter from './comments/router.js';
+
 server(
   ctx => send(ctx.user),
   [ ctx => console.log(ctx.data) ],
-  require('./comments/router.js')
+  commentsRouter
 );
 ```
 
 Then in `./comments/router.js`:
 
 ```js
-const { get, post, put, del } = require('server/router');
-const { json } = require('server/reply');
+import server from 'server';
+const { get, post, put, del } = server.router;
+const { json } = server.reply;
 
-module.exports = [
+export default [
   get('/',    ctx => { /* ... */ }),
   post('/',   ctx => { /* ... */ }),
   put('/:id', ctx => { /* ... */ }),
@@ -179,10 +175,11 @@ const middle = async ctx => {
 Server.js is using express as the underlying library (we <3 express!). You can import middleware designed for express with `modern`:
 
 ```js
-const server = require('server');
+import server from 'server';
+import Helmet from 'helmet';
 
-// Require it and initialize it with some options
-const legacy = require('helmet')({ ... });
+// Initialize it with some options
+const legacy = Helmet({ ... });
 
 // Convert it to server.js middleware
 const mid = server.utils.modern(legacy);
@@ -193,26 +190,13 @@ server(mid, ...);
 
 > Note: the `{ ... }` represent the options for that middleware since many of [express libraries](https://expressjs.com/en/guide/writing-middleware.html) follow the [factory pattern](https://github.com/expressjs/express/issues/3150).
 
-To simplify it, we can also perform this operation inline:
-
-```js
-const server = require('server');
-const { modern } = server.utils;
-
-server(
-  modern(require('express-mid-1')({ ... })),
-  modern(require('express-mid-2')({ ... })),
-  // ...
-);
-```
-
-Or just keep the whole middleware in a separated file/folder:
+Or you can keep the whole middleware in a separated file/folder:
 
 ```js
 // index.js
-const server = require('server');
-const middleware = require('./middleware');
-const routes = require('./routes');
+import server from 'server';
+import middleware from './middleware.js';
+import routes from './routes.js';
 
 server(middleware, routes);
 ```
@@ -221,12 +205,15 @@ Then in our `middleware.js`:
 
 ```js
 // middleware.js
-const server = require('server');
+import server from 'server';
+import Middleware1 from 'express-mid-1';
+import Middleware2 from 'express-mid-2';
+
 const { modern } = server.utils;
 
-module.exports = [
-  modern(require('express-mid-1')({ /* ... */ })),
-  modern(require('express-mid-2')({ /* ... */ }))
+export default [
+  modern(Middleware1({ /* ... */ })),
+  modern(Middleware2({ /* ... */ }))
 ];
 ```
 
@@ -240,7 +227,7 @@ To allow requesting a resource from another domain you must enable [Cross-Origin
 Let's see how to do it manually for any domain:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { header } = server.reply;  // OR server.reply;
 
 const cors = [
@@ -256,10 +243,11 @@ server({}, cors, ...);
 If you want to whitelist some domains it's not easy manually, so we can use the great package [`cors` from npm](https://www.npmjs.com/package/cors):
 
 ```js
-const server = require('server');
+import server from 'server';
+import Cors from 'cors';
 
 // Load it with the options
-const corsExpress = require('cors')({
+const corsExpress = Cors({
   origin: ['https://example.com', 'https://example2.com']
 });
 
@@ -279,12 +267,8 @@ This is the concept of redirecting each request to our server to the right place
 For this we will be creating routes using server's routers. We can import it like this:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { get, post } = server.router;
-
-// OR
-
-const { get, post } = require('server/router');
 ```
 
 There are some other ways, but these are the recommended ones. Then we say the path of the request for the method that we want to listen to and a middleware:
@@ -300,7 +284,7 @@ const getGallery = get('/gallery/:id', async ctx => {
 Let's put it all together to see how they work:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { get, post } = server.router;
 
 const getHome = get('/', () => render('index.pug'));

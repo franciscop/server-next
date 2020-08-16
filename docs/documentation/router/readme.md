@@ -22,7 +22,8 @@ A router is a function that tells the server how to handle each request. They ar
 
 ```js
 // Import methods 'get' and 'post' from the router
-const { get, post } = require('server/router');
+import server from 'server';
+const { get, post } = server.router;
 
 server([
   get('/', ctx => { /* ... */ }),      // Render homepage
@@ -37,11 +38,9 @@ The `ctx` argument is [explained in middleware's Context](/documentation/context
 // For whenever you have previously defined `server`
 const { get, post } = server.router;
 
-// For standalone files:
+// [DEPRECATED] This is no longer recommended:
 const { get, post } = require('server/router');
 ```
-
-There are many more ways of importing the router methods, but those above are the recommended ones.
 
 
 
@@ -51,16 +50,17 @@ If you are going to have many routes, we recommend splitting them into separated
 
 ```js
 // app.js
-const server = require('server');
-const routes = require('./routes');
+import server from 'server';
+import routes from './routes.js';
 
 server(routes);
 ```
 
 ```js
 // routes.js
-const { get, post } = require('server/router');
-const ctrl = require('auto-load')('controllers');
+import server from 'server';
+import ctrl from './controllers/index.js';
+const { get, post } = server.router;
 
 // You can simply export an array of routes
 module.exports = [
@@ -78,7 +78,7 @@ The `ctx` variable is [the context (documentation here)](https://serverjs.io/doc
 All of the routers reside within the `server.router` and follow this structure:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { TYPE } = server.router;
 const doSomething = TYPE(ID, fn1, [fn2], [fn3]);
 server(doSomething);
@@ -117,8 +117,7 @@ fetch('/', {
 }).then(...);
 ```
 
-
-Or you could also just disable it if you know what you are doing:
+If you have a different auth method and you know what you are doing, you can also disable it:
 
 ```js
 server({ security: { csrf: false } }, ...);
@@ -180,7 +179,7 @@ Example:
 
 ```js
 // index.js
-const server = require('server');
+import server from 'server';
 const { get, post } = server.router;
 const { file, redirect } = server.reply;
 
@@ -344,7 +343,7 @@ server(mid1, mid2, handleUser);
 Handle subdomain calls:
 
 ```js
-const server = require('server');
+import server from 'server';
 const { sub } = server.router;
 
 server([
@@ -369,7 +368,7 @@ const language = sub(/(en|es|jp)/, ctx => {
 > *Experimental now, coming stable in version 1.1*
 
 ```js
-const server = require('server');
+import server from 'server';
 const { get, socket } = server.router;
 const { render } = server.reply;
 

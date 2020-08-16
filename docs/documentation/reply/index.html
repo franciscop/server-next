@@ -38,8 +38,9 @@
       <label for="bmenub" class="burger">menu</label>
     
       <div class="menu">
+        <a href="/about">About</a>
         <a href="/documentation">Documentation</a>
-        <a href="/screencasts">Screencasts</a>
+        <!-- <a href="/screencasts">Screencasts</a> -->
         <a href="/tutorials">Tutorials</a>
         <a href="https://github.com/franciscop/server">Github</a>
       </div>
@@ -413,12 +414,13 @@
 </tr>
 </tbody></table>
 <p>Examples:</p>
-<pre><code class="language-js">const { get, post } = require(&#39;server/router&#39;);
-const { render, redirect, file } = require(&#39;server/reply&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
+const { get, post } = server.router;
+const { render, redirect } = server.reply;
 
-module.exports = [
-  get(&#39;/&#39;, ctx =&gt; render(&#39;index.hbs&#39;)),
-  post(&#39;/&#39;, processRequest, ctx =&gt; redirect(&#39;/&#39;))
+export default [
+  get(&#39;/&#39;, () =&gt; render(&#39;index.hbs&#39;)),
+  post(&#39;/&#39;, processRequest, () =&gt; redirect(&#39;/&#39;))
 ];</code></pre>
 <blockquote class="warning">
   Make sure to **return** the reply that you want to use. It won't work otherwise.
@@ -430,9 +432,8 @@ module.exports = [
 <pre><code class="language-js">// For whenever you have previously defined `server`
 const { send, json } = server.reply;
 
-// For standalone files:
+// [DEPRECATED] This method is no longer recommended
 const { send, json } = require(&#39;server/reply&#39;);</code></pre>
-<p>There are many more ways of importing the reply methods, but those above are the recommended ones.</p>
 
     <h3 id="chainable">
       Chainable

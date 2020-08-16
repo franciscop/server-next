@@ -38,8 +38,9 @@
       <label for="bmenub" class="burger">menu</label>
     
       <div class="menu">
+        <a href="/about">About</a>
         <a href="/documentation">Documentation</a>
-        <a href="/screencasts">Screencasts</a>
+        <!-- <a href="/screencasts">Screencasts</a> -->
         <a href="/tutorials">Tutorials</a>
         <a href="https://github.com/franciscop/server">Github</a>
       </div>
@@ -437,7 +438,7 @@
 </tbody></table>
 <p>You can set those through <strong>the first argument</strong> in <code>server()</code> function:</p>
 <pre><code class="language-js">// Import the main library
-const server = require(&#39;server&#39;);
+import server from &#39;server&#39;;
 
 // Launch the server with the options
 server({
@@ -473,7 +474,7 @@ NODE_ENV=development</code></pre>
       Argument
     </h3>
   <p>The alternative to the environment variables is to pass them <strong>as the first argument</strong> when calling <code>server()</code>. Each option is a combination of key/value in the object and they all go in lowercase. See some options with their defaults:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 
 server({
   port: 3000,
@@ -668,15 +669,16 @@ server(ctx =&gt; render(&#39;index.hbs&#39;));
   <p>Engines are really easy to write with server.js. They must be a function that receives the file path and the options (or locals) and returns the text to render from the engine. It can be either sync or async. To configure it for handling a specific extension, just put that as the key in an object for <code>engine</code>.</p>
 <p>As an example of how to handle nunjucks, in a single file for it:</p>
 <pre><code class="language-js">// nunjucks-engine.js
-const nunjucks = require(&#39;nunjucks&#39;);
+import nunjucks from &#39;nunjucks&#39;;
 
 // The .render() in Nunjucks is sync, so no need to wait
-module.exports = (file, options) =&gt; nunjucks.render(file, options);</code></pre>
+export default = (file, options) =&gt; nunjucks.render(file, options);</code></pre>
 <p>Then in your main file:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
+import nunjucks from &#39;./nunjucks.js&#39;;
+
 const { get } = server.router;
 const { render } = server.reply;
-const nunjucks = require(&#39;./nunjucks&#39;);
 
 const options = {
   engine: {
@@ -734,7 +736,7 @@ production</code></pre>
       Favicon
     </h2>
   <p>To include a favicon, specify its path with the <code>favicon</code> key:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 
 server({ favicon: &#39;public/favicon.png&#39; },
   ctx =&gt; &#39;Hello world&#39;
@@ -830,7 +832,7 @@ server({ favicon: &#39;public/favicon.png&#39; },
 <pre><code class="language-bash"># .env
 REDIS_URL=redis://:password@hostname:port/db_number</code></pre>
 <pre><code class="language-js">// index.js
-const server = require(&#39;server&#39;);
+import server from &#39;server&#39;;
 
 // It will work by default since it&#39;s an env variable
 server({}, ...);</code></pre>
@@ -848,11 +850,14 @@ const store = ...;
 // Use it within the session
 server({ session: { store } }, ...);</code></pre>
 <p>Many of the stores will need you to pass the raw <strong><code>session</code></strong> initially like this:</p>
-<pre><code class="language-js">const RedisStore = require(&#39;connect-redis&#39;)(session);
+<pre><code class="language-js">import Redis from &#39;connect-redis&#39;;
+const RedisStore = Redis(session);
 const store = RedisStore({ ... });</code></pre>
 <p>You can access this variable through <code>server.session</code> after requiring <code>server</code>:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
-const RedisStore = require(&#39;connect-redis&#39;)(server.session);
+<pre><code class="language-js">import server from &#39;server&#39;;
+import Redis from &#39;connect-redis&#39;;
+
+const RedisStore = Redis(server.session);
 const store = RedisStore({ ... });
 
 server({ session: { store } }, ...);</code></pre>

@@ -38,8 +38,9 @@
       <label for="bmenub" class="burger">menu</label>
     
       <div class="menu">
+        <a href="/about">About</a>
         <a href="/documentation">Documentation</a>
-        <a href="/screencasts">Screencasts</a>
+        <!-- <a href="/screencasts">Screencasts</a> -->
         <a href="/tutorials">Tutorials</a>
         <a href="https://github.com/franciscop/server">Github</a>
       </div>
@@ -434,7 +435,7 @@
 </tbody></table>
 <p>It can appear at several points, but the most important one is as a middleware parameter:</p>
 <pre><code class="language-js">// Load the server from the dependencies
-const server = require(&quot;server&quot;);
+import server from &quot;server&quot;;
 
 // Display &quot;Hello 世界&quot; for any request
 const middleware = (ctx) =&gt; {
@@ -485,7 +486,7 @@ form(method=&quot;POST&quot; action=&quot;/contact&quot;)
   input(name=&quot;_csrf&quot; value=csrf type=&quot;hidden&quot;)
   input(type=&quot;submit&quot; value=&quot;Subscribe&quot;)</code></pre>
 <p>Then to parse the data from the back-end:</p>
-<pre><code class="language-js">const server = require(&quot;server&quot;);
+<pre><code class="language-js">import server from &quot;server&quot;;
 const { get, post } = server.router;
 const { render, redirect } = server.reply;
 

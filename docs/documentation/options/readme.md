@@ -27,7 +27,7 @@ You can set those through **the first argument** in `server()` function:
 
 ```js
 // Import the main library
-const server = require('server');
+import server from 'server';
 
 // Launch the server with the options
 server({
@@ -76,7 +76,7 @@ To set them in remote server it will depend on the hosting that you use ([see He
 The alternative to the environment variables is to pass them **as the first argument** when calling `server()`. Each option is a combination of key/value in the object and they all go in lowercase. See some options with their defaults:
 
 ```js
-const server = require('server');
+import server from 'server';
 
 server({
   port: 3000,
@@ -311,19 +311,20 @@ As an example of how to handle nunjucks, in a single file for it:
 
 ```js
 // nunjucks-engine.js
-const nunjucks = require('nunjucks');
+import nunjucks from 'nunjucks';
 
 // The .render() in Nunjucks is sync, so no need to wait
-module.exports = (file, options) => nunjucks.render(file, options);
+export default = (file, options) => nunjucks.render(file, options);
 ```
 
 Then in your main file:
 
 ```js
-const server = require('server');
+import server from 'server';
+import nunjucks from './nunjucks.js';
+
 const { get } = server.router;
 const { render } = server.reply;
-const nunjucks = require('./nunjucks');
 
 const options = {
   engine: {
@@ -388,7 +389,7 @@ server(ctx => {
 To include a favicon, specify its path with the `favicon` key:
 
 ```js
-const server = require('server');
+import server from 'server';
 
 server({ favicon: 'public/favicon.png' },
   ctx => 'Hello world'
@@ -520,7 +521,7 @@ REDIS_URL=redis://:password@hostname:port/db_number
 
 ```js
 // index.js
-const server = require('server');
+import server from 'server';
 
 // It will work by default since it's an env variable
 server({}, ...);
@@ -549,15 +550,18 @@ server({ session: { store } }, ...);
 Many of the stores will need you to pass the raw **`session`** initially like this:
 
 ```js
-const RedisStore = require('connect-redis')(session);
+import Redis from 'connect-redis';
+const RedisStore = Redis(session);
 const store = RedisStore({ ... });
 ```
 
 You can access this variable through `server.session` after requiring `server`:
 
 ```js
-const server = require('server');
-const RedisStore = require('connect-redis')(server.session);
+import server from 'server';
+import Redis from 'connect-redis';
+
+const RedisStore = Redis(server.session);
 const store = RedisStore({ ... });
 
 server({ session: { store } }, ...);

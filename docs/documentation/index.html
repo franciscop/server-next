@@ -38,8 +38,9 @@
       <label for="bmenub" class="burger">menu</label>
     
       <div class="menu">
+        <a href="/about">About</a>
         <a href="/documentation">Documentation</a>
-        <a href="/screencasts">Screencasts</a>
+        <!-- <a href="/screencasts">Screencasts</a> -->
         <a href="/tutorials">Tutorials</a>
         <a href="https://github.com/franciscop/server">Github</a>
       </div>
@@ -364,29 +365,29 @@ server(options, fn1, fn2, fn3, ...);</code></pre>
     </h2>
   <p>There&#39;s <a href="/tutorials/getting-started/">a getting started tutorial for beginners</a>. If you know your way around:</p>
 <pre><code class="language-bash">npm install server</code></pre>
-<p>Then remember to add the <code>&quot;type&quot;: &quot;module&quot;</code> to your <code>package.json</code> since we are using ESM:</p>
+<p>Add the <code>&quot;type&quot;: &quot;module&quot;</code> to your <code>package.json</code> since we use ESM:</p>
 <pre><code class="language-json">{
   &quot;name&quot;: &quot;my-package1&quot;,
   &quot;type&quot;: &quot;module&quot;,
   ...
 }</code></pre>
-<p>Then create some demo code in your <code>index.js</code>:</p>
+<p>Create some demo code in your <code>index.js</code>:</p>
 <pre><code class="language-js">// Answers to any request with &quot;Hello world&quot;
 import server from &#39;server&#39;;
 server(ctx =&gt; &#39;Hello world&#39;);</code></pre>
 <p>Finally run the example from the terminal:</p>
 <pre><code class="language-bash">node .</code></pre>
-<p>Open your browser on <a href="http://localhost:3000/">localhost:3000</a> to see it in action.</p>
+<p>Open your browser on <a href="http://localhost:3000/">localhost:3000</a> to see the response in your browser.</p>
 
     <h2 id="basic-usage">
       Basic usage
     </h2>
   <p>Some of the components are the main function on itself, <a href="/documentation/router/">router</a> and <a href="/documentation/reply/">reply</a>. The main function accepts first an optional object for <a href="/documentation/options/">the options</a>, and then as many <a href="#middleware">middleware</a> or arrays of middleware as wanted:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 
 server({ port: 3000 }, ctx =&gt; &#39;Hello 世界&#39;);</code></pre>
 <p>To use the router and reply extract their methods as needed:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 const { get, post } = server.router;
 const { render, json } = server.reply;
 
@@ -395,9 +396,6 @@ server([
   post(&#39;/&#39;, ctx =&gt; json(ctx.data)),
   get(ctx =&gt; status(404))
 ]);</code></pre>
-<p>Then when you are splitting your files into different parts and don&#39;t have access to the global server you can import only the corresponding parts:</p>
-<pre><code class="language-js">const { get, post } = require(&#39;server/router&#39;);
-const { render, json } = require(&#39;server/reply&#39;);</code></pre>
 
     <h2 id="middleware">
       Middleware
@@ -407,16 +405,19 @@ const { render, json } = require(&#39;server/reply&#39;);</code></pre>
 const sendname = ctx =&gt; send(ctx.user);
 server(setname, sendname);</code></pre>
 <p>They can be placed as <code>server()</code> arguments, combined into an array or imported/exported from other files:</p>
-<pre><code class="language-js">server(
+<pre><code class="language-js">import commentsRouter from &#39;./comments/router.js&#39;;
+
+server(
   ctx =&gt; send(ctx.user),
   [ ctx =&gt; console.log(ctx.data) ],
-  require(&#39;./comments/router.js&#39;)
+  commentsRouter
 );</code></pre>
 <p>Then in <code>./comments/router.js</code>:</p>
-<pre><code class="language-js">const { get, post, put, del } = require(&#39;server/router&#39;);
-const { json } = require(&#39;server/reply&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
+const { get, post, put, del } = server.router;
+const { json } = server.reply;
 
-module.exports = [
+export default [
   get(&#39;/&#39;,    ctx =&gt; { /* ... */ }),
   post(&#39;/&#39;,   ctx =&gt; { /* ... */ }),
   put(&#39;/:id&#39;, ctx =&gt; { /* ... */ }),
@@ -466,10 +467,11 @@ const mid = ctx =&gt; {
       Express middleware
     </h2>
   <p>Server.js is using express as the underlying library (we &lt;3 express!). You can import middleware designed for express with <code>modern</code>:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
+import Helmet from &#39;helmet&#39;;
 
-// Require it and initialize it with some options
-const legacy = require(&#39;helmet&#39;)({ ... });
+// Initialize it with some options
+const legacy = Helmet({ ... });
 
 // Convert it to server.js middleware
 const mid = server.utils.modern(legacy);
@@ -479,30 +481,24 @@ server(mid, ...);</code></pre>
 <blockquote>
 <p>Note: the <code>{ ... }</code> represent the options for that middleware since many of <a href="https://expressjs.com/en/guide/writing-middleware.html">express libraries</a> follow the <a href="https://github.com/expressjs/express/issues/3150">factory pattern</a>.</p>
 </blockquote>
-<p>To simplify it, we can also perform this operation inline:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
-const { modern } = server.utils;
-
-server(
-  modern(require(&#39;express-mid-1&#39;)({ ... })),
-  modern(require(&#39;express-mid-2&#39;)({ ... })),
-  // ...
-);</code></pre>
-<p>Or just keep the whole middleware in a separated file/folder:</p>
+<p>Or you can keep the whole middleware in a separated file/folder:</p>
 <pre><code class="language-js">// index.js
-const server = require(&#39;server&#39;);
-const middleware = require(&#39;./middleware&#39;);
-const routes = require(&#39;./routes&#39;);
+import server from &#39;server&#39;;
+import middleware from &#39;./middleware.js&#39;;
+import routes from &#39;./routes.js&#39;;
 
 server(middleware, routes);</code></pre>
 <p>Then in our <code>middleware.js</code>:</p>
 <pre><code class="language-js">// middleware.js
-const server = require(&#39;server&#39;);
+import server from &#39;server&#39;;
+import Middleware1 from &#39;express-mid-1&#39;;
+import Middleware2 from &#39;express-mid-2&#39;;
+
 const { modern } = server.utils;
 
-module.exports = [
-  modern(require(&#39;express-mid-1&#39;)({ /* ... */ })),
-  modern(require(&#39;express-mid-2&#39;)({ /* ... */ }))
+export default [
+  modern(Middleware1({ /* ... */ })),
+  modern(Middleware2({ /* ... */ }))
 ];</code></pre>
 <p>Read the next section for a great example of a common middleware from express used with server.</p>
 
@@ -511,7 +507,7 @@ module.exports = [
     </h2>
   <p>To allow requesting a resource from another domain you must enable <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS">Cross-Origin Resource Sharing (CORS)</a>. To do so, you have two options: do it manually or through a great library. Both of them end up setting some headers.</p>
 <p>Let&#39;s see how to do it manually for any domain:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 const { header } = server.reply;  // OR server.reply;
 
 const cors = [
@@ -523,10 +519,11 @@ const cors = [
 
 server({}, cors, ...);</code></pre>
 <p>If you want to whitelist some domains it&#39;s not easy manually, so we can use the great package <a href="https://www.npmjs.com/package/cors"><code>cors</code> from npm</a>:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
+import Cors from &#39;cors&#39;;
 
 // Load it with the options
-const corsExpress = require(&#39;cors&#39;)({
+const corsExpress = Cors({
   origin: [&#39;https://example.com&#39;, &#39;https://example2.com&#39;]
 });
 
@@ -541,12 +538,8 @@ server({}, cors, ...);</code></pre>
     </h2>
   <p>This is the concept of redirecting each request to our server to the right place. For instance, if the user requests our homepage <code>/</code> we want to render the homepage, but if they request an image gallery <code>/gallery/67546</code> we want to render the gallery <code>67546</code>.</p>
 <p>For this we will be creating routes using server&#39;s routers. We can import it like this:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
-const { get, post } = server.router;
-
-// OR
-
-const { get, post } = require(&#39;server/router&#39;);</code></pre>
+<pre><code class="language-js">import server from &#39;server&#39;;
+const { get, post } = server.router;</code></pre>
 <p>There are some other ways, but these are the recommended ones. Then we say the path of the request for the method that we want to listen to and a middleware:</p>
 <pre><code class="language-js">const getHome = get(&#39;/&#39;, () =&gt; render(&#39;index.pug&#39;));
 const getGallery = get(&#39;/gallery/:id&#39;, async ctx =&gt; {
@@ -554,7 +547,7 @@ const getGallery = get(&#39;/gallery/:id&#39;, async ctx =&gt; {
   return render(&#39;gallery.pug&#39;, { images });
 });</code></pre>
 <p>Let&#39;s put it all together to see how they work:</p>
-<pre><code class="language-js">const server = require(&#39;server&#39;);
+<pre><code class="language-js">import server from &#39;server&#39;;
 const { get, post } = server.router;
 
 const getHome = get(&#39;/&#39;, () =&gt; render(&#39;index.pug&#39;));

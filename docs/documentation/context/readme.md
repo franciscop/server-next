@@ -29,7 +29,7 @@ It can appear at several points, but the most important one is as a middleware p
 
 ```js
 // Load the server from the dependencies
-const server = require("server");
+import server from "server";
 
 // Display "Hello 世界" for any request
 const middleware = (ctx) => {
@@ -99,7 +99,7 @@ form(method="POST" action="/contact")
 Then to parse the data from the back-end:
 
 ```js
-const server = require("server");
+import server from "server";
 const { get, post } = server.router;
 const { render, redirect } = server.reply;
 
