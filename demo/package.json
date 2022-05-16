@@ -1,9 +1,9 @@
 {
-  "name": "@server/next-demo",
-  "version": "0.0.0",
-  "private-comment": "Not really private, but it's just a test/demo folder so",
+  "name": "demopkg",
+  "version": "1.0.0",
+  "homepage": "https://myapi.com/",
+  "description": "A small demo API for testing the new server.js Developer Experience",
   "private": true,
-  "description": "An experimental Server.js reimplementation",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -16,27 +16,5 @@
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
-  "dependencies": {},
-  "devDependencies": {
-    "@babel/core": "^7.4.4",
-    "@babel/preset-env": "^7.4.4",
-    "rollup": "^1.21.4"
-  },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ]
-    ],
-    "plugins": [
-      [
-        "@babel/plugin-syntax-dynamic-import"
-      ]
-    ]
-  }
+  "dependencies": {}
 }
