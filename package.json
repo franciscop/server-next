@@ -1,8 +1,9 @@
 {
   "name": "@server/next",
   "version": "0.14.0",
-  "description": "An experimental Server.js reimplementation",
+  "description": "An experimental reimplementation of server.js focused on the DX",
   "main": "index.js",
+  "homepage": "https://node-server.com/",
   "type": "module",
   "scripts": {
     "build": "rollup -c && npm run size",
@@ -22,30 +23,26 @@
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/franciscop/server-next.git"
-  },
+  "repository": "git+https://github.com/franciscop/server-next.git",
+  "bugs": "https://github.com/franciscop/server-next/issues",
   "dependencies": {
-    "formidable": "^2.0.0-canary.20200504.1"
+    "dotenv": "^16.0.1",
+    "files": "^2.1.1",
+    "formidable": "^2.0.0-canary.20200504.1",
+    "mime": "^3.0.0",
+    "open": "^8.4.0",
+    "ora": "^6.1.0",
+    "prettier": "^2.0.5",
+    "spinnies": "^0.5.1",
+    "urlpattern-polyfill": "^4.0.3"
   },
   "devDependencies": {
     "jest": "^26.0.1",
     "path-to-regexp": "^6.1.0",
-    "picnic": "^6.5.2",
-    "prettier": "^2.0.5",
-    "rollup": "^1.21.4",
-    "rollup-plugin-commonjs": "^10.1.0",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-terser": "^6.1.0",
     "sign": "^1.0.2"
   },
   "jest": {
     "testEnvironment": "jest-environment-node",
     "transform": {}
-  },
-  "bugs": {
-    "url": "https://github.com/franciscop/server-next/issues"
-  },
-  "homepage": "https://github.com/franciscop/server-next#readme"
+  }
 }

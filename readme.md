@@ -1,6 +1,42 @@
+# Server @ Next
+
 > **VERY EARLY WORK IN PROGRESS**
 >
 > **I don't know what will come out of this, if anything! Treat as the most experimental thing you've ever seen**
+
+An early new implementation from scratch of Server.js. Now with plugins!
+
+```js
+import server, { get, post, put, use, error } from 'server';
+
+// Create a running instance of the server
+const app = server(config, [pluginA, pluginB]);
+
+// Attach handlers to the instance
+app([
+  get('/users', getUsers),
+  post('/users', createUser),
+  put('/users/:id', editUser),
+  use('/admin/*', dashboard),
+  error(ctx => console.log(ctx.error))
+]);
+```
+
+Why? The ecosystem is moving out of server-rendered websites so we are as well. Now instead we treat APIs as first-class citizens. Desired improvements (WIP!):
+
+- Tiny footprint with no dependencies, all bundled in a single file. Installing and using the full library takes under 10kb (target limit).
+- Faster! Reimplemented from scratch for speed. With raw ES6+ and a tiny code footprint, your server will fly.
+- Modern ES6+ESM syntax for both the library and examples.
+- Error handling improved greatly.
+- ~Compatible with Cloudflare Workers so you can run the same code on Node.js or on a Worker.~ non-goal anymore
+- Not using express underneath anymore. Considering keeping the compatibility layer anynway (since Express itself is a thin layer).
+- Changed the reply logic greatly, including the removal of `render()`. This is the main reason express was removed. Many servers don't need render() at all.
+- **[security]** Removed mandatory CSRF token, since this is only useful for server-rendered pages and not for SPA. You can activate it with a single option as before.
+
+
+
+
+
 
 # Server.js
 
@@ -26,6 +62,15 @@ server(
   get("/users/:id", ({ params }) => `The user is ${params.id}`),
   post("/users", () => ({ id: "abc", name: "Francisco" }))
 );
+
+// It will be published under `server` in the future
+import server, { get, post } from "@server/next";
+const app = server();
+app([
+  get('/', () => 'Homepage works! Try /users/abc'),
+  get('/users/:id', ({ params }) => `The user is ${params.id}`),
+  post('/users', () => ({ id: 'abc', name: 'Francisco' }))
+]);
 ```
 
 ## Demo

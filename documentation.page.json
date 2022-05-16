@@ -1,0 +1,9 @@
+{
+  "home": "docs/index.html",
+  "menu": {
+    "About": "/about",
+    "Documentation": "/documentation",
+    "Tutorials": "/tutorials",
+    "Github": "https://github.com/franciscop/server-next"
+  }
+}
