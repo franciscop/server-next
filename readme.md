@@ -41,7 +41,9 @@ Why? The ecosystem is moving out of server-rendered websites so we are as well. 
 
 ## Progress
 
-- Router has `get` and `post`, as well as URL pattern matches
+- Router has all verbs, as well as URL pattern matches
+- Full URL parsing, including `query` and `params` in ctx.url.
+- Body and Files parsing is working (TODO: try with binary files and add tests)
 - The middleware can return:
   - A number and it'll be set as the status code
   - A string and it'll be sent as plain text or html (if it starts with "<")
