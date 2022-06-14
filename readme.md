@@ -7,7 +7,7 @@
 A fully-fledged web server for Node.js, with all the basics covered for you:
 
 ```js
-import server, { get, post, put, use, error } from 'server';
+import server, { get, post, put, use } from 'server';
 
 // Create a running instance of the server
 const app = server(config, [pluginA, pluginB]);
@@ -17,8 +17,7 @@ app([
   get('/users', getUsers),
   post('/users', createUser),
   put('/users/:id', editUser),
-  use('/admin/*', dashboard),
-  error(ctx => console.log(ctx.error))
+  use('/admin/*', dashboard)
 ]);
 ```
 

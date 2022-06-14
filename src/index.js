@@ -278,3 +278,12 @@ export const head = (pattern, callback) => {
     return callback(ctx);
   };
 };
+
+export const use = (pattern, callback) => {
+  return (ctx) => {
+    const match = pathPattern(pattern, ctx.url.path);
+    if (!match) return null;
+    ctx.url.params = match;
+    return callback(ctx);
+  };
+};
