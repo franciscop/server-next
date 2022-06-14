@@ -2,44 +2,39 @@
   "name": "@server/next",
   "version": "0.14.0",
   "description": "An experimental reimplementation of server.js focused on the DX",
-  "main": "index.js",
   "homepage": "https://node-server.com/",
-  "type": "module",
+  "repository": "https://github.com/franciscop/server-next.git",
+  "bugs": "https://github.com/franciscop/server-next/issues",
+  "funding": "https://www.paypal.me/franciscopresencia/19",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "UNLICENSED",
   "scripts": {
-    "build": "rollup -c && npm run size",
     "start": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "engineStrict": true,
   "keywords": [
     "server",
     "node",
     "server.js"
   ],
-  "files": [],
-  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
-  "license": "UNLICENSED",
-  "repository": "git+https://github.com/franciscop/server-next.git",
-  "bugs": "https://github.com/franciscop/server-next/issues",
+  "type": "module",
+  "main": "src/index.js",
+  "files": [
+    "src/"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "engineStrict": true,
   "dependencies": {
     "dotenv": "^16.0.1",
-    "files": "^2.1.1",
-    "formidable": "^2.0.0-canary.20200504.1",
-    "mime": "^3.0.0",
-    "open": "^8.4.0",
-    "ora": "^6.1.0",
-    "prettier": "^2.0.5",
     "spinnies": "^0.5.1",
-    "urlpattern-polyfill": "^4.0.3"
+    "urlpattern-polyfill": "^5.0.0"
   },
   "devDependencies": {
     "jest": "^26.0.1",
-    "path-to-regexp": "^6.1.0",
-    "sign": "^1.0.2"
+    "prettier": "^2.7.0"
   },
   "jest": {
     "testEnvironment": "jest-environment-node",

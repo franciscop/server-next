@@ -1,7 +1,5 @@
 import { URLPattern } from "urlpattern-polyfill";
 
-// const { URLPattern } = pkg;
-
 export default function pathPattern(pattern, path) {
   pattern = pattern.replace(/\/$/, "") || "/";
   path = path.replace(/\/$/, "") || "/";
