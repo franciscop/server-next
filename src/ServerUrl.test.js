@@ -17,6 +17,24 @@ describe("getUrl()", () => {
     expect(url.host).toBe("example.com");
     expect(url.hostname).toBe("example.com");
     expect(url.port).toBe(null);
+
+    expect(Object.keys(url)).toEqual([
+      "hash",
+      "host",
+      "hostname",
+      "href",
+      "origin",
+      "params",
+      "password",
+      "path",
+      "pathname",
+      "port",
+      "protocol",
+      "query",
+      "search",
+      "searchParams",
+      "username",
+    ]);
   });
 
   it("can parse localhost", () => {

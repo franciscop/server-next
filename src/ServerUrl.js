@@ -1,21 +1,53 @@
-export default class ServerUrl {
+import { inspect } from "util";
+
+const colors = {
+  string: process.env.NO_COLOR ? "" : "\x1b[32m",
+  number: process.env.NO_COLOR ? "" : "\x1b[33m",
+};
+
+const properties = [
+  "hash",
+  "host",
+  "hostname",
+  "href",
+  "origin",
+  "params",
+  "password",
+  "path",
+  "pathname",
+  "port",
+  "protocol",
+  "query",
+  "search",
+  "searchParams",
+  "username",
+];
+
+export default class ServerUrl extends URL {
   constructor(urlString) {
-    const url = new URL(urlString);
-    this.href = url.href;
-    this.origin = url.origin;
-    this.protocol = url.protocol;
-    this.username = url.username;
-    this.password = url.password;
-    this.host = url.host;
-    this.hostname = url.hostname;
-    this.port = url.port ? +url.port : null; // make it an intege
-    this.pathname = url.pathname;
-    this.path = url.pathname; // nicknam
-    this.params = {}; // The URL parameter
-    this.search = url.search;
-    this.searchParams = url.searchParams;
-    this.query = this.getQuery(url.searchParams.entries()); // As a plain object
-    this.hash = url.hash;
+    super(urlString);
+
+    const custom = {
+      port: +this.port || null,
+      path: this.pathname,
+      params: {},
+      query: this.getQuery(this.searchParams.entries()),
+    };
+
+    for (let key of properties) {
+      const value = key in custom ? custom[key] : this[key];
+      Object.defineProperty(this, key, { value, enumerable: true });
+    }
+  }
+
+  [inspect.custom]() {
+    const props = Object.keys(this)
+      .map((key) => {
+        const color = colors[typeof this[key]] || "";
+        return `  ${key}: ${color}${inspect(this[key])}\x1b[0m`;
+      })
+      .join("\n");
+    return `ServerUrl {\n${props}\n}`;
   }
 
   getQuery(entries) {
