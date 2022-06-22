@@ -36,7 +36,11 @@ export default class ServerUrl extends URL {
 
     for (let key of properties) {
       const value = key in custom ? custom[key] : this[key];
-      Object.defineProperty(this, key, { value, enumerable: true });
+      Object.defineProperty(this, key, {
+        value,
+        enumerable: true,
+        writable: true,
+      });
     }
   }
 

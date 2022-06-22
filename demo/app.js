@@ -31,8 +31,9 @@ app([
   get("/pets", async function getAllPets() {
     // @title Find all the pets
     // @description Get a list of all pets available in the store right now.
-    const pets = await pets.findAll();
-    return pets;
+    // const pets = await pets.findAll();
+    // return pets;
+    return "Hello world! This is such an exciting time!1";
   }),
 
   get("/pets/:id", async () => {

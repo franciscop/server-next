@@ -17,13 +17,6 @@ const format = (n, [below, above], limit = Infinity) => {
   }
 };
 
-const findSize = ({ headers, body, size }, res) => {
-  if (size) return size;
-  if (body) return body.length;
-  if (headers["content-length"]) return +headers["content-length"];
-  return 0;
-};
-
 function simpleType(type) {
   const simpler = {
     "text/html": "html",
@@ -59,7 +52,7 @@ export default function RequestLogger(ctx) {
       const statColor =
         status < 300 ? "green" : status < 500 ? "yellow" : "red";
       const statusBlock = `{${statColor}}[${ctx.res.status}]{/}`;
-      const resSize = format(findSize(ctx.res), ["b", "kb"], 100000);
+      const resSize = format(ctx.res.size || 0, ["b", "kb"], 100000);
       const t = Math.round(ctx.time._total - ctx.time._init);
       const resTime = format(t, ["ms", "s"], 1000);
 

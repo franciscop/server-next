@@ -2,7 +2,9 @@ import http from "node:http";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import zlib from "node:zlib";
 import { pipeline } from "node:stream/promises";
+import { Readable, PassThrough } from "node:stream";
 
 import "dotenv/config";
 
@@ -27,6 +29,35 @@ const exists = (file) => {
     (stat) => stat.isFile(),
     () => false
   );
+};
+
+const measure = (ctx) => {
+  const sizeUp = new PassThrough();
+  ctx.res.size = 0;
+  sizeUp.on("data", (chunk) => {
+    ctx.res.size += chunk.length;
+  });
+  return sizeUp;
+};
+
+const findEncoding = (acceptEncoding) => {
+  let encoding;
+  if (/\bbr\b/.test(acceptEncoding)) {
+    encoding = "br";
+  } else if (/\bgzip\b/.test(acceptEncoding)) {
+    encoding = "gzip";
+  } else if (/\bdeflate\b/.test(acceptEncoding)) {
+    encoding = "deflate";
+  }
+
+  const methods = {
+    deflate: () => zlib.createDeflate(),
+    gzip: () => zlib.createGzip(),
+    br: () => zlib.createBrotliCompress(),
+  };
+
+  const compress = methods[encoding];
+  return [encoding, compress];
 };
 
 const api = {
@@ -119,7 +150,6 @@ export default function (options = {}, plugins) {
           ctx.res.body = out;
           const isHtml = out.trim().startsWith("<");
           ctx.res.headers["content-type"] = isHtml ? "text/html" : "text/plain";
-          ctx.res.headers["content-length"] = Buffer.byteLength(out);
         } else {
           if (out.pipe) {
             ctx.res.body = out;
@@ -127,7 +157,6 @@ export default function (options = {}, plugins) {
           } else {
             // Plain object
             if (out.type) ctx.res.headers["content-type"] = out.type;
-            if (out.length) ctx.res.headers["content-length"] = out.length;
             ctx.res.headers = { ...ctx.res.headers, ...(out.headers || {}) };
             ctx.res.body = out.body || "";
             ctx.res.status = out.status || 200;
@@ -147,21 +176,30 @@ export default function (options = {}, plugins) {
         ctx.res.headers["server-timing"] += ", ";
       }
     });
-    res.writeHead(ctx.res.status, ctx.res.headers);
-    if (ctx.res.body.pipe) {
-      if (ctx.res.body.path) {
-        ctx.res.type = ctx.res.body.path.split(".").pop();
-        ctx.res.size = await fsp.stat(ctx.res.body.path).then((s) => s.size);
-      } else {
-        ctx.res.size = 0;
-        ctx.res.body.on("data", function (chunk) {
-          ctx.res.size += chunk.length;
-        });
-      }
-      await pipeline(ctx.res.body, res);
-    } else {
-      res.end(ctx.res.body);
+
+    const [encoding, compress] = findEncoding(ctx.headers["accept-encoding"]);
+    if (encoding) {
+      ctx.res.headers["content-encoding"] = encoding;
     }
+
+    res.writeHead(ctx.res.status, ctx.res.headers);
+
+    // If it's not a pipe, e.g. a String, make it a pipe
+    if (!ctx.res.body.pipe) {
+      ctx.res.body = Readable.from([ctx.res.body]);
+    }
+
+    if (ctx.res.body.path) {
+      ctx.res.type = ctx.res.body.path.split(".").pop();
+    }
+
+    if (compress) {
+      await pipeline(ctx.res.body, compress(), measure(ctx), res);
+    } else {
+      await pipeline(ctx.res.body, measure(ctx), res);
+    }
+    res.end();
+
     // The actual sent headers, as seen by the response
     ctx.res.headers = Object.fromEntries(
       res._header
