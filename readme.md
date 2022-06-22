@@ -21,7 +21,7 @@ app([
 ]);
 ```
 
-It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli\*, streaming, etc.
+It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, server-timing, plugins\*, etc.
 
 > \* not yet available
 
