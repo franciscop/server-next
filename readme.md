@@ -29,7 +29,7 @@ It includes all the things you would expect from a modern Server framework, like
 
 Why? The ecosystem is moving out of server-rendered websites so we are as well. Now instead we treat APIs as first-class citizens. Desired improvements (WIP!):
 
-- Tiny footprint with no dependencies, all bundled in a single file. Installing and using the full library takes under 10kb (target limit).
+- Tiny footprint with no dependencies\*, all bundled in a single file. Installing and using the full library takes under 10kb (target limit).
 - Faster! Reimplemented from scratch for speed. With raw ES6+ and a tiny code footprint, your server will fly.
 - Modern ES6+ESM syntax for both the library and examples.
 - Error handling improved greatly.
@@ -48,6 +48,7 @@ Why? The ecosystem is moving out of server-rendered websites so we are as well. 
   - A string and it'll be sent as plain text or html (if it starts with "<")
   - A readStream and it'll be piped to the response
   - An object with `status`, `body` and `headers` and it'll be set raw.
+- Response compression works
 
 
 ## Some plugins
@@ -84,4 +85,25 @@ app([
     // file.size
   })
 ]);
+```
+
+
+## Examples
+
+
+### Streams
+
+Creating a 100x100px thumbnail on the fly with Sharp:
+
+```js
+// createThumbnail.js
+import { get } from '@server/next';
+import sharp from 'sharp';
+
+export default function createThumbnail(ctx) {
+  // Return a pipe, which will be streamed to the output
+  return sharp(ctx.url.params.name)
+    .resize(100, 100, { fit: 'cover' })
+    .png();
+}
 ```

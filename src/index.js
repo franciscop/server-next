@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import http from "node:http";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -5,8 +7,6 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import { Readable, PassThrough } from "node:stream";
-
-import "dotenv/config";
 
 import ServerUrl from "./ServerUrl.js";
 import RequestLogger from "./RequestLogger.js";
