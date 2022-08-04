@@ -11,9 +11,10 @@ import { Readable, PassThrough } from "node:stream";
 import ServerUrl from "./ServerUrl.js";
 import RequestLogger from "./RequestLogger.js";
 
+import logger from "./logger.js";
+import getMime from "./getMime.js";
 import pathPattern from "./pathPattern.js";
 import parseBody from "./parseBody.js";
-import color from "./color.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -23,13 +24,6 @@ const getIp = (req) =>
   req.connection.remoteAddress ||
   req.socket.remoteAddress ||
   req.connection.socket.remoteAddress;
-
-const exists = (file) => {
-  return fsp.stat(file, fs.constants.F_OK).then(
-    (stat) => stat.isFile(),
-    () => false
-  );
-};
 
 const measure = (ctx) => {
   const sizeUp = new PassThrough();
@@ -83,19 +77,32 @@ const getCtx = (req) => ({
 const createApp = (server) => {
   const app = function (...mid) {
     app.middleware.push(...mid.flat());
+
+    // Final error handling
+    app.middleware.push({
+      handle: (error) => {
+        // console.clear();
+        // console.log("ERROR!", error);
+        return {
+          status: 500,
+          body: JSON.stringify({ error: error.message }),
+          type: "application/json",
+        };
+      },
+    });
   };
 
+  // Static middleware
   app.middleware = [
     async function (ctx) {
-      if (ctx.method === "get") {
-        const file = path.join(process.cwd(), ctx.options.public, ctx.url.path);
-        const size = await fsp.stat(file).then(
-          (stat) => stat.isFile() && stat.size,
-          (err) => false
-        );
-        if (size) {
-          return fs.createReadStream(file);
-        }
+      if (ctx.method !== "get") return;
+      const file = path.join(process.cwd(), ctx.options.public, ctx.url.path);
+      const size = await fsp.stat(file).then(
+        (stat) => stat.isFile() && stat.size,
+        () => false
+      );
+      if (size) {
+        return fs.createReadStream(file);
       }
     },
   ];
@@ -111,12 +118,49 @@ const createApp = (server) => {
   return app;
 };
 
-const logStart = (port) => {
-  if (isProduction) return;
-  const routes = Object.values(api).flat().length;
-  console.log(
-    color(`Running on {under}http://localhost:${port}/{/} (${routes} routes)`)
-  );
+let ttyWarn = null;
+// if (!process.stdin.isTTY) {
+//   ttyWarn = "Invalid terminal; cannot accept user input";
+// }
+// if (ttyWarn && process.env._.endsWith("nodemon")) {
+//   ttyWarn = "when running with nodemon, please pass the flag --no-stdin";
+// }
+
+const parseOutput = async (res, data) => {
+  // Plain number
+  if (typeof data === "number") {
+    res.status = data;
+    res.body = "";
+    res.type = "text/plain";
+    return res;
+  }
+
+  // Plain string, which can only be text or html
+  if (typeof data === "string") {
+    res.status = 200;
+    res.body = data;
+    const isHtml = data.trim().startsWith("<");
+    res.type = isHtml ? "text/html" : "text/plain";
+    return res;
+  }
+
+  // When piping the output
+  if (data.pipe) {
+    res.body = data;
+    res.status = 200;
+    // It's a file; find its mimetype
+    if (res.body.path) {
+      res.type = await getMime(res.body.path);
+    }
+    return res;
+  }
+
+  // Plain object, merge it with the existing one
+  if (data.type) res.type = data.type;
+  res.headers = { ...res.headers, ...(data.headers || {}) };
+  res.body = data.body || ""; // This could also be a pipe and that's okay
+  res.status = data.status || 200;
+  return res;
 };
 
 export default function (options = {}, plugins) {
@@ -126,44 +170,41 @@ export default function (options = {}, plugins) {
 
   const server = http.createServer(async (req, res) => {
     const logger = new RequestLogger(req);
-    const ctx = { ...getCtx(req), options };
+    const ctx = { ...getCtx(req), bucket: options.bucket, options };
 
-    const parsed = await parseBody(ctx.req, ctx.headers["content-type"]);
+    const parsed = await parseBody(
+      ctx.req,
+      ctx.headers["content-type"],
+      ctx.bucket
+    );
     if (parsed) {
       ctx.body = parsed.body;
       ctx.files = parsed.files;
     }
 
     let out;
+    let err;
     ctx.res = { headers: {} };
     for (let cb of app.middleware) {
-      out = await cb(ctx);
-      if (out) {
-        if (typeof out === "number") {
-          // Plain number
-          ctx.res.status = out;
-          ctx.res.body = "";
-          ctx.res.headers["content-type"] = "text/plain";
-        } else if (typeof out === "string") {
-          // Plain string
-          ctx.res.status = 200;
-          ctx.res.body = out;
-          const isHtml = out.trim().startsWith("<");
-          ctx.res.headers["content-type"] = isHtml ? "text/html" : "text/plain";
-        } else {
-          if (out.pipe) {
-            ctx.res.body = out;
-            ctx.res.status = 200;
-          } else {
-            // Plain object
-            if (out.type) ctx.res.headers["content-type"] = out.type;
-            ctx.res.headers = { ...ctx.res.headers, ...(out.headers || {}) };
-            ctx.res.body = out.body || "";
-            ctx.res.status = out.status || 200;
+      try {
+        if (err) {
+          if (cb.handle) {
+            out = await cb.handle(err);
           }
+        } else {
+          out = await cb(ctx);
         }
-        break;
+        if (out) {
+          ctx.res = await parseOutput(ctx.res, out);
+          break;
+        }
+      } catch (error) {
+        err = error;
       }
+    }
+
+    if (ctx.res.type) {
+      ctx.res.headers["content-type"] = ctx.res.type;
     }
 
     ctx.time._total = performance.now();
@@ -189,10 +230,6 @@ export default function (options = {}, plugins) {
       ctx.res.body = Readable.from([ctx.res.body]);
     }
 
-    if (ctx.res.body.path) {
-      ctx.res.type = ctx.res.body.path.split(".").pop();
-    }
-
     if (compress) {
       await pipeline(ctx.res.body, compress(), measure(ctx), res);
     } else {
@@ -213,6 +250,9 @@ export default function (options = {}, plugins) {
     );
 
     logger.end(ctx);
+    if (err) {
+      logger.error(err);
+    }
   });
 
   const app = createApp(server);
@@ -226,7 +266,7 @@ export default function (options = {}, plugins) {
       }
     } else {
       app.events.ready.forEach((cb) => cb({ options }));
-      logStart(options.port);
+      logger.header({ api, options });
     }
   });
 

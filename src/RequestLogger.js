@@ -1,3 +1,4 @@
+import path from "node:path";
 import Spinnies from "spinnies";
 import color from "./color.js";
 
@@ -17,6 +18,15 @@ const format = (n, [below, above], limit = Infinity) => {
   }
 };
 
+const range = (char, num) => {
+  const cols = process.stdout.columns || 80;
+  let str = "";
+  for (let i = 0; i < cols; i += char.length) {
+    str += char;
+  }
+  return str;
+};
+
 function simpleType(type) {
   const simpler = {
     "text/html": "html",
@@ -24,12 +34,15 @@ function simpleType(type) {
     "image/svg+xml": "svg",
     "image/png": "png",
     "text/css": "css",
+    "text/javascript": "js",
     "application/javascript": "js",
     "application/json": "json",
     "text/markdown": "md",
   };
   return simpler[type] || type;
 }
+
+const cwd = path.resolve("./");
 
 let spinnies;
 export default function RequestLogger(ctx) {
@@ -45,26 +58,66 @@ export default function RequestLogger(ctx) {
   }
 
   this.end = function (ctx) {
-    if (!isProduction) {
-      const status = ctx.res.status;
+    if (isProduction) return;
+    const status = ctx.res.status;
 
-      const paddedPath = `${ctx.url?.path || ctx.url} {dim}`.padEnd(30, "╌");
-      const statColor =
-        status < 300 ? "green" : status < 500 ? "yellow" : "red";
-      const statusBlock = `{${statColor}}[${ctx.res.status}]{/}`;
-      const resSize = format(ctx.res.size || 0, ["b", "kb"], 100000);
-      const t = Math.round(ctx.time._total - ctx.time._init);
-      const resTime = format(t, ["ms", "s"], 1000);
+    const paddedPath = `${ctx.url?.path || ctx.url} {dim}`.padEnd(30, "─");
+    const statColor = status < 300 ? "green" : status < 500 ? "yellow" : "red";
+    const statusBlock = `{${statColor}}[${ctx.res.status}]{/}`;
+    const resSize = format(ctx.res.size || 0, ["b", "kb"], 100000);
+    const t = Math.round(ctx.time._total - ctx.time._init);
+    const resTime = format(t, ["ms", "s"], 1000);
 
-      const type = simpleType(
-        ctx.res.type || ctx.res.headers["content-type"] || "----"
-      );
-      const method = ("[" + ctx.method + "]").padEnd(6, " ");
-      const reqText = `{dim}${method}{/} ${paddedPath}`;
-      const resText = `${statusBlock} ${resSize} ${resTime} ${type}`;
-      const text = color(`${reqText}╌›{/} ${resText}`);
+    const type = simpleType(
+      ctx.res.type || ctx.res.headers["content-type"] || "----"
+    );
+    const method = ("[" + ctx.method + "]").padEnd(6, " ");
+    const reqText = `{dim}${method}{/} ${paddedPath}`;
+    const resText = `${statusBlock} ${resSize} ${resTime} ${type}`;
+    const text = color(`${reqText}─›{/} ${resText}`);
 
+    this.text = text;
+    if (statColor !== "red") {
       spinnies.succeed(`spinner-${this.id}`, { text });
+    } else {
+      spinnies.fail(`spinner-${this.id}`, { text });
     }
+  };
+
+  this.error = function (err) {
+    const cols = process.stdout.columns || 80;
+    console.log(color("{red}  ┌───────┬" + range("─").slice(12) + "┐{/}"));
+    console.log(
+      color(
+        `{red}  │ {bright}{red}Error{/} {red}│{/} ${err.message.padEnd(
+          cols - 14,
+          " "
+        )} {red}│{/}`
+      )
+    );
+    console.log(color("{red}  ├───────┼" + range("─").slice(12) + "┤{/}"));
+    console.log(
+      color(
+        err.stack
+          .split("\n")
+          .slice(1)
+          .map((line, i) => {
+            line = line.replace(/\s*at\s/, "");
+            line = line.replace("file://" + cwd, "{dim}$PWD{/}");
+            return (
+              `{red}  │{/} ${i === 0 ? "Trace" : "     "} {red}│{/} ` +
+              line.padEnd(cols - 6, " ") +
+              " {red}│{/}"
+            );
+          })
+          .join("\n")
+      )
+    );
+    console.log(color("{red}  └───────┴" + range("─").slice(12) + "┘{/}"));
+  };
+
+  this.reprint = function () {
+    if (isProduction) return;
+    console.log(color(`{red}✖{/} `) + this.text);
   };
 }

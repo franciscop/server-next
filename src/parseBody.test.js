@@ -36,34 +36,23 @@ const getBody = () => {
   return body;
 };
 
+const matchMd = expect.stringMatching(/^file-\w{12}.md$/);
+const matchTxt = expect.stringMatching(/^file-\w{12}.txt$/);
+
 describe("parseBody", () => {
   it("can parse the example body", async () => {
-    const parsed = await parseBody(
+    const body = await parseBody(
       getBody(),
-      "multipart/form-data; boundary=----WebKitFormBoundaryvef1fLxmoUdYZWXp"
+      "multipart/form-data; boundary=----WebKitFormBoundaryvef1fLxmoUdYZWXp",
+      { write: (id) => id }
     );
-    expect(parsed.body).toEqual({
+    expect(body).toMatchObject({
       hello: "world",
       test: ["test message 123456", "test message number two"],
     });
-    expect(parsed.files).toEqual({
-      profile: {
-        name: "profile.md",
-        type: "text/plain",
-        value: "@11X111Y\r\n111Z\rCCCC\nCCCC\r\nCCCCC@\r\n",
-      },
-      gallery: [
-        {
-          name: "A.txt",
-          type: "text/plain",
-          value: "@11X111Y\r\n111Z\rCCCC\nCCCC\r\nCCCCC@\r\n",
-        },
-        {
-          name: "C.txt",
-          type: "text/plain",
-          value: "@CCCCCCY\r\nCCCZ\rCCCW\nCCC0\r\n666@",
-        },
-      ],
+    expect(body).toMatchObject({
+      profile: matchMd,
+      gallery: [matchTxt, matchTxt],
     });
   });
 });

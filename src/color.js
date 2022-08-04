@@ -12,7 +12,11 @@ const map = {
   bgblue: 44, bgmagenta: 45, bgcyan: 46, bgwhite: 47,
 };
 
-const replace = (k) => (process.env.NO_COLOR ? "" : `\x1b[${map[k]}m`);
+const replace = (k) => {
+  if (process.env.NO_COLOR) return "";
+  if (!(k in map)) throw new Error(`"{${k}}" is not a valid color`);
+  return `\x1b[${map[k]}m`;
+};
 
 export default function color(str, ...vals) {
   if (typeof str === "string") {
@@ -21,6 +25,6 @@ export default function color(str, ...vals) {
       .replaceAll(/\{\/\w*\}/g, replace("reset"));
   }
 
-  // For template literals, put them together first and then color it
+  // Template literals, put them together first and then color them
   return color(str[0] + vals.map((v, i) => v + str[i + 1]).join(""));
 }

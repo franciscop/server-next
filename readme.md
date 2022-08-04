@@ -7,25 +7,25 @@
 A fully-fledged web server for Node.js, with all the basics covered for you:
 
 ```js
-import server, { get, post, put, use } from 'server';
+import server, { get, post, put, use } from "server";
 
 // Create a running instance of the server
 const app = server(config, [pluginA, pluginB]);
 
 // Attach handlers to the instance
 app([
-  get('/users', getUsers),
-  post('/users', createUser),
-  put('/users/:id', editUser),
-  use('/admin/*', dashboard)
+  get("/users", getUsers),
+  post("/users", createUser),
+  put("/users/:id", editUser),
+  use("/admin/*", dashboard),
 ]);
 ```
 
-It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, server-timing, plugins\*, etc.
+It includes all the things you would expect from a modern Server framework, like routing, static file serving, options\*, body+file parsing, gzip+brotli, streaming, server-timing, plugins\*, etc.
 
 > \* not yet available
 
-## Upgradingn server
+## Upgrading server
 
 Why? The ecosystem is moving out of server-rendered websites so we are as well. Now instead we treat APIs as first-class citizens. Desired improvements (WIP!):
 
@@ -37,6 +37,13 @@ Why? The ecosystem is moving out of server-rendered websites so we are as well. 
 - Changed the reply logic greatly, including the removal of `render()`. This is the main reason express was removed. Many servers don't need render() at all.
 - **[security]** Removed mandatory CSRF token, since this is only useful for server-rendered pages and not for SPA. You can activate it with a single option as before.
 
+Major changes:
+
+- New fully fledged `ctx.url` that extends [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) object inside `ctx` (also note: `ctx.url` is no longer a string):
+  - `ctx.params` is now `ctx.url.params`, e.g. `ctx.url.params.id`.
+  - `ctx.query` is now `ctx.url.query`, e.g. `ctx.url.params.search`.
+  - `ctx.path` is now `ctx.url.path` (or `ctx.url.pathname`).
+  - All URL properties are available, like `ctx.url.port`, `ctx.url.searchParams`, etc.
 
 ## Progress
 
@@ -49,7 +56,6 @@ Why? The ecosystem is moving out of server-rendered websites so we are as well. 
   - A readStream and it'll be piped to the response
   - An object with `status`, `body` and `headers` and it'll be set raw.
 - Response compression works
-
 
 ## Some plugins
 
@@ -87,9 +93,7 @@ app([
 ]);
 ```
 
-
 ## Examples
-
 
 ### Streams
 
@@ -97,13 +101,11 @@ Creating a 100x100px thumbnail on the fly with Sharp:
 
 ```js
 // createThumbnail.js
-import { get } from '@server/next';
-import sharp from 'sharp';
+import { get } from "@server/next";
+import sharp from "sharp";
 
 export default function createThumbnail(ctx) {
   // Return a pipe, which will be streamed to the output
-  return sharp(ctx.url.params.name)
-    .resize(100, 100, { fit: 'cover' })
-    .png();
+  return sharp(ctx.url.params.name).resize(100, 100, { fit: "cover" }).png();
 }
 ```

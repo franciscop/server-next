@@ -23,17 +23,32 @@ function getMatching(string, regex) {
 
 const getBody = async (req) => {
   return await new Promise((done) => {
-    let data = "";
+    const buffers = [];
     req.on("data", (chunk) => {
-      data += chunk;
+      buffers.push(chunk);
     });
     req.on("end", () => {
-      done(data);
+      done(Buffer.concat(buffers).toString("binary"));
     });
   });
 };
 
-export default async function Parse(req, contentType) {
+const nanoid = (size = 12) => {
+  let str = "";
+  while (str.length < size + 2) {
+    str += Math.round(Math.random() * 1000000).toString(16);
+  }
+  return str.slice(0, size);
+};
+
+const saveFile = async (name, value, bucket) => {
+  const ext = name.split(".").pop();
+  const id = `file-${nanoid(12)}.${ext}`;
+  await bucket.write(id, value, "binary");
+  return id;
+};
+
+export default async function Parse(req, contentType, bucket) {
   const rawData = await (typeof req === "string" ? req : getBody(req));
   if (!rawData) return null;
 
@@ -44,10 +59,7 @@ export default async function Parse(req, contentType) {
   const boundary = getBoundary(contentType);
   if (!boundary) return null;
 
-  let result = {};
-
   const body = {};
-  const files = {};
 
   const rawDataArray = rawData.split(boundary);
   for (let item of rawDataArray) {
@@ -56,41 +68,26 @@ export default async function Parse(req, contentType) {
       .trim()
       .replace(/\[\]$/, "");
     if (!name) continue;
-    const value = getMatching(item, /(?:\r\n\r\n)([\S\s]*)(?:\r\n--$)/);
+
+    let value = getMatching(item, /(?:\r\n\r\n)([\S\s]*)(?:\r\n--$)/);
     if (!value) continue;
 
+    // Check whether we have a filename. If we do, assign it to the value
     const filename = getMatching(item, /(?:filename=")(.*?)(?:")/).trim();
-    // It's a file!
     if (filename) {
-      const file = { name: filename };
-      const type = getMatching(item, /(?:Content-Type:)(.*?)(?:\r\n)/).trim();
-      if (type) {
-        file.type = type;
-      }
-      file.value = value;
+      value = await saveFile(filename, value, bucket);
+    }
 
-      // Already exists, so (maybe convert to an array) and push the item in it
-      if (files[name]) {
-        if (!Array.isArray(files.name)) {
-          files[name] = [files[name]];
-        }
-        files[name].push(file);
-      } else {
-        files[name] = file;
+    // Save the key-value, accounting for possibly repeated keys
+    if (body[name]) {
+      if (!Array.isArray(body[name])) {
+        body[name] = [body[name]];
       }
-
-      // It's a body
+      body[name].push(value);
     } else {
-      if (body[name]) {
-        if (!Array.isArray(body[name])) {
-          body[name] = [body[name]];
-        }
-        body[name].push(value);
-      } else {
-        body[name] = value;
-      }
+      body[name] = value;
     }
   }
 
-  return { body, files };
+  return body;
 }
