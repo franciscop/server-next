@@ -146,8 +146,8 @@ const parseOutput = async (res, data) => {
 
   // When piping the output
   if (data.pipe) {
-    res.body = data;
     res.status = 200;
+    res.body = data;
     // It's a file; find its mimetype
     if (res.body.path) {
       res.type = await getMime(res.body.path);
@@ -159,7 +159,7 @@ const parseOutput = async (res, data) => {
   if (data.type) res.type = data.type;
   res.headers = { ...res.headers, ...(data.headers || {}) };
   res.body = data.body || ""; // This could also be a pipe and that's okay
-  res.status = data.status || 200;
+  res.status = data.status || 200; // user set > default
   return res;
 };
 
@@ -184,7 +184,8 @@ export default function (options = {}, plugins) {
 
     let out;
     let err;
-    ctx.res = { headers: {} };
+    // Will (hopefully) be overwritten later on!
+    ctx.res = { status: 500, headers: {} };
     for (let cb of app.middleware) {
       try {
         if (err) {
