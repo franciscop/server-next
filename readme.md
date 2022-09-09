@@ -49,7 +49,7 @@ Major changes:
 
 - Router has all verbs, as well as URL pattern matches
 - Full URL parsing, including `query` and `params` in ctx.url.
-- Body and Files parsing is working (TODO: try with binary files and add tests)
+- Body and Files parsing is working (need testing)
 - The middleware can return:
   - A number and it'll be set as the status code
   - A string and it'll be sent as plain text or html (if it starts with "<")
@@ -70,7 +70,7 @@ import Redis from 'redis';
 const bucket = Bucket('my-bucket', { id, key });
 const cache = Redis('my-redis', ...);
 
-const app = server({ public:  bucket, cache });
+const app = server({ public: bucket, uploads: bucket, cache });
 
 app([
   post('/uploads', ctx => {
