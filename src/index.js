@@ -191,7 +191,7 @@ export default function (options = {}, plugins) {
           if (cb.handle) {
             out = await cb.handle(err);
           }
-        } else {
+        } else if (typeof cb === "function") {
           out = await cb(ctx);
         }
         if (out) {
