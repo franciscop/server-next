@@ -227,8 +227,8 @@ export default function (options = {}, plugins) {
     res.writeHead(ctx.res.status, ctx.res.headers);
 
     // If it's not a pipe, e.g. a String, make it a pipe
-    if (!ctx.res.body.pipe) {
-      ctx.res.body = Readable.from([ctx.res.body]);
+    if (!ctx.res.body || !ctx.res.body.pipe) {
+      ctx.res.body = Readable.from([ctx.res.body || ""]);
     }
 
     if (compress) {
