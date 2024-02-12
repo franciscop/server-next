@@ -10,9 +10,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "demo": "nodemon ./demo/app.js",
-    "start": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "size": "echo \"$(gzip -c index.js | wc -c) bytes\" # Only for Unix",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "build": "bun build src/index.js --outdir ./ --entry-naming server.js",
+    "start": "bun test --watch",
+    "size": "echo \"$(gzip -c server.js | wc -c) bytes\" # Only for Unix",
+    "test": "bun test"
   },
   "keywords": [
     "server",
@@ -25,14 +26,10 @@
     "src/"
   ],
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=20.0.0"
   },
   "engineStrict": true,
-  "dependencies": {
-    "dotenv": "^16.0.1",
-    "spinnies": "^0.5.1",
-    "urlpattern-polyfill": "^5.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "jest": "^26.0.1",
     "prettier": "^2.7.0"

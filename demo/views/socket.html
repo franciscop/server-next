@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <form>
+      <input name="text" />
+      <button>Send</button>
+    </form>
+    <ul></ul>
+    <script>
+      const socket = new WebSocket("ws://localhost:3000/chat");
+      socket.addEventListener("message", (event) => {
+        const it = document.createElement("li");
+        it.innerText = event.data;
+        document.querySelector("ul").appendChild(it);
+      });
+      document.querySelector("form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const form = new FormData(e.target);
+        const text = form.get("text");
+        socket.send(text);
+        e.target.reset();
+      });
+    </script>
+  </body>
+</html>

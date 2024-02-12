@@ -16,5 +16,7 @@
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
-  "dependencies": {}
+  "dependencies": {
+    "polystore": "^0.5.0"
+  }
 }

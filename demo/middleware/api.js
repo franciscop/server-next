@@ -48,8 +48,7 @@ const getReturn = (fn) => {
   return prettier.format(code, { parser: "babel" });
 };
 
-export default (ctx) => {
-  const body = `
+export default (ctx) => `
   <!DOCTYPE html>
   <html lang="en">
     <head>
@@ -128,6 +127,4 @@ export default (ctx) => {
         .join("")}
     </body>
   </html>
-  `;
-  return body;
-};
+`;

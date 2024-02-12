@@ -1,6 +1,7 @@
-import path from "node:path";
-import fs from "node:fs";
-import fsp from "node:fs/promises";
+import fs from "fs";
+import path from "path";
+
+import fsp from "fs/promises";
 
 // A fake tiny implementation of a generic bucket, it needs
 // at the very least a read(id) and write(id, value), both returning
@@ -12,6 +13,7 @@ export default function (root) {
   };
 
   return {
+    path: root,
     read: (name, type = "utf8") => {
       const fullPath = absolute(name);
       return fsp.readFile(fullPath, type);

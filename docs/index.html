@@ -6,23 +6,33 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <link
       href="https://fonts.googleapis.com/css?family=Montserrat:400,600|Source+Code+Pro&display=swap"
-      rel="stylesheet">
-    <link rel="stylesheet" href="/style.min.css">
-  
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.min.css" />
+
     <title>Server.js for Node</title>
-    <meta name="description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
-    <link rel="icon" type="image/png" href="/img/logo.png"/>
-  
+    <meta
+      name="description"
+      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
+    />
+    <link rel="icon" type="image/png" href="/img/logo.png" />
+
     <!-- Twitter -->
     <meta name="twitter:title" content="Server.js for Node" />
-    <meta name="twitter:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
+    <meta
+      name="twitter:description"
+      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
+    />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://node-server.com/" />
-    <meta name="twitter:image" content="https://node-server.com/img/hero.png">
-  
+    <meta name="twitter:image" content="https://node-server.com/img/hero.png" />
+
     <!-- Facebook & others -->
     <meta property="og:title" content="Server.js for Node" />
-    <meta property="og:description" content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details." />
+    <meta
+      property="og:description"
+      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://node-server.com/" />
     <meta property="og:image" content="https://node-server.com/img/hero.png" />
@@ -30,13 +40,13 @@
   <body>
     <nav>
       <a href="/" class="brand">
-        <img class="logo" src="/img/logo.svg" alt="">
+        <img class="logo" src="/img/logo.svg" alt="" />
         <span>Server.js</span>
       </a>
-    
-      <input id="bmenub" type="checkbox" class="show">
+
+      <input id="bmenub" type="checkbox" class="show" />
       <label for="bmenub" class="burger">menu</label>
-    
+
       <div class="menu">
         <a href="/about">About</a>
         <a href="/documentation">Documentation</a>
@@ -46,32 +56,47 @@
       </div>
     </nav>
     <div class="hero">
-      <div style="border: 2px solid red; background: #faa; margin: 0 0 20px;border-radius: 8px; padding: 10px 20px;">WORK IN PROGRESS; WEBSITE NOT YET USABLE</div>
+      <!-- <div
+        style="
+          border: 2px solid red;
+          background: #faa;
+          margin: 0 0 20px;
+          border-radius: 8px;
+          padding: 10px 20px;
+        "
+      >
+        WORK IN PROGRESS; WEBSITE NOT YET USABLE
+      </div> -->
       <div class="flex one two-600">
         <div>
           <h1>Server.js for Node</h1>
           <p>
-            A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details:
+            A library to easily create a modern Node.js server. Handles HTTP,
+            Websockets and all the small details:
           </p>
           <pre class="install"><code>npm install server</code></pre>
           <div>
             <a href="/documentation#getting-started" class="button">
               Getting Started
             </a>
-            <a href="http://eepurl.com/cGRggH" class="pseudo button" target="_blank">
+            <a
+              href="http://eepurl.com/cGRggH"
+              class="pseudo button"
+              target="_blank"
+            >
               Subscribe
             </a>
           </div>
         </div>
         <div>
-<pre><code class="language-js">import server, { get, post } from &quot;server&quot;;
-server(
-  get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;),
-  post(&quot;/users&quot;, ctx =&gt; {
+          <pre><code class="language-js">import server from &quot;server&quot;;
+
+export default server()
+  .get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;)
+  .post(&quot;/users&quot;, ctx =&gt; {
     console.log(ctx.body, ctx.files);
     return &#39;ok&#39;;
-  })
-);</code></pre>
+  });</code></pre>
         </div>
       </div>
     </div>
@@ -80,46 +105,62 @@ server(
         <div class="flex one two-500 three-800">
           <div>
             <div class="feature">
-              <img src="/img/battery.svg"><h3>Batteries on</h3>
-              <p>Everything needed is loaded by default, just write your app.</p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/socketio.svg"><h3>socket.io</h3>
-              <p>Fully managed websockets with channels, reconnect, etc.</p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/modern.svg"><h3>Modern ES7+</h3>
-              <p>Use the clean syntax <code>async</code>, <code>await</code>, <code>import</code>, <code>export</code>, etc.
+              <img src="/img/battery.svg" />
+              <h3>Batteries on</h3>
+              <p>
+                All the basics work as expected by default. Just write your app!
               </p>
             </div>
           </div>
           <div>
             <div class="feature">
-              <img src="/img/document.svg"><h3>Documented</h3>
+              <img src="/img/socketio.svg" />
+              <h3>Websockets</h3>
+              <p>Fully managed websockets with channels, reconnect, etc.</p>
+            </div>
+          </div>
+          <div>
+            <div class="feature">
+              <img src="/img/modern.svg" />
+              <h3>Modern ES7+</h3>
+              <p>
+                Use the clean syntax <code>async</code>, <code>await</code>,
+                <code>import</code>, <code>export</code>, etc.
+              </p>
+            </div>
+          </div>
+          <div>
+            <div class="feature">
+              <img src="/img/document.svg" />
+              <h3>Documented</h3>
               <p>Extensive docs, tutorials and videos make it easy to learn.</p>
             </div>
           </div>
           <div>
             <div class="feature">
-              <img src="/img/lock.svg"><h3>Secure</h3>
+              <img src="/img/lock.svg" />
+              <h3>Secure</h3>
               <p>Safe by default while fully configurable CORS, CSRF, etc.</p>
             </div>
           </div>
           <div>
             <div class="feature">
-              <img src="/img/lego.svg"><h3>Extensible</h3>
+              <img src="/img/lego.svg" />
+              <h3>Extensible</h3>
               <p>Compatible with thousands of existing Express.js libraries.</p>
             </div>
           </div>
         </div>
       </div>
     </main>
-    <script src="https://unpkg.com/prismjs@1.20.0/prism.js" charset="utf-8"></script>
-    <script src="https://cdn.jsdelivr.net/npm/umbrellajs" charset="utf-8"></script>
+    <script
+      src="https://unpkg.com/prismjs@1.20.0/prism.js"
+      charset="utf-8"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/umbrellajs"
+      charset="utf-8"
+    ></script>
     <script src="/documentation/script.js" charset="utf-8"></script>
   </body>
 </html>

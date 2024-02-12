@@ -36,9 +36,6 @@ const getBody = () => {
   return body;
 };
 
-const matchMd = expect.stringMatching(/^file-\w{12}.md$/);
-const matchTxt = expect.stringMatching(/^file-\w{12}.txt$/);
-
 describe("parseBody", () => {
   it("can parse the example body", async () => {
     const body = await parseBody(
@@ -50,6 +47,9 @@ describe("parseBody", () => {
       hello: "world",
       test: ["test message 123456", "test message number two"],
     });
+
+    const matchMd = expect.stringMatching(/^file-\w{12}.md$/);
+    const matchTxt = expect.stringMatching(/^file-\w{12}.txt$/);
     expect(body).toMatchObject({
       profile: matchMd,
       gallery: [matchTxt, matchTxt],

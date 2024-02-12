@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register</title>
+  </head>
+  <body>
+    <h1>Register</h1>
+    <form method="POST" action="/auth/register">
+      <input name="email" type="email" />
+      <input name="password" type="password" />
+      <button>Send</button>
+    </form>
+
+    <br /><br />
+
+    <a href="./login">Login</a>
+
+    <script src="https://cdn.jsdelivr.net/npm/umbrellajs"></script>
+    <script>
+      u("form").handle("submit", async (e) => {
+        const body = new FormData(e.target);
+        const res = await fetch("/auth/register", { method: "POST", body });
+        const data = await res.json();
+        alert(JSON.stringify(data));
+      });
+    </script>
+  </body>
+</html>

@@ -21,18 +21,6 @@ function getMatching(string, regex) {
   return matches[1];
 }
 
-const getBody = async (req) => {
-  return await new Promise((done) => {
-    const buffers = [];
-    req.on("data", (chunk) => {
-      buffers.push(chunk);
-    });
-    req.on("end", () => {
-      done(Buffer.concat(buffers).toString("binary"));
-    });
-  });
-};
-
 const nanoid = (size = 12) => {
   let str = "";
   while (str.length < size + 2) {
@@ -48,12 +36,16 @@ const saveFile = async (name, value, bucket) => {
   return id;
 };
 
-export default async function Parse(req, contentType, bucket) {
-  const rawData = await (typeof req === "string" ? req : getBody(req));
-  if (!rawData) return null;
+export default async function parseBody(raw, contentType, bucket) {
+  const rawData = typeof raw === "string" ? raw : await raw.text();
+  if (!rawData) return {};
+
+  if (!contentType || /text\/plain/.test(contentType)) {
+    return rawData;
+  }
 
   if (/application\/json/.test(contentType)) {
-    return { body: JSON.parse(rawData), files: {} };
+    return JSON.parse(rawData);
   }
 
   const boundary = getBoundary(contentType);

@@ -1,368 +1,143 @@
-import "dotenv/config";
+import "./polyfill.js";
 
-import http from "node:http";
-import fs from "node:fs";
-import fsp from "node:fs/promises";
-import path from "node:path";
-import zlib from "node:zlib";
-import { pipeline } from "node:stream/promises";
-import { Readable, PassThrough } from "node:stream";
+import Bucket from "./bucket.js";
+import createNodeContext from "./context/node.js";
+import createWinterContext from "./context/winter.js";
+import { getMachine, handleRequest, iterate } from "./helpers/index.js";
 
-import ServerUrl from "./ServerUrl.js";
-import RequestLogger from "./RequestLogger.js";
+// Export the reply helpers
+export * from "./reply.js";
 
-import logger from "./logger.js";
-import getMime from "./getMime.js";
-import pathPattern from "./pathPattern.js";
-import parseBody from "./parseBody.js";
+// Allow to create a sub-router
+export { default as router } from "./router.js";
 
-const isProduction = process.env.NODE_ENV === "production";
-
-// https://stackoverflow.com/a/19524949/938236
-const getIp = (req) =>
-  (req.headers["x-forwarded-for"] || "").split(",").pop() ||
-  req.connection.remoteAddress ||
-  req.socket.remoteAddress ||
-  req.connection.socket.remoteAddress;
-
-const measure = (ctx) => {
-  const sizeUp = new PassThrough();
-  ctx.res.size = 0;
-  sizeUp.on("data", (chunk) => {
-    ctx.res.size += chunk.length;
-  });
-  return sizeUp;
-};
-
-const findEncoding = (acceptEncoding) => {
-  let encoding;
-  if (/\bbr\b/.test(acceptEncoding)) {
-    encoding = "br";
-  } else if (/\bgzip\b/.test(acceptEncoding)) {
-    encoding = "gzip";
-  } else if (/\bdeflate\b/.test(acceptEncoding)) {
-    encoding = "deflate";
+// Export the main server()
+export default function server(options = {}) {
+  if (!(this instanceof server)) {
+    return new server(options);
   }
 
-  const methods = {
-    deflate: () => zlib.createDeflate(),
-    gzip: () => zlib.createGzip(),
-    br: () => zlib.createBrotliCompress(),
-  };
+  this.platform = getMachine();
 
-  const compress = methods[encoding];
-  return [encoding, compress];
-};
+  this.handlers = {};
 
-const api = {
-  get: [],
-  post: [],
-  put: [],
-  patch: [],
-  del: [],
-  options: [],
-  head: [],
-};
+  options.views = options.views ? Bucket(options.views) : null;
+  options.public = options.public ? Bucket(options.public) : null;
+  options.uploads = options.uploads ? Bucket(options.uploads) : null;
 
-const getCtx = (req) => ({
-  url: new ServerUrl(req.protocol + "://" + req.headers["host"] + req.url),
-  method: req.method.toLowerCase(),
-  headers: req.headers,
-  ip: getIp(req),
-  time: { _init: performance.now() },
-  api,
-  req,
-});
+  this.options = options;
 
-const createApp = (server) => {
-  const app = function (...mid) {
-    app.middleware.push(...mid.flat());
-
-    // Final error handling
-    app.middleware.push({
-      handle: (error) => {
-        // console.clear();
-        // console.log("ERROR!", error);
-        return {
-          status: 500,
-          body: JSON.stringify({ error: error.message }),
-          type: "application/json",
-        };
-      },
-    });
-  };
-
-  // Static middleware
-  app.middleware = [
-    async function (ctx) {
-      if (ctx.method !== "get") return;
-      const file = path.join(process.cwd(), ctx.options.public, ctx.url.path);
-      const size = await fsp.stat(file).then(
-        (stat) => stat.isFile() && stat.size,
-        () => false
-      );
-      if (size) {
-        return fs.createReadStream(file);
-      }
+  // WEBSOCKETS stuff
+  this.sockets = [];
+  this.websocket = {
+    message: async (ws, body) => {
+      this.handlers.socket
+        ?.filter((s) => s[0] === "message")
+        ?.map((s) => s[1]({ socket: ws, sockets: this.sockets, body }));
     },
-  ];
-
-  app.events = {
-    error: [],
-    ready: [],
+    open: (ws) => this.sockets.push(ws),
+    close: (ws) => this.sockets.splice(this.sockets.indexOf(ws), 1),
   };
 
-  app.on = (name, cb) => app.events[name].push(cb);
-  app.close = () => server.close();
+  if (this.platform.runtime === "node") {
+    (async () => {
+      const http = await import("http");
+      http
+        .createServer(async (request, response) => {
+          const ctx = await createNodeContext(request, options);
+          ctx.platform = this.platform;
 
-  return app;
-};
+          const out = await handleRequest(this.handlers, ctx);
 
-let ttyWarn = null;
-// if (!process.stdin.isTTY) {
-//   ttyWarn = "Invalid terminal; cannot accept user input";
-// }
-// if (ttyWarn && process.env._.endsWith("nodemon")) {
-//   ttyWarn = "when running with nodemon, please pass the flag --no-stdin";
-// }
-
-const parseOutput = async (res, data) => {
-  // Plain number
-  if (typeof data === "number") {
-    res.status = data;
-    res.body = "";
-    res.type = "text/plain";
-    return res;
-  }
-
-  // Plain string, which can only be text or html
-  if (typeof data === "string") {
-    res.status = 200;
-    res.body = data;
-    const isHtml = data.trim().startsWith("<");
-    res.type = isHtml ? "text/html" : "text/plain";
-    return res;
-  }
-
-  // When piping the output
-  if (data.pipe) {
-    res.status = 200;
-    res.body = data;
-    // It's a file; find its mimetype
-    if (res.body.path) {
-      res.type = await getMime(res.body.path);
-    }
-    return res;
-  }
-
-  // Plain object, merge it with the existing one
-  if (data.type) res.type = data.type;
-  res.headers = { ...res.headers, ...(data.headers || {}) };
-  res.body = data.body || ""; // This could also be a pipe and that's okay
-  res.status = data.status || 200; // user set > default
-  return res;
-};
-
-export default function (options = {}, plugins) {
-  if (!options.public) {
-    options.public = "public";
-  }
-
-  const server = http.createServer(async (req, res) => {
-    const logger = new RequestLogger(req);
-    const ctx = { ...getCtx(req), bucket: options.bucket, options };
-
-    const parsed = await parseBody(
-      ctx.req,
-      ctx.headers["content-type"],
-      ctx.bucket
-    );
-    if (parsed) {
-      ctx.body = parsed.body;
-      ctx.files = parsed.files;
-    }
-
-    let out;
-    let err;
-    // Will (hopefully) be overwritten later on!
-    ctx.res = { status: 500, headers: {} };
-    for (let cb of app.middleware) {
-      try {
-        if (err) {
-          if (cb.handle) {
-            out = await cb.handle(err);
+          response.writeHead(out.status || 200, { header: out.headers });
+          if (out.body instanceof ReadableStream) {
+            await iterate(out.body, (chunk) => response.write(chunk));
+          } else {
+            response.write(out.body || "");
           }
-        } else if (typeof cb === "function") {
-          out = await cb(ctx);
-        }
-        if (out) {
-          ctx.res = await parseOutput(ctx.res, out);
-          break;
-        }
-      } catch (error) {
-        err = error;
-      }
-    }
-
-    if (ctx.res.type) {
-      ctx.res.headers["content-type"] = ctx.res.type;
-    }
-
-    ctx.time._total = performance.now();
-    ctx.res.headers["server-timing"] = ctx.res.headers["server-timing"] || "";
-    Object.entries(ctx.time).forEach(([name, value], i, times) => {
-      if (name === "_init") return; // Index = 0
-      ctx.res.headers["server-timing"] +=
-        name + ";dur=" + Math.round(value - times[i - 1][1]);
-      if (i !== times.length - 1) {
-        ctx.res.headers["server-timing"] += ", ";
-      }
-    });
-
-    const [encoding, compress] = findEncoding(ctx.headers["accept-encoding"]);
-    if (encoding) {
-      ctx.res.headers["content-encoding"] = encoding;
-    }
-
-    res.writeHead(ctx.res.status, ctx.res.headers);
-
-    // If it's not a pipe, e.g. a String, make it a pipe
-    if (!ctx.res.body || !ctx.res.body.pipe) {
-      ctx.res.body = Readable.from([ctx.res.body || ""]);
-    }
-
-    if (compress) {
-      await pipeline(ctx.res.body, compress(), measure(ctx), res);
-    } else {
-      await pipeline(ctx.res.body, measure(ctx), res);
-    }
-    res.end();
-
-    // The actual sent headers, as seen by the response
-    ctx.res.headers = Object.fromEntries(
-      res._header
-        .split("\r\n")
-        .filter(Boolean)
-        .slice(1)
-        .map((line) => {
-          const [key, ...vals] = line.split(":");
-          return [key.toLowerCase(), vals.join(":").trim()];
+          response.end();
         })
-    );
+        .listen(options.port || 3000);
+    })();
+  }
 
-    logger.end(ctx);
-    if (err) {
-      logger.error(err);
-    }
-  });
+  this.fetch = async (request, env, fetchCtx) => {
+    if (env?.upgrade(request)) return;
 
-  const app = createApp(server);
+    const ctx = await createWinterContext(request, options);
+    ctx.platform = this.platform;
 
-  server.listen(options.port, (error) => {
-    options.port = server.address().port;
-    if (error) {
-      app.events.error.forEach((cb) => cb(error));
-      if (!isProduction) {
-        console.error("Error:", error);
-      }
-    } else {
-      app.events.ready.forEach((cb) => cb({ options }));
-      logger.header({ api, options });
-    }
-  });
-
-  return app;
+    return await handleRequest(this.handlers, ctx);
+  };
 }
 
-export const get = (pattern, callback) => {
-  api.get.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "get") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+// INTERNAL
+server.prototype.handle = function (name, ...middleware) {
+  if (!this.handlers[name]) {
+    this.handlers[name] = [];
+  }
+  this.handlers[name].push(...middleware);
+  return this;
 };
 
-export const post = (pattern, callback) => {
-  api.post.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "post") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.socket = function (path, ...middleware) {
+  return this.handle("socket", [path, ...middleware]);
 };
 
-export const put = (pattern, callback) => {
-  api.put.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "put") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.get = function (path, ...middleware) {
+  return this.handle("get", [path, ...middleware]);
 };
 
-export const patch = (pattern, callback) => {
-  api.patch.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "patch") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.head = function (path, ...middleware) {
+  return this.handle("head", [path, ...middleware]);
 };
 
-export const del = (pattern, callback) => {
-  api.del.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "delete") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.post = function (path, ...middleware) {
+  return this.handle("post", [path, ...middleware]);
 };
 
-export const options = (pattern, callback) => {
-  api.options.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "options") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.put = function (path, ...middleware) {
+  return this.handle("put", [path, ...middleware]);
 };
 
-export const head = (pattern, callback) => {
-  api.head.push([pattern, callback]);
-
-  return (ctx) => {
-    if (ctx.method !== "head") return;
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.patch = function (path, ...middleware) {
+  return this.handle("patch", [path, ...middleware]);
 };
 
-export const use = (pattern, callback) => {
-  return (ctx) => {
-    const match = pathPattern(pattern, ctx.url.path);
-    if (!match) return null;
-    ctx.url.params = match;
-    return callback(ctx);
-  };
+server.prototype.del = function (path, ...middleware) {
+  return this.handle("del", [path, ...middleware]);
+};
+
+server.prototype.options = function (path, ...middleware) {
+  return this.handle("options", [path, ...middleware]);
+};
+
+server.prototype.use = function (...middleware) {
+  let path = "*";
+  if (typeof middleware[0] === "string" || middleware[0] instanceof RegExp) {
+    path = middleware.shift();
+  }
+
+  this.handle("socket", [path, ...middleware]);
+  this.handle("get", [path, ...middleware]);
+  this.handle("head", [path, ...middleware]);
+  this.handle("post", [path, ...middleware]);
+  this.handle("put", [path, ...middleware]);
+  this.handle("patch", [path, ...middleware]);
+  this.handle("del", [path, ...middleware]);
+  this.handle("options", [path, ...middleware]);
+
+  return this;
+};
+
+server.prototype.router = function (basePath, router) {
+  basePath = "/" + basePath.replace(/^\//, "").replace(/\/$/, "") + "/";
+  for (const method in router.handlers) {
+    const handlers = router.handlers[method].map(([path, ...callbacks]) => [
+      basePath + path.replace(/^\//, ""),
+      ...callbacks,
+    ]);
+    this.handle(method, ...handlers);
+  }
+  return this;
 };
