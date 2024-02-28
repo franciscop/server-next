@@ -9,7 +9,7 @@ export default async function parseResponse(handler, ctx) {
   if (!out && typeof out !== "string") return null;
 
   if (typeof out === "function") {
-    out = out(ctx);
+    out = await out(ctx);
   }
 
   // A plain number is a status code

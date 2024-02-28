@@ -4,6 +4,7 @@ import parseCookies from "./parseCookies.js";
 
 export default async (request, options = {}) => {
   const ctx = {};
+  ctx.options = options;
   ctx.req = request;
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();

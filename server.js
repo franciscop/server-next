@@ -3684,6 +3684,9 @@ var q = y(h());
 // src/bucket.js
 var { default: fsp} = (()=>({}));
 function bucket_default(root) {
+  if (typeof root !== "string") {
+    return root;
+  }
   const absolute = (name) => {
     if (!name)
       throw new Error(`File name is required`);
@@ -3693,6 +3696,7 @@ function bucket_default(root) {
     path: root,
     read: (name, type = "utf8") => {
       const fullPath = absolute(name);
+      console.log(name, fullPath);
       return fsp.readFile(fullPath, type);
     },
     write: (name, value, type = "utf8") => {
@@ -3785,6 +3789,18 @@ Reply.prototype.file = async function(path) {
     return this.type(path.split(".").pop()).send(data);
   return status(404).send();
 };
+Reply.prototype.view = async function(path) {
+  return async (ctx) => {
+    console.log(ctx);
+    if (!ctx.options.views) {
+      throw new Error("Views not enabled");
+    }
+    const data = await ctx.options.views.read(path);
+    if (data)
+      return this.type(path.split(".").pop()).send(data);
+    return status(404).send();
+  };
+};
 Reply.prototype.send = function(body = "") {
   const { status = 200 } = this.res;
   if (typeof body === "string") {
@@ -3804,6 +3820,7 @@ var cookies = (...args) => new Reply().cookies(...args);
 var send = (...args) => new Reply().send(...args);
 var json = (...args) => new Reply().json(...args);
 var file = (...args) => new Reply().file(...args);
+var view = (...args) => new Reply().view(...args);
 
 // src/parseResponse.js
 async function parseResponse(handler, ctx) {
@@ -3811,7 +3828,7 @@ async function parseResponse(handler, ctx) {
   if (!out && typeof out !== "string")
     return null;
   if (typeof out === "function") {
-    out = out(ctx);
+    out = await out(ctx);
   }
   if (typeof out === "number") {
     out = new Response(undefined, { status: out });
@@ -4059,6 +4076,7 @@ function parseCookies(cookies2) {
 // src/context/node.js
 var node_default = async (request, options = {}) => {
   const ctx = {};
+  ctx.options = options;
   ctx.req = request;
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
@@ -4079,6 +4097,7 @@ var node_default = async (request, options = {}) => {
 // src/context/winter.js
 var winter_default = async (request, options = {}) => {
   const ctx = {};
+  ctx.options = options;
   ctx.req = request;
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
@@ -4233,6 +4252,7 @@ server.prototype.router = function(basePath, router2) {
   return this;
 };
 export {
+  view,
   type,
   status,
   send,

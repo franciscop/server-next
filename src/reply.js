@@ -62,6 +62,18 @@ Reply.prototype.file = async function (path) {
   return status(404).send();
 };
 
+Reply.prototype.view = async function (path) {
+  return async (ctx) => {
+    console.log(ctx);
+    if (!ctx.options.views) {
+      throw new Error("Views not enabled");
+    }
+    const data = await ctx.options.views.read(path);
+    if (data) return this.type(path.split(".").pop()).send(data);
+    return status(404).send();
+  };
+};
+
 Reply.prototype.send = function (body = "") {
   const { status = 200 } = this.res;
 
@@ -93,3 +105,4 @@ export const cookies = (...args) => new Reply().cookies(...args);
 export const send = (...args) => new Reply().send(...args);
 export const json = (...args) => new Reply().json(...args);
 export const file = (...args) => new Reply().file(...args);
+export const view = (...args) => new Reply().view(...args);

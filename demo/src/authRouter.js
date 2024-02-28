@@ -1,6 +1,6 @@
 import kv from "polystore";
 
-import { file, router, status } from "../src/index.js";
+import { file, router, status } from "../../src/index.js";
 
 const store = kv(new URL(`file://${process.cwd()}/demo/auth.json`));
 

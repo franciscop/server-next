@@ -7,6 +7,11 @@ import fsp from "fs/promises";
 // at the very least a read(id) and write(id, value), both returning
 // promises. If possible both are also pipeable/streamable.
 export default function (root) {
+  // Already a bucket, no need to do anything with it, just return it:
+  if (typeof root !== "string") {
+    return root;
+  }
+
   const absolute = (name) => {
     if (!name) throw new Error(`File name is required`);
     return path.resolve(path.join(root, name));
@@ -16,6 +21,7 @@ export default function (root) {
     path: root,
     read: (name, type = "utf8") => {
       const fullPath = absolute(name);
+      console.log(name, fullPath);
       return fsp.readFile(fullPath, type);
     },
     write: (name, value, type = "utf8") => {

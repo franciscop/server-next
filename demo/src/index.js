@@ -1,48 +1,37 @@
-import fs from "fs/promises";
-
-import server, { cookies, file, json, status } from "../src/index.js";
+import server, { cookies, file, json, status, view } from "../../";
 import authRouter from "./authRouter.js";
-import pets from "./pets.js";
+import db from "./db.js";
 
 const options = {
   port: 3000,
-  views: "demo/views",
+  views: "views",
   public: "docs",
 };
 
 export default server(options)
   .router("/auth", authRouter)
 
-  .get("/", function getHome() {
-    return fs.readFile("./demo/views/home.html", "utf-8");
-  })
-
-  .get("/home", function getHome() {
-    return fs.readFile("./demo/views/home.html", "utf-8");
-  })
+  .get("/", () => view("home.html"))
 
   .get("/pets", async function getAllPets() {
-    return json(pets);
+    return json(await db.pets.list());
   })
-
   .get("/pets/:id", async (ctx) => {
     const id = Number(ctx.url.params.id);
-    const pet = pets.find((p) => p.id === id);
+    const pet = await db.pets.get(id);
     if (!pet) return status(404).json({ error: "Not found" });
     return json(pet);
   })
-
   .patch("/pets/:id", async (ctx) => {
     // DO SOMETHING
     return 200;
   })
-
   .put("/pets/:id", async (ctx) => {
     // DO SOMETHING
     return 200;
   })
-
   .post("/pets", (ctx) => {
+    // DO SOMETHING
     return status(201).json(ctx.body);
   })
 
@@ -73,7 +62,7 @@ export default server(options)
     return "Welcome page";
   })
 
-  .get("/socket", () => file("./demo/views/socket.html"))
+  .get("/socket", () => view("socket.html"))
 
   .socket("message", async (ctx) => {
     console.log(ctx.socket);
