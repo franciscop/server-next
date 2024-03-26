@@ -21,7 +21,6 @@ export default function (root) {
     path: root,
     read: (name, type = "utf8") => {
       const fullPath = absolute(name);
-      console.log(name, fullPath);
       return fsp.readFile(fullPath, type);
     },
     write: (name, value, type = "utf8") => {

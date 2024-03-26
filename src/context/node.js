@@ -20,10 +20,23 @@ export default async (request, options = {}) => {
     Object.fromEntries(url.searchParams.entries())
   );
 
-  if (request.body) {
-    const type = ctx.headers["content-type"];
-    ctx.body = await parseBody(request, type, options.uploads);
-  }
+  await new Promise((resolve, reject) => {
+    const body = [];
+    request
+      .on("data", (chunk) => {
+        body.push(chunk);
+      })
+      .on("end", async () => {
+        const type = ctx.headers["content-type"];
+        ctx.body = await parseBody(
+          Buffer.concat(body).toString(),
+          type,
+          options.uploads
+        );
+        resolve();
+      })
+      .on("error", reject);
+  });
 
   return ctx;
 };

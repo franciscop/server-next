@@ -1,4 +1,6 @@
-import server, { cookies, file, json, status, view } from "../../";
+import z from "zod";
+
+import server, { cookies, json, status, view } from "../../src/index.js";
 import authRouter from "./authRouter.js";
 import db from "./db.js";
 
@@ -8,14 +10,24 @@ const options = {
   public: "docs",
 };
 
+const PetSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+}).parse;
+
 export default server(options)
   .router("/auth", authRouter)
 
   .get("/", () => view("home.html"))
 
-  .get("/pets", async function getAllPets() {
-    return json(await db.pets.list());
-  })
+  .get(
+    "/pets",
+    { query: z.object({ name: z.string() }) },
+    async function getAllPets(ctx) {
+      console.log(ctx.url.query);
+      return json(await db.pets.list());
+    }
+  )
   .get("/pets/:id", async (ctx) => {
     const id = Number(ctx.url.params.id);
     const pet = await db.pets.get(id);
@@ -30,8 +42,9 @@ export default server(options)
     // DO SOMETHING
     return 200;
   })
-  .post("/pets", (ctx) => {
+  .post("/pets", { body: PetSchema }, (ctx) => {
     // DO SOMETHING
+    console.log(ctx.body);
     return status(201).json(ctx.body);
   })
 
@@ -65,7 +78,6 @@ export default server(options)
   .get("/socket", () => view("socket.html"))
 
   .socket("message", async (ctx) => {
-    console.log(ctx.socket);
     // send back a message
     ctx.socket.send(`You said: ${ctx.body}`);
     await new Promise((done) =>

@@ -64,7 +64,6 @@ Reply.prototype.file = async function (path) {
 
 Reply.prototype.view = async function (path) {
   return async (ctx) => {
-    console.log(ctx);
     if (!ctx.options.views) {
       throw new Error("Views not enabled");
     }

@@ -3696,7 +3696,6 @@ function bucket_default(root) {
     path: root,
     read: (name, type = "utf8") => {
       const fullPath = absolute(name);
-      console.log(name, fullPath);
       return fsp.readFile(fullPath, type);
     },
     write: (name, value, type = "utf8") => {
@@ -3791,7 +3790,6 @@ Reply.prototype.file = async function(path) {
 };
 Reply.prototype.view = async function(path) {
   return async (ctx) => {
-    console.log(ctx);
     if (!ctx.options.views) {
       throw new Error("Views not enabled");
     }
@@ -3886,6 +3884,46 @@ function pathPattern(pattern, path) {
   return false;
 }
 
+// src/helpers/StatusError.js
+class StatusError extends Error {
+  constructor(msg, status2 = 500) {
+    super(msg);
+    this.status = status2;
+  }
+}
+
+// src/helpers/validate.js
+function validate_default(ctx, schema) {
+  if (!schema || typeof schema !== "object")
+    return;
+  let base;
+  try {
+    if (typeof schema?.body === "function") {
+      base = "body";
+      schema.body(ctx.body || {});
+    }
+    if (typeof schema?.body?.parse === "function") {
+      base = "body";
+      schema.body.parse(ctx.body || {});
+    }
+    if (typeof schema?.query === "function") {
+      base = "query";
+      schema.query(ctx.url.query || {});
+    }
+    if (typeof schema?.query?.parse === "function") {
+      base = "query";
+      schema.query.parse(ctx.url.query || {});
+    }
+  } catch (error) {
+    if (error.constructor.name === "ZodError") {
+      console.log(error);
+      const message = error.issues.map(({ path, message: message2 }) => `[${base}.${path.join(".")}]: ${message2}`).sort().join("\n");
+      throw new StatusError(message, 422);
+    }
+    throw error;
+  }
+}
+
 // src/helpers/handleRequest.js
 async function handleRequest(handlers, ctx) {
   for (let [matcher, ...cbs] of handlers[ctx.method]) {
@@ -3894,12 +3932,19 @@ async function handleRequest(handlers, ctx) {
       continue;
     define(ctx.url, "params", () => match);
     for (let cb of cbs) {
-      const out = await parseResponse(cb, ctx);
-      if (out)
-        return out;
+      try {
+        validate_default(ctx, cb);
+        if (typeof cb === "function") {
+          const out = await parseResponse(cb, ctx);
+          if (out)
+            return out;
+        }
+      } catch (error) {
+        return new Response(error.message, { status: error.status || 500 });
+      }
     }
   }
-  return Response("Not Found", { status: 404 });
+  return new Response("Not Found", { status: 404 });
 }
 // src/helpers/iterate.js
 async function iterate(stream, cb) {
@@ -4087,10 +4132,16 @@ var node_default = async (request, options = {}) => {
   const path = request.url.replace(/\/$/, "") || "/";
   ctx.url = new URL(path, `${https}://${host}`);
   define(ctx.url, "query", (url) => Object.fromEntries(url.searchParams.entries()));
-  if (request.body) {
-    const type2 = ctx.headers["content-type"];
-    ctx.body = await parseBody(request, type2, options.uploads);
-  }
+  await new Promise((resolve, reject) => {
+    const body = [];
+    request.on("data", (chunk) => {
+      body.push(chunk);
+    }).on("end", async () => {
+      const type2 = ctx.headers["content-type"];
+      ctx.body = await parseBody(Buffer.concat(body).toString(), type2, options.uploads);
+      resolve();
+    }).on("error", reject);
+  });
   return ctx;
 };
 

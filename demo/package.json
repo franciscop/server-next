@@ -7,16 +7,17 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "build": "npm run rollup && npm run size",
-    "rollup": "rollup index.js --output.format es --output.file index.min.js",
-    "start": "node --experimental-modules ./index.js",
-    "size": "echo \"$(gzip -c index.min.js | wc -c) bytes\" # Only for Unix"
+    "start": "nodemon --experimental-modules ./src/index.js"
   },
   "keywords": [],
   "files": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
   "dependencies": {
-    "polystore": "^0.5.0"
+    "polystore": "^0.5.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
