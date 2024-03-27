@@ -19,7 +19,7 @@ It includes all the things you would expect from a modern Server framework, like
 
 - KV Stores: in-memory, Redis, Consul, DynamoDB.
 - Buckets: AWS S3, Cloudflare R2, Backblaze B2.
-- Validation libraries: Zod, Joi, Yup.
+- Validation libraries: Zod, Joi, Yup, [Validate](https://validatejs.org), etc.
 - Auth: JWT, Session, Cookies
 
 ```js
