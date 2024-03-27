@@ -1,4 +1,4 @@
-## Introduction
+# Documentation
 
 > **⚠️ WIP** This is an **experimental library** right now!
 
@@ -32,6 +32,22 @@ it("can retrieve the homepage", async () => {
   expect(books[0]).toEqual({ id: 0, name: 'The Catcher In The Rye', ... });
 });
 ```
+
+## Introduction
+
+### Getting started
+
+### Basic usage
+
+### Middleware
+
+## Guides
+
+### Validation
+
+### Stores
+
+### File handling
 
 ## Options
 
