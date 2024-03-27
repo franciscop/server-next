@@ -1,166 +1,334 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <link
-      href="https://fonts.googleapis.com/css?family=Montserrat:400,600|Source+Code+Pro&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/style.min.css" />
+<br />
 
-    <title>Server.js for Node</title>
-    <meta
-      name="description"
-      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
-    />
-    <link rel="icon" type="image/png" href="/img/logo.png" />
-
-    <!-- Twitter -->
-    <meta name="twitter:title" content="Server.js for Node" />
-    <meta
-      name="twitter:description"
-      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
-    />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://node-server.com/" />
-    <meta name="twitter:image" content="https://node-server.com/img/hero.png" />
-
-    <!-- Facebook & others -->
-    <meta property="og:title" content="Server.js for Node" />
-    <meta
-      property="og:description"
-      content="A library to easily create a modern Node.js server. Handles HTTP, Websockets and all the small details."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://node-server.com/" />
-    <meta property="og:image" content="https://node-server.com/img/hero.png" />
-  </head>
-  <body>
-    <nav>
-      <a href="/" class="brand">
-        <img class="logo" src="/img/logo.svg" alt="" />
-        <span>Server.js</span>
-      </a>
-
-      <input id="bmenub" type="checkbox" class="show" />
-      <label for="bmenub" class="burger">menu</label>
-
-      <div class="menu">
-        <a href="/about">About</a>
-        <a href="/documentation">Documentation</a>
-        <!-- <a href="/screencasts">Screencasts</a> -->
-        <a href="/tutorials">Tutorials</a>
-        <a href="https://github.com/franciscop/server">Github</a>
-      </div>
-    </nav>
-    <div class="hero">
-      <!-- <div
-        style="
-          border: 2px solid red;
-          background: #faa;
-          margin: 0 0 20px;
-          border-radius: 8px;
-          padding: 10px 20px;
-        "
+<section class="hero flex center nowrap">
+  <div>
+    <h1>Server Next</h1>
+    <p style="max-width: 620px">
+      A library to easily create a modern Node.js server. Handles HTTP,
+      Websockets and all the small details:
+    </p>
+    <pre class="small">npm install @server/next</pre>
+    <div class="buttons">
+      <a class="button" href="/documentation#getting-started"
+        >Getting Started</a
       >
-        WORK IN PROGRESS; WEBSITE NOT YET USABLE
-      </div> -->
-      <div class="flex one two-600">
-        <div>
-          <h1>Server.js for Node</h1>
-          <p>
-            A library to easily create a modern Node.js server. Handles HTTP,
-            Websockets and all the small details:
-          </p>
-          <pre class="install"><code>npm install server</code></pre>
-          <div>
-            <a href="/documentation#getting-started" class="button">
-              Getting Started
-            </a>
-            <a
-              href="http://eepurl.com/cGRggH"
-              class="pseudo button"
-              target="_blank"
-            >
-              Subscribe
-            </a>
-          </div>
-        </div>
-        <div>
-          <pre><code class="language-js">import server from &quot;server&quot;;
+      <a class="pseudo button" href="/documentation">Documentation</a>
+    </div>
+  </div>
+  <div style="width: 630px; max-width: 100%">
+    <pre><code class="language-js">import server from &quot;server&quot;;
 
 export default server()
   .get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;)
   .post(&quot;/users&quot;, ctx =&gt; {
     console.log(ctx.body, ctx.files);
-    return &#39;ok&#39;;
+    return 'ok';
   });</code></pre>
-        </div>
-      </div>
+  </div>
+</section>
+
+<div class="separator">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
+    <circle cx="10" cy="10" r="3" />
+    <line x1="20" y1="10" x2="260" y2="10" />
+    <circle cx="270" cy="10" r="3" />
+    <circle class="empty" cx="283" cy="10" r="3" />
+    <circle class="empty" cx="300" cy="10" r="5" />
+    <circle class="empty" cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="3" />
+    <line x1="340" y1="10" x2="580" y2="10" />
+    <circle cx="590" cy="10" r="3" />
+  </svg>
+</div>
+
+<section class="features flex one two-500 three-900">
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
+        />
+        <h3>Batteries on</h3>
+      </header>
+      <p>All the basics work as expected by default. Just write your app!</p>
     </div>
-    <main class="home">
-      <div class="features">
-        <div class="flex one two-500 three-800">
-          <div>
-            <div class="feature">
-              <img src="/img/battery.svg" />
-              <h3>Batteries on</h3>
-              <p>
-                All the basics work as expected by default. Just write your app!
-              </p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/socketio.svg" />
-              <h3>Websockets</h3>
-              <p>Fully managed websockets with channels, reconnect, etc.</p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/modern.svg" />
-              <h3>Modern ES7+</h3>
-              <p>
-                Use the clean syntax <code>async</code>, <code>await</code>,
-                <code>import</code>, <code>export</code>, etc.
-              </p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/document.svg" />
-              <h3>Documented</h3>
-              <p>Extensive docs, tutorials and videos make it easy to learn.</p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/lock.svg" />
-              <h3>Secure</h3>
-              <p>Safe by default while fully configurable CORS, CSRF, etc.</p>
-            </div>
-          </div>
-          <div>
-            <div class="feature">
-              <img src="/img/lego.svg" />
-              <h3>Extensible</h3>
-              <p>Compatible with thousands of existing Express.js libraries.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    <script
-      src="https://unpkg.com/prismjs@1.20.0/prism.js"
-      charset="utf-8"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/umbrellajs"
-      charset="utf-8"
-    ></script>
-    <script src="/documentation/script.js" charset="utf-8"></script>
-  </body>
-</html>
+  </div>
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/modern.svg"
+        />
+        <h3>Modern ES7+</h3>
+      </header>
+      <p>
+        Use the clean syntax <code>async</code>, <code>await</code>,
+        <code>import</code>, <code>export</code>, etc.
+      </p>
+    </div>
+  </div>
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/socketio.svg"
+        />
+        <h3>Websockets</h3>
+      </header>
+      <p>Fully managed websockets with channels, reconnect, etc.</p>
+    </div>
+  </div>
+
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/document.svg"
+        />
+        <h3>Documented</h3>
+      </header>
+      <p>Extensive docs, tutorials and videos make it easy to learn.</p>
+    </div>
+  </div>
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lock.svg"
+        />
+        <h3>Secure</h3>
+      </header>
+      <p>Safe by default while fully configurable CORS, CSRF, etc.</p>
+    </div>
+  </div>
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lego.svg"
+        />
+        <h3>Extensible</h3>
+      </header>
+      <p>Compatible with thousands of existing Express.js libraries.</p>
+    </div>
+  </div>
+</section>
+
+<div class="separator">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
+    <circle cx="10" cy="10" r="3" />
+    <line x1="20" y1="10" x2="260" y2="10" />
+    <circle cx="270" cy="10" r="3" />
+    <circle class="empty" cx="283" cy="10" r="3" />
+    <circle class="empty" cx="300" cy="10" r="5" />
+    <circle class="empty" cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="3" />
+    <line x1="340" y1="10" x2="580" y2="10" />
+    <circle cx="590" cy="10" r="3" />
+  </svg>
+</div>
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>🚂 Render and assert</h2>
+      <p>
+        Allows you to render React components and make assertions against it
+        with Jest or other testing libraries.
+      </p>
+      <p>
+        You can use the library methods to read values like
+        <code>.text()</code>, or get a node with <code>.get(index)</code> and
+        then use the native DOM API.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import $ from &quot;react-test&quot;;
+
+it(&quot;renders a simple title&quot;, () =&gt; {
+  const title = $(&lt;h1&gt;Hello&lt;/h1&gt;);
+  expect(title.text()).toBe(&quot;Hello&quot;);
+  expect(title.attr(&quot;id&quot;)).toBe(null);
+  expect(title.get(0).nodeName).toBe(&quot;H1&quot;);
+  // ...
+});</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>
+        <img
+          width="26"
+          height="26"
+          style="vertical-align: middle"
+          src="https://raw.githubusercontent.com/franciscop/react-test/master/assets/jest.svg"
+        />
+        Clear Jest Matchers
+      </h2>
+      <p>
+        We've also created
+        <a href="/documentation#jest-matchers">a series of Jest Matchers</a>
+        (included by default if you use Jest) that makes the tests more readable
+        and the error messages when a test fails very clear.
+      </p>
+      <p>
+        They can be used in single elements and for a set of elements, both in
+        the affirmative and negative form.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import $ from &quot;react-test&quot;;
+
+it(&quot;renders a simple title&quot;, () =&gt; {
+  const title = $(&lt;h1&gt;Hello&lt;/h1&gt;);
+  expect(title).toHaveText(&quot;Hello&quot;);
+  expect(title).not.toHaveAttribute(&quot;id&quot;);
+  expect(title).toMatchSelector(&quot;h1&quot;);
+  // ...
+});</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>👆 Simulate user actions</h2>
+      <p>
+        This is where this library gets really valuable! Emulating user
+        interactions is as easy as it could ever be. There's
+        <a href="/documentation#library-api">multiple event helpers</a>
+        available.
+      </p>
+      <p>
+        For example, to <a href="/documentation#counter">test a Counter</a> that
+        increments when clicked: render and assert the initial status, then
+        await for a user click, and finally make more assertions.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import $ from &quot;react-test&quot;;
+import Counter from &quot;./Counter&quot;;
+
+it(&quot;Can increment a counter&quot;, async () =&gt; {
+  const counter = $(&lt;Counter /&gt;);
+  expect(counter).toHaveText(&quot;0&quot;);
+  await counter.click();
+  await counter.click();
+  expect(counter).toHaveText(&quot;2&quot;);
+});</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>⏱ Timers, async, etc.</h2>
+      <p>
+        There's other helpers for common React workflows: waiting for a network
+        call, for a specific DOM element, or for fixed amount of time before
+        doing assertions.
+      </p>
+      <p>
+        You can use <a href="/documentation#delay"><code>.delay()</code></a> for
+        a simple timer or
+        <a href="/documentation#until"><code>until()</code></a>
+        for more complex DOM behavior.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import $, {until } from &quot;react-test&quot;;
+import UserList from &quot;./UserList&quot;;
+
+it(&quot;waits for a DOM change&quot;, async () =&gt; {
+  const users = $(&lt;UserList /&gt;);
+  expect(users.find(&quot;li&quot;)).toHaveLength(0);
+  await until(users).find(&quot;li&quot;);
+  expect(users.find(&quot;li&quot;)).toHaveLength(10);
+});</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>✨ Magic Autocomplete</h2>
+      <p>
+        Added jsdocs so the expected parameters and return value will be clearly
+        defined in your IDE/Code Editor.
+      </p>
+      <p>
+        We added the <em>description</em>, a representative <em>example</em> and
+        even a <em>link</em> for more information for
+        <strong>every one</strong> of the methods available! We want you to have
+        the best development experience possible with React Test!
+      </p>
+    </div>
+  </div>
+  <div>
+    <div class="splash">
+      <img
+        width="535"
+        src="https://raw.githubusercontent.com/franciscop/react-test/master/assets/autocomplete.webp"
+      />
+    </div>
+  </div>
+</section>
+
+<div class="separator">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
+    <circle cx="10" cy="10" r="3" />
+    <line x1="20" y1="10" x2="260" y2="10" />
+    <circle cx="270" cy="10" r="3" />
+    <circle class="empty" cx="283" cy="10" r="3" />
+    <circle class="empty" cx="300" cy="10" r="5" />
+    <circle class="empty" cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="3" />
+    <line x1="340" y1="10" x2="580" y2="10" />
+    <circle cx="590" cy="10" r="3" />
+  </svg>
+</div>
+
+<div style="text-align: center">
+  <p>
+    Created by <a href="https://francisco.io/" target="_blank">Francisco</a> and
+    <a
+      href="https://github.com/franciscop/react-test/graphs/contributors"
+      target="_blank"
+      >other contributors</a
+    >.
+  </p>
+  <p>
+    Need help?
+    <a
+      href="https://superpeer.com/francisco/-/javascript-and-react-help"
+      target="_blank"
+      >Book a call</a
+    >.
+  </p>
+</div>

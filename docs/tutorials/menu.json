@@ -1,7 +1,0 @@
-{
-  "Getting started": "readme.md",
-  "Server in production": "server-production/readme.md",
-  "Spreadsheet database": "spreadsheet/readme.md",
-  "Todo": "todo/readme.md",
-  "Real-time Chat": "chat/readme.md"
-}

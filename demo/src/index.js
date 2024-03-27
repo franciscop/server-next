@@ -13,7 +13,7 @@ const options = {
 const PetSchema = z.object({
   name: z.string(),
   age: z.number(),
-}).parse;
+});
 
 export default server(options)
   .router("/auth", authRouter)
