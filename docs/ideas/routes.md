@@ -21,9 +21,20 @@ const routes = {
   "/books/info": { get: [], post: [], put: [], del: [] },
   "/books/*": { get: [], post: [], put: [], del: [] },
   "/users": { get: [], post: [], put: [], del: [] },
-  "/users/logout": { get: [], post: [], put: [], del: [] },
+  "/users/login": { get: [], post: [], put: [], del: [] },
   "/users/:id": { get: [], post: [], put: [], del: [] },
 };
+```
+
+Resolving and comparing routes _fast_:
+
+```js
+// URL and what we try (and match)
+'/users'             -> '/users'
+'/users/login'       -> '/users/login'
+'/users/43554'       -> '/users/43554' -> '/users/*'
+'/users/43554/info'  -> '/users/43554/info' -> '/users/43554/*' -> '/users/*'
+'/buks/456/info'     -> '/buks/456/info' -> '/buks/456/*' -> '/buks/*' -> '/*' -> 404
 ```
 
 ```js

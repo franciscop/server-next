@@ -21,6 +21,8 @@ export default function server(options = {}) {
 
   this.handlers = {};
 
+  options.port = options.port || process.env.PORT || 3000;
+
   options.views = options.views ? Bucket(options.views) : null;
   options.public = options.public ? Bucket(options.public) : null;
   options.uploads = options.uploads ? Bucket(options.uploads) : null;
@@ -64,7 +66,7 @@ export default function server(options = {}) {
   this.fetch = async (request, env, fetchCtx) => {
     if (env?.upgrade(request)) return;
 
-    const ctx = await createWinterContext(request, options);
+    const ctx = await createWinterContext(request, options, this.platform);
     ctx.platform = this.platform;
 
     return await handleRequest(this.handlers, ctx);

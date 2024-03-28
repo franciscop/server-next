@@ -1,20 +1,36 @@
 import server, { status } from "./index.js";
 
-describe("server", () => {
+describe("return different types", () => {
   const app = server()
     .get("/", () => "Hello world")
     .get("/text", () => "Hello world")
     .get("/array", () => ["Hello world"])
     .get("/object", () => ({ hello: "world" }))
-    .get("/status", () => 201)
-    .post("/", (ctx) => status(201).send(ctx.body));
+    .get("/status", () => 201);
 
-  it("can render hello world", async () => {
-    const res = await app.fetch(new Request("http://localhost:3000/"));
-
-    expect(res.status).toBe(200);
+  it("can get the plain text", async () => {
+    const res = await app.fetch(new Request("http://localhost:3000/text"));
     expect(await res.text()).toBe("Hello world");
   });
+
+  it("can get the array", async () => {
+    const res = await app.fetch(new Request("http://localhost:3000/array"));
+    expect(await res.json()).toEqual(["Hello world"]);
+  });
+
+  it("can get the object", async () => {
+    const res = await app.fetch(new Request("http://localhost:3000/object"));
+    expect(await res.json()).toEqual({ hello: "world" });
+  });
+
+  it("can get the status", async () => {
+    const res = await app.fetch(new Request("http://localhost:3000/status"));
+    expect(res.status).toBe(201);
+  });
+});
+
+describe("simple post works", () => {
+  const app = server().post("/", (ctx) => status(201).send(ctx.body));
 
   it("can post new data", async () => {
     const res = await app.fetch(
@@ -41,5 +57,3 @@ describe("server", () => {
     expect(await res.json()).toEqual({ hello: "world" });
   });
 });
-
-describe("all the replies", () => {});

@@ -4208,6 +4208,7 @@ function server(options = {}) {
   }
   this.platform = getMachine();
   this.handlers = {};
+  options.port = options.port || process.env.PORT || 3000;
   options.views = options.views ? bucket_default(options.views) : null;
   options.public = options.public ? bucket_default(options.public) : null;
   options.uploads = options.uploads ? bucket_default(options.uploads) : null;
@@ -4240,7 +4241,7 @@ function server(options = {}) {
   this.fetch = async (request, env, fetchCtx) => {
     if (env?.upgrade(request))
       return;
-    const ctx = await winter_default(request, options);
+    const ctx = await winter_default(request, options, this.platform);
     ctx.platform = this.platform;
     return await handleRequest(this.handlers, ctx);
   };

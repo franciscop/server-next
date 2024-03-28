@@ -27,8 +27,10 @@ It includes all the things you would expect from a modern Server framework, like
 import app from "./";
 
 it("can retrieve the homepage", async () => {
-  const res = await app.fetch(new Request("http://localhost:3000/books/"));
+  const res = await app.fetch(new Request("http://localhost:3000/books"));
   const books = await res.json();
+
+  expect(res.status).toBe(200);
   expect(books[0]).toEqual({ id: 0, name: 'The Catcher In The Rye', ... });
 });
 ```
