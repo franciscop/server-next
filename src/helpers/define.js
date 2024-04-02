@@ -8,8 +8,8 @@ export default function define(obj, key, cb) {
     get() {
       const value = cb(obj);
       Object.defineProperty(obj, key, {
-        configurable: false,
-        writable: false,
+        configurable: true,
+        writable: true,
         value,
       });
       return obj[key];

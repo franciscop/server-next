@@ -4,7 +4,7 @@ import define from "./define.js";
 import validate from "./validate.js";
 
 export default async function handleRequest(handlers, ctx) {
-  for (let [matcher, ...cbs] of handlers[ctx.method]) {
+  for (let [method, matcher, ...cbs] of handlers[ctx.method]) {
     const match = pathPattern(matcher, ctx.url.pathname || "/");
     // Skip this whole middleware if there was no match
     if (!match) continue;
@@ -22,6 +22,9 @@ export default async function handleRequest(handlers, ctx) {
         return new Response(error.message, { status: error.status || 500 });
       }
     }
+
+    // When it's an HTTP method, break free after it's done (which will 404)
+    if (method !== "*") break;
   }
 
   return new Response("Not Found", { status: 404 });

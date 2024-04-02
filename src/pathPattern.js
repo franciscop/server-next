@@ -1,4 +1,5 @@
 export default function pathPattern(pattern, path) {
+  pattern = "/" + pattern.replace(/^\//, "");
   pattern = pattern.replace(/\/$/, "") || "/";
   path = path.replace(/\/$/, "") || "/";
 

@@ -11,7 +11,8 @@
   "scripts": {
     "demo": "nodemon ./demo/app.js",
     "start": "bun test --watch",
-    "test": "bun test"
+    "test": "bun test",
+    "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "keywords": [
     "server",
@@ -31,8 +32,7 @@
   "engineStrict": true,
   "dependencies": {},
   "devDependencies": {
-    "jest": "^26.0.1",
-    "prettier": "^2.7.0"
+    "jest": "^29.7.0"
   },
   "jest": {
     "testEnvironment": "jest-environment-node",

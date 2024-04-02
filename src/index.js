@@ -19,7 +19,16 @@ export default function server(options = {}) {
 
   this.platform = getMachine();
 
-  this.handlers = {};
+  this.handlers = {
+    socket: [],
+    get: [],
+    head: [],
+    post: [],
+    put: [],
+    patch: [],
+    delete: [],
+    options: [],
+  };
 
   options.port = options.port || process.env.PORT || 3000;
 
@@ -59,7 +68,7 @@ export default function server(options = {}) {
           }
           response.end();
         })
-        .listen(options.port || 3000);
+        .listen(options.port);
     })();
   }
 
@@ -74,62 +83,55 @@ export default function server(options = {}) {
 }
 
 // INTERNAL
-server.prototype.handle = function (name, ...middleware) {
-  if (!this.handlers[name]) {
-    this.handlers[name] = [];
+server.prototype.handle = function (method, path, ...middleware) {
+  if (method === "*") {
+    for (let m in this.handlers) {
+      this.handlers[m].push(["*", path, ...middleware]);
+    }
+  } else {
+    this.handlers[method].push([method, path, ...middleware]);
   }
-  this.handlers[name].push(...middleware);
+
   return this;
 };
 
 server.prototype.socket = function (path, ...middleware) {
-  return this.handle("socket", [path, ...middleware]);
+  return this.handle("socket", path, ...middleware);
 };
 
 server.prototype.get = function (path, ...middleware) {
-  return this.handle("get", [path, ...middleware]);
+  return this.handle("get", path, ...middleware);
 };
 
 server.prototype.head = function (path, ...middleware) {
-  return this.handle("head", [path, ...middleware]);
+  return this.handle("head", path, ...middleware);
 };
 
 server.prototype.post = function (path, ...middleware) {
-  return this.handle("post", [path, ...middleware]);
+  return this.handle("post", path, ...middleware);
 };
 
 server.prototype.put = function (path, ...middleware) {
-  return this.handle("put", [path, ...middleware]);
+  return this.handle("put", path, ...middleware);
 };
 
 server.prototype.patch = function (path, ...middleware) {
-  return this.handle("patch", [path, ...middleware]);
+  return this.handle("patch", path, ...middleware);
 };
 
 server.prototype.del = function (path, ...middleware) {
-  return this.handle("del", [path, ...middleware]);
+  return this.handle("del", path, ...middleware);
 };
 
 server.prototype.options = function (path, ...middleware) {
-  return this.handle("options", [path, ...middleware]);
+  return this.handle("options", path, ...middleware);
 };
 
 server.prototype.use = function (...middleware) {
-  let path = "*";
-  if (typeof middleware[0] === "string" || middleware[0] instanceof RegExp) {
-    path = middleware.shift();
+  if (typeof middleware[0] === "string") {
+    return this.handle("*", ...middleware);
   }
-
-  this.handle("socket", [path, ...middleware]);
-  this.handle("get", [path, ...middleware]);
-  this.handle("head", [path, ...middleware]);
-  this.handle("post", [path, ...middleware]);
-  this.handle("put", [path, ...middleware]);
-  this.handle("patch", [path, ...middleware]);
-  this.handle("del", [path, ...middleware]);
-  this.handle("options", [path, ...middleware]);
-
-  return this;
+  return this.handle("*", "*", ...middleware);
 };
 
 server.prototype.router = function (basePath, router) {
