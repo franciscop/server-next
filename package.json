@@ -10,9 +10,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "demo": "nodemon ./demo/app.js",
-    "build": "bun build src/index.js --outdir ./ --entry-naming server.js",
     "start": "bun test --watch",
-    "size": "echo \"$(gzip -c server.js | wc -c) bytes\" # Only for Unix",
     "test": "bun test"
   },
   "keywords": [
@@ -21,9 +19,11 @@
     "server.js"
   ],
   "type": "module",
+  "types": "index.d.ts",
   "main": "src/index.js",
   "files": [
-    "src/"
+    "src/",
+    "index.d.ts"
   ],
   "engines": {
     "node": ">=20.0.0"
