@@ -2,9 +2,7 @@
 
 import { json } from "./reply.js";
 
-export default async function parseResponse(handler, ctx) {
-  let out = await handler(ctx);
-
+export default async function parseResponse(out, ctx) {
   // undefined || null || 0 || false || ~""~ -> empty string is still 200
   if (!out && typeof out !== "string") return null;
 

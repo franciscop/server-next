@@ -17,8 +17,7 @@ export default function server(options = {}) {
     return new server(options);
   }
 
-  this.platform = getMachine();
-
+  // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
   this.handlers = {
     socket: [],
     get: [],
@@ -30,33 +29,33 @@ export default function server(options = {}) {
     options: [],
   };
 
+  const platform = getMachine();
   options.port = options.port || process.env.PORT || 3000;
 
   options.views = options.views ? Bucket(options.views) : null;
   options.public = options.public ? Bucket(options.public) : null;
   options.uploads = options.uploads ? Bucket(options.uploads) : null;
 
-  this.options = options;
-
   // WEBSOCKETS stuff
-  this.sockets = [];
+  const sockets = [];
   this.websocket = {
-    message: async (ws, body) => {
+    message: async (socket, body) => {
       this.handlers.socket
         ?.filter((s) => s[0] === "message")
-        ?.map((s) => s[1]({ socket: ws, sockets: this.sockets, body }));
+        ?.map((s) => s[1]({ socket, sockets, body }));
     },
-    open: (ws) => this.sockets.push(ws),
-    close: (ws) => this.sockets.splice(this.sockets.indexOf(ws), 1),
+    open: (ws) => sockets.push(ws),
+    close: (ws) => sockets.splice(sockets.indexOf(ws), 1),
   };
 
-  if (this.platform.runtime === "node") {
+  if (platform.runtime === "node") {
     (async () => {
       const http = await import("http");
       http
         .createServer(async (request, response) => {
           const ctx = await createNodeContext(request, options);
-          ctx.platform = this.platform;
+          ctx.app = this;
+          ctx.platform = platform;
 
           const out = await handleRequest(this.handlers, ctx);
 
@@ -75,8 +74,9 @@ export default function server(options = {}) {
   this.fetch = async (request, env, fetchCtx) => {
     if (env?.upgrade(request)) return;
 
-    const ctx = await createWinterContext(request, options, this.platform);
-    ctx.platform = this.platform;
+    const ctx = await createWinterContext(request, options);
+    ctx.app = this;
+    ctx.platform = platform;
 
     return await handleRequest(this.handlers, ctx);
   };
@@ -86,7 +86,7 @@ export default function server(options = {}) {
 server.prototype.handle = function (method, path, ...middleware) {
   if (method === "*") {
     for (let m in this.handlers) {
-      this.handlers[m].push(["*", path, ...middleware]);
+      this.handlers[m].push([method, path, ...middleware]);
     }
   } else {
     this.handlers[method].push([method, path, ...middleware]);

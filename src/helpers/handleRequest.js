@@ -15,7 +15,8 @@ export default async function handleRequest(handlers, ctx) {
       try {
         validate(ctx, cb);
         if (typeof cb === "function") {
-          const out = await parseResponse(cb, ctx);
+          const res = await cb(ctx);
+          const out = await parseResponse(res, ctx);
           if (out) return out;
         }
       } catch (error) {
