@@ -1,6 +1,6 @@
 import z from "zod";
 
-import server, { cookies, json, status, view } from "../../src/index.js";
+import server, { cookies, file, json, status, view } from "../../src/index.js";
 import authRouter from "./authRouter.js";
 import db from "./db.js";
 
@@ -61,6 +61,10 @@ export default server(options)
 
   .get("/json", () => {
     return json({ hello: "world" });
+  })
+
+  .get("/file", () => {
+    return file("public/logo.png");
   })
 
   .post("/json", (ctx) => {
