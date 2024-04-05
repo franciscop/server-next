@@ -57,9 +57,11 @@ Reply.prototype.json = function (body) {
 };
 
 Reply.prototype.file = async function (path) {
-  const data = await fs.readFile(path, "utf-8");
-  if (data) return this.type(path.split(".").pop()).send(data);
-  return status(404).send();
+  const data = await fs.readFile(path);
+  if (!data) return status(404).send();
+
+  this.type(path.split(".").pop());
+  return new Response(data, { status: 200, headers: this.res.headers });
 };
 
 Reply.prototype.view = async function (path) {

@@ -137,11 +137,9 @@ server.prototype.use = function (...middleware) {
 server.prototype.router = function (basePath, router) {
   basePath = "/" + basePath.replace(/^\//, "").replace(/\/$/, "") + "/";
   for (const method in router.handlers) {
-    const handlers = router.handlers[method].map(([path, ...callbacks]) => [
-      basePath + path.replace(/^\//, ""),
-      ...callbacks,
-    ]);
-    this.handle(method, ...handlers);
+    router.handlers[method].forEach(([method, path, ...callbacks]) => {
+      this.handle(method, basePath + path.replace(/^\//, ""), ...callbacks);
+    });
   }
   return this;
 };
