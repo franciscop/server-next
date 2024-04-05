@@ -57,11 +57,16 @@ Reply.prototype.json = function (body) {
 };
 
 Reply.prototype.file = async function (path) {
-  const data = await fs.readFile(path);
-  if (!data) return status(404).send();
-
-  this.type(path.split(".").pop());
-  return new Response(data, { status: 200, headers: this.res.headers });
+  try {
+    const data = await fs.readFile(path);
+    const ext = path.split(".").pop();
+    return this.type(ext).send(data);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return status(404).send();
+    }
+    throw error;
+  }
 };
 
 Reply.prototype.view = async function (path) {
@@ -85,6 +90,11 @@ Reply.prototype.send = function (body = "") {
       this.res.headers["content-type"] = isHtml ? "text/html" : "text/plain";
     }
 
+    const headers = this.generateHeaders();
+    return new Response(body, { status, headers });
+  }
+
+  if (body?.constructor?.name === "Buffer") {
     const headers = this.generateHeaders();
     return new Response(body, { status, headers });
   }
