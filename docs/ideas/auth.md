@@ -42,12 +42,14 @@ This automatically creates some endpoints:
 /auth/login/:provider
 /auth/logout
 /auth/reset/:provider
+/auth/change/:provider
 
 // 'jwt', 'token', 'key' define these endpoints:
 /api/auth/register/:provider
 /api/auth/login/:provider
 /api/auth/logout
 /api/auth/reset/:provider
+/api/auth/change/:provider
 ```
 
 On the front-end, it's all up to you. Here a small example with plain JS, see below for more in-depth examples:
