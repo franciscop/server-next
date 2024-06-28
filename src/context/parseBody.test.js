@@ -48,8 +48,8 @@ describe("parseBody", () => {
       test: ["test message 123456", "test message number two"],
     });
 
-    const matchMd = expect.stringMatching(/^file-\w{12}.md$/);
-    const matchTxt = expect.stringMatching(/^file-\w{12}.txt$/);
+    const matchMd = expect.stringMatching(/^\w{24}.md$/);
+    const matchTxt = expect.stringMatching(/^\w{24}.txt$/);
     expect(body).toMatchObject({
       profile: matchMd,
       gallery: [matchTxt, matchTxt],

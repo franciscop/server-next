@@ -1,6 +1,8 @@
 // import { Readable } from "node:stream";
 
+import { createCookies, createId } from "./helpers/index.js";
 import { json } from "./reply.js";
+import ServerError from "./ServerError.js";
 
 export default async function parseResponse(out, ctx) {
   // undefined || null || 0 || false || ~""~ -> empty string is still 200
@@ -36,6 +38,39 @@ export default async function parseResponse(out, ctx) {
   }
 
   // Here it should be a Response
+
+  // If we have a session, we need to persist it into a cookie
+  if (Object.keys(ctx.session || {}).length) {
+    if (!ctx.options.session?.store) {
+      throw ServerError.NO_STORE_WRITE({});
+    }
+
+    let id;
+    // Persistence is based on the Token
+    if (ctx.auth) {
+      id = ctx.auth.id;
+    } else {
+      // Persistence is based on the Cookies
+      // No session cookies, generate a _persistent_ cookie
+      if (!ctx.cookies.session) {
+        ctx.res.cookies.session = createId();
+      }
+      id = ctx.cookies.session;
+    }
+
+    // Saves the session in the session store
+    // Note that this is async but we are totally fine deferring it
+    ctx.options.session.store.set(id, ctx.session);
+  }
+
+  // Cookies to headers
+  if (ctx.options.cookies) {
+    if (Object.keys(ctx.res.cookies).length) {
+      ctx.res.headers["set-cookie"] = createCookies(ctx.res.cookies);
+    }
+  }
+
+  // Add the headers that are neeeded
   if (ctx?.res?.headers) {
     for (let key in ctx.res.headers) {
       out.headers[key] = ctx.res.headers[key];

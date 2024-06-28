@@ -23,7 +23,6 @@ export default function (ctx, schema) {
     }
   } catch (error) {
     if (error.constructor.name === "ZodError") {
-      console.log(error);
       const message = error.issues
         .map(({ path, message }) => `[${base}.${path.join(".")}]: ${message}`)
         .sort()

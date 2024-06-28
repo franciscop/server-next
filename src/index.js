@@ -1,15 +1,84 @@
 import "./polyfill.js";
+// Define the errors for ServerError
+import "./errors/index.js";
 
 import Bucket from "./bucket.js";
 import createNodeContext from "./context/node.js";
 import createWinterContext from "./context/winter.js";
-import { getMachine, handleRequest, iterate } from "./helpers/index.js";
+import {
+  createId,
+  getMachine,
+  handleRequest,
+  iterate,
+} from "./helpers/index.js";
+import middle from "./middle/index.js";
 
 // Export the reply helpers
 export * from "./reply.js";
 
+export { default as ServerError } from "./ServerError.js";
+
 // Allow to create a sub-router
 export { default as router } from "./router.js";
+
+const createNodeServer = async (app, options) => {
+  const http = await import("http");
+  http
+    .createServer(async (request, response) => {
+      try {
+        const ctx = await createNodeContext(request, options, app);
+        extendWithDefaults(ctx);
+        const out = await handleRequest(app.handlers, ctx);
+
+        response.writeHead(out.status || 200, out.headers);
+        if (out.body instanceof ReadableStream) {
+          await iterate(out.body, (chunk) => response.write(chunk));
+        } else {
+          response.write(out.body || "");
+        }
+        response.end();
+      } catch (error) {
+        response.writeHead(error.status || 500);
+        response.write(error.message || "");
+        response.end();
+      }
+    })
+    .listen(options.port);
+};
+
+const validateOptions = (options, env = {}) => {
+  options.port = options.port || env.PORT || 3000;
+  options.secret = options.secret || env.SECRET || "unsafe-" + createId();
+
+  options.views = options.views ? Bucket(options.views) : null;
+  options.public = options.public ? Bucket(options.public) : null;
+  options.uploads = options.uploads ? Bucket(options.uploads) : null;
+
+  options.store = options.store ?? null;
+  options.cookies = options.cookies ?? {};
+  if (options.store && options.cookies) {
+    options.session = { store: options.store.prefix("session:") };
+  }
+  options.auth = options.auth || {};
+  if (options.auth) {
+    if (typeof options.auth !== "object") {
+      options.auth = { type: options.auth };
+    }
+    if (!options.auth.store && options.store) {
+      options.auth.store = options.store.prefix("auth:");
+    }
+  }
+
+  return options;
+};
+
+const extendWithDefaults = (ctx) => {
+  // Only want to execute it once; it needs to happen on a per-request
+  // basis since we only have full access to the options there
+  if (ctx.app.extended) return;
+  middle(ctx);
+  ctx.app.extended = true;
+};
 
 // Export the main server()
 export default function server(options = {}) {
@@ -29,12 +98,9 @@ export default function server(options = {}) {
     options: [],
   };
 
-  const platform = getMachine();
-  options.port = options.port || process.env.PORT || 3000;
+  this.extended = false;
 
-  options.views = options.views ? Bucket(options.views) : null;
-  options.public = options.public ? Bucket(options.public) : null;
-  options.uploads = options.uploads ? Bucket(options.uploads) : null;
+  this.platform = getMachine();
 
   // WEBSOCKETS stuff
   const sockets = [];
@@ -48,37 +114,24 @@ export default function server(options = {}) {
     close: (ws) => sockets.splice(sockets.indexOf(ws), 1),
   };
 
-  if (platform.runtime === "node") {
-    (async () => {
-      const http = await import("http");
-      http
-        .createServer(async (request, response) => {
-          const ctx = await createNodeContext(request, options);
-          ctx.app = this;
-          ctx.platform = platform;
+  // Starting stuff
+  if (this.platform.runtime === "node") {
+    options = validateOptions(options, process.env);
 
-          const out = await handleRequest(this.handlers, ctx);
-
-          response.writeHead(out.status || 200, { header: out.headers });
-          if (out.body instanceof ReadableStream) {
-            await iterate(out.body, (chunk) => response.write(chunk));
-          } else {
-            response.write(out.body || "");
-          }
-          response.end();
-        })
-        .listen(options.port);
-    })();
+    createNodeServer(this, options);
   }
 
   this.fetch = async (request, env, fetchCtx) => {
     if (env?.upgrade(request)) return;
 
-    const ctx = await createWinterContext(request, options);
-    ctx.app = this;
-    ctx.platform = platform;
-
-    return await handleRequest(this.handlers, ctx);
+    try {
+      options = validateOptions(options, env);
+      const ctx = await createWinterContext(request, options, this);
+      extendWithDefaults(ctx);
+      return await handleRequest(this.handlers, ctx);
+    } catch (error) {
+      return new Response(error.message, { status: error.status || 500 });
+    }
   };
 }
 

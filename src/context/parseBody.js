@@ -1,3 +1,5 @@
+import { createId } from "../helpers/index.js";
+
 function getBoundary(header) {
   if (!header) return null;
   var items = header.split(";");
@@ -21,17 +23,9 @@ function getMatching(string, regex) {
   return matches[1];
 }
 
-const nanoid = (size = 12) => {
-  let str = "";
-  while (str.length < size + 2) {
-    str += Math.round(Math.random() * 1000000).toString(16);
-  }
-  return str.slice(0, size);
-};
-
 const saveFile = async (name, value, bucket) => {
   const ext = name.split(".").pop();
-  const id = `file-${nanoid(12)}.${ext}`;
+  const id = `${createId()}.${ext}`;
   await bucket.write(id, value, "binary");
   return id;
 };

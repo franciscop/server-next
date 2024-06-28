@@ -1,8 +1,10 @@
 import { define } from "../helpers/index.js";
+import findAuth from "./findAuth.js";
+import findSession from "./findSession.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
-export default async (request, options = {}) => {
+export default async (request, options = {}, app) => {
   const ctx = {};
   ctx.options = options;
   ctx.req = request;
@@ -10,7 +12,9 @@ export default async (request, options = {}) => {
   ctx.method = request.method.toLowerCase();
 
   ctx.headers = request.headers;
-  define(ctx, "cookies", () => parseCookies(request.headers.cookie));
+  ctx.cookies = parseCookies(ctx.headers.cookie);
+  ctx.session = await findSession(ctx);
+  await findAuth(ctx);
 
   const https = request.connection.encrypted ? "https" : "http";
   const host = ctx.headers.host || "localhost" + options.port;
@@ -37,6 +41,9 @@ export default async (request, options = {}) => {
       })
       .on("error", reject);
   });
+
+  ctx.app = app;
+  ctx.platform = app.platform;
 
   return ctx;
 };

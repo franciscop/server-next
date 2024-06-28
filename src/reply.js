@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 
-import { types } from "./helpers/index.js";
+import { createCookies, types } from "./helpers/index.js";
 
 function Reply() {}
 
@@ -8,9 +8,7 @@ Reply.prototype.res = { headers: {}, cookies: {} };
 
 // INTERNAL
 Reply.prototype.generateHeaders = function () {
-  const cookies = Object.entries(this.res.cookies)
-    .map(([k, { value, path = "/" }]) => `${k}=${value};Path=${path}`)
-    .join(";");
+  const cookies = createCookies(this.res.cookies);
   return { ...this.res.headers, "set-cookie": cookies };
 };
 

@@ -34,7 +34,7 @@ Resolving and comparing routes _fast_:
 '/users/login'       -> '/users/login'
 '/users/43554'       -> '/users/43554' -> '/users/*'
 '/users/43554/info'  -> '/users/43554/info' -> '/users/43554/*' -> '/users/*'
-'/buks/456/info'     -> '/buks/456/info' -> '/buks/456/*' -> '/buks/*' -> '/*' -> 404
+'/books/456/info'    -> '/books/456/info' -> '/books/456/*' -> '/books/*' -> '/*' -> 404
 ```
 
 ```js

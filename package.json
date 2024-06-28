@@ -30,12 +30,15 @@
     "node": ">=20.0.0"
   },
   "engineStrict": true,
-  "dependencies": {},
   "devDependencies": {
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "polystore": "^0.8.0"
   },
   "jest": {
     "testEnvironment": "jest-environment-node",
     "transform": {}
+  },
+  "dependencies": {
+    "argon2": "^0.40.3"
   }
 }
