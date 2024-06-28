@@ -41,7 +41,7 @@ const register = async (ctx) => {
 const doNuff = (ctx) => {};
 
 export default router()
-  .get("/login", doNuff, () => file("./demo/views/login.html"))
+  .get("/login", doNuff, () => file("./views/login.html"))
   .post("/login", doNuff, login)
-  .get("/register", () => file("./demo/views/register.html"))
+  .get("/register", () => file("./views/register.html"))
   .post("/register", register);

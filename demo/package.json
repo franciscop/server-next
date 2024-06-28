@@ -7,7 +7,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon --experimental-modules ./src/index.js"
+    "start": "nodemon --ignore data --experimental-modules ./src/index.js"
   },
   "keywords": [],
   "files": [],
