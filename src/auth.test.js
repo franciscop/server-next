@@ -28,42 +28,51 @@ describe("auth", () => {
     expect(await res.text()).toBe("Bearer REqA2l022l8Q0tuIRtqLOPUy");
   });
 
-  describe.skip("user creation flow", () => {
-    const url = (path, options = {}) =>
+  describe("user creation flow", () => {
+    // These are obviously mock data
+    const EMAIL = "abc@test.com";
+    const PASS = "11111111";
+
+    const url = (path, body = {}, headers = {}) =>
       new Request("http://localhost:3000" + path, {
         headers: {
           cookie: "session=REqA2l022l8Q0tuIRtqLOPUy",
           "content-type": "application/json",
+          ...headers,
         },
-        ...options,
-        body: JSON.stringify(options.body),
+        method: "POST",
+        body: JSON.stringify(body),
       });
 
     const store = kv(new Map());
-    const app = server({ auth: "email", store });
+    const app = server({ auth: { type: "token", providers: "email" }, store });
 
     it("can create a new user", async () => {
-      const registered = await app.fetch(
-        url("/register", {
-          method: "POST",
-          body: { email: "abc@test.com", password: "11111111" },
-        })
+      const regReq = await app.fetch(
+        url("/auth/register/email", { email: EMAIL, password: PASS })
       );
-      console.log(registered);
-      console.log(Object.fromEntries(await store.entries()));
-      console.log(await registered.text());
-      expect(registered.status).toBe(201);
+      const register = await regReq.json();
+      expect(regReq.status).toBe(201);
+      expect(await store.keys()).toEqual([
+        "auth:abc@test.com",
+        "session:" + register.token,
+      ]);
 
-      const login = await app.fetch(
-        url("/login", {
-          method: "POST",
-          body: { email: "abc@test.com", password: "11111111" },
-        })
+      const logoutReq = await app.fetch(
+        url("/auth/logout", {}, { authorization: "Bearer " + register.token })
       );
-      console.log(login);
-      console.log(Object.fromEntries(await store.entries()));
-      console.log(await login.text());
-      expect(login.status).toBe(200);
+      expect(logoutReq.status).toBe(200);
+      expect(await store.keys()).toEqual(["auth:abc@test.com"]);
+
+      const loginReq = await app.fetch(
+        url("/auth/login/email", { email: EMAIL, password: PASS })
+      );
+      const login = await loginReq.json();
+      expect(loginReq.status).toBe(200);
+      expect(await store.keys()).toEqual([
+        "auth:abc@test.com",
+        "session:" + login.token,
+      ]);
     });
   });
 });

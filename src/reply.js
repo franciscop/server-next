@@ -2,9 +2,12 @@ import fs from "fs/promises";
 
 import { createCookies, types } from "./helpers/index.js";
 
-function Reply() {}
-
-Reply.prototype.res = { headers: {}, cookies: {} };
+function Reply() {
+  this.res = {
+    headers: {},
+    cookies: {},
+  };
+}
 
 // INTERNAL
 Reply.prototype.generateHeaders = function () {
@@ -49,7 +52,7 @@ Reply.prototype.cookies = function (cookies) {
 
 // FINAL
 Reply.prototype.json = function (body) {
-  return headers({ "content-type": "application/json" }).send(
+  return this.headers({ "content-type": "application/json" }).send(
     JSON.stringify(body)
   );
 };
@@ -74,7 +77,7 @@ Reply.prototype.view = async function (path) {
     }
     const data = await ctx.options.views.read(path);
     if (data) return this.type(path.split(".").pop()).send(data);
-    return status(404).send();
+    return this.status(404).send();
   };
 };
 

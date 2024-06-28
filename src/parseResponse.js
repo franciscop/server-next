@@ -42,21 +42,16 @@ export default async function parseResponse(out, ctx) {
   // If we have a session, we need to persist it into a cookie
   if (Object.keys(ctx.session || {}).length) {
     if (!ctx.options.session?.store) {
-      throw ServerError.NO_STORE_WRITE({});
+      throw ServerError.NO_STORE({});
     }
 
-    let id;
     // Persistence is based on the Token
-    if (ctx.auth) {
-      id = ctx.auth.id;
-    } else {
-      // Persistence is based on the Cookies
-      // No session cookies, generate a _persistent_ cookie
-      if (!ctx.cookies.session) {
-        ctx.res.cookies.session = createId();
-      }
-      id = ctx.cookies.session;
+    // Persistence is based on the Cookies
+    // No session cookies, generate a _persistent_ cookie
+    if (!ctx.cookies.session) {
+      ctx.res.cookies.session = createId();
     }
+    const id = ctx.cookies.session;
 
     // Saves the session in the session store
     // Note that this is async but we are totally fine deferring it

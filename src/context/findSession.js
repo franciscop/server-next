@@ -1,4 +1,4 @@
-import { ServerError } from "../";
+import { ServerError } from "../index.js";
 
 class NoSession {}
 

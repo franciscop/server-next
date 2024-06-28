@@ -1,4 +1,4 @@
-import { ServerError } from "../";
+import { ServerError } from "../index.js";
 
 export default async function findAuth(ctx) {
   // NO AUTH AT ALL
@@ -7,7 +7,11 @@ export default async function findAuth(ctx) {
   if (!store) return;
 
   // AUTHENTICATION IS AVAILABLE
-  ctx.auth = { type: ctx.options.auth.type, store };
+  ctx.auth = {
+    type: ctx.options.auth.type,
+    providers: ctx.options.auth.providers,
+    store,
+  };
 
   // If the user is not authenticated, there's no auth to retrieve
   if (!ctx.headers.authorization) return;

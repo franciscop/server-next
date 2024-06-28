@@ -1,4 +1,4 @@
-import server, { router } from "./index.js";
+import server, { router, status } from "./index.js";
 
 const url = (path, options = {}) =>
   new Request("http://localhost:3000" + path, options);
@@ -43,5 +43,16 @@ describe("can route properly", () => {
   it("can post to the nested get", async () => {
     const res = await app.fetch(url("/api/hello", { method: "POST" }));
     expect(await res.text()).toBe("Hello /api/hello");
+  });
+
+  it("no status reuse", async () => {
+    const app = server()
+      .get("/a", () => status(201).send("hello"))
+      .get("/b", () => ({ hello: "bye" }))
+      .get("/", () => "Fallback");
+    const resA = await app.fetch(url("/a"));
+    expect(resA.status).toBe(201);
+    const resB = await app.fetch(url("/b"));
+    expect(resB.status).toBe(200);
   });
 });
