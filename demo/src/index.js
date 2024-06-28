@@ -6,11 +6,22 @@ import authRouter from "./authRouter.js";
 import db from "./db.js";
 
 const store = kv(new URL(`file://${process.cwd()}/data/store.json`));
+const sessionStore = kv(new URL(`file://${process.cwd()}/data/session.json`));
+const authStore = kv(new URL(`file://${process.cwd()}/data/auth.json`));
 
 const options = {
   port: 3000,
   views: "views",
+  public: "public",
   store,
+  session: {
+    store: sessionStore,
+  },
+  auth: {
+    type: "token",
+    providers: "email",
+    store: authStore,
+  },
 };
 
 const PetSchema = z.object({
@@ -27,7 +38,6 @@ export default server(options)
     "/pets",
     { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
-      console.log(ctx.url.query);
       return json(await db.pets.list());
     }
   )
@@ -47,7 +57,6 @@ export default server(options)
   })
   .post("/pets", { body: PetSchema }, (ctx) => {
     // DO SOMETHING
-    console.log(ctx.body);
     return status(201).json(ctx.body);
   })
 
