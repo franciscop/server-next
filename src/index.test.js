@@ -1,59 +1,50 @@
 import server, { status } from "./index.js";
 
 describe("return different types", () => {
-  const app = server()
+  const api = server()
     .get("/", () => "Hello world")
     .get("/text", () => "Hello world")
     .get("/array", () => ["Hello world"])
     .get("/object", () => ({ hello: "world" }))
-    .get("/status", () => 201);
+    .get("/status", () => 201)
+    .test();
 
   it("can get the plain text", async () => {
-    const res = await app.fetch(new Request("http://localhost:3000/text"));
-    expect(await res.text()).toBe("Hello world");
+    const { data } = await api.get("/text");
+    expect(data).toBe("Hello world");
   });
 
   it("can get the array", async () => {
-    const res = await app.fetch(new Request("http://localhost:3000/array"));
-    expect(await res.json()).toEqual(["Hello world"]);
+    const { data } = await api.get("/array");
+    expect(data).toEqual(["Hello world"]);
   });
 
   it("can get the object", async () => {
-    const res = await app.fetch(new Request("http://localhost:3000/object"));
-    expect(await res.json()).toEqual({ hello: "world" });
+    const { data } = await api.get("/object");
+    expect(data).toEqual({ hello: "world" });
   });
 
   it("can get the status", async () => {
-    const res = await app.fetch(new Request("http://localhost:3000/status"));
-    expect(res.status).toBe(201);
+    const { status } = await api.get("/status");
+    expect(status).toBe(201);
   });
 });
 
 describe("simple post works", () => {
-  const app = server().post("/", (ctx) => status(201).send(ctx.body));
+  const api = server()
+    .post("/", (ctx) => status(201).send(ctx.body))
+    .test();
 
   it("can post new data", async () => {
-    const res = await app.fetch(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        body: "New Data",
-      })
-    );
-
-    expect(res.status).toBe(201);
-    expect(await res.text()).toBe("New Data");
+    const { data, status } = await api.post("/", "New Data");
+    expect(status).toBe(201);
+    expect(data).toBe("New Data");
   });
 
   it("will return JSON", async () => {
-    const res = await app.fetch(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        body: JSON.stringify({ hello: "world" }),
-        headers: { "content-type": "application/json" },
-      })
-    );
-
-    expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ hello: "world" });
+    const { data, status, headers } = await api.post("/", { hello: "world" });
+    expect(status).toBe(201);
+    expect(data).toEqual({ hello: "world" });
+    expect(headers["content-type"]).toBe("application/json");
   });
 });

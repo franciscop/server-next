@@ -11,8 +11,11 @@ function Reply() {
 
 // INTERNAL
 Reply.prototype.generateHeaders = function () {
-  const cookies = createCookies(this.res.cookies);
-  return { ...this.res.headers, "set-cookie": cookies };
+  const headers = new Headers(this.res.headers);
+  createCookies(this.res.cookies).forEach((cookie) => {
+    headers.append("set-cookie", cookie);
+  });
+  return headers;
 };
 
 // PARTIAL

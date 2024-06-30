@@ -196,3 +196,55 @@ server.prototype.router = function (basePath, router) {
   }
   return this;
 };
+
+server.prototype.test = function () {
+  let cookie = "";
+  const fetch = async (path, options = {}) => {
+    if (!options.headers) options.headers = {};
+    if (options.body && typeof options.body !== "string") {
+      options.headers["content-type"] = "application/json";
+      options.body = JSON.stringify(options.body);
+    }
+    if (cookie && !options.headers.cookie) {
+      options.headers.cookie = cookie;
+    }
+    const res = await this.fetch(
+      new Request("http://localhost:3000" + path, options)
+    );
+
+    const headers = {};
+    for (const [key, value] of res.headers.entries()) {
+      if (headers[key]) {
+        if (!Array.isArray(headers[key])) {
+          headers[key] = [headers[key]];
+        }
+        headers[key].push(value);
+      } else {
+        headers[key] = value;
+      }
+    }
+    let data;
+    if (headers["set-cookie"]) {
+      // TODO: this should really be a smart merge of the 2
+      cookie = headers["set-cookie"];
+    }
+    if (headers["content-type"]?.includes("application/json")) {
+      data = await res.json();
+    } else {
+      data = await res.text();
+    }
+    return { status: res.status, headers, data };
+  };
+  return {
+    get: (path, options) => fetch(path, { method: "get", ...options }),
+    head: (path, options) => fetch(path, { method: "head", ...options }),
+    post: (path, body, options) =>
+      fetch(path, { method: "post", body, ...options }),
+    put: (path, body, options) =>
+      fetch(path, { method: "put", body, ...options }),
+    patch: (path, body, options) =>
+      fetch(path, { method: "patch", body, ...options }),
+    delete: (path, options) => fetch(path, { method: "delete", ...options }),
+    options: (path, options) => fetch(path, { method: "options", ...options }),
+  };
+};
