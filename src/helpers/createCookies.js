@@ -2,10 +2,15 @@
 export default function createCookies(cookies) {
   if (!cookies || !Object.keys(cookies).length) return [];
   return Object.entries(cookies).map(([key, val]) => {
-    if (typeof val === "string") {
-      val = { value: val, path };
+    if (!val) {
+      val = { value: "", expires: new Date(0).toUTCString() };
     }
-    const { value, path } = val;
-    return `${key}=${value}${path ? ";Path=" + path : ""}`;
+    if (typeof val === "string") {
+      val = { value: val };
+    }
+    const { value, path, expires } = val;
+    const pathPart = path ? ";Path=" + path : "";
+    const expiresPart = expires ? ";Expires=" + expires : "";
+    return `${key}=${value || ""}${pathPart}${expiresPart}`;
   });
 }

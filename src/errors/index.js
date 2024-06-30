@@ -6,6 +6,7 @@ ServerError.extend({
   NO_STORE_READ: `You need a 'store' to read 'ctx.session.{key}'`,
   AUTH_INVALID_TYPE: `Invalid Authorization type, '{type}'`,
   AUTH_INVALID_TOKEN: `Invalid Authorization token`,
+  AUTH_INVALID_COOKIE: `Invalid Authorization cookie`,
 
   LOGIN_NO_EMAIL: "The email is required to log in",
   LOGIN_INVALID_EMAIL: "The email you wrote is not correct",

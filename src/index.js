@@ -59,13 +59,22 @@ const validateOptions = (options, env = {}) => {
   if (options.store && options.cookies) {
     options.session = { store: options.store.prefix("session:") };
   }
-  options.auth = options.auth || {};
+  options.auth = options.auth || null;
   if (options.auth) {
     if (typeof options.auth !== "object") {
       options.auth = { type: options.auth };
     }
     if (!options.auth.store && options.store) {
       options.auth.store = options.store.prefix("auth:");
+    }
+    if (!options.auth.session && options.session) {
+      options.auth.session = options.session.store;
+    }
+    if (!options.auth.cleanUser) {
+      options.auth.cleanUser = (fullUser) => {
+        const { password, ...user } = fullUser;
+        return user;
+      };
     }
   }
 
@@ -236,6 +245,7 @@ server.prototype.test = function () {
     return { status: res.status, headers, data };
   };
   return {
+    app: this,
     get: (path, options) => fetch(path, { method: "get", ...options }),
     head: (path, options) => fetch(path, { method: "head", ...options }),
     post: (path, body, options) =>

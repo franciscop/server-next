@@ -6,8 +6,8 @@ The `auth` module will take over the `/auth` and adds a series of endpoints and 
 
 Global options:
 
-- `type` (`jwt|token|key|cookie`): the primary mechanism for authentication. This is a very important option, since it will determine other things like available endpoints, configuration, etc. It's all detailed in the [type documentation](#type).
-- `providers` (`['email','username','github']`): a list of the providers that can allow for authentication. Again, this is an important option that might change some of the other options, like callbacks, etc.
+- `type` (`token|cookie|jwt|key`): the primary mechanism for authentication. This is a very important option, since it will determine other things like available endpoints, configuration, etc. It's all detailed in the [type documentation](#type).
+- `providers` (`email|username|github`): a list of the providers that can allow for authentication. Again, this is an important option that might change some of the other options, like callbacks, etc.
 
 Local options:
 
@@ -37,22 +37,14 @@ export default server({ auth })
 This automatically creates some endpoints:
 
 ```js
-// 'cookie' defines these endpoints:
 /auth/register/:provider
 /auth/login/:provider
 /auth/logout
 /auth/reset/:provider
 /auth/change/:provider
-
-// 'jwt', 'token', 'key' define these endpoints:
-/api/auth/register/:provider
-/api/auth/login/:provider
-/api/auth/logout
-/api/auth/reset/:provider
-/api/auth/change/:provider
 ```
 
-On the front-end, it's all up to you. Here a small example with plain JS, see below for more in-depth examples:
+The `cookie` will return a `set-cookie` header, while the rest will return a JSON with the user data (except password) and a `token` within that user data. On the front-end, it's all up to you. Here a small example with plain JS, see below for more in-depth examples:
 
 ```js
 // Handle clicks on the "Login with Github" button

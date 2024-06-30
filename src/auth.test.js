@@ -1,62 +1,49 @@
+import "./test/toSucceed.js";
+
 import kv from "polystore";
 
 import server from "./index.js";
 
-describe("auth", () => {
+describe("token", () => {
   const store = kv(new Map());
-  const api = server({ store })
-    .get("/", (ctx) => ctx.headers.authorization)
+  const api = server({ store, auth: { type: "token" } })
+    .get("/", (ctx) => ctx.auth)
     .test();
 
   it("should be Bearer", async () => {
     const authorization = "Basic REqA2l022l8Q0tuIRtqLOPUy";
-    const { data } = await api.get("/", { headers: { authorization } });
-    expect(data).toBe("Invalid Authorization type, 'Basic'");
+    const req = await api.get("/", { headers: { authorization } });
+    expect(req).not.toSucceed("Invalid Authorization type, 'Basic'");
   });
 
   it("should have the proper token", async () => {
     const authorization = "Bearer hola";
-    const { data } = await api.get("/", { headers: { authorization } });
-    expect(data).toBe("Invalid Authorization token");
+    const req = await api.get("/", { headers: { authorization } });
+    expect(req).not.toSucceed("Invalid Authorization token");
   });
 
-  it("can get the nested get", async () => {
+  it("can get the proper session", async () => {
     const authorization = "Bearer REqA2l022l8Q0tuIRtqLOPUy";
-    const { data } = await api.get("/", { headers: { authorization } });
-    expect(data).toBe("Bearer REqA2l022l8Q0tuIRtqLOPUy");
+    const req = await api.get("/", { headers: { authorization } });
+    expect(req).not.toSucceed("Credentials do not correspond to a user");
   });
 });
 
-describe("user creation flow", () => {
-  // These are obviously mock data
-  const EMAIL = "abc@test.com";
-  const PASS = "11111111";
-  const CREDENTIALS = { email: EMAIL, password: PASS };
-
+describe("cookie", () => {
   const store = kv(new Map());
-  const auth = { type: "token", providers: "email" };
-  const api = server({ auth, store }).test();
+  const api = server({ store, auth: { type: "cookie" } })
+    .get("/", (ctx) => ctx.auth)
+    .test();
 
-  it("can create a new user", async () => {
-    const register = await api.post("/auth/register/email", CREDENTIALS);
-    expect(register.status).toBe(201);
-    expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + register.data.token,
-    ]);
+  it("should have the proper token in email", async () => {
+    const cookie = "authorization=hello";
+    const req = await api.get("/", { headers: { cookie } });
+    expect(req).not.toSucceed("Invalid Authorization cookie");
+  });
 
-    const authorization = "Bearer " + register.data.token;
-    const headers = { authorization };
-    const logout = await api.post("/auth/logout", {}, { headers });
-
-    expect(logout.status).toBe(200);
-    expect(await store.keys()).toEqual(["auth:abc@test.com"]);
-
-    const login = await api.post("/auth/login/email", CREDENTIALS);
-    expect(login.status).toBe(200);
-    expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + login.data.token,
-    ]);
+  it("can get the proper session", async () => {
+    const cookie = "authorization=REqA2l022l8Q0tuIRtqLOPUy";
+    const req = await api.get("/", { headers: { cookie } });
+    expect(req).not.toSucceed("Credentials do not correspond to a user");
   });
 });

@@ -20,13 +20,14 @@ describe("return different types", () => {
   });
 
   it("can get the object", async () => {
-    const { data } = await api.get("/object");
-    expect(data).toEqual({ hello: "world" });
+    const req = await api.get("/object");
+    expect(req).toSucceed({ hello: "world" });
   });
 
   it("can get the status", async () => {
-    const { status } = await api.get("/status");
-    expect(status).toBe(201);
+    const req = await api.get("/status");
+    expect(req).toSucceed();
+    expect(req.status).toBe(201);
   });
 });
 
