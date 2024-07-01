@@ -2,6 +2,8 @@ import argon2 from "argon2";
 
 import { createId } from "../../helpers/index.js";
 import { ServerError, status } from "../../index.js";
+import findUser from "../findUser.js";
+import updateUser from "../updateUser.js";
 
 const createSession = async (user, ctx) => {
   const { type, session, cleanUser } = ctx.options.auth;
@@ -70,4 +72,40 @@ async function register(ctx) {
   return createSession(user, ctx);
 }
 
-export default { login, register };
+async function reset(ctx) {
+  // const reset = ctx.options.store.prefix("reset:");
+  // // Already resetting
+  // if (ctx.body.token) {
+  //   const { token, password } = ctx.body;
+  //   const secret = sha256(token);
+  //   const auth = await reset.get(secret);
+  //   const user = await store.get(auth.email);
+  // } else {
+  //   const email = ctx.body.email;
+  //   const user = await store.get(email);
+  //   const token = createId();
+  //   const secret = sha256(token);
+  //   await reset.set(secret, { email }, { expires: "2h" });
+  //   //
+  //   ctx.email.send(
+  //     user.email,
+  //     `Reset email: <a href="${domain}/auth/reset/email?token=${token}">`
+  //   );
+  // }
+}
+
+async function password(ctx) {
+  const { previous, updated } = ctx.body;
+
+  const fullUser = await findUser(ctx.auth, ctx.options.auth.store);
+
+  const isValid = await argon2.verify(fullUser.password, previous);
+  if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
+
+  fullUser.password = await argon2.hash(updated);
+  await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
+
+  return 200;
+}
+
+export default { login, register, reset, password };

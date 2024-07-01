@@ -48,5 +48,10 @@ export default async function findAuth(ctx) {
 
   const auth = await options.session.get(sessionId);
   if (!auth) throw ServerError.AUTH_NO_SESSION();
+  if (!auth.provider) throw ServerError.AUTH_NO_PROVIDER();
+  if (!options.provider.includes(auth.provider)) {
+    const valid = JSON.stringify(options.provider);
+    throw ServerError.AUTH_INVALID_PROVIDER({ provider: auth.provider, valid });
+  }
   return auth;
 }

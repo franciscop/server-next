@@ -17,6 +17,8 @@ const middle = async (ctx) => {
     if (ctx.options.auth.provider.includes("email")) {
       ctx.app.post("/auth/register/email", providers.email.register);
       ctx.app.post("/auth/login/email", providers.email.login);
+      ctx.app.put("/auth/password/email", providers.email.password);
+      ctx.app.put("/auth/reset/email", providers.email.password);
     }
   }
 };
