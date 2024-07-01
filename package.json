@@ -9,7 +9,6 @@
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
   "scripts": {
-    "demo": "nodemon ./demo/src/index.js",
     "start": "bun test --watch",
     "test": "bun test",
     "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"

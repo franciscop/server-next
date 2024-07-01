@@ -1,6 +1,5 @@
-import { define } from "../helpers/index.js";
-import findAuth from "./findAuth.js";
-import findSession from "./findSession.js";
+import auth from "../auth/index.js";
+import { define, parseHeaders } from "../helpers/index.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
@@ -11,10 +10,9 @@ export default async (request, options = {}, app) => {
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
 
-  ctx.headers = Object.fromEntries(request.headers.entries());
+  ctx.headers = parseHeaders(request.headers);
   ctx.cookies = parseCookies(ctx.headers.cookie);
-  ctx.session = await findSession(ctx);
-  await findAuth(ctx);
+  await auth.load(ctx);
 
   ctx.url = new URL(request.url.replace(/\/$/, ""));
   define(ctx.url, "query", (url) =>

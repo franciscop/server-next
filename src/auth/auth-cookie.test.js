@@ -11,8 +11,7 @@ describe("user creation flow", () => {
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
   const store = kv(new Map());
-  const auth = { type: "cookie", providers: "email" };
-  const api = server({ auth, store })
+  const api = server({ store, auth: "cookie:email" })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 
@@ -20,8 +19,8 @@ describe("user creation flow", () => {
     const register = await api.post("/auth/register/email", CREDENTIALS);
     expect(register).toSucceed();
     expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + register.headers["set-cookie"].split("=")[1],
+      "user:abc@test.com",
+      "auth:" + register.headers["set-cookie"].split("=")[1],
     ]);
 
     const me = await api.get("/me");
@@ -30,13 +29,13 @@ describe("user creation flow", () => {
 
     const logout = await api.post("/auth/logout");
     expect(logout).toSucceed();
-    expect(await store.keys()).toEqual(["auth:abc@test.com"]);
+    expect(await store.keys()).toEqual(["user:abc@test.com"]);
 
     const login = await api.post("/auth/login/email", CREDENTIALS);
     expect(login).toSucceed();
     expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + login.headers["set-cookie"].split("=")[1],
+      "user:abc@test.com",
+      "auth:" + login.headers["set-cookie"].split("=")[1],
     ]);
   });
 });

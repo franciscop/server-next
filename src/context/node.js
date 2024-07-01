@@ -1,8 +1,13 @@
+import auth from "../auth/index.js";
 import { define } from "../helpers/index.js";
-import findAuth from "./findAuth.js";
-import findSession from "./findSession.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
+
+// https://stackoverflow.com/a/54029307/938236
+const chunkArray = (arr, size) =>
+  arr.length > size
+    ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
+    : [arr];
 
 export default async (request, options = {}, app) => {
   const ctx = {};
@@ -11,10 +16,9 @@ export default async (request, options = {}, app) => {
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
 
-  ctx.headers = request.headers;
+  ctx.headers = parseHeaders(new Headers(chunkArray(request.rawHeaders, 2)));
   ctx.cookies = parseCookies(ctx.headers.cookie);
-  ctx.session = await findSession(ctx);
-  await findAuth(ctx);
+  await auth.load(ctx);
 
   const https = request.connection.encrypted ? "https" : "http";
   const host = ctx.headers.host || "localhost" + options.port;

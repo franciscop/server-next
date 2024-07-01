@@ -2,8 +2,6 @@
 
 > **⚠️ WIP** This is an **experimental library** right now!
 
-[**Documentation Here**](https://node-server.com/documentation/)
-
 A fully-fledged web server for Bun and Node.js, with all the basics covered for you:
 
 ```js
@@ -26,11 +24,11 @@ It includes all the things you would expect from a modern Server framework, like
 ```js
 // Easy testing as well - index.test.js
 import app from "./";
+const api = app.test();  // Very convenient helper, AXIOS-like interface
 
 it("can retrieve the homepage", async () => {
-  const res = await app.fetch(new Request("http://localhost:3000/books/"));
-  const books = await res.json();
-  expect(books[0]).toEqual({ id: 0, name: 'The Catcher In The Rye', ... });
+  const { data: books } = await api.get("/books/");
+  expect(books[0]).toEqual({ id: 0, name: ... });
 });
 ```
 
@@ -56,6 +54,8 @@ Why? We live in the era of multi-cloud (Heroku, Workers, Lambda, etc) and multi-
   - A readStream and it'll be piped to the response
   - An object with `status`, `body` and `headers` and it'll be set raw.
 - Response compression works
+- Zod light integration
+- Auth work
 
 ## Examples
 

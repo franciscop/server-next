@@ -10,6 +10,7 @@ import {
   getMachine,
   handleRequest,
   iterate,
+  parseHeaders,
 } from "./helpers/index.js";
 import middle from "./middle/index.js";
 
@@ -59,16 +60,28 @@ const validateOptions = (options, env = {}) => {
   if (options.store && options.cookies) {
     options.session = { store: options.store.prefix("session:") };
   }
-  options.auth = options.auth || null;
+
+  // AUTH
+  options.auth = options.auth || env.AUTH || null;
   if (options.auth) {
     if (typeof options.auth !== "object") {
-      options.auth = { type: options.auth };
+      const [type, provider] = options.auth.split(":");
+      options.auth = { type, provider };
+    }
+    if (typeof options.auth.provider === "string") {
+      options.auth.provider === options.auth.provider.split("|");
+    }
+    if (!options.auth.type) {
+      throw new Error("Auth options needs a type");
+    }
+    if (!options.auth.provider) {
+      throw new Error("Auth options needs a provider");
+    }
+    if (!options.auth.session && options.store) {
+      options.auth.session = options.store.prefix("auth:");
     }
     if (!options.auth.store && options.store) {
-      options.auth.store = options.store.prefix("auth:");
-    }
-    if (!options.auth.session && options.session) {
-      options.auth.session = options.session.store;
+      options.auth.store = options.store.prefix("user:");
     }
     if (!options.auth.cleanUser) {
       options.auth.cleanUser = (fullUser) => {
@@ -221,17 +234,7 @@ server.prototype.test = function () {
       new Request("http://localhost:3000" + path, options)
     );
 
-    const headers = {};
-    for (const [key, value] of res.headers.entries()) {
-      if (headers[key]) {
-        if (!Array.isArray(headers[key])) {
-          headers[key] = [headers[key]];
-        }
-        headers[key].push(value);
-      } else {
-        headers[key] = value;
-      }
-    }
+    const headers = parseHeaders(res.headers);
     let data;
     if (headers["set-cookie"]) {
       // TODO: this should really be a smart merge of the 2

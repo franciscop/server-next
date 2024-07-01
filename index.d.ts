@@ -15,6 +15,7 @@ type ServerOptions = {
   views?: string | Bucket;
   public?: string | Bucket;
   uploads?: string | Bucket;
+  auth?: string | { type: string; provider: string };
 };
 
 type Context = {

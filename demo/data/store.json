@@ -1,42 +1,13 @@
 {
-  "session:Cy5IOtRpRI6ESyqclhs9RgLp": {
-    "expire": null,
+  "session:9s6ggtgchQRuh56qphRdqRIh": {
+    "expire": 1720376937934,
     "value": {
-      "id": "sS5u9I5EUsdN02NyZsQUQcCs",
-      "email": "hello@test.com",
-      "time": "2024-06-28T05:23:52.990Z"
-    }
-  },
-  "session:UR6Z6p9I9csR6p0A928Rcyns": {
-    "expire": null,
-    "value": {
-      "id": "OEQSILpU0tEqQUcZO2y2nn5d",
-      "email": "hello@test.com",
-      "time": "2024-06-28T05:24:37.387Z"
-    }
-  },
-  "session:UuZgUqg2QLEglEQQRllOOyLl": {
-    "expire": null,
-    "value": {
-      "id": "OEQSILpU0tEqQUcZO2y2nn5d",
-      "email": "hello@test.com",
-      "time": "2024-06-28T05:24:56.195Z"
-    }
-  },
-  "session:zcUzL25lszRz2Qu9nzs8LPqS": {
-    "expire": null,
-    "value": {
-      "id": "OEQSILpU0tEqQUcZO2y2nn5d",
-      "email": "hello@test.com",
-      "time": "2024-06-28T05:29:24.878Z"
-    }
-  },
-  "session:tLOPtUAppOzISyZUPALOsqsl": {
-    "expire": null,
-    "value": {
-      "id": "QQZqQz5nRN0lgRuC5p6uzy2Z",
-      "email": "hello1@test.com",
-      "time": "2024-06-28T05:40:24.422Z"
+      "id": "9s6ggtgchQRuh56qphRdqRIh",
+      "type": "token",
+      "provider": "email",
+      "user": "yOuZEdSsNLq8PgZyLhSz0Llh",
+      "email": "test@test.com",
+      "time": "2024-06-30T18:28:57Z"
     }
   }
 }

@@ -21,7 +21,7 @@ export default function toSucceed(request, message) {
           )}${this.utils.printExpected(message)}\nReceived body:${spaceOrEnter(
             request.data
           )}${this.utils.printReceived(request.data)}`,
-        pass: false,
+        pass,
       };
     }
 
@@ -32,7 +32,7 @@ export default function toSucceed(request, message) {
         )}${this.utils.printExpected(message)}\nReceived error:${spaceOrEnter(
           request.data
         )}${this.utils.printReceived(request.data)}`,
-      pass: true,
+      pass: !pass,
     };
   }
 

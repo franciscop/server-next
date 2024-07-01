@@ -11,8 +11,7 @@ describe("user creation flow", () => {
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
   const store = kv(new Map());
-  const auth = { type: "token", providers: "email" };
-  const api = server({ auth, store })
+  const api = server({ store, auth: "token:email" })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 
@@ -20,8 +19,8 @@ describe("user creation flow", () => {
     const register = await api.post("/auth/register/email", CREDENTIALS);
     expect(register).toSucceed();
     expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + register.data.token,
+      "user:abc@test.com",
+      "auth:" + register.data.token,
     ]);
 
     const headers = { authorization: "Bearer " + register.data.token };
@@ -31,13 +30,13 @@ describe("user creation flow", () => {
 
     const logout = await api.post("/auth/logout", {}, { headers });
     expect(logout).toSucceed();
-    expect(await store.keys()).toEqual(["auth:abc@test.com"]);
+    expect(await store.keys()).toEqual(["user:abc@test.com"]);
 
     const login = await api.post("/auth/login/email", CREDENTIALS);
     expect(login).toSucceed();
     expect(await store.keys()).toEqual([
-      "auth:abc@test.com",
-      "session:" + login.data.token,
+      "user:abc@test.com",
+      "auth:" + login.data.token,
     ]);
   });
 });

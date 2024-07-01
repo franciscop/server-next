@@ -1,3 +1,5 @@
+import "./test/toSucceed.js";
+
 import server, { status } from "./index.js";
 
 describe("return different types", () => {
