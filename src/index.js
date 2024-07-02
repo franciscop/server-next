@@ -50,6 +50,7 @@ const createNodeServer = async (app, options) => {
 const validateOptions = (options, env = {}) => {
   options.port = options.port || env.PORT || 3000;
   options.secret = options.secret || env.SECRET || "unsafe-" + createId();
+  options.cors = options.cors || env.CORS || null;
 
   options.views = options.views ? Bucket(options.views) : null;
   options.public = options.public ? Bucket(options.public) : null;
