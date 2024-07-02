@@ -31,7 +31,7 @@ const createNodeServer = async (app, options) => {
         extendWithDefaults(ctx);
         const out = await handleRequest(app.handlers, ctx);
 
-        response.writeHead(out.status || 200, out.headers);
+        response.writeHead(out.status || 200, parseHeaders(out.headers));
         if (out.body instanceof ReadableStream) {
           await iterate(out.body, (chunk) => response.write(chunk));
         } else {

@@ -1,5 +1,5 @@
 import auth from "../auth/index.js";
-import { define } from "../helpers/index.js";
+import { define, parseHeaders } from "../helpers/index.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
