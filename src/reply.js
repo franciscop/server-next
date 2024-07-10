@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 
-import { createCookies, types } from "./helpers/index.js";
+import { createCookies, toWeb, types } from "./helpers/index.js";
 
 function Reply() {
   this.res = {
@@ -98,9 +98,20 @@ Reply.prototype.send = function (body = "") {
     return new Response(body, { status, headers });
   }
 
-  if (body?.constructor?.name === "Buffer") {
+  const name = body?.constructor?.name;
+  if (name === "Buffer") {
     const headers = this.generateHeaders();
     return new Response(body, { status, headers });
+  }
+
+  // WebStream already, just pass it through
+  if (name === "ReadableStream") {
+    return new Response(body, { status, headers });
+  }
+
+  // Node stream, convert it to web stream
+  if (name === "PassThrough" || name === "Readable") {
+    return new Response(toWeb(body), { status, headers });
   }
 
   // This is a bit loopy, send({}) => json({}) => send('{}')
