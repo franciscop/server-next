@@ -2,7 +2,7 @@
 
 > **⚠️ WIP** This is an **experimental library** right now!
 
-A fully-fledged web server for Bun and Node.js, with all the basics covered for you:
+A fully-fledged web server for Bun and Node.js, with all the basics built-in:
 
 ```js
 import server from "@server/next";
