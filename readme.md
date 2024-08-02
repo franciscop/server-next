@@ -10,17 +10,17 @@ import server from "@server/next";
 // Create a running instance of the server
 export default server(options)
   .get("/books", () => Book.list())
-  .post("/books", { body: BookSchema }, (ctx) => {
+  .post("/books", BookSchema, (ctx) => {
     return Book.create(ctx.body).save();
   });
 ```
 
 It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, testing, error handling, websockets, etc. We also have integrations with these, and adaptors for others are really easy:
 
-- KV Stores: in-memory, Redis, Consul, DynamoDB.
+- KV Stores: in-memory, Redis, Consul, DynamoDB, [Level](https://github.com/Level/level).
 - Buckets: AWS S3, Cloudflare R2, Backblaze B2.
-- Validation libraries: Zod, Joi, Yup, [Validate](https://validatejs.org), etc.
-- Auth: JWT, Session, Cookies
+- Validation libraries: [Zod](https://zod.dev/), [Joi](https://joi.dev/), [Yup](https://github.com/jquense/yup), [Validate](https://validatejs.org), etc.
+- Auth: JWT, Session, Cookies, Social login.
 
 ```js
 // How to test your server - index.test.js
@@ -67,9 +67,9 @@ There are some major configuration options that you might want to set up though,
 
 Now that you know how to create a barebones server, there are some important bits that you might want to update.
 
-`SECRET`: create an `.env` file (ignored in git with `.gitignore`) with the `SECRET=` and then a very long, unique random secret. Best is a long random string. It will be used to sign and/or encrypt things as needed.
+`SECRET`: create an `.env` file (ignored in git with `.gitignore`) with the `SECRET=` and then a long, unique random secret. It will be used to sign and/or encrypt things as needed.
 
-`store`: almost anything you want to persist will need a KV store to do so. For dev you can use an in-memory or a file-based (easy for debugging!) store, but for production systems you would normally use something like Redis.
+`store`: almost anything you want to persist will need a KV store to do so. For dev you can use an in-memory or a file-based (easy for debugging!) store, but for production systems you would normally use something like Redis. Can be as easy as `const store = new Map();` for dev.
 
 > Note: `bucket` is still _not_ available
 
@@ -82,11 +82,10 @@ An example of how that works in practice:
 import server from "@server/next";
 
 import Bucket from "bucket/b2";
-import Store from "polystore";
 import { createClient } from "redis";
 
 const bucket = Bucket("mybucketname", { id, key });
-const store = Store(createClient("...").connect());
+const store = createClient("...").connect();
 
 export default server({ bucket, store })
   .get("/", () => "Hello world")
@@ -95,8 +94,6 @@ export default server({ bucket, store })
     return 201;
   });
 ```
-
-> Note: the `polystore` project _wraps_ other libraries to provide a unified API, while the `bucket` project directly interacts with the different third party APIs so you only import the one you need.
 
 ### Middleware
 
