@@ -7,7 +7,6 @@ A fully-fledged web server for Bun and Node.js, with all the basics built-in:
 ```js
 import server from "@server/next";
 
-// Create a running instance of the server
 export default server(options)
   .get("/books", () => Book.list())
   .post("/books", BookSchema, (ctx) => {
@@ -15,7 +14,9 @@ export default server(options)
   });
 ```
 
-It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, testing, error handling, websockets, etc. We also have integrations with these, and adaptors for others are really easy:
+It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, testing, error handling, websockets, etc.
+
+We also have integrations and adaptors for these:
 
 - KV Stores: in-memory, Redis, Consul, DynamoDB, [Level](https://github.com/Level/level).
 - Buckets: AWS S3, Cloudflare R2, Backblaze B2.
@@ -33,9 +34,7 @@ it("can retrieve the book list", async () => {
 });
 ```
 
-## Introduction
-
-### Getting started
+## Getting started
 
 First install it:
 
@@ -63,7 +62,7 @@ Then run `node .` or `bun .` and open your browser on http://localhost:3000/ to 
 
 There are some major configuration options that you might want to set up though, enumerated in the [Basic Usage](#basic-usage) and explained through the docs.
 
-### Basic usage
+## Basic usage
 
 Now that you know how to create a barebones server, there are some important bits that you might want to update.
 
@@ -95,9 +94,9 @@ export default server({ bucket, store })
   });
 ```
 
-### Middleware
-
 ## Guides
+
+### Middleware
 
 ### Validation
 
