@@ -1,12 +1,9 @@
 {
   "title": "Server Next",
-  "home": "docs/index.html",
-  "homepage": "https://node-server.com/",
+  "homepage": "https://server-js.com/",
   "menu": {
     "About": "/about",
     "Documentation": "/documentation",
-    "Tutorials": "/tutorials",
     "Github": "https://github.com/franciscop/server-next"
-  },
-  "pages": ["docs/readme.md"]
+  }
 }

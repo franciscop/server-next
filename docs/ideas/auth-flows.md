@@ -1,6 +1,6 @@
 # The auth flavours: key, tokens, jwts and cookies
 
-The 4 most common ways of protecting an API are those 4:
+The 4 most common ways of protecting an API are these:
 
 - Key: a key issued to protect resource(s) and that should be included to access those.
 - Token: an opaque token issued to a specific user and that should be included to access the API.

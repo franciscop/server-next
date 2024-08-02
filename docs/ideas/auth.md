@@ -7,7 +7,7 @@ The `auth` module will take over the `/auth` and adds a series of endpoints and 
 Global options:
 
 - `type` (`token|cookie|jwt|key`): the primary mechanism for authentication. This is a very important option, since it will determine other things like available endpoints, configuration, etc. It's all detailed in the [type documentation](#type).
-- `providers` (`email|username|github`): a list of the providers that can allow for authentication. Again, this is an important option that might change some of the other options, like callbacks, etc.
+- `strategy` (`email|username|github`): a list of the providers that can allow for authentication. Again, this is an important option that might change some of the other options, like callbacks, etc.
 
 Local options:
 

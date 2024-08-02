@@ -1,4 +1,4 @@
-# Server @ Next
+# Documentation
 
 > **⚠️ WIP** This is an **experimental library** right now!
 
@@ -15,97 +15,41 @@ export default server(options)
   });
 ```
 
-It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, testing, error handling, websockets, etc. We also have integrations with these:
+It includes all the things you would expect from a modern Server framework, like routing, static file serving, body+file parsing, gzip+brotli, streaming, testing, error handling, websockets, etc. We also have integrations with these, and adaptors for others are really easy:
 
 - KV Stores: in-memory, Redis, Consul, DynamoDB.
 - Buckets: AWS S3, Cloudflare R2, Backblaze B2.
-- Validation libraries: Zod, Joi, Yup.
+- Validation libraries: Zod, Joi, Yup, [Validate](https://validatejs.org), etc.
+- Auth: JWT, Session, Cookies
 
 ```js
-// Easy testing as well - index.test.js
+// How to test your server - index.test.js
 import app from "./";
 const api = app.test();  // Very convenient helper, AXIOS-like interface
 
-it("can retrieve the homepage", async () => {
+it("can retrieve the book list", async () => {
   const { data: books } = await api.get("/books/");
   expect(books[0]).toEqual({ id: 0, name: ... });
 });
 ```
 
-## Upgrading server
+## Introduction
 
-Why? We live in the era of multi-cloud (Heroku, Workers, Lambda, etc) and multi-runtimes (Node.js, Bun, WinterGC, etc). Desired improvements (WIP!):
+### Getting started
 
-- Tiny footprint with few dependencies. Installing and using the full library takes under 10kb (target limit).
-- Faster! Reimplemented from scratch for speed. With raw ES6+ and a tiny code footprint, your server will fly.
-- Modern ES6+ESM syntax for both the library and examples.
-- Not using express underneath anymore. Considering keeping the compatibility layer anyway (since Express itself is a thin layer).
-- Changed the reply logic greatly, including the removal of `render()`. This is the main reason express was removed. Many servers don't need render() at all.
-- **[security]** Removed mandatory CSRF token, since this is only useful for server-rendered pages and not for SPA. Now we provide an `auth` module instead.
+First install it:
 
-## Progress
-
-- Router has all verbs, as well as URL pattern matches
-- Full URL parsing, including `query` and `params` in `ctx.url`.
-- Body and Files parsing is working (need testing)
-- The middleware can return:
-  - A number and it'll be set as the status code
-  - A string and it'll be sent as plain text or html (if it starts with "<")
-  - A readStream and it'll be piped to the response
-  - An object with `status`, `body` and `headers` and it'll be set raw.
-- Response compression works
-- Zod light integration
-- Auth work
-
-## Examples
-
-### Streams
-
-Creating a 100x100px thumbnail on the fly with Sharp:
-
-```js
-// createThumbnail.js
-import sharp from "sharp";
-
-export default function createThumbnail(ctx) {
-  // Return a pipe, which will be streamed to the output
-  return sharp(ctx.url.params.name).resize(100, 100, { fit: "cover" }).png();
-}
+```
+npm install @server/next
+yarn add @server/next
+bun install @server/next
 ```
 
-### Breaking Changes
-
-`import`, `export` and routing are the main changes from your point of view:
+Now you can create your first simple server:
 
 ```js
-import server, { status, type, ...reply } from 'server';
-
-export default server({ ...options })
-  .use(mid1)
-  .get('/', cb1)
-  .get('/b', mid2, cb2)
-  .routes({ get: [['/c', mid3, cb3]] });
-```
-
-`status()` now it's always partial:
-
-```js
-// OLD
-return 404;
-return status(404).send("Not here..."); // treated as partial
-return status(404); // treated as final
-
-// NEW
-return 404;
-return status(404).send("Not here..."); // GOOD
-return status(404).send(); // GOOD
-
-// DON'T DO:
-return status(404); // INVALID
-```
-
-```js
-import server from "server";
+// index.js
+import server from "@server/next";
 
 export default server()
   .get("/", () => "Hello world")
@@ -114,3 +58,68 @@ export default server()
     return 201;
   });
 ```
+
+Then run `node .` or `bun .` and open your browser on http://localhost:3000/ to see the message.
+
+There are some major configuration options that you might want to set up though, enumerated in the [Basic Usage](#basic-usage) and explained through the docs.
+
+### Basic usage
+
+Now that you know how to create a barebones server, there are some important bits that you might want to update.
+
+`SECRET`: create an `.env` file (ignored in git with `.gitignore`) with the `SECRET=` and then a very long, unique random secret. Best is a long random string. It will be used to sign and/or encrypt things as needed.
+
+`store`: almost anything you want to persist will need a KV store to do so. For dev you can use an in-memory or a file-based (easy for debugging!) store, but for production systems you would normally use something like Redis.
+
+> Note: `bucket` is still _not_ available
+
+`bucket`: if you want to accept user files you will need a place to persist them. By default they are put in the filesystem, but since most cloud providers are ephemeral, provide a `bucket` and it will be used to handle the files directly.
+
+An example of how that works in practice:
+
+```js
+// index.js
+import server from "@server/next";
+
+import Bucket from "bucket/b2";
+import Store from "polystore";
+import { createClient } from "redis";
+
+const bucket = Bucket("mybucketname", { id, key });
+const store = Store(createClient("...").connect());
+
+export default server({ bucket, store })
+  .get("/", () => "Hello world")
+  .post("/", (ctx) => {
+    console.log(ctx.body);
+    return 201;
+  });
+```
+
+> Note: the `polystore` project _wraps_ other libraries to provide a unified API, while the `bucket` project directly interacts with the different third party APIs so you only import the one you need.
+
+### Middleware
+
+## Guides
+
+### Validation
+
+### Stores
+
+### File handling
+
+## Options
+
+Options docs here
+
+## Router
+
+Router docs here
+
+## Context
+
+Context docs here
+
+## Reply
+
+Reply docs here

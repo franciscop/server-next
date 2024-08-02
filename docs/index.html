@@ -16,13 +16,13 @@
     </div>
   </div>
   <div style="width: 630px; max-width: 100%">
-    <pre><code class="language-js">import server from &quot;server&quot;;
+    <pre><code class="language-js">import server from &quot;@server/next&quot;;
 
 export default server()
   .get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;)
   .post(&quot;/users&quot;, ctx =&gt; {
-    console.log(ctx.body, ctx.files);
-    return 'ok';
+    console.log(ctx.body);
+    return { id: 100 };
   });</code></pre>
   </div>
 </section>
@@ -108,7 +108,7 @@ export default server()
         />
         <h3>Secure</h3>
       </header>
-      <p>Safe by default while fully configurable CORS, CSRF, etc.</p>
+      <p>Safe by default while fully configurable CORS, CSRF, JWT, etc.</p>
     </div>
   </div>
   <div>
