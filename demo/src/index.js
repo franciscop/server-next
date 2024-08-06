@@ -19,7 +19,7 @@ const options = {
   },
   auth: {
     type: "token",
-    providers: "email",
+    provider: "email",
     store: authStore,
   },
 };
@@ -33,6 +33,8 @@ export default server(options)
   .router("/auth", authRouter)
 
   .get("/", () => view("home.html"))
+  .get("/login", () => view("login.html"))
+  .get("/register", () => view("register.html"))
 
   .get(
     "/pets",

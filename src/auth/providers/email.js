@@ -1,9 +1,35 @@
-import argon2 from "argon2";
-
 import { createId } from "../../helpers/index.js";
 import { ServerError, status } from "../../index.js";
 import findUser from "../findUser.js";
 import updateUser from "../updateUser.js";
+
+const hash = new Proxy(
+  {},
+  {
+    get: (self, key) => {
+      const load = async () =>
+        Object.assign(
+          self,
+          await import("argon2").catch(() => {
+            throw new ServerError.AUTH_ARGON_NEEDED();
+          })
+        );
+      if (key === "verify" && !self.verify) {
+        return async (hash, pass) => {
+          await load();
+          return self.verify(hash, pass);
+        };
+      }
+      if (key === "hash" && !self.hash) {
+        return async (pass) => {
+          await load();
+          return self.hash(pass);
+        };
+      }
+      return self[key];
+    },
+  }
+);
 
 const createSession = async (user, ctx) => {
   const { type, session, cleanUser } = ctx.options.auth;
@@ -45,7 +71,7 @@ async function login(ctx) {
   if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
   const user = await store.get(email);
-  const isValid = await argon2.verify(user.password, password);
+  const isValid = await hash.verify(user.password, password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
   return createSession(user, ctx);
@@ -64,7 +90,7 @@ async function register(ctx) {
   const user = {
     id: createId(),
     email,
-    password: await argon2.hash(password),
+    password: await hash.hash(password),
     ...data,
   };
   await store.set(email, user);
@@ -99,10 +125,10 @@ async function password(ctx) {
 
   const fullUser = await findUser(ctx.auth, ctx.options.auth.store);
 
-  const isValid = await argon2.verify(fullUser.password, previous);
+  const isValid = await hash.verify(fullUser.password, previous);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
-  fullUser.password = await argon2.hash(updated);
+  fullUser.password = await hash.hash(updated);
   await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
 
   return 200;
