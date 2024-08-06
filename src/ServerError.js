@@ -4,7 +4,9 @@ export default class ServerError extends Error {
       message = message(vars);
     }
     for (let key in vars) {
-      message = message.replaceAll(`{${key}}`, vars[key]);
+      if (typeof message === "string") {
+        message = message.replaceAll(`{${key}}`, vars[key]);
+      }
     }
 
     super(message);
