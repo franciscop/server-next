@@ -1,5 +1,5 @@
 {
-  "title": "Server Next",
+  "title": "Server JS - A web server for Bun and Node.js",
   "homepage": "https://server-js.com/",
   "menu": {
     "About": "/about",
