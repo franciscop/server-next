@@ -1,26 +1,12 @@
-const self =
-  typeof globalThis !== "undefined"
-    ? globalThis
-    : typeof global !== "undefined"
-    ? global
-    : typeof window !== "undefined"
-    ? window
-    : null;
-
 // out = new Response(out, { headers: { "content-type": type } });
 if (typeof Response === "undefined") {
-  self.Response = function Response(body, other = {}) {
+  global.Response = function Response(body, other = {}) {
     return { body, ...other };
   };
 }
 
 // Polyfill Netlify's environment variables
-if (typeof Netlify !== "undefined") {
-  if (!self.process) {
-    self.process = {};
-  }
-  if (!self.process.env) {
-    self.process.env = {};
-  }
-  Object.assign(self.process.env, Netlify.env.toObject());
+if (typeof Netlify !== "undefined" && typeof import.meta !== "undefined") {
+  if (!import.meta.env) import.meta.env = {};
+  Object.assign(import.meta.env, Netlify.env.toObject());
 }
