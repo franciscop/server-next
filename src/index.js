@@ -118,11 +118,15 @@ export default function server(options = {}) {
   if (!(this instanceof server)) {
     const inst = new server(options);
     const cb = inst.netlify;
-    Object.keys(Object.getPrototypeOf(inst)).forEach((key) => {
-      cb[key] = inst[key];
-    });
-    Object.keys(inst).forEach((key) => {
-      cb[key] = inst[key];
+    const keys = Object.keys(Object.getPrototypeOf(inst)).concat(
+      Object.keys(inst)
+    );
+    keys.forEach((key) => {
+      if (typeof inst[key] === "function") {
+        cb[key] = inst[key].bind(inst);
+      } else {
+        cb[key] = inst[key];
+      }
     });
     return cb;
   }
