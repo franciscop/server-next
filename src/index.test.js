@@ -2,6 +2,24 @@ import "./test/toSucceed.js";
 
 import server, { status } from "./index.js";
 
+describe("exports", () => {
+  it("exports as a function", () => {
+    expect(typeof server()).toBe("function");
+  });
+
+  it("nested is also a function", () => {
+    expect(typeof server().get("/", () => {})).toBe("function");
+  });
+
+  it("export has a fetch", () => {
+    expect(typeof server().fetch).toBe("function");
+  });
+
+  it("nested is also a function", () => {
+    expect(typeof server().get("/", () => {}).fetch).toBe("function");
+  });
+});
+
 describe("return different types", () => {
   const api = server()
     .get("/", () => "Hello world")

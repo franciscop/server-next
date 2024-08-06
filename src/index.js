@@ -117,18 +117,7 @@ export default function server(options = {}) {
   // Make it so that the exported one is a prototype of function()
   if (!(this instanceof server)) {
     const inst = new server(options);
-    const cb = inst.netlify;
-    const keys = Object.keys(Object.getPrototypeOf(inst)).concat(
-      Object.keys(inst)
-    );
-    keys.forEach((key) => {
-      if (typeof inst[key] === "function") {
-        cb[key] = inst[key].bind(inst);
-      } else {
-        cb[key] = inst[key];
-      }
-    });
-    return cb;
+    return inst.self();
   }
 
   // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
@@ -193,6 +182,17 @@ export default function server(options = {}) {
   };
 }
 
+server.prototype.self = function () {
+  const cb = this.netlify;
+  const keys = Object.keys(Object.getPrototypeOf(this)).concat(
+    Object.keys(this)
+  );
+  keys.forEach((key) => {
+    cb[key] = this[key];
+  });
+  return cb;
+};
+
 // INTERNAL
 server.prototype.handle = function (method, path, ...middleware) {
   if (method === "*") {
@@ -203,7 +203,7 @@ server.prototype.handle = function (method, path, ...middleware) {
     this.handlers[method].push([method, path, ...middleware]);
   }
 
-  return this;
+  return this.self();
 };
 
 server.prototype.socket = function (path, ...middleware) {
