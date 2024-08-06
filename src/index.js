@@ -168,10 +168,14 @@ export default function server(options = {}) {
   };
 
   this.netlify = async (request) => {
-    if (typeof Netlify === "undefined") throw new Error("Unknown");
-    console.log("Experimental Netlify");
     try {
-      options = validateOptions(options, Netlify.env.toObject());
+      if (typeof Netlify === "undefined") {
+        throw new Error("Netlify doesn't exist");
+      }
+      if (typeof import.meta === "undefined") {
+        throw new Error("import.meta.env doesn't exist");
+      }
+      options = validateOptions(options, import.meta.env);
       const ctx = await createWinterContext(request, options, this);
       extendWithDefaults(ctx);
       return await handleRequest(this.handlers, ctx);
