@@ -176,6 +176,7 @@ export default function server(options = {}) {
       extendWithDefaults(ctx);
       return await handleRequest(this.handlers, ctx);
     } catch (error) {
+      console.error(error);
       return new Response(error.message, { status: error.status || 500 });
     }
   };
