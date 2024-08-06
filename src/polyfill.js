@@ -4,3 +4,14 @@ if (typeof Response === "undefined") {
     return { body, ...other };
   };
 }
+
+// Polyfill Netlify's environment variables
+if (typeof Netlify !== "undefined") {
+  if (!global.process) {
+    global.process = {};
+  }
+  if (!global.process.env) {
+    global.process.env = {};
+  }
+  Object.assign(global.process.env, Netlify.env.toObject());
+}
