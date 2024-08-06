@@ -1,6 +1,6 @@
 import StatusError from "./StatusError.js";
 
-export default function (ctx, schema) {
+export default function validate(ctx, schema) {
   if (!schema || typeof schema !== "object") return;
 
   let base;
@@ -22,7 +22,7 @@ export default function (ctx, schema) {
       schema.query.parse(ctx.url.query || {});
     }
   } catch (error) {
-    if (error.constructor.name === "ZodError") {
+    if (error.name === "ZodError" || error.constructor.name === "ZodError") {
       const message = error.issues
         .map(({ path, message }) => `[${base}.${path.join(".")}]: ${message}`)
         .sort()

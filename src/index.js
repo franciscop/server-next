@@ -174,11 +174,8 @@ export default function server(options = {}) {
       options = validateOptions(options, Netlify.env.toObject());
       const ctx = await createWinterContext(request, options, this);
       extendWithDefaults(ctx);
-      const out = await handleRequest(this.handlers, ctx);
-      console.log(out);
-      return out;
+      return await handleRequest(this.handlers, ctx);
     } catch (error) {
-      console.error(error);
       return new Response(error.message, { status: error.status || 500 });
     }
   };

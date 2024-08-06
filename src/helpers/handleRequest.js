@@ -12,11 +12,12 @@ export default async function handleRequest(handlers, ctx) {
     define(ctx.url, "params", () => match);
 
     for (let cb of cbs) {
-      validate(ctx, cb);
       if (typeof cb === "function") {
         const res = await cb(ctx);
         const out = await parseResponse(res, ctx);
         if (out) return out;
+      } else {
+        validate(ctx, cb);
       }
     }
 
