@@ -259,7 +259,7 @@ server.prototype.test = function () {
   const fetch = async (path, options = {}) => {
     if (!options.headers) options.headers = {};
     if (options.body && typeof options.body !== "string") {
-      options.headers["content-type"] = "application/json";
+      options.headers["content-type"] = "application/json; charset=utf-8";
       options.body = JSON.stringify(options.body);
     }
     if (cookie && !options.headers.cookie) {

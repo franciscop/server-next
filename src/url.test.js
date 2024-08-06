@@ -9,7 +9,7 @@ describe("can match the url", () => {
 
     const { data, headers } = await api.get("/hello");
     expect(data).toEqual({ id: "hello" });
-    expect(headers["content-type"]).toEqual("application/json");
+    expect(headers["content-type"]).toEqual("application/json; charset=utf-8");
   });
 
   it("but it doesn't if it's a use", async () => {
@@ -21,6 +21,6 @@ describe("can match the url", () => {
 
     const { data, headers, ...rest } = await api.get("/hello");
     expect(data).toEqual({ id: "hello" });
-    expect(headers["content-type"]).toEqual("application/json");
+    expect(headers["content-type"]).toEqual("application/json; charset=utf-8");
   });
 });
