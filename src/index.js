@@ -114,8 +114,17 @@ const extendWithDefaults = (ctx) => {
 
 // Export the main server()
 export default function server(options = {}) {
+  // Make it so that the exported one is a prototype of function()
   if (!(this instanceof server)) {
-    return new server(options);
+    const inst = new server(options);
+    const cb = inst.netlify;
+    Object.keys(Object.getPrototypeOf(inst)).forEach((key) => {
+      cb[key] = inst[key];
+    });
+    Object.keys(inst).forEach((key) => {
+      cb[key] = inst[key];
+    });
+    return cb;
   }
 
   // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
@@ -158,6 +167,19 @@ export default function server(options = {}) {
 
     try {
       options = validateOptions(options, env);
+      const ctx = await createWinterContext(request, options, this);
+      extendWithDefaults(ctx);
+      return await handleRequest(this.handlers, ctx);
+    } catch (error) {
+      return new Response(error.message, { status: error.status || 500 });
+    }
+  };
+
+  this.netlify = async (request) => {
+    if (typeof Netlify === "undefined") throw new Error("Unknown");
+    console.log("Experimental Netlify");
+    try {
+      options = validateOptions(options, Netlify.env.toObject());
       const ctx = await createWinterContext(request, options, this);
       extendWithDefaults(ctx);
       return await handleRequest(this.handlers, ctx);
