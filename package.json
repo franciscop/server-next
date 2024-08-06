@@ -1,6 +1,6 @@
 {
   "name": "@server/next",
-  "version": "0.20.28",
+  "version": "0.20.29",
   "description": "An experimental reimplementation of server.js focused on the DX",
   "homepage": "https://node-server.com/",
   "repository": "https://github.com/franciscop/server-next.git",
