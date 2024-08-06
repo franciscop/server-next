@@ -116,8 +116,7 @@ const extendWithDefaults = (ctx) => {
 export default function server(options = {}) {
   // Make it so that the exported one is a prototype of function()
   if (!(this instanceof server)) {
-    const inst = new server(options);
-    return inst.self();
+    return new server(options).self();
   }
 
   // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
@@ -252,7 +251,7 @@ server.prototype.router = function (basePath, router) {
       this.handle(method, basePath + path.replace(/^\//, ""), ...callbacks);
     });
   }
-  return this;
+  return this.self();
 };
 
 server.prototype.test = function () {
