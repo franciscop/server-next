@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/logo.png" />
     <title>Login</title>
     <style>
       html,
@@ -14,15 +15,36 @@
         align-items: center;
         justify-content: center;
       }
+      body {
+        border: 1px solid #eee;
+        display: flex;
+        width: 620px;
+        height: auto;
+        border-radius: 6px;
+        padding: 0;
+        margin: 0 auto 30px;
+        justify-content: space-between;
+      }
+      .splash {
+        display: block;
+        width: 260px;
+        flex-basis: 50%;
+        padding: 20px;
+        transition: all 0.2s ease;
+      }
+      .splash:hover {
+        transform: scale(1.05);
+      }
+      hr {
+        height: 100%;
+      }
       form {
         width: 260px;
-        margin: 0 auto 30px;
-        border: 1px solid #eee;
-        border-radius: 6px;
-        padding: 30px;
         display: flex;
         flex-direction: column;
         gap: 12px;
+        border-left: 1px solid #eee;
+        padding: 30px;
       }
       h1,
       p {
@@ -69,10 +91,13 @@
     </style>
   </head>
   <body>
+    <div>
+      <a class="splash" href="/"><img src="/splash.jpg" /></a>
+    </div>
     <form method="POST" action="/auth/login">
       <h1>Login</h1>
       <p>Get into your account (or <a href="./register">register</a>):</p>
-      <input placeholder="Email" name="email" type="email" />
+      <input placeholder="Email" name="email" type="email" autofocus />
       <input placeholder="Password" name="password" type="password" />
       <button>Login</button>
 
