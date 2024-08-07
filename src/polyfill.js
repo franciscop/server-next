@@ -6,7 +6,13 @@ if (typeof Response === "undefined") {
 }
 
 // Polyfill Netlify's environment variables
-if (typeof Netlify !== "undefined" && typeof import.meta !== "undefined") {
-  if (!import.meta.env) import.meta.env = {};
-  Object.assign(import.meta.env, Netlify.env.toObject());
+globalThis.env = {};
+if (typeof Netlify !== "undefined") {
+  Object.assign(env, Netlify.env.toObject());
+}
+if (typeof process !== "undefined") {
+  Object.assign(env, process.env);
+}
+if (typeof import.meta.env !== "undefined") {
+  Object.assign(env, import.meta.env);
 }

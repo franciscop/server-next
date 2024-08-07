@@ -1,5 +1,6 @@
 export { default as createCookies } from "./createCookies.js";
 export { default as createId } from "./createId.js";
+export { default as config } from "./config.js";
 export { default as define } from "./define.js";
 export { default as getMachine } from "./getMachine.js";
 export { default as handleRequest } from "./handleRequest.js";

@@ -1,18 +1,15 @@
 import "./polyfill.js";
-// Define the errors for ServerError
 import "./errors/index.js";
 
-import Bucket from "./bucket.js";
 import createNodeContext from "./context/node.js";
 import createWinterContext from "./context/winter.js";
 import {
-  createId,
+  config,
   getMachine,
   handleRequest,
   iterate,
   parseHeaders,
 } from "./helpers/index.js";
-import middle from "./middle/index.js";
 
 // Export the reply helpers
 export * from "./reply.js";
@@ -22,14 +19,73 @@ export { default as ServerError } from "./ServerError.js";
 // Allow to create a sub-router
 export { default as router } from "./router.js";
 
-const createNodeServer = async (app, options) => {
+// #region server()
+export default function server(options = {}) {
+  // Make it so that the exported one is a prototype of function()
+  if (!(this instanceof server)) {
+    return new server(options).self();
+  }
+
+  // Keep a copy of the options in the instance
+  this.opts = options;
+  this.platform = getMachine();
+
+  // TODO: find a way to remove this hack
+  this.extended = false;
+
+  // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
+  this.handlers = {
+    socket: [],
+    get: [],
+    head: [],
+    post: [],
+    put: [],
+    patch: [],
+    delete: [],
+    options: [],
+  };
+
+  this.sockets = [];
+  // Note: required by Bun
+  this.websocket = {
+    message: async (socket, body) => {
+      this.handlers.socket
+        ?.filter((s) => s[0] === "message")
+        ?.map((s) => s[1]({ socket, sockets: this.sockets, body }));
+    },
+    open: (ws) => this.sockets.push(ws),
+    close: (ws) => this.sockets.splice(this.sockets.indexOf(ws), 1),
+  };
+
+  // Initialize it right away for Node.js
+  if (this.platform.runtime === "node") {
+    this.node();
+  }
+}
+
+server.prototype.self = function () {
+  const cb = this.callback.bind(this);
+  const proto = Object.getPrototypeOf(this);
+  for (let key in { ...proto, ...this }) {
+    if (typeof this[key] === "function") {
+      cb[key] = this[key].bind(this);
+    } else {
+      cb[key] = this[key];
+    }
+  }
+  return cb;
+};
+
+// #region Runtimes
+// Node.js
+server.prototype.node = async function () {
   const http = await import("http");
   http
     .createServer(async (request, response) => {
       try {
-        const ctx = await createNodeContext(request, options, app);
-        extendWithDefaults(ctx);
-        const out = await handleRequest(app.handlers, ctx);
+        const options = config(this.opts);
+        const ctx = await createNodeContext(request, options, this);
+        const out = await handleRequest(this.handlers, ctx);
 
         response.writeHead(out.status || 200, parseHeaders(out.headers));
         if (out.body instanceof ReadableStream) {
@@ -44,155 +100,38 @@ const createNodeServer = async (app, options) => {
         response.end();
       }
     })
-    .listen(options.port);
+    .listen(this.opts.port);
 };
 
-const validateOptions = (options, env = {}) => {
-  options.port = options.port || env.PORT || 3000;
-  options.secret = options.secret || env.SECRET || "unsafe-" + createId();
-  options.cors = options.cors || env.CORS || null;
-  if (options.cors === true) {
-    options.cors = { origin: options.domain || "*" };
+// Netlify
+server.prototype.callback = async function (request) {
+  try {
+    if (typeof Netlify === "undefined") {
+      throw new Error("Netlify doesn't exist");
+    }
+    const options = config(this.opts);
+    const ctx = await createWinterContext(request, options, this);
+    return await handleRequest(this.handlers, ctx);
+  } catch (error) {
+    return new Response(error.message, { status: error.status || 500 });
   }
-  if (typeof options.cors === "string") {
-    options.cors = { origin: options.cors };
-  }
-  if (options.cors && !options.cors.methods) {
-    options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
-  }
-
-  options.views = options.views ? Bucket(options.views) : null;
-  options.public = options.public ? Bucket(options.public) : null;
-  options.uploads = options.uploads ? Bucket(options.uploads) : null;
-
-  options.store = options.store ?? null;
-  options.cookies = options.cookies ?? {};
-  if (options.store && options.cookies) {
-    options.session = { store: options.store.prefix("session:") };
-  }
-
-  // AUTH
-  options.auth = options.auth || env.AUTH || null;
-  if (options.auth) {
-    if (typeof options.auth !== "object") {
-      const [type, provider] = options.auth.split(":");
-      options.auth = { type, provider };
-    }
-    if (typeof options.auth.provider === "string") {
-      options.auth.provider === options.auth.provider.split("|");
-    }
-    if (!options.auth.type) {
-      throw new Error("Auth options needs a type");
-    }
-    if (!options.auth.provider) {
-      throw new Error("Auth options needs a provider");
-    }
-    if (!options.auth.session && options.store) {
-      options.auth.session = options.store.prefix("auth:");
-    }
-    if (!options.auth.store && options.store) {
-      options.auth.store = options.store.prefix("user:");
-    }
-    if (!options.auth.cleanUser) {
-      options.auth.cleanUser = (fullUser) => {
-        const { password, ...user } = fullUser;
-        return user;
-      };
-    }
-  }
-
-  return options;
 };
 
-const extendWithDefaults = (ctx) => {
-  // Only want to execute it once; it needs to happen on a per-request
-  // basis since we only have full access to the options there
-  if (ctx.app.extended) return;
-  middle(ctx);
-  ctx.app.extended = true;
+// WinterCG, Bun, Cloudflare Workers
+server.prototype.fetch = async function (request, env) {
+  if (env?.upgrade(request)) return;
+  Object.assign(globalThis.env, env); // Extend env with the passed vars
+
+  try {
+    const options = config(this.opts);
+    const ctx = await createWinterContext(request, options, this);
+    return await handleRequest(this.handlers, ctx);
+  } catch (error) {
+    return new Response(error.message, { status: error.status || 500 });
+  }
 };
 
-// Export the main server()
-export default function server(options = {}) {
-  // Make it so that the exported one is a prototype of function()
-  if (!(this instanceof server)) {
-    return new server(options).self();
-  }
-
-  // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
-  this.handlers = {
-    socket: [],
-    get: [],
-    head: [],
-    post: [],
-    put: [],
-    patch: [],
-    delete: [],
-    options: [],
-  };
-
-  this.extended = false;
-
-  this.platform = getMachine();
-
-  // WEBSOCKETS stuff
-  const sockets = [];
-  this.websocket = {
-    message: async (socket, body) => {
-      this.handlers.socket
-        ?.filter((s) => s[0] === "message")
-        ?.map((s) => s[1]({ socket, sockets, body }));
-    },
-    open: (ws) => sockets.push(ws),
-    close: (ws) => sockets.splice(sockets.indexOf(ws), 1),
-  };
-
-  // Starting stuff
-  if (this.platform.runtime === "node") {
-    options = validateOptions(options, process.env);
-
-    createNodeServer(this, options);
-  }
-
-  this.fetch = async (request, env, fetchCtx) => {
-    if (env?.upgrade(request)) return;
-
-    try {
-      options = validateOptions(options, env);
-      const ctx = await createWinterContext(request, options, this);
-      extendWithDefaults(ctx);
-      return await handleRequest(this.handlers, ctx);
-    } catch (error) {
-      return new Response(error.message, { status: error.status || 500 });
-    }
-  };
-
-  this.netlify = async (request) => {
-    try {
-      if (typeof Netlify === "undefined") {
-        throw new Error("Netlify doesn't exist");
-      }
-      if (typeof import.meta === "undefined") {
-        throw new Error("import.meta.env doesn't exist");
-      }
-      options = validateOptions(options, import.meta.env);
-      const ctx = await createWinterContext(request, options, this);
-      extendWithDefaults(ctx);
-      return await handleRequest(this.handlers, ctx);
-    } catch (error) {
-      return new Response(error.message, { status: error.status || 500 });
-    }
-  };
-}
-
-server.prototype.self = function () {
-  const cb = this.netlify;
-  for (let key in { ...Object.getPrototypeOf(this), ...this }) {
-    cb[key] = this[key];
-  }
-  return cb;
-};
-
+// #region HTTP methods
 // INTERNAL
 server.prototype.handle = function (method, path, ...middleware) {
   if (method === "*") {
@@ -245,6 +184,7 @@ server.prototype.use = function (...middleware) {
   return this.handle("*", "*", ...middleware);
 };
 
+// Unwind the children routers into the main router
 server.prototype.router = function (basePath, router) {
   basePath = ("/" + basePath + "/").replace(/^\/+/, "/").replace(/\/+$/, "/");
   for (const method in router.handlers) {
@@ -255,6 +195,7 @@ server.prototype.router = function (basePath, router) {
   return this.self();
 };
 
+// #region Testing helper
 server.prototype.test = function () {
   let cookie = "";
   const fetch = async (path, options = {}) => {
