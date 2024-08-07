@@ -13,6 +13,21 @@ describe("exports", () => {
 
   it("export has a fetch", () => {
     expect(typeof server().fetch).toBe("function");
+    expect(typeof server().get().fetch).toBe("function");
+  });
+
+  it("export has the basic methods", () => {
+    expect(typeof server().get).toBe("function");
+    expect(typeof server().post).toBe("function");
+    expect(typeof server().use).toBe("function");
+    expect(typeof server().router).toBe("function");
+  });
+
+  it("export has the basic nested methods", () => {
+    expect(typeof server().get().get).toBe("function");
+    expect(typeof server().post().post).toBe("function");
+    expect(typeof server().use().use).toBe("function");
+    expect(typeof server().get().router).toBe("function");
   });
 
   it("nested is also a function", () => {

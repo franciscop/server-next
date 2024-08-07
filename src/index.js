@@ -187,12 +187,9 @@ export default function server(options = {}) {
 
 server.prototype.self = function () {
   const cb = this.netlify;
-  const keys = Object.keys(Object.getPrototypeOf(this)).concat(
-    Object.keys(this)
-  );
-  keys.forEach((key) => {
+  for (let key in { ...Object.getPrototypeOf(this), ...this }) {
     cb[key] = this[key];
-  });
+  }
   return cb;
 };
 
