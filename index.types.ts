@@ -1,4 +1,4 @@
-import server from ".";
+import server, { headers } from ".";
 
 server()
   .get("/", (ctx) => {
@@ -7,6 +7,7 @@ server()
     console.log(ctx.headers);
     console.log(ctx.cookies);
     console.log(ctx.body);
+    return headers();
   })
   .post("/", () => {
     return 201;

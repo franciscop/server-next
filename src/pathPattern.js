@@ -30,5 +30,5 @@ export default function pathPattern(pattern, path) {
     allSame = false;
   }
   if (allSame) return params;
-  return false;
+  return null;
 }

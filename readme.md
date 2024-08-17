@@ -104,6 +104,117 @@ export default server({ bucket, store })
 
 ### File handling
 
+To manage files, you need to install and use the library [`bucket`](http://bucketjs.com/), which is a very thin wrapper for file management systems. It is also created by the makers of Server.js.
+
+The easiest and default is to set a folder in your filesystem:
+
+```js
+import FileSystem from "bucket/fs";
+
+const uploads = FileSystem("./uploads");
+
+// All paths are relative to the CWD
+export default server({ uploads })
+  .get("/", () => "Hello")
+  .put("/users/:id", async (ctx) => {
+    // This is the plain string as the file name, already in our FS
+    const fileName = ctx.body.profile;
+    // 'yOuZEdSsNLq8PgZyLhSz0Llh.jpg'
+
+    // Convert it into a File instance
+    const file = ctx.uploads.file(fileName);
+
+    // Now we can use other methods if we want
+    // .info(), .read(), .write(), .pipe(), .pipeTo(), etc
+    const info = await file.info();
+    // {
+    //    id: "yOuZEdSsNLq8PgZyLhSz0Llh.jpg",
+    //    type: "jpg",
+    //    size: 435435,
+    //    timestamp: "2024-08-07T14:26:37Z",
+    //    // Note: this can be customized providing the option "domain"
+    //    url: "file:///Users/me/my-project/uploads/yOuZEdSsNLq8PgZyLhSz0Llh.jpg",
+    // }
+
+    return 200;
+  });
+```
+
+To upload the files to a 3rd party system, you just need to use the corresponding `bucket` implementation (or write a thin compatibility layer). Let's see an example with Backblaze's B2:
+
+```js
+import server from "@server/next";
+import Backblaze from "bucket/b2";
+
+const uploads = Backblaze("bucket-name", {
+  id: process.env.BACKBLAZE_ID,
+  key: process.env.BACKBLAZE_KEY,
+});
+
+export default server({ uploads })
+  .put("/users/:id", async (ctx) => {
+    const fileName = ctx.body.profile;
+    // 'yOuZEdSsNLq8PgZyLhSz0Llh.jpg'
+
+    // Convert it into a File instance
+    const file = ctx.uploads.file(fileName);
+
+    // Now we can use other methods if we want
+    const info = await file.info();
+    // {
+    //    id: "yOuZEdSsNLq8PgZyLhSz0Llh.jpg",
+    //    type: "jpg",
+    //    size: 435435,
+    //    timestamp: "2024-08-07T14:26:37Z",
+    //    url: "https://f???.backblazeb2.com/???/yOuZEdSsNLq8PgZyLhSz0Llh.jpg",
+    // }
+
+    return 200;
+  });
+  .;
+```
+
+#### Example: resizing the user profile picture
+
+Let's see a complete example of uploading and resizing a user profile picture:
+
+```js
+import server, { status } from "@server/next";
+import sharp from "sharp";
+import FileSystem from "bucket/fs";
+
+const uploads = FileSystem("./uploads");
+
+// All paths are relative to the CWD
+export default server({ uploads })
+  .get("/", () => "Hello")
+  .put("/users/:id", async (ctx) => {
+    // Create the instance of the file to read and write
+    const src = ctx.uploads.file(ctx.body.profile);
+    const dst = ctx.uploads.file("/profile/" + ctx.url.params.id + ".jpg");
+
+    const ext = src.id.split(".").pop();
+    if (!["jpg", "jpeg", "png", "webp", "avif"].includes(ext)) {
+      await src.remove(); // Don't store it
+      return status(400).json({ error: "Invalid file format" });
+    }
+
+    // Create the Readable, Transform and Writable Node streams
+    await pipeline(
+      src.readable("node"),
+      sharp().resize(200, 200).jpg(),
+      dst.writable("node")
+    );
+
+    // We no longer need the original file
+    await src.remove();
+
+    return status(200).json({ updated: true });
+  });
+```
+
+Note that the option `uploads` gets converted into a `Bucket` instance and passed as `ctx.uploads`. Th
+
 ## Options
 
 Options docs here

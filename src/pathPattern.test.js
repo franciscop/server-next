@@ -2,6 +2,8 @@ import pathPattern from "./pathPattern.js";
 
 describe("pathPattern.js", () => {
   it("matches the same string", () => {
+    expect(pathPattern("/", "/hello")).toEqual(null);
+    expect(pathPattern("/hello", "/")).toEqual(null);
     expect(pathPattern("/hello", "/hello")).toEqual({});
     expect(pathPattern("/hello/world", "/hello/world")).toEqual({});
   });
@@ -19,8 +21,8 @@ describe("pathPattern.js", () => {
   });
 
   it("doesn't do partial matches", () => {
-    expect(pathPattern("/hello", "/hello/John")).toEqual(false);
-    expect(pathPattern("/hello/", "/hello/John")).toEqual(false);
+    expect(pathPattern("/hello", "/hello/John")).toEqual(null);
+    expect(pathPattern("/hello/", "/hello/John")).toEqual(null);
   });
 
   it("can capture simple groups", () => {
@@ -31,7 +33,7 @@ describe("pathPattern.js", () => {
   });
 
   it("requires a part for the asterisk", () => {
-    expect(pathPattern("/hello/:there/*", "/hello/John")).toEqual(false);
+    expect(pathPattern("/hello/:there/*", "/hello/John")).toEqual(null);
   });
 
   it("can make a part optional", () => {

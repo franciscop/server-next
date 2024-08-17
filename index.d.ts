@@ -27,7 +27,37 @@ type Context = {
   options: ServerOptions;
 };
 
-type Middleware = (ctx: Context) => any;
+type Body = string;
+
+type ContentType = "application/json" | "text/plain" | (string & {});
+
+// (src: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers)
+type Headers = {
+  "Cache-Control"?: string;
+  "Content-Type"?: ContentType;
+  Server?: string;
+  "Set-Cookie"?: string;
+  "Content-Length"?: string;
+  Location?: string;
+
+  "cache-control"?: string;
+  "content-type"?: ContentType;
+  server?: string;
+  "set-cookie"?: string;
+  "content-length"?: string;
+  location?: string;
+
+  [key: string]: string | undefined;
+};
+
+type InlineReply =
+  | Response
+  | { body: Body; headers?: Headers }
+  | string
+  | number
+  | void;
+
+type Middleware = (ctx: Context) => InlineReply;
 
 type Router = {};
 
@@ -47,5 +77,8 @@ declare interface Server {
   router(router: Router): this;
 }
 
+type headers = (obj?: Headers) => any;
+
 declare const server: Server;
+export const headers: headers;
 export default server;
