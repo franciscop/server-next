@@ -5,6 +5,7 @@ import define from "./define.js";
 import validate from "./validate.js";
 
 const extendWithDefaults = (ctx) => {
+  // TODO: find a better way of doing this FFS
   // Only want to execute it once; it needs to happen on a per-request
   // basis since we only have full access to the options there
   if (ctx.app.extended) return;
@@ -36,5 +37,10 @@ export default async function handleRequest(handlers, ctx) {
     if (method !== "*") break;
   }
 
+  // In Netlify, a non-response is perfectly valid, which would indicate
+  // the edge function to just go ahead and consume the original resource
+  if (ctx.machine.provider === "netlify") return;
+
+  // In other environments, a non-response is wrong and we should 404 then
   return new Response("Not Found", { status: 404 });
 }
