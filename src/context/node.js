@@ -3,6 +3,7 @@ import { define, parseHeaders } from "../helpers/index.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
+// Headers come like [title1, value1, title2, value2, ...]
 // https://stackoverflow.com/a/54029307/938236
 const chunkArray = (arr, size) =>
   arr.length > size
