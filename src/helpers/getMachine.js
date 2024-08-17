@@ -15,10 +15,15 @@ function getRuntime() {
 }
 
 export default function getMachine() {
+  const provider = getProvider();
   return {
-    provider: getProvider(),
+    provider,
     service: getService(),
     runtime: getRuntime(),
-    production: process.env.NODE_ENV === "production",
+    // Can I cry now?
+    production:
+      provider === "netlify"
+        ? Netlify.env.get("NETLIFY_DEV") === "true"
+        : process.env.NODE_ENV === "production",
   };
 }

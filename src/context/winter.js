@@ -26,6 +26,7 @@ export default async (request, options = {}, app) => {
 
   ctx.app = app;
   ctx.platform = app.platform;
+  ctx.machine = app.platform;
 
   return ctx;
 };
