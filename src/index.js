@@ -104,7 +104,8 @@ server.prototype.node = async function () {
 };
 
 // Netlify
-server.prototype.callback = async function (request) {
+server.prototype.callback = async function (request, context) {
+  request.context = context;
   try {
     if (typeof Netlify === "undefined") {
       throw new Error("Netlify doesn't exist");

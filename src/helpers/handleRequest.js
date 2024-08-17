@@ -39,7 +39,9 @@ export default async function handleRequest(handlers, ctx) {
 
   // In Netlify, a non-response is perfectly valid, which would indicate
   // the edge function to just go ahead and consume the original resource
-  if (ctx.platform.provider === "netlify") return;
+  if (ctx.platform.provider === "netlify") {
+    return ctx.req.context.next();
+  }
 
   // In other environments, a non-response is wrong and we should 404 then
   return new Response("Not Found", { status: 404 });
