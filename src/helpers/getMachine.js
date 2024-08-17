@@ -23,7 +23,7 @@ export default function getMachine() {
     // Can I cry now?
     production:
       provider === "netlify"
-        ? Netlify.env.get("NETLIFY_DEV") === "true"
+        ? Netlify.env.get("NETLIFY_DEV") !== "true"
         : process.env.NODE_ENV === "production",
   };
 }
