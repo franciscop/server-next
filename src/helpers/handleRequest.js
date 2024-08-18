@@ -41,7 +41,9 @@ export default async function handleRequest(handlers, ctx) {
   // the edge function to just go ahead and consume the original resource. But
   // we have already "consumed" the resource, so we can only return the next one
   if (ctx.machine.provider === "netlify") {
-    return await ctx.req.context.next();
+    const response = await ctx.req.context.next();
+    console.log(response instanceof Response);
+    return response;
   }
 
   // In other environments, a non-response is wrong and we should 404 then
