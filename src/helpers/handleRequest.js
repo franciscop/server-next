@@ -42,7 +42,7 @@ export default async function handleRequest(handlers, ctx) {
   // we have already "consumed" the resource, so we can only return the next one
   if (ctx.machine.provider === "netlify") {
     const response = await ctx.req.context.next();
-    console.log(response instanceof Response);
+    console.log(response instanceof Response, response);
     return response;
   }
 
