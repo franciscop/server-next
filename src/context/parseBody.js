@@ -31,7 +31,7 @@ const saveFile = async (name, value, bucket) => {
 };
 
 export default async function parseBody(raw, contentType, bucket) {
-  const rawData = typeof raw === "string" ? raw : await raw.text();
+  const rawData = typeof raw === "string" ? raw : await raw.clone().text();
   if (!rawData) return {};
 
   if (!contentType || /text\/plain/.test(contentType)) {

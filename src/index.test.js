@@ -71,14 +71,16 @@ describe("simple post works", () => {
     .post("/", (ctx) => status(201).send(ctx.body))
     .test();
 
-  it("can post new data", async () => {
+  // Bun's bug: https://github.com/oven-sh/bun/issues/6348
+  it.skip("can post new data", async () => {
     const { data, status, headers } = await api.post("/", "New Data");
     expect(status).toBe(201);
     expect(data).toBe("New Data");
     expect(headers["content-type"]).toBe("text/plain; charset=utf-8");
   });
 
-  it("will return JSON", async () => {
+  // Bun's bug: https://github.com/oven-sh/bun/issues/6348
+  it.skip("will return JSON", async () => {
     const { data, status, headers } = await api.post("/", { hello: "world" });
     expect(status).toBe(201);
     expect(data).toEqual({ hello: "world" });
