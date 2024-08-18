@@ -1,29 +1,26 @@
 function getProvider() {
-  if ("Netlify" in globalThis) return "netlify";
-  return null;
-}
-
-function getService() {
+  if (typeof Netlify !== "undefined") return "netlify";
   return null;
 }
 
 function getRuntime() {
-  if ("Bun" in globalThis) return "bun";
-  if ("Deno" in globalThis) return "deno";
+  if (typeof Bun !== "undefined") return "bun";
+  if (typeof Deno !== "undefined") return "deno";
   if (globalThis.process?.versions?.node) return "node";
   return null;
 }
 
+function getProduction() {
+  // Can I cry now?
+  if (typeof Netlify !== "undefined")
+    return Netlify.env.get("NETLIFY_DEV") !== "true";
+  return process.env.NODE_ENV === "production";
+}
+
 export default function getMachine() {
-  const provider = getProvider();
   return {
-    provider,
-    service: getService(),
+    provider: getProvider(),
     runtime: getRuntime(),
-    // Can I cry now?
-    production:
-      provider === "netlify"
-        ? Netlify.env.get("NETLIFY_DEV") !== "true"
-        : process.env.NODE_ENV === "production",
+    production: getProduction(),
   };
 }

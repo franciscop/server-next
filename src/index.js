@@ -105,6 +105,7 @@ server.prototype.node = async function () {
 
 // Netlify
 server.prototype.callback = async function (request, context) {
+  // Consider simply renaming to "ctx.next()"
   request.context = context;
   try {
     if (typeof Netlify === "undefined") {
