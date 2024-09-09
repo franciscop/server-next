@@ -8,6 +8,14 @@
   "funding": "https://www.paypal.me/franciscopresencia/19",
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
+  "documentation": {
+    "title": "Server JS - A modern web server for Bun and Node.js",
+    "menu": {
+      "About": "/about",
+      "Documentation": "/documentation",
+      "Github": "https://github.com/franciscop/server-next"
+    }
+  },
   "scripts": {
     "start": "bun test --watch",
     "test": "bun test",
