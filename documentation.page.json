@@ -6,5 +6,5 @@
     "Documentation": "/documentation",
     "Github": "https://github.com/franciscop/server-next"
   },
-  "pages": ["./readme.md"]
+  "pages": ["./docs/"]
 }
