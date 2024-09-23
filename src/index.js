@@ -79,11 +79,11 @@ server.prototype.self = function () {
 // #region Runtimes
 // Node.js
 server.prototype.node = async function () {
+  const options = config(this.opts);
   const http = await import("http");
   http
     .createServer(async (request, response) => {
       try {
-        const options = config(this.opts);
         const ctx = await createNodeContext(request, options, this);
         const out = await handleRequest(this.handlers, ctx);
 
@@ -100,7 +100,7 @@ server.prototype.node = async function () {
         response.end();
       }
     })
-    .listen(this.opts.port);
+    .listen(options.port);
 };
 
 // Netlify
@@ -210,7 +210,7 @@ server.prototype.test = function () {
       options.headers.cookie = cookie;
     }
     const res = await this.fetch(
-      new Request("http://localhost:3000" + path, options)
+      new Request("http://localhost:3000" + path, options),
     );
 
     const headers = parseHeaders(res.headers);
