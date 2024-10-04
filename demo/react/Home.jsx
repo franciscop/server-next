@@ -1,9 +1,16 @@
 const Card = ({ children }) => <p>{children}</p>;
 Card.Text = ({ children }) => <p>{children}</p>;
 
+const css = `
+body {
+  background: #eee;
+}
+`;
+
 export default function Home() {
   return (
     <article>
+      <style>{css}</style>
       <h1 id="hello">Hello world</h1>
       <p>
         This is some <strong>basic</strong> test with{" "}

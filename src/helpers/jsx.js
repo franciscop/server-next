@@ -13,7 +13,7 @@ export const jsx = (tag, { children, ...props }) => {
     children = props.dangerouslySetInnerHTML.__html;
   if (!children) children = [];
   if (typeof children === "string") children = [children];
-  children = (children || [])
+  children = (Array.isArray(children) ? children : [children])
     .map((c) => (typeof c === "function" ? c() : encode(c)))
     .join("");
   if (!tag) return () => children;
