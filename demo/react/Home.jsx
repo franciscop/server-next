@@ -11,7 +11,9 @@ export default function Home() {
   return (
     <article>
       <style>{css}</style>
-      <h1 id="hello">Hello world</h1>
+      <h1 id="hello" className="Hello">
+        Hello world
+      </h1>
       <p>
         This is some <strong>basic</strong> test with{" "}
         <a

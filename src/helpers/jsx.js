@@ -5,6 +5,10 @@ const SELFCLOSE = new Set(
   "area,base,br,col,embed,hr,img,input,link,meta,source,track,wbr".split(","),
 );
 
+const altAttrs = {
+  classname: "class",
+};
+
 export const jsx = (tag, { children, ...props }) => {
   if (typeof tag === "function") return tag({ children, ...props });
 
@@ -19,9 +23,9 @@ export const jsx = (tag, { children, ...props }) => {
   if (!tag) return () => children;
   const attrStr = Object.entries(props || {})
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
-    .map(([k, v]) => `${encode(k)}="${encode(v)}"`)
+    .map(([k, v]) => `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(v)}"`)
     .join(" ");
-  return () => `<${tag} ${attrStr}>${children}</${tag}>`;
+  return () => `<${tag}${attrStr ? " " : ""}${attrStr}>${children}</${tag}>`;
 };
 export const jsxDEV = jsx;
 export const Fragment = "";
