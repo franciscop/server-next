@@ -12,20 +12,22 @@ const altAttrs = {
 export const jsx = (tag, { children, ...props }) => {
   if (typeof tag === "function") return tag({ children, ...props });
 
-  if (SELFCLOSE.has(tag)) return `<${tag} />`;
   if (props.dangerouslySetInnerHTML)
     children = props.dangerouslySetInnerHTML.__html;
   if (!children) children = [];
   if (typeof children === "string") children = [children];
   children = (Array.isArray(children) ? children : [children])
+    .flat()
     .map((c) => (typeof c === "function" ? c() : encode(c)))
     .join("");
   if (!tag) return () => children;
-  const attrStr = Object.entries(props || {})
+  let attrStr = Object.entries(props || {})
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
     .map(([k, v]) => `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(v)}"`)
     .join(" ");
-  return () => `<${tag}${attrStr ? " " : ""}${attrStr}>${children}</${tag}>`;
+  if (attrStr) attrStr = " " + attrStr;
+  if (SELFCLOSE.has(tag)) return () => `<${tag}${attrStr} />`;
+  return () => `<${tag}${attrStr}>${children}</${tag}>`;
 };
 export const jsxDEV = jsx;
 export const Fragment = "";
