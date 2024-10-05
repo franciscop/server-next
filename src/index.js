@@ -53,8 +53,18 @@ export default function server(options = {}) {
         ?.filter((s) => s[1] === "message")
         ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
     },
-    open: (ws) => this.sockets.push(ws),
-    close: (ws) => this.sockets.splice(this.sockets.indexOf(ws), 1),
+    open: (ws) => {
+      this.sockets.push(ws);
+      this.handlers.socket
+        ?.filter((s) => s[1] === "open")
+        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
+    },
+    close: (ws) => {
+      this.sockets.splice(this.sockets.indexOf(ws), 1);
+      this.handlers.socket
+        ?.filter((s) => s[1] === "close")
+        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
+    },
   };
 
   // Initialize it right away for Node.js
