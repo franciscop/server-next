@@ -50,8 +50,8 @@ export default function server(options = {}) {
   this.websocket = {
     message: async (socket, body) => {
       this.handlers.socket
-        ?.filter((s) => s[0] === "message")
-        ?.map((s) => s[1]({ socket, sockets: this.sockets, body }));
+        ?.filter((s) => s[1] === "message")
+        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
     },
     open: (ws) => this.sockets.push(ws),
     close: (ws) => this.sockets.splice(this.sockets.indexOf(ws), 1),
