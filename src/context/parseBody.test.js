@@ -41,15 +41,15 @@ describe("parseBody", () => {
     const body = await parseBody(
       getBody(),
       "multipart/form-data; boundary=----WebKitFormBoundaryvef1fLxmoUdYZWXp",
-      { write: (id) => id }
+      { write: (id) => id },
     );
     expect(body).toMatchObject({
       hello: "world",
       test: ["test message 123456", "test message number two"],
     });
 
-    const matchMd = expect.stringMatching(/^\w{24}.md$/);
-    const matchTxt = expect.stringMatching(/^\w{24}.txt$/);
+    const matchMd = expect.stringMatching(/^\w{16}.md$/);
+    const matchTxt = expect.stringMatching(/^\w{16}.txt$/);
     expect(body).toMatchObject({
       profile: matchMd,
       gallery: [matchTxt, matchTxt],

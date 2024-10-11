@@ -12,12 +12,12 @@ describe("set-cookie", () => {
   it("sets the right cookie", async () => {
     const api = app.test();
     const res = await api.get("/hello");
-    expect(res.headers["set-cookie"]).toBe("hello=world");
+    expect(res.headers["set-cookie"]).toBe("hello=world;Path=/");
   });
 
   it("can set multiple cookies", async () => {
     const api = app.test();
     const res = await api.get("/multiple");
-    expect(res.headers["set-cookie"]).toEqual(["a=b", "c=d"]);
+    expect(res.headers["set-cookie"]).toEqual(["a=b;Path=/", "c=d;Path=/"]);
   });
 });

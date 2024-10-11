@@ -4,7 +4,7 @@ import kv from "polystore";
 
 import server from "../index.js";
 
-const ID = "REqA2l022l8Q0tuIRtqLOPUy";
+const ID = "REqA2l022l8Q0tuI";
 
 describe("auth", () => {
   it("requires a provider", () => {
@@ -24,14 +24,14 @@ describe("auth", () => {
       id: ID,
       type: "token",
       provider: "wrong",
-      user: "QypOn5SQApyOPdUpIZsO9u2O",
+      user: "QypOn5SQApyOPdUp",
       email: "abc@test.com",
       time: "2024-07-01T03:21:40Z",
     });
-    const authorization = "Bearer REqA2l022l8Q0tuIRtqLOPUy";
+    const authorization = "Bearer REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed(
-      'Invalid provider "wrong", valid ones are: "email"'
+      'Invalid provider "wrong", valid ones are: "email"',
     );
   });
 });
@@ -47,7 +47,7 @@ describe("token", () => {
   });
 
   it("should be Bearer", async () => {
-    const authorization = "Basic REqA2l022l8Q0tuIRtqLOPUy";
+    const authorization = "Basic REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed("Invalid Authorization type, 'Basic'");
   });
@@ -59,7 +59,7 @@ describe("token", () => {
   });
 
   it("cannot get the session", async () => {
-    const authorization = "Bearer REqA2l022l8Q0tuIRtqLOPUy";
+    const authorization = "Bearer REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed("Invalid session");
   });
@@ -69,29 +69,29 @@ describe("token", () => {
       id: ID,
       type: "token",
       provider: "email",
-      user: "QypOn5SQApyOPdUpIZsO9u2O",
+      user: "QypOn5SQApyOPdUp",
       email: "abc@test.com",
       time: "2024-07-01T03:21:40Z",
     });
-    const authorization = "Bearer REqA2l022l8Q0tuIRtqLOPUy";
+    const authorization = "Bearer REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed("Credentials do not correspond to a user");
   });
 
   it("cannot get the user", async () => {
-    store.set("auth:REqA2l022l8Q0tuIRtqLOPUy", {
-      id: "REqA2l022l8Q0tuIRtqLOPUy",
+    store.set("auth:REqA2l022l8Q0tuI", {
+      id: "REqA2l022l8Q0tuI",
       type: "token",
       provider: "email",
-      user: "QypOn5SQApyOPdUpIZsO9u2O",
+      user: "QypOn5SQApyOPdUp",
       email: "abc@test.com",
       time: "2024-07-01T03:21:40Z",
     });
-    store.set("user:abc@test.com", {
-      id: "QypOn5SQApyOPdUpIZsO9u2O",
+    store.set("user:QypOn5SQApyOPdUp", {
+      id: "QypOn5SQApyOPdUp",
       email: "abc@test.com",
     });
-    const authorization = "Bearer REqA2l022l8Q0tuIRtqLOPUy";
+    const authorization = "Bearer REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).toSucceed();
   });
@@ -104,19 +104,19 @@ describe("cookie", () => {
     .test();
 
   it("should have the proper token in email", async () => {
-    const cookie = "authorization=hello";
+    const cookie = "authentication=hello";
     const req = await api.get("/", { headers: { cookie } });
     expect(req).not.toSucceed("Invalid Authorization cookie");
   });
 
   it("can get the proper session", async () => {
-    const cookie = "authorization=REqA2l022l8Q0tuIRtqLOPUy";
+    const cookie = "authentication=REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { cookie } });
     expect(req).not.toSucceed("Invalid session");
   });
 
   it("can get the proper session", async () => {
-    const cookie = "authorization=REqA2l022l8Q0tuIRtqLOPUy";
+    const cookie = "authentication=REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { cookie } });
     expect(req).not.toSucceed();
   });

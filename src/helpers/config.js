@@ -58,9 +58,12 @@ export default function config(options) {
     }
     if (!options.auth.cleanUser) {
       options.auth.cleanUser = (fullUser) => {
-        const { password, ...user } = fullUser;
+        const { password, token, ...user } = fullUser;
         return user;
       };
+    }
+    if (!options.auth.redirect) {
+      options.auth.redirect = "/user";
     }
   }
 

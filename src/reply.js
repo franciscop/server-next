@@ -60,6 +60,10 @@ Reply.prototype.json = function (body) {
   }).send(JSON.stringify(body));
 };
 
+Reply.prototype.redirect = function (Location) {
+  return this.headers({ Location }).status(302).send();
+};
+
 Reply.prototype.file = async function (path) {
   try {
     const data = await fs.readFile(path);
@@ -133,4 +137,5 @@ export const cookies = (...args) => new Reply().cookies(...args);
 export const send = (...args) => new Reply().send(...args);
 export const json = (...args) => new Reply().json(...args);
 export const file = (...args) => new Reply().file(...args);
+export const redirect = (...args) => new Reply().redirect(...args);
 export const view = (...args) => new Reply().view(...args);

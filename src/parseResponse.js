@@ -19,7 +19,7 @@ export default async function parseResponse(out, ctx) {
 
   // A plain string will be converted to either html or plain
   if (typeof out === "string") {
-    const type = /\s*\</.test(out) ? "text/html" : "text/plain";
+    const type = /^\s*\</.test(out) ? "text/html" : "text/plain";
     out = new Response(out, { headers: { "content-type": type } });
   }
 

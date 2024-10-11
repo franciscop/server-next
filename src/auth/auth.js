@@ -5,14 +5,14 @@ const validateToken = (authorization) => {
   if (type.toLowerCase() !== "bearer") {
     throw ServerError.AUTH_INVALID_TYPE({ type });
   }
-  if (id.length !== 24) {
+  if (id.length !== 16) {
     throw ServerError.AUTH_INVALID_TOKEN();
   }
   return id;
 };
 
 const validateCookie = (authorization) => {
-  if (authorization.length !== 24) {
+  if (authorization.length !== 16) {
     throw ServerError.AUTH_INVALID_COOKIE();
   }
   return authorization;
@@ -31,15 +31,15 @@ const findSessionId = (ctx) => {
 
   if (type === "cookie") {
     // If the user is not authenticated, there's no auth to retrieve
-    if (!ctx.cookies.authorization) return;
+    if (!ctx.cookies.authentication) return;
 
-    return validateCookie(ctx.cookies.authorization);
+    return validateCookie(ctx.cookies.authentication);
   }
 
-  throw new Error("Invalid auth type " + type);
+  throw new Error(`Invalid auth type "${type}"`);
 };
 
-export default async function findAuth(ctx) {
+export default async function auth(ctx) {
   if (!ctx.options.auth) return; // NO AUTH AT ALL; nothing to do here
   const options = ctx.options.auth;
 
@@ -47,7 +47,10 @@ export default async function findAuth(ctx) {
   if (!sessionId) return; // NO SESSION FOUND; no auth
 
   const auth = await options.session.get(sessionId);
+  // Mmh, which one to do...
   if (!auth) throw ServerError.AUTH_NO_SESSION();
+  // if (!auth) return; // SESSION ALREADY INVALID; no auth
+
   if (!auth.provider) throw ServerError.AUTH_NO_PROVIDER();
   if (!options.provider.includes(auth.provider)) {
     const valid = JSON.stringify(options.provider);

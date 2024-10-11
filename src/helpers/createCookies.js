@@ -9,7 +9,7 @@ export default function createCookies(cookies) {
       val = { value: val };
     }
     const { value, path, expires } = val;
-    const pathPart = path ? ";Path=" + path : "";
+    const pathPart = ";Path=" + (path || "/");
     const expiresPart = expires ? ";Expires=" + expires : "";
     return `${key}=${value || ""}${pathPart}${expiresPart}`;
   });

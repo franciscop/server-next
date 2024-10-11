@@ -1,6 +1,5 @@
 import { createId } from "../../helpers/index.js";
 import { ServerError, status } from "../../index.js";
-import findUser from "../findUser.js";
 import updateUser from "../updateUser.js";
 
 const hash = new Proxy(
@@ -12,7 +11,7 @@ const hash = new Proxy(
           self,
           await import("argon2").catch(() => {
             throw new ServerError.AUTH_ARGON_NEEDED();
-          })
+          }),
         );
       if (key === "verify" && !self.verify) {
         return async (hash, pass) => {
@@ -28,29 +27,29 @@ const hash = new Proxy(
       }
       return self[key];
     },
-  }
+  },
 );
 
 const createSession = async (user, ctx) => {
-  const { type, session, cleanUser } = ctx.options.auth;
+  const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;
   user = cleanUser(user);
-  const token = createId();
+  const id = createId();
   const provider = "email";
   const time = new Date().toISOString().replace(/\.[0-9]*/, "");
   ctx.auth = {
-    id: token,
+    id,
     type,
     provider,
-    user: user.id,
+    user: user.email,
     email: user.email,
     time,
   };
-  await session.set(token, ctx.auth, { expires: "1w" });
+  await session.set(id, ctx.auth, { expires: "1w" });
 
   if (type === "token") {
-    return status(201).json({ ...user, token });
+    return status(201).json({ ...user, token: id });
   } else if (type === "cookie") {
-    return status(201).cookies({ authorization: token }).send(user);
+    return status(302).cookies({ authentication: id }).redirect(redirect);
   } else if (type === "jwt") {
     throw new Error("JWT auth not supported yet");
   } else if (type === "key") {
@@ -87,10 +86,12 @@ async function register(ctx) {
   const store = ctx.options.auth.store;
   if (await store.has(email)) throw ServerError.REGISTER_EMAIL_EXISTS();
 
+  const time = new Date().toISOString().replace(/\.[0-9]*/, "");
   const user = {
-    id: createId(),
+    id: createId(user.email),
     email,
     password: await hash.hash(password),
+    time,
     ...data,
   };
   await store.set(email, user);
@@ -123,7 +124,7 @@ async function reset(ctx) {
 async function password(ctx) {
   const { previous, updated } = ctx.body;
 
-  const fullUser = await findUser(ctx.auth, ctx.options.auth.store);
+  const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
 
   const isValid = await hash.verify(fullUser.password, previous);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
