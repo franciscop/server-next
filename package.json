@@ -10,8 +10,9 @@
   "license": "UNLICENSED",
   "documentation": {
     "title": "Server JS - A modern web server for Bun and Node.js",
+    "home": "./docs/index.html",
     "menu": {
-      "About": "/about",
+      "About": "/",
       "Documentation": "/documentation",
       "Github": "https://github.com/franciscop/server-next"
     }

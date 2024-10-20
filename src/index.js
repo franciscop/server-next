@@ -11,6 +11,8 @@ import {
   parseHeaders,
 } from "./helpers/index.js";
 
+import middle from "./middle/index.js";
+
 // Export the reply helpers
 export * from "./reply.js";
 
@@ -71,6 +73,8 @@ export default function server(options = {}) {
   if (this.platform.runtime === "node") {
     this.node();
   }
+
+  this.use(...middle);
 }
 
 server.prototype.self = function () {
@@ -146,6 +150,8 @@ server.prototype.fetch = async function (request, env) {
 // #region HTTP methods
 // INTERNAL
 server.prototype.handle = function (method, path, ...middleware) {
+  // Do not try to optimize, we NEED the method to remain '*' here so that
+  // it doesn't auto-finish
   if (method === "*") {
     for (let m in this.handlers) {
       this.handlers[m].push([method, path, ...middleware]);
@@ -224,17 +230,17 @@ server.prototype.test = function () {
     );
 
     const headers = parseHeaders(res.headers);
-    let data;
+    let body;
     if (headers["set-cookie"]) {
       // TODO: this should really be a smart merge of the 2
       cookie = headers["set-cookie"];
     }
     if (headers["content-type"]?.includes("application/json")) {
-      data = await res.json();
+      body = await res.json();
     } else {
-      data = await res.text();
+      body = await res.text();
     }
-    return { status: res.status, headers, data };
+    return { status: res.status, headers, body, data: body };
   };
   return {
     app: this,

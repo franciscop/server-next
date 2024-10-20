@@ -1,6 +1,8 @@
 import { type } from "../reply.js";
 
 export default async function assets(ctx) {
+  if (!ctx.options.public) return;
+  if (!ctx.method !== "get") return;
   try {
     // TODO: streaming
     // Read it as buffer (null)
