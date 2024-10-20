@@ -12,5 +12,10 @@ export default server({ store, auth: "cookie:github" })
   ))
   .get("/user", async (ctx) => {
     if (!ctx.user) return redirect("/login");
-    return <p>Hello {ctx.user.name}</p>;
+    return (
+      <p>
+        Hello {ctx.user.name} <br />
+        <a href="/auth/logout">Logout</a>
+      </p>
+    );
   });
