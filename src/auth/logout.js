@@ -7,7 +7,7 @@ export default async function logout(ctx) {
   if (type === "token") {
     return { token: null };
   } else if (type === "cookie") {
-    return cookies({ authorization: null }).send({});
+    return cookies({ authorization: null }).redirect("/");
   } else if (type === "jwt") {
     throw new Error("JWT auth not supported yet");
   } else if (type === "key") {

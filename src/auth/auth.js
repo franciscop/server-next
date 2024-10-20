@@ -48,8 +48,8 @@ export default async function auth(ctx) {
 
   const auth = await options.session.get(sessionId);
   // Mmh, which one to do...
-  if (!auth) throw ServerError.AUTH_NO_SESSION();
-  // if (!auth) return; // SESSION ALREADY INVALID; no auth
+  // if (!auth) throw ServerError.AUTH_NO_SESSION();
+  if (!auth) return; // SESSION ALREADY INVALID; no auth
 
   if (!auth.provider) throw ServerError.AUTH_NO_PROVIDER();
   if (!options.provider.includes(auth.provider)) {

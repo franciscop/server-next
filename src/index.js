@@ -11,7 +11,7 @@ import {
   parseHeaders,
 } from "./helpers/index.js";
 
-import middle from "./middle/index.js";
+import { assets, auth } from "./middle/index.js";
 
 // Export the reply helpers
 export * from "./reply.js";
@@ -29,7 +29,7 @@ export default function server(options = {}) {
   }
 
   // Keep a copy of the options in the instance
-  this.opts = options;
+  this.opts = config(options);
   this.platform = getMachine();
 
   // TODO: find a way to remove this hack
@@ -74,7 +74,10 @@ export default function server(options = {}) {
     this.node();
   }
 
-  this.use(...middle);
+  this.use(assets);
+  if (this.opts.auth) {
+    this.use(auth({ options: this.opts, app: this }));
+  }
 }
 
 server.prototype.self = function () {
@@ -93,12 +96,11 @@ server.prototype.self = function () {
 // #region Runtimes
 // Node.js
 server.prototype.node = async function () {
-  const options = config(this.opts);
   const http = await import("http");
   http
     .createServer(async (request, response) => {
       try {
-        const ctx = await createNodeContext(request, options, this);
+        const ctx = await createNodeContext(request, this.opts, this);
         const out = await handleRequest(this.handlers, ctx);
 
         response.writeHead(out.status || 200, parseHeaders(out.headers));
@@ -125,8 +127,7 @@ server.prototype.callback = async function (request, context) {
     if (typeof Netlify === "undefined") {
       throw new Error("Netlify doesn't exist");
     }
-    const options = config(this.opts);
-    const ctx = await createWinterContext(request, options, this);
+    const ctx = await createWinterContext(request, this.opts, this);
     return await handleRequest(this.handlers, ctx);
   } catch (error) {
     return new Response(error.message, { status: error.status || 500 });
@@ -139,8 +140,7 @@ server.prototype.fetch = async function (request, env) {
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
   try {
-    const options = config(this.opts);
-    const ctx = await createWinterContext(request, options, this);
+    const ctx = await createWinterContext(request, this.opts, this);
     return await handleRequest(this.handlers, ctx);
   } catch (error) {
     return new Response(error.message, { status: error.status || 500 });

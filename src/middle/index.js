@@ -1,4 +1,5 @@
-import auth from "../auth/index.js";
+import authMod from "../auth/index.js";
 import assets from "./assets.js";
 
-export default [assets, auth.middle];
+const auth = authMod.middle;
+export { assets, auth };
