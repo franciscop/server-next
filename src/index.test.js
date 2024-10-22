@@ -45,13 +45,13 @@ describe("return different types", () => {
     .test();
 
   it("can get the plain text", async () => {
-    const { data } = await api.get("/text");
-    expect(data).toBe("Hello world");
+    const { body } = await api.get("/text");
+    expect(body).toBe("Hello world");
   });
 
   it("can get the array", async () => {
-    const { data } = await api.get("/array");
-    expect(data).toEqual(["Hello world"]);
+    const { body } = await api.get("/array");
+    expect(body).toEqual(["Hello world"]);
   });
 
   it("can get the object", async () => {
@@ -71,19 +71,17 @@ describe("simple post works", () => {
     .post("/", (ctx) => status(201).send(ctx.body))
     .test();
 
-  // Bun's bug: https://github.com/oven-sh/bun/issues/6348
-  it.skip("can post new data", async () => {
-    const { data, status, headers } = await api.post("/", "New Data");
+  it("can post new data", async () => {
+    const { body, status, headers } = await api.post("/", "New Data");
     expect(status).toBe(201);
-    expect(data).toBe("New Data");
+    expect(body).toBe("New Data");
     expect(headers["content-type"]).toBe("text/plain; charset=utf-8");
   });
 
-  // Bun's bug: https://github.com/oven-sh/bun/issues/6348
-  it.skip("will return JSON", async () => {
-    const { data, status, headers } = await api.post("/", { hello: "world" });
+  it("will return JSON", async () => {
+    const { body, status, headers } = await api.post("/", { hello: "world" });
     expect(status).toBe(201);
-    expect(data).toEqual({ hello: "world" });
+    expect(body).toEqual({ hello: "world" });
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
   });
 });

@@ -10,17 +10,17 @@ const spaceOrEnter = (msg) => {
 };
 
 export default function toSucceed(request, message) {
-  const pass = request.status >= 200 && request.status < 300;
+  const pass = request.status >= 200 && request.status < 400;
 
-  if (message && JSON.stringify(request.data) !== JSON.stringify(message)) {
+  if (message && JSON.stringify(request.body) !== JSON.stringify(message)) {
     if (pass) {
       return {
         message: () =>
           `${reset}Expected body:${spaceOrEnter(
-            message
+            message,
           )}${this.utils.printExpected(message)}\nReceived body:${spaceOrEnter(
-            request.data
-          )}${this.utils.printReceived(request.data)}`,
+            request.body,
+          )}${this.utils.printReceived(request.body)}`,
         pass,
       };
     }
@@ -28,10 +28,10 @@ export default function toSucceed(request, message) {
     return {
       message: () =>
         `${reset}Expected error:${spaceOrEnter(
-          message
+          message,
         )}${this.utils.printExpected(message)}\nReceived error:${spaceOrEnter(
-          request.data
-        )}${this.utils.printReceived(request.data)}`,
+          request.body,
+        )}${this.utils.printReceived(request.body)}`,
       pass: !pass,
     };
   }
@@ -40,9 +40,9 @@ export default function toSucceed(request, message) {
     return {
       message: () =>
         `${reset}Expected ${this.utils.printExpected(
-          request.status
+          request.status,
         )} to be an error code, received body:\n${this.utils.printExpected(
-          request.data
+          request.body,
         )}`,
       pass: true,
     };
@@ -51,11 +51,11 @@ export default function toSucceed(request, message) {
   return {
     message: () =>
       `${reset}Expected ${this.utils.printReceived(
-        request.status
+        request.status,
       )} to succeed, received body:\n${this.utils.printReceived(
-        request.data,
+        request.body,
         null,
-        2
+        2,
       )}`,
     pass: false,
   };

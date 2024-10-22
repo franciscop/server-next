@@ -240,7 +240,7 @@ server.prototype.test = function () {
     } else {
       body = await res.text();
     }
-    return { status: res.status, headers, body, data: body };
+    return { status: res.status, headers, body };
   };
   return {
     app: this,

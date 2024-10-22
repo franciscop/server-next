@@ -88,7 +88,7 @@ async function register(ctx) {
 
   const time = new Date().toISOString().replace(/\.[0-9]*/, "");
   const user = {
-    id: createId(user.email),
+    id: createId(email),
     email,
     password: await hash.hash(password),
     time,

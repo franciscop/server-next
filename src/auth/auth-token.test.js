@@ -18,7 +18,7 @@ describe("user creation flow", () => {
     .test();
 
   // Bun's bug: https://github.com/oven-sh/bun/issues/6348
-  it.skip("tests a long user flow with tokens", async () => {
+  it("tests a long user flow with tokens", async () => {
     // The latest updated token
     let token;
 
@@ -28,8 +28,8 @@ describe("user creation flow", () => {
       expect(register).toSucceed();
 
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([register.data.token]);
-      return register.data.token;
+      expect(await sessions()).toEqual([register.body.token]);
+      return register.body.token;
     })();
 
     // CAN GET MY OWN INFO
@@ -37,7 +37,7 @@ describe("user creation flow", () => {
       const headers = { authorization: "Bearer " + token };
       const me = await api.get("/me", { headers });
       expect(me).toSucceed();
-      expect(me.data.email).toEqual(EMAIL);
+      expect(me.body.email).toEqual(EMAIL);
 
       expect(await users()).toEqual(["abc@test.com"]);
       expect(await sessions()).toEqual([token]);
@@ -57,8 +57,8 @@ describe("user creation flow", () => {
       const login = await api.post("/auth/login/email", CREDENTIALS);
       expect(login).toSucceed();
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([login.data.token]);
-      return login.data.token;
+      expect(await sessions()).toEqual([login.body.token]);
+      return login.body.token;
     })();
 
     // CAN GET MY OWN INFO
@@ -66,7 +66,7 @@ describe("user creation flow", () => {
       const headers = { authorization: "Bearer " + token };
       const me = await api.get("/me", { headers });
       expect(me).toSucceed();
-      expect(me.data.email).toEqual(EMAIL);
+      expect(me.body.email).toEqual(EMAIL);
     })();
 
     // UPDATE PASSWORD
@@ -103,8 +103,8 @@ describe("user creation flow", () => {
       });
       expect(login).toSucceed();
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([login.data.token]);
-      return login.data.token;
+      expect(await sessions()).toEqual([login.body.token]);
+      return login.body.token;
     })();
   });
 });

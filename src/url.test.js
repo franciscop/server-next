@@ -7,8 +7,8 @@ describe("can match the url", () => {
       .get("/*", (ctx) => ctx.url.params)
       .test();
 
-    const { data, headers } = await api.get("/hello");
-    expect(data).toEqual({ id: "hello" });
+    const { body, headers } = await api.get("/hello");
+    expect(body).toEqual({ id: "hello" });
     expect(headers["content-type"]).toEqual("application/json; charset=utf-8");
   });
 
@@ -19,8 +19,8 @@ describe("can match the url", () => {
       .get("/*", (ctx) => ctx.url.params)
       .test();
 
-    const { data, headers, ...rest } = await api.get("/hello");
-    expect(data).toEqual({ id: "hello" });
+    const { body, headers, ...rest } = await api.get("/hello");
+    expect(body).toEqual({ id: "hello" });
     expect(headers["content-type"]).toEqual("application/json; charset=utf-8");
   });
 });
