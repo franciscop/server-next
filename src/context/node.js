@@ -17,6 +17,17 @@ export default async (request, options = {}, app) => {
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
 
+  // Private
+  const events = {};
+  ctx.unstableOn = (name, callback) => {
+    events[name] = events[name] || [];
+    events[name].push(callback);
+  };
+  ctx.unstableFire = (name, data) => {
+    if (!events[name]) return;
+    events[name].forEach((cb) => cb(data));
+  };
+
   ctx.headers = parseHeaders(new Headers(chunkArray(request.rawHeaders, 2)));
   ctx.cookies = parseCookies(ctx.headers.cookie);
   await auth.load(ctx);
@@ -26,7 +37,7 @@ export default async (request, options = {}, app) => {
   const path = request.url.replace(/\/$/, "") || "/";
   ctx.url = new URL(path, `${https}://${host}`);
   define(ctx.url, "query", (url) =>
-    Object.fromEntries(url.searchParams.entries())
+    Object.fromEntries(url.searchParams.entries()),
   );
 
   await new Promise((resolve, reject) => {
@@ -40,7 +51,7 @@ export default async (request, options = {}, app) => {
         ctx.body = await parseBody(
           Buffer.concat(body).toString(),
           type,
-          options.uploads
+          options.uploads,
         );
         resolve();
       })

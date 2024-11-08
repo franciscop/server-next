@@ -3,7 +3,7 @@ import createId from "./createId.js";
 
 // Big mess; parse all of the options for server, which can be at launch time
 // or dynamically per-request for the functions (so have to read ENV inside)
-export default function config(options) {
+export default function config(options = {}) {
   const env = globalThis.env;
 
   // Basic options

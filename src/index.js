@@ -116,7 +116,7 @@ server.prototype.node = async function () {
         response.end();
       }
     })
-    .listen(options.port);
+    .listen(this.opts.port);
 };
 
 // Netlify
@@ -139,12 +139,16 @@ server.prototype.fetch = async function (request, env) {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
+  let ctx, res, error;
   try {
-    const ctx = await createWinterContext(request, this.opts, this);
-    return await handleRequest(this.handlers, ctx);
-  } catch (error) {
-    return new Response(error.message, { status: error.status || 500 });
+    ctx = await createWinterContext(request, this.opts, this);
+    res = await handleRequest(this.handlers, ctx);
+  } catch (err) {
+    error = err;
+    res = new Response(error.message, { status: error.status || 500 });
   }
+  ctx?.unstableFire("finish", { ...ctx, error, res, end: performance.now() });
+  return res;
 };
 
 // #region HTTP methods
