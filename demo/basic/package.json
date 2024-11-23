@@ -14,7 +14,7 @@
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "UNLICENSED",
   "dependencies": {
-    "polystore": "^0.8.0",
+    "polystore": "^0.15.10",
     "zod": "^3.22.4"
   },
   "devDependencies": {

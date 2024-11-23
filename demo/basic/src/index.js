@@ -1,17 +1,23 @@
 import kv from "polystore";
 import z from "zod";
 
-import server, { cookies, file, json, status, view } from "../../src/index.js";
+import server, {
+  cookies,
+  file,
+  json,
+  status,
+  view,
+} from "../../../src/index.js";
 import authRouter from "./authRouter.js";
 import db from "./db.js";
 
-const store = kv(new URL(`file://${process.cwd()}/data/store.json`));
-const sessionStore = kv(new URL(`file://${process.cwd()}/data/session.json`));
-const authStore = kv(new URL(`file://${process.cwd()}/data/auth.json`));
+const store = kv(`file://${process.cwd()}/src/data/store.json`);
+const sessionStore = kv(`file://${process.cwd()}/src/data/session.json`);
+const authStore = kv(`file://${process.cwd()}/src/data/auth.json`);
 
 const options = {
   port: 3000,
-  views: "views",
+  views: "src/views",
   public: "public",
   store,
   session: {
@@ -41,7 +47,7 @@ export default server(options)
     { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
       return json(await db.pets.list());
-    }
+    },
   )
   .get("/pets/:id", async (ctx) => {
     const id = Number(ctx.url.params.id);
@@ -126,7 +132,7 @@ export default server(options)
     // send back a message
     ctx.socket.send(`You said: ${ctx.body}`);
     await new Promise((done) =>
-      setTimeout(done, 1000 + 3 * Math.random() * 1000)
+      setTimeout(done, 1000 + 3 * Math.random() * 1000),
     );
     ctx.socket.send(`They said: ${Math.random()}`);
   })

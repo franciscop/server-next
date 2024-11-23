@@ -1,4 +1,4 @@
-import { file, router } from "../../src/index.js";
+import { file, router } from "../../../src/index.js";
 
 export default router()
   .get("/login", () => file("./views/login.html"))

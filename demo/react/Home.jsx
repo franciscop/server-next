@@ -1,16 +1,20 @@
+import reset from "./reset.js";
+
 const Card = ({ children }) => <p>{children}</p>;
 Card.Text = ({ children }) => <p>{children}</p>;
 
-const css = `
-body {
-  background: #eee;
-}
-`;
+const Page = ({ children }) => (
+  <html>
+    <body>
+      <article>{children}</article>
+    </body>
+  </html>
+);
 
 export default function Home() {
   return (
-    <article>
-      <style>{css}</style>
+    <Page>
+      <style>{reset}</style>
       <h1 id="hello" className="Hello">
         Hello world
       </h1>
@@ -35,6 +39,9 @@ export default function Home() {
         HTML {"<strong>gets escaped</strong>"} properly.
       </p>
       <Card.Text>Some more weird stuff</Card.Text>
-    </article>
+      <script>{`
+        console.log("Hello world");
+      `}</script>
+    </Page>
   );
 }

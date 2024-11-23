@@ -13,9 +13,35 @@ const altAttrs = {
   classname: "class",
 };
 
+const minifyCss = (str) =>
+  str
+    .replace(/\s+/g, " ")
+    .replace(/(?!<\")\/\*[^\*]+\*\/(?!\")/g, "")
+    .replace(/(\w|\*) (\{)/g, "$1$2")
+    .replace(/(\}) (\w|\*)/g, "$1$2")
+    .replace(/(\{) (\w)/g, "$1$2")
+    .replace(/(\w)(\:) /g, "$1$2")
+    .replace(/(\;) (\})/g, "$1$2")
+    .replace(/(\;) (\w)/g, "$1$2")
+    .replace(/\;(\})/g, "$1")
+    .replace(/(\w), (\w)/g, "$1,$2")
+    .replace(/(\w), (\w)/g, "$1,$2")
+    .replace(/(\{) (\w)/g, "$1$2")
+    .trim();
+
 export const jsx = (tag, { children, ...props }) => {
   if (typeof tag === "function") return tag({ children, ...props });
 
+  // If they include an explicit <script>, let them be, just render it
+  // without escaping
+  if (tag === "script" && children) {
+    const src = children;
+    children = () => src;
+  }
+  if (tag === "style" && children) {
+    const src = minifyCss(children);
+    children = () => src;
+  }
   if (props.dangerouslySetInnerHTML)
     children = () => props.dangerouslySetInnerHTML.__html;
   if (!children) children = [];

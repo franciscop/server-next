@@ -1,10 +1,9 @@
-import { dirname } from "node:path";
 import kv from "polystore";
 
-const demoDir = dirname(import.meta.dirname);
+const demoDir = new URL(".", import.meta.url).pathname;
 
 const fileToDb = (name) => {
-  const store = kv(new URL(`file://${demoDir}/data/${name}`));
+  const store = kv(`file://${demoDir}/src/data/${name}`);
   return {
     list: () => store.values(),
     get: (id) => store.get(id),

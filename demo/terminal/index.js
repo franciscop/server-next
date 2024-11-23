@@ -1,4 +1,4 @@
-import server, { redirect } from "../../";
+import server from "../../";
 
 const rows = [
   // {
