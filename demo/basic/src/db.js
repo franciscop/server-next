@@ -3,7 +3,7 @@ import kv from "polystore";
 const demoDir = new URL(".", import.meta.url).pathname;
 
 const fileToDb = (name) => {
-  const store = kv(`file://${demoDir}/src/data/${name}`);
+  const store = kv(`file://${demoDir}/data/${name}`);
   return {
     list: () => store.values(),
     get: (id) => store.get(id),
