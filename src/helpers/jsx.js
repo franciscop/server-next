@@ -13,6 +13,9 @@ const altAttrs = {
   classname: "class",
 };
 
+// "" and 0 are valid children, false and null and undefined are not
+const isValidChild = (child) => child || child === "" || child === 0;
+
 const minifyCss = (str) =>
   str
     .replace(/\s+/g, " ")
@@ -44,7 +47,8 @@ export const jsx = (tag, { children, ...props }) => {
   }
   if (props.dangerouslySetInnerHTML)
     children = () => props.dangerouslySetInnerHTML.__html;
-  if (!children) children = [];
+
+  if (!isValidChild(children)) children = [];
   if (typeof children === "string") children = [children];
   children = (Array.isArray(children) ? children : [children])
     .flat()
