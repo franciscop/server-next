@@ -1,15 +1,10 @@
 import kv from "polystore";
 import z from "zod";
 
-import server, {
-  cookies,
-  file,
-  json,
-  status,
-  view,
-} from "../../../src/index.js";
+import server, { cookies, file, json, status } from "../../../src/index.js";
 import authRouter from "./authRouter.js";
 import db from "./db.js";
+import api from "./middleware/api.js";
 
 const store = kv(`file://${process.cwd()}/src/data/store.json`);
 const sessionStore = kv(`file://${process.cwd()}/src/data/session.json`);
@@ -17,12 +12,9 @@ const authStore = kv(`file://${process.cwd()}/src/data/auth.json`);
 
 const options = {
   port: 3000,
-  views: "src/views",
   public: "public",
   store,
-  session: {
-    store: sessionStore,
-  },
+  session: { store: sessionStore },
   auth: {
     type: "token",
     provider: "email",
@@ -36,16 +28,20 @@ const PetSchema = z.object({
 });
 
 export default server(options)
+  .get("/docs/", api)
   .router("/auth", authRouter)
 
-  .get("/", () => view("home.html"))
-  .get("/login", () => view("login.html"))
-  .get("/register", () => view("register.html"))
+  .get("/", () => file("src/views/home.html"))
+  .get("/login", () => file("src/views/login.html"))
+  .get("/register", () => file("src/views/register.html"))
+  .get("/socket", () => file("src/views/socket.html"))
 
   .get(
     "/pets",
     { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
+      // @description Get a list of all the pets in the store
+      // @returns Pet[]
       return json(await db.pets.list());
     },
   )
@@ -125,8 +121,6 @@ export default server(options)
   .get("/hello", async () => {
     return "Welcome page";
   })
-
-  .get("/socket", () => view("socket.html"))
 
   .socket("message", async (ctx) => {
     // send back a message

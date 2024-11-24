@@ -1,5 +1,5 @@
 {
-  "name": "demopkg",
+  "name": "server-demo",
   "version": "1.0.0",
   "homepage": "https://myapi.com/",
   "description": "A small demo API for testing the new server.js Developer Experience",
@@ -15,6 +15,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "polystore": "^0.15.10",
+    "prettier": "^3.3.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {
