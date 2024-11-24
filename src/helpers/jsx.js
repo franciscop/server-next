@@ -38,7 +38,7 @@ export const jsx = (tag, { children, ...props }) => {
     const src = children;
     children = () => src;
   }
-  if (tag === "style" && children) {
+  if (tag === "style" && children && typeof children === "string") {
     const src = minifyCss(children);
     children = () => src;
   }
