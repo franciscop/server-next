@@ -15,7 +15,7 @@ describe("can route properly", () => {
   // INTERNAL - so this might change in the future
   it("has the correct structure", () => {
     const registeredPaths = app.handlers.get.map((h) => h[1]);
-    expect(registeredPaths).toEqual(["*", "/hello", "/api/hello", "/"]);
+    expect(registeredPaths).toEqual(["*", "*", "/hello", "/api/hello", "/"]);
   });
 
   it("can get fallback when nothing matches", async () => {

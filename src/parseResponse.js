@@ -46,6 +46,18 @@ export default async function parseResponse(out, ctx) {
     out.headers.set("Access-Control-Allow-Methods", methods);
   }
 
+  // Only attach the headers if the user is using the timing API
+  // 1 item is the `init` so it doesn't count
+  if (ctx.time.times.length > 1) {
+    const r = (t) => Math.round(t);
+    const times = ctx.time.times;
+    const timing = times
+      .slice(1)
+      .map(([name, time], i) => `${name};dur=${r(time - times[i][1])}`)
+      .join(", ");
+    out.headers.set("Server-Timing", timing);
+  }
+
   // If we have a session, we need to persist it into a cookie
   if (Object.keys(ctx.session || {}).length) {
     if (!ctx.options.session?.store) {

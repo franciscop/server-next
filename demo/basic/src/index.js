@@ -38,11 +38,14 @@ export default server(options)
 
   .get(
     "/pets",
-    { query: z.object({ name: z.string() }) },
+    // { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
       // @description Get a list of all the pets in the store
       // @returns Pet[]
-      return json(await db.pets.list());
+      const data = await db.pets.list();
+      ctx.time("db-list");
+      console.log("DATA:", data);
+      return json(data);
     },
   )
   .get("/pets/:id", async (ctx) => {
