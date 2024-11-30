@@ -41,21 +41,14 @@ export default async function parseResponse(out, ctx) {
 
   // If we have CORS, set it up
   if (ctx.options.cors) {
-    const { origin, methods } = ctx.options.cors;
-    out.headers.set("Access-Control-Allow-Origin", origin);
-    out.headers.set("Access-Control-Allow-Methods", methods);
+    // Set the proper CORS headers
+    cors(out.headers, ctx.options.cors, ctx);
   }
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
   if (ctx.time.times.length > 1) {
-    const r = (t) => Math.round(t);
-    const times = ctx.time.times;
-    const timing = times
-      .slice(1)
-      .map(([name, time], i) => `${name};dur=${r(time - times[i][1])}`)
-      .join(", ");
-    out.headers.set("Server-Timing", timing);
+    out.headers.set("Server-Timing", ctx.time.headers());
   }
 
   // If we have a session, we need to persist it into a cookie

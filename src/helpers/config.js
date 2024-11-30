@@ -21,6 +21,9 @@ export default function config(options = {}) {
   if (options.cors && !options.cors.methods) {
     options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
   }
+  if (options.cors && !options.cors.headers) {
+    options.cors.methods = "*";
+  }
 
   // Bucket
   options.views = options.views ? Bucket(options.views) : null;
