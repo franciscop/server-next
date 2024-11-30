@@ -42,7 +42,12 @@ export default async function parseResponse(out, ctx) {
   // If we have CORS, set it up
   if (ctx.options.cors) {
     // Set the proper CORS headers
-    cors(out.headers, ctx.options.cors, ctx);
+    const origin = cors(ctx.options.cors, ctx.headers.origin);
+    if (origin) {
+      headers.set("Access-Control-Allow-Methods", options.methods);
+      headers.set("Access-Control-Allow-Headers", options.headers);
+      headers.set("Access-Control-Allow-Origin", origin);
+    }
   }
 
   // Only attach the headers if the user is using the timing API

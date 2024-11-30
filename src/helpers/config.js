@@ -18,6 +18,9 @@ export default function config(options = {}) {
   if (typeof options.cors === "string") {
     options.cors = { origin: options.cors };
   }
+  if (options.cors && typeof options.cors.origin === "string") {
+    options.cors.origin = options.cors.origin.toLowerCase();
+  }
   if (options.cors && !options.cors.methods) {
     options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
   }

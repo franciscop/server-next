@@ -1,19 +1,24 @@
-export default function cors(headers, options, ctx) {
-  headers.set("Access-Control-Allow-Methods", options.methods);
-  headers.set("Access-Control-Allow-Headers", options.headers);
+export default function cors(configOrigin, origin = "") {
+  // A star should always return a star
+  if (configOrigin === "*") return "*";
 
-  const origin = ctx.headers.origin.toLowerCase();
-  if (!ctx.platform.production && /http:\/\/localhost:\d+/.test(origin)) {
-    return headers.set("Access-Control-Allow-Origin", origin);
+  origin = origin.toLowerCase();
+
+  // No origin
+  if (!origin) {
+    console.warn("CORS: Missing Origin header");
+    return null;
   }
 
-  if (options.origin === "*") {
-    return headers.set("Access-Control-Allow-Origin", "*");
+  // Coming from localhost
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+    return origin;
   }
 
-  if (options.origin.toLowerCase().split(/\,\s/g).includes(origin)) {
-    return headers.set("Access-Control-Allow-Origin", origin);
+  if (configOrigin.toLowerCase().split(/\,\s/g).includes(origin)) {
+    return origin;
   }
 
-  throw new Error(`Invalid origin ${origin}`);
+  console.warn(`CORS: Origin "${origin}" is not allowed`);
+  return null;
 }
