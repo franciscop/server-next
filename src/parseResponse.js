@@ -42,11 +42,14 @@ export default async function parseResponse(out, ctx) {
   // If we have CORS, set it up
   if (ctx.options.cors) {
     // Set the proper CORS headers
-    const origin = cors(ctx.options.cors, ctx.headers.origin);
+    const origin = cors(ctx.options.cors.origin, ctx.headers.origin);
     if (origin) {
-      headers.set("Access-Control-Allow-Methods", options.methods);
-      headers.set("Access-Control-Allow-Headers", options.headers);
+      headers.set("Access-Control-Allow-Methods", ctx.options.cors.methods);
+      headers.set("Access-Control-Allow-Headers", ctx.options.cors.headers);
       headers.set("Access-Control-Allow-Origin", origin);
+      if (ctx.options.cors.credentials) {
+        headers.set("Access-Control-Allow-Credentials", "true");
+      }
     }
   }
 

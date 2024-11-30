@@ -12,20 +12,22 @@ export default function config(options = {}) {
 
   // CORS
   options.cors = options.cors || env.CORS || null;
-  if (options.cors === true) {
-    options.cors = { origin: options.domain || "*" };
-  }
-  if (typeof options.cors === "string") {
-    options.cors = { origin: options.cors };
-  }
-  if (options.cors && typeof options.cors.origin === "string") {
-    options.cors.origin = options.cors.origin.toLowerCase();
-  }
-  if (options.cors && !options.cors.methods) {
-    options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
-  }
-  if (options.cors && !options.cors.headers) {
-    options.cors.methods = "*";
+  if (options.cors) {
+    if (options.cors === true) {
+      options.cors = { origin: true };
+    }
+    if (typeof options.cors === "string") {
+      options.cors = { origin: options.cors };
+    }
+    if (typeof options.cors.origin === "string") {
+      options.cors.origin = options.cors.origin.toLowerCase();
+    }
+    if (!options.cors.methods) {
+      options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
+    }
+    if (!options.cors.headers) {
+      options.cors.methods = "*";
+    }
   }
 
   // Bucket
