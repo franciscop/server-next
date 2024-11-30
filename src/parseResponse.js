@@ -1,6 +1,6 @@
 // import { Readable } from "node:stream";
 
-import { createCookies, createId } from "./helpers/index.js";
+import { cors, createCookies, createId } from "./helpers/index.js";
 import { json } from "./reply.js";
 import ServerError from "./ServerError.js";
 
