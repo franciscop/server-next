@@ -14,19 +14,26 @@ export default function config(options = {}) {
   options.cors = options.cors || env.CORS || null;
   if (options.cors) {
     if (options.cors === true) {
-      options.cors = { origin: true };
+      options.cors = { origin: options.cors };
     }
     if (typeof options.cors === "string") {
       options.cors = { origin: options.cors };
     }
+    if (Array.isArray(options.cors)) {
+      options.cors = { origin: options.cors };
+    }
+    if (Array.isArray(options.cors.origin)) {
+      options.cors.origin = options.cors.origin.join(",");
+    }
     if (typeof options.cors.origin === "string") {
       options.cors.origin = options.cors.origin.toLowerCase();
     }
+
     if (!options.cors.methods) {
-      options.cors.methods = "GET,HEAD,POST,PUT,PATCH";
+      options.cors.methods = "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS";
     }
     if (!options.cors.headers) {
-      options.cors.methods = "*";
+      options.cors.headers = "*";
     }
   }
 

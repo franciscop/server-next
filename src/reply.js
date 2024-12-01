@@ -56,7 +56,7 @@ Reply.prototype.cookies = function (cookies) {
 // FINAL
 Reply.prototype.json = function (body) {
   return this.headers({
-    "content-type": "application/json; charset=utf-8",
+    "content-type": "application/json",
   }).send(JSON.stringify(body));
 };
 
@@ -95,9 +95,7 @@ Reply.prototype.send = function (body = "") {
     // Not yet set, so infer the type from type of string
     if (!this.res.headers["content-type"]) {
       const isHtml = body.startsWith("<");
-      this.res.headers["content-type"] = isHtml
-        ? "text/html; charset=utf-8"
-        : "text/plain; charset=utf-8";
+      this.res.headers["content-type"] = isHtml ? "text/html" : "text/plain";
     }
 
     const headers = this.generateHeaders();

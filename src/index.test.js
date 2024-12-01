@@ -75,13 +75,13 @@ describe("simple post works", () => {
     const { body, status, headers } = await api.post("/", "New Data");
     expect(status).toBe(201);
     expect(body).toBe("New Data");
-    expect(headers["content-type"]).toBe("text/plain; charset=utf-8");
+    expect(headers["content-type"]).toBe("text/plain");
   });
 
   it("will return JSON", async () => {
     const { body, status, headers } = await api.post("/", { hello: "world" });
     expect(status).toBe(201);
     expect(body).toEqual({ hello: "world" });
-    expect(headers["content-type"]).toBe("application/json; charset=utf-8");
+    expect(headers["content-type"]).toBe("application/json");
   });
 });
