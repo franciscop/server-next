@@ -53,8 +53,10 @@ export default async function auth(ctx) {
 
   if (!auth.provider) throw ServerError.AUTH_NO_PROVIDER();
   if (!options.provider.includes(auth.provider)) {
-    const valid = JSON.stringify(options.provider);
-    throw ServerError.AUTH_INVALID_PROVIDER({ provider: auth.provider, valid });
+    throw ServerError.AUTH_INVALID_PROVIDER({
+      provider: auth.provider,
+      valid: options.provider,
+    });
   }
   return auth;
 }

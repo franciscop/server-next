@@ -48,15 +48,17 @@ const createSession = async (user, ctx) => {
 
   if (type === "token") {
     return status(201).json({ ...user, token: id });
-  } else if (type === "cookie") {
-    return status(302).cookies({ authentication: id }).redirect(redirect);
-  } else if (type === "jwt") {
-    throw new Error("JWT auth not supported yet");
-  } else if (type === "key") {
-    throw new Error("Key auth not supported yet");
-  } else {
-    throw new Error("Unknown auth type");
   }
+  if (type === "cookie") {
+    return status(302).cookies({ authentication: id }).redirect(redirect);
+  }
+  if (type === "jwt") {
+    throw new Error("JWT auth not supported yet");
+  }
+  if (type === "key") {
+    throw new Error("Key auth not supported yet");
+  }
+  throw new Error("Unknown auth type");
 };
 
 async function login(ctx) {

@@ -31,7 +31,7 @@ describe("auth", () => {
     const authorization = "Bearer REqA2l022l8Q0tuI";
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed(
-      'Invalid provider "wrong", valid ones are: "email"',
+      "Invalid provider 'wrong', valid ones are: 'email'",
     );
   });
 });

@@ -2,9 +2,9 @@ import server, { router, status } from "./index.js";
 
 describe("can route properly", () => {
   const apiRouter = router()
-    .get("/hello", (ctx) => "Hello " + ctx.url.pathname)
-    .put("/hello", (ctx) => "Hello " + ctx.url.pathname)
-    .post("/hello", (ctx) => "Hello " + ctx.url.pathname);
+    .get("/hello", (ctx) => `Hello ${ctx.url.pathname}`)
+    .put("/hello", (ctx) => `Hello ${ctx.url.pathname}`)
+    .post("/hello", (ctx) => `Hello ${ctx.url.pathname}`);
 
   const app = server()
     .router("/", apiRouter)

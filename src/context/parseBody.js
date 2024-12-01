@@ -2,12 +2,12 @@ import { createId } from "../helpers/index.js";
 
 function getBoundary(header) {
   if (!header) return null;
-  var items = header.split(";");
+  const items = header.split(";");
   if (items)
-    for (var j = 0; j < items.length; j++) {
-      var item = new String(items[j]).trim();
+    for (let j = 0; j < items.length; j++) {
+      const item = new String(items[j]).trim();
       if (item.indexOf("boundary") >= 0) {
-        var k = item.split("=");
+        const k = item.split("=");
         return new String(k[1]).trim();
       }
     }
@@ -48,7 +48,7 @@ export default async function parseBody(raw, contentType, bucket) {
   const body = {};
 
   const rawDataArray = rawData.split(boundary);
-  for (let item of rawDataArray) {
+  for (const item of rawDataArray) {
     // Use non-matching groups to exclude part of the result
     const name = getMatching(item, /(?:name=")(.+?)(?:")/)
       .trim()

@@ -65,7 +65,7 @@ export const jsx = (tag, { children, ...props }) => {
         : `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(v)}"`,
     )
     .join(" ");
-  if (attrStr) attrStr = " " + attrStr;
+  if (attrStr) attrStr = ` ${attrStr}`;
   if (SELFCLOSE.has(tag)) return () => `<${tag}${attrStr} />`;
   const doctype = tag === "html" ? "<!DOCTYPE html>" : "";
   return () => `${doctype}<${tag}${attrStr}>${children}</${tag}>`;

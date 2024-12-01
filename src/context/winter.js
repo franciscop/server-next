@@ -3,10 +3,10 @@ import { define, parseHeaders } from "../helpers/index.js";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
-export default async (request, options = {}, app) => {
+export default async (request, app) => {
   const ctx = {};
   ctx.init = performance.now();
-  ctx.options = options;
+  ctx.options = app.opts || {};
   ctx.req = request;
   ctx.res = { status: null, headers: {}, cookies: {} };
   ctx.method = request.method.toLowerCase();
@@ -19,7 +19,9 @@ export default async (request, options = {}, app) => {
   };
   ctx.unstableFire = (name, data) => {
     if (!events[name]) return;
-    events[name].forEach((cb) => cb(data));
+    for (const cb of events[name]) {
+      cb(data);
+    }
   };
 
   ctx.headers = parseHeaders(request.headers);
@@ -33,7 +35,7 @@ export default async (request, options = {}, app) => {
 
   if (request.body) {
     const type = ctx.headers["content-type"];
-    ctx.body = await parseBody(request, type, options.uploads);
+    ctx.body = await parseBody(request, type, ctx.options.uploads);
   }
 
   ctx.app = app;

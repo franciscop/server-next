@@ -34,7 +34,7 @@ describe("user creation flow", () => {
 
     // CAN GET MY OWN INFO
     await (async () => {
-      const headers = { authorization: "Bearer " + token };
+      const headers = { authorization: `Bearer ${token}` };
       const me = await api.get("/me", { headers });
       expect(me).toSucceed();
       expect(me.body.email).toEqual(EMAIL);
@@ -45,7 +45,7 @@ describe("user creation flow", () => {
 
     // LOGOUT TEST
     await (async () => {
-      const headers = { authorization: "Bearer " + token };
+      const headers = { authorization: `Bearer ${token}` };
       const logout = await api.post("/auth/logout", {}, { headers });
       expect(logout).toSucceed();
       expect(await users()).toEqual(["abc@test.com"]);
@@ -63,7 +63,7 @@ describe("user creation flow", () => {
 
     // CAN GET MY OWN INFO
     await (async () => {
-      const headers = { authorization: "Bearer " + token };
+      const headers = { authorization: `Bearer ${token}` };
       const me = await api.get("/me", { headers });
       expect(me).toSucceed();
       expect(me.body.email).toEqual(EMAIL);
@@ -71,7 +71,7 @@ describe("user creation flow", () => {
 
     // UPDATE PASSWORD
     await (async () => {
-      const headers = { authorization: "Bearer " + token };
+      const headers = { authorization: `Bearer ${token}` };
       const body = { previous: PASS, updated: "22222222" };
       const update = await api.put("/auth/password/email", body, { headers });
       expect(update).toSucceed();
@@ -81,7 +81,7 @@ describe("user creation flow", () => {
 
     // LOGOUT AGAIN
     await (async () => {
-      const headers = { authorization: "Bearer " + token };
+      const headers = { authorization: `Bearer ${token}` };
       const logout = await api.post("/auth/logout", {}, { headers });
       expect(logout).toSucceed();
       expect(await users()).toEqual(["abc@test.com"]);

@@ -81,15 +81,15 @@ export default async function parseResponse(out, ctx) {
   // Cookies to headers
   if (ctx.options.cookies) {
     if (Object.keys(ctx.res.cookies).length) {
-      createCookies(ctx.res.cookies).forEach((cookie) => {
+      for (const cookie of ctx.res.cookies) {
         ctx.res.headers.append("set-cookie", cookie);
-      });
+      }
     }
   }
 
   // Add the headers that are neeeded
   if (ctx?.res?.headers) {
-    for (let key in ctx.res.headers) {
+    for (const key in ctx.res.headers) {
       out.headers[key] = ctx.res.headers[key];
     }
   }

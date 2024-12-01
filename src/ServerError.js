@@ -3,10 +3,11 @@ export default class ServerError extends Error {
     if (typeof message === "function") {
       message = message(vars);
     }
-    for (let key in vars) {
-      if (typeof message === "string" && typeof vars[key] === "string") {
-        message = message.replaceAll(`{${key}}`, vars[key]);
-      }
+    if (typeof message !== "string") throw Error(`Invalid error ${message}`);
+    for (const key in vars) {
+      let val = vars[key];
+      if (Array.isArray(val)) val = vars[key].join(",");
+      message = message.replaceAll(`{${key}}`, val);
     }
 
     super(message);
@@ -15,7 +16,7 @@ export default class ServerError extends Error {
     this.status = status;
   }
   static extend(errors) {
-    for (let code in errors) {
+    for (const code in errors) {
       const message = errors[code]?.message || errors[code];
       const status = errors[code]?.status;
       ServerError[code] = (vars) =>

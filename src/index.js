@@ -84,7 +84,7 @@ export default function server(options = {}) {
 server.prototype.self = function () {
   const cb = this.callback.bind(this);
   const proto = Object.getPrototypeOf(this);
-  for (let key in { ...proto, ...this }) {
+  for (const key in { ...proto, ...this }) {
     if (typeof this[key] === "function") {
       cb[key] = this[key].bind(this);
     } else {
@@ -97,11 +97,11 @@ server.prototype.self = function () {
 // #region Runtimes
 // Node.js
 server.prototype.node = async function () {
-  const http = await import("http");
+  const http = await import("node:http");
   http
     .createServer(async (request, response) => {
       try {
-        const ctx = await createNodeContext(request, this.opts, this);
+        const ctx = await createNodeContext(request, this);
         const out = await handleRequest(this.handlers, ctx);
 
         response.writeHead(out.status || 200, parseHeaders(out.headers));
@@ -128,7 +128,7 @@ server.prototype.callback = async function (request, context) {
     if (typeof Netlify === "undefined") {
       throw new Error("Netlify doesn't exist");
     }
-    const ctx = await createWinterContext(request, this.opts, this);
+    const ctx = await createWinterContext(request, this);
     return await handleRequest(this.handlers, ctx);
   } catch (error) {
     return new Response(error.message, { status: error.status || 500 });
@@ -140,9 +140,11 @@ server.prototype.fetch = async function (request, env) {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
-  let ctx, res, error;
+  let ctx;
+  let res;
+  let error;
   try {
-    ctx = await createWinterContext(request, this.opts, this);
+    ctx = await createWinterContext(request, this);
     res = await handleRequest(this.handlers, ctx);
   } catch (err) {
     error = err;
@@ -158,7 +160,7 @@ server.prototype.handle = function (method, path, ...middleware) {
   // Do not try to optimize, we NEED the method to remain '*' here so that
   // it doesn't auto-finish
   if (method === "*") {
-    for (let m in this.handlers) {
+    for (const m in this.handlers) {
       this.handlers[m].push([method, path, ...middleware]);
     }
   } else {
@@ -209,11 +211,11 @@ server.prototype.use = function (...middleware) {
 
 // Unwind the children routers into the main router
 server.prototype.router = function (basePath, router) {
-  basePath = ("/" + basePath + "/").replace(/^\/+/, "/").replace(/\/+$/, "/");
-  for (const method in router.handlers) {
-    router.handlers[method].forEach(([method, path, ...callbacks]) => {
+  basePath = `/${basePath}/`.replace(/^\/+/, "/").replace(/\/+$/, "/");
+  for (const m in router.handlers) {
+    for (const [method, path, ...callbacks] of router.handlers[m]) {
       this.handle(method, basePath + path.replace(/^\//, ""), ...callbacks);
-    });
+    }
   }
   return this.self();
 };
@@ -231,7 +233,7 @@ server.prototype.test = function () {
       options.headers.cookie = cookie;
     }
     const res = await this.fetch(
-      new Request("http://localhost:3000" + path, options),
+      new Request(`http://localhost:3000${path}`, options),
     );
 
     const headers = parseHeaders(res.headers);

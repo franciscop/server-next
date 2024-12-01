@@ -1,7 +1,6 @@
-import fs from "fs";
-import path from "path";
-
-import fsp from "fs/promises";
+import fs from "node:fs";
+import path from "node:path";
+import fsp from "node:fs/promises";
 
 // A fake tiny implementation of a generic bucket, it needs
 // at the very least a read(id) and write(id, value), both returning
@@ -13,7 +12,7 @@ export default function (root) {
   }
 
   const absolute = (name) => {
-    if (!name) throw new Error(`File name is required`);
+    if (!name) throw new Error("File name is required");
     return path.resolve(path.join(root, name));
   };
 
@@ -27,9 +26,8 @@ export default function (root) {
       const fullPath = absolute(name);
       if (value) {
         return fsp.writeFile(fullPath, value, type).then(() => fullPath);
-      } else {
-        return fs.createWriteStream(fullPath);
       }
+      return fs.createWriteStream(fullPath);
     },
   };
 }

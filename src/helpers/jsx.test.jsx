@@ -16,7 +16,7 @@ expect.extend({
 
 describe("jsx", () => {
   it("can render a div", () => {
-    expect(<div>Hello</div>).toRender(`<div>Hello</div>`);
+    expect(<div>Hello</div>).toRender("<div>Hello</div>");
   });
 
   it("can render an input with attributes", () => {
@@ -40,6 +40,7 @@ describe("jsx", () => {
   });
 
   it("will inject the doctype for html", () => {
+    // biome-ignore lint/a11y/useHtmlLang: This is an example, not user code
     expect(<html>Hello</html>).toRender("<!DOCTYPE html><html>Hello</html>");
     expect(<html lang="en">Hello</html>).toRender(
       `<!DOCTYPE html><html lang="en">Hello</html>`,

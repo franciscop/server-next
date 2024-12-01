@@ -19,6 +19,7 @@
   },
   "scripts": {
     "start": "bun test --watch",
+    "lint": "npx @biomejs/biome lint ./src --skip=lint/style/noParameterAssign",
     "test": "bun test",
     "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },

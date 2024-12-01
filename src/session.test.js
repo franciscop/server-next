@@ -5,11 +5,11 @@ import server from "./index.js";
 describe("session", () => {
   const store = kv(new Map());
   const api = server({ store })
-    .get("/hello", (ctx) => "Hello " + ctx.session.a)
+    .get("/hello", (ctx) => `Hello ${ctx.session.a}`)
     .post("/hello", (ctx) => {
       if (!ctx.session.a) ctx.session.a = 0;
       ctx.session.a += 1;
-      return "Bye " + ctx.session.a;
+      return `Bye ${ctx.session.a}`;
     })
     .get("/", () => "Fallback")
     .test();
@@ -44,7 +44,7 @@ describe("session", () => {
 
 describe("missing store", () => {
   const api = server({ store: null })
-    .get("/read", (ctx) => "Bye " + ctx.session.a)
+    .get("/read", (ctx) => `Bye ${ctx.session.a}`)
     .get("/write", (ctx) => {
       ctx.session.a = "hello";
       return "All good";

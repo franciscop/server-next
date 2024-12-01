@@ -1,4 +1,4 @@
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 
 import { createCookies, toWeb, types } from "./helpers/index.js";
 
@@ -12,9 +12,9 @@ function Reply() {
 // INTERNAL
 Reply.prototype.generateHeaders = function () {
   const headers = new Headers(this.res.headers);
-  createCookies(this.res.cookies).forEach((cookie) => {
+  for (const cookie of createCookies(this.res.cookies)) {
     headers.append("set-cookie", cookie);
-  });
+  }
   return headers;
 };
 
@@ -32,9 +32,9 @@ Reply.prototype.type = function (type) {
 };
 
 // Prompt for download from the user side
-Reply.prototype.download = function (name = "", type) {
+Reply.prototype.download = function (name, type) {
   // filename.txt and no explicit type => add headers "text/plain"
-  if (name && !ext) type = name.split(".")[1];
+  if (name && !type) type = name.split(".")[1];
 
   // Add the Content-Type if there's a type
   if (type) this.type(type);
@@ -46,7 +46,7 @@ Reply.prototype.download = function (name = "", type) {
 // Set extra headers
 Reply.prototype.headers = function (headers) {
   if (!headers || typeof headers !== "object") return this;
-  for (let key in headers) {
+  for (const key in headers) {
     this.res.headers[key] = headers[key];
   }
   return this;
@@ -55,7 +55,7 @@ Reply.prototype.headers = function (headers) {
 // Set extra cookies
 Reply.prototype.cookies = function (cookies) {
   if (!cookies || typeof cookies !== "object") return this;
-  for (let key in cookies) {
+  for (const key in cookies) {
     if (typeof cookies[key] === "string") {
       this.res.cookies[key] = { value: cookies[key] };
     } else {

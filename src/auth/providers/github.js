@@ -19,8 +19,8 @@ const oauth = async (code) => {
     }),
   });
   return (path) => {
-    return fch("https://api.github.com" + path, {
-      headers: { Authorization: "Bearer " + res.access_token },
+    return fch(`https://api.github.com${path}`, {
+      headers: { Authorization: `Bearer ${res.access_token}` },
     });
   };
 };
@@ -68,15 +68,17 @@ const callback = async (ctx) => {
 
   if (auth.type === "token") {
     return status(201).json({ ...user, token: auth.id });
-  } else if (auth.type === "cookie") {
-    return status(302).cookies({ authentication: auth.id }).redirect(redirect);
-  } else if (auth.type === "jwt") {
-    throw new Error("JWT auth not supported yet");
-  } else if (auth.type === "key") {
-    throw new Error("Key auth not supported yet");
-  } else {
-    throw new Error("Unknown auth type");
   }
+  if (auth.type === "cookie") {
+    return status(302).cookies({ authentication: auth.id }).redirect(redirect);
+  }
+  if (auth.type === "jwt") {
+    throw new Error("JWT auth not supported yet");
+  }
+  if (auth.type === "key") {
+    throw new Error("Key auth not supported yet");
+  }
+  throw new Error("Unknown auth type");
 };
 
 export default { login, callback };

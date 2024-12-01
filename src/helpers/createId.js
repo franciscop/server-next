@@ -1,7 +1,7 @@
 const alphabet =
   "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
 
-export let random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
+export const random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
 
 // Credit: https://stackoverflow.com/a/52171480/938236
 const cyrb53 = (str, seed = 0) => {
@@ -35,7 +35,7 @@ const hash = (str, size) => {
 
 const randomId = (size = 16) => {
   let id = "";
-  let bytes = random(size);
+  const bytes = random(size);
   while (size--) {
     // Using the bitwise AND operator to "cap" the value of
     // the random byte from 255 to 63, in that way we can make sure

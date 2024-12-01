@@ -8,7 +8,7 @@ export default function config(options = {}) {
 
   // Basic options
   options.port = options.port || env.PORT || 3000;
-  options.secret = options.secret || env.SECRET || "unsafe-" + createId();
+  options.secret = options.secret || env.SECRET || `unsafe-${createId()}`;
 
   // CORS
   options.cors = options.cors || env.CORS || null;

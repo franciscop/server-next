@@ -21,7 +21,7 @@ describe("user creation flow", () => {
     expect(register).toSucceed();
     expect(await store.keys()).toEqual([
       "user:abc@test.com",
-      "auth:" + register.headers["set-cookie"].split(";")[0].split("=")[1],
+      `auth:${register.headers["set-cookie"].split(";")[0].split("=")[1]}`,
     ]);
 
     const me = await api.get("/me");
@@ -36,7 +36,7 @@ describe("user creation flow", () => {
     expect(login).toSucceed();
     expect(await store.keys()).toEqual([
       "user:abc@test.com",
-      "auth:" + login.headers["set-cookie"].split(";")[0].split("=")[1],
+      `auth:${login.headers["set-cookie"].split(";")[0].split("=")[1]}`,
     ]);
   });
 });

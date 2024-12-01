@@ -4,14 +4,14 @@ import define from "./define.js";
 import validate from "./validate.js";
 
 export default async function handleRequest(handlers, ctx) {
-  for (let [method, matcher, ...cbs] of handlers[ctx.method]) {
+  for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
     const match = pathPattern(matcher, ctx.url.pathname || "/");
     // Skip this whole middleware if there was no match
     if (!match) continue;
 
     define(ctx.url, "params", () => match);
 
-    for (let cb of cbs) {
+    for (const cb of cbs) {
       if (typeof cb === "function") {
         const res = await cb(ctx);
         const out = await parseResponse(res, ctx);
