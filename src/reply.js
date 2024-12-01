@@ -27,8 +27,20 @@ Reply.prototype.status = function (status) {
 // `.html`, `html`, `text/html`
 Reply.prototype.type = function (type) {
   if (!type) return this;
-  this.res.headers["content-type"] = types[type.replace(/^\./)] || type;
-  return this;
+  type = types[type.replace(/^\./)] || type;
+  return this.headers({ "content-type": type });
+};
+
+// Prompt for download from the user side
+Reply.prototype.download = function (name = "", type) {
+  // filename.txt and no explicit type => add headers "text/plain"
+  if (name && !ext) type = name.split(".")[1];
+
+  // Add the Content-Type if there's a type
+  if (type) this.type(type);
+
+  const filename = name ? `; filename="${name}"` : "";
+  return this.headers({ "content-disposition": `attachment${filename}` });
 };
 
 // Set extra headers
@@ -127,8 +139,9 @@ export { Reply };
 
 // PARTIAL
 export const status = (...args) => new Reply().status(...args);
-export const type = (...args) => new Reply().type(...args);
 export const headers = (...args) => new Reply().headers(...args);
+export const type = (...args) => new Reply().type(...args);
+export const download = (...args) => new Reply().download(...args);
 export const cookies = (...args) => new Reply().cookies(...args);
 
 // FINAL
