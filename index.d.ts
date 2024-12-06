@@ -44,7 +44,7 @@ type Context<Path extends string = string> = {
   body?: any;
   url: URL & {
     params: Simplify<PathToParams<Path>>; // Simplify here
-    query: {};
+    query: { [key: string]: string };
   };
   options: ServerOptions;
 };
@@ -55,18 +55,11 @@ type ContentType = "application/json" | "text/plain" | (string & {});
 
 // (src: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers)
 type Headers = {
-  "Cache-Control"?: string;
-  "Content-Type"?: ContentType;
-  Server?: string;
-  "Set-Cookie"?: string;
-  "Content-Length"?: string;
-  Location?: string;
-
   "cache-control"?: string;
   "content-type"?: ContentType;
-  server?: string;
   "set-cookie"?: string;
   "content-length"?: string;
+  server?: string;
   location?: string;
 
   [key: string]: string | undefined;
