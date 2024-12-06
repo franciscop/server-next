@@ -18,12 +18,34 @@ type ServerOptions = {
   auth?: string | { type: string; provider: string };
 };
 
-type Context = {
+type ExtractPathParams<Path extends string> =
+  Path extends `${string}:${infer Param}/${infer Rest}`
+    ? Param | ExtractPathParams<`/${Rest}`>
+    : Path extends `${string}:${infer Param}`
+      ? Param
+      : never;
+
+type ParamsToObject<Params extends string> = {
+  [K in Params as K extends `${infer Key}?`
+    ? Key
+    : K]: K extends `${infer Key}?` ? string | undefined : string;
+};
+
+type PathToParams<Path extends string> = ParamsToObject<
+  ExtractPathParams<Path>
+>;
+
+type Simplify<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+
+type Context<Path extends string = string> = {
   method: Method;
   headers: { [key: string]: string | string[] };
   cookies: { [key: string]: any };
   body?: any;
-  url: URL & { params: {}; query: {} };
+  url: URL & {
+    params: Simplify<PathToParams<Path>>; // Simplify here
+    query: {};
+  };
   options: ServerOptions;
 };
 
@@ -57,28 +79,40 @@ type InlineReply =
   | number
   | void;
 
-type Middleware = (ctx: Context) => InlineReply;
+type Middleware<Path extends string = string> = (
+  ctx: Context<Path>,
+) => InlineReply;
 
-type Router = {};
+declare interface Router {
+  get<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  head<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  post<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  put<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  patch<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  del<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  options<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+}
 
 declare interface Server {
   (options?: ServerOptions): this;
 
-  socket(path: string, ...middleware: Middleware[]): this;
-  get(path: string, ...middleware: Middleware[]): this;
-  head(path: string, ...middleware: Middleware[]): this;
-  post(path: string, ...middleware: Middleware[]): this;
-  put(path: string, ...middleware: Middleware[]): this;
-  patch(path: string, ...middleware: Middleware[]): this;
-  del(path: string, ...middleware: Middleware[]): this;
-  options(path: string, ...middleware: Middleware[]): this;
+  socket(path: string, ...middle: Middleware[]): this;
 
-  use(...middleware: Middleware[]): this;
+  get<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  head<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  post<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  put<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  patch<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  del<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+  options<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;
+
+  use(...middle: Middleware[]): this;
   router(router: Router): this;
 }
 
 type headers = (obj?: Headers) => any;
 
 declare const server: Server;
+export const router: Router;
 export const headers: headers;
 export default server;

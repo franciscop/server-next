@@ -1,4 +1,15 @@
-import server, { headers } from ".";
+import server, { headers, router } from ".";
+
+const users = router
+  .post("/users", (ctx) => {
+    console.log(ctx.url.params); // No .id
+  })
+  .get("/users/:id?", (ctx) => {
+    console.log(ctx.url.params.id);
+  })
+  .del("/users/:id", (ctx) => {
+    console.log(ctx.url.params.id);
+  });
 
 server()
   .get("/", (ctx) => {
@@ -9,6 +20,7 @@ server()
     console.log(ctx.body);
     return headers();
   })
+  .router(users)
   .post("/", () => {
     return 201;
   });
