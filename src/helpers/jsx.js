@@ -16,6 +16,7 @@ const altAttrs = {
 // "" and 0 are valid children, false and null and undefined are not
 const isValidChild = (child) => child || child === "" || child === 0;
 
+const escapeCSS = (value) => String(value).replace(/[<>&"'`]/g, "\\$&");
 const minifyCss = (str) =>
   str
     .replace(/\s+/g, " ")
@@ -42,7 +43,7 @@ export const jsx = (tag, { children, ...props }) => {
     children = () => src;
   }
   if (tag === "style" && children && typeof children === "string") {
-    const src = minifyCss(children);
+    const src = minifyCss(escapeCSS(children));
     children = () => src;
   }
   if (props.dangerouslySetInnerHTML)

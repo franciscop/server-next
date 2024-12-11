@@ -1,5 +1,3 @@
-type Bucket = {};
-
 type Method =
   | "socket"
   | "get"
@@ -10,12 +8,40 @@ type Method =
   | "delete"
   | "options";
 
+type Store = {
+  get: (key: string) => Promise<any>;
+  set: (
+    key: string,
+    value: any,
+    { expires }?: { expires?: string | number },
+  ) => Promise<any>;
+};
+
+type Bucket = any;
+
+type Auth = {
+  type: "cookie" | "token";
+  provider: "github" | "email";
+};
+type AuthString = `${Auth["type"]}:${Auth["provider"]}`;
+
+type Domain = `https://${string}/`;
+type Origin = boolean | "*" | Domain | Domain[];
+type Cors = {
+  origin: Origin;
+  methods: string;
+  headers: string;
+  credentials?: boolean;
+};
+
 type ServerOptions = {
   port?: number;
   views?: string | Bucket;
   public?: string | Bucket;
   uploads?: string | Bucket;
-  auth?: string | { type: string; provider: string };
+  cors?: boolean | Origin | Cors;
+  auth?: AuthString | Auth;
+  store?: Store;
 };
 
 type ExtractPathParams<Path extends string> =
@@ -87,6 +113,21 @@ declare interface Router {
 }
 
 declare interface Server {
+  /**
+   * Launch the server with the optional configuration:
+   *
+   * ```js
+   * export default server({
+   *   port: 3000,
+   *   public: './public',
+   *   store: kv(new Map()),
+   * })
+   * ```
+   *
+   * **[→ Getting Started](https://react-test.dev/documentation#attr)**
+   *
+   * **[→ Options Docs](https://react-test.dev/documentation#attr)**
+   */
   (options?: ServerOptions): this;
 
   socket(path: string, ...middle: Middleware[]): this;

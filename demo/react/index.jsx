@@ -1,4 +1,41 @@
 import server from "../../";
-import Home from "./Home";
+import Home from "./Home.jsx";
+import styled from "./styled.jsx";
 
-export default server().get("/", () => <Home />);
+const Container = styled.div`
+  display: flex;
+  flex-gap: 10px;
+`;
+
+const Button = styled.button`
+  background: red;
+  color: white;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+`;
+
+const DynButton = styled.button`
+  background: ${(p) => (p.active ? "#faa" : "#fcc")};
+  color: white;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+`;
+
+export default server()
+  .get("/", () => <Home />)
+  .get("/hello", () => (
+    <div>
+      <div>Hello world</div>
+      <Container>
+        <Button>Click me</Button>
+        <Button>Click me</Button>
+        <Button>Click me</Button>
+        <DynButton>Click me</DynButton>
+        <DynButton active>Click me</DynButton>
+      </Container>
+    </div>
+  ));

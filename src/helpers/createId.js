@@ -45,8 +45,7 @@ const randomId = (size = 16) => {
   return id;
 };
 
-export default function createId(source) {
-  const size = 16;
+export default function createId(source, size = 16) {
   if (source) return hash(source, size);
   return randomId(size);
 }

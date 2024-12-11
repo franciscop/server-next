@@ -21,7 +21,6 @@ export { default as ServerError } from "./ServerError.js";
 // Allow to create a sub-router
 export { default as router } from "./router.js";
 
-// #region server()
 export default function server(options = {}) {
   // Make it so that the exported one is a prototype of function()
   if (!(this instanceof server)) {
