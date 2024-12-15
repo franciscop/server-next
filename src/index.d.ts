@@ -66,7 +66,7 @@ type ExtractPathParams<Path extends string> =
 type ParamTypeMap = {
   string: string;
   number: number;
-  boolean: boolean;
+  date: Date;
 };
 
 type InferParamType<T extends string> = T extends keyof ParamTypeMap
