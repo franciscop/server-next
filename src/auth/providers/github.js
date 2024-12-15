@@ -25,7 +25,7 @@ const oauth = async (code) => {
   };
 };
 
-const login = (ctx) => {
+const login = function githubLogin(ctx) {
   return redirect(
     `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_ID}&scope=user:email`,
   );

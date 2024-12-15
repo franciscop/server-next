@@ -82,5 +82,12 @@ export default function config(options = {}) {
     }
   }
 
+  // OpenAPI
+  if (options.openapi) {
+    if (options.openapi === true) {
+      options.openapi = {};
+    }
+  }
+
   return options;
 }

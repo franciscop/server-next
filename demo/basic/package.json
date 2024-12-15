@@ -1,7 +1,6 @@
 {
   "name": "server-demo",
   "version": "1.0.0",
-  "homepage": "https://myapi.com/",
   "description": "A small demo API for testing the new server.js Developer Experience",
   "private": true,
   "main": "src/index.js",

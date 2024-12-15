@@ -10,7 +10,7 @@ export default server({
     console.log(ctx.url.params.id);
     return "nero";
   })
-  .get("/users/:id/posts/:postId?", (ctx) => {
+  .get("/users/:id(number)/posts/:postId?", (ctx) => {
     console.log(ctx.url.params);
     return "nerin";
   });

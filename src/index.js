@@ -11,7 +11,7 @@ import {
   parseHeaders,
 } from "./helpers/index.js";
 
-import { assets, auth, timer } from "./middle/index.js";
+import { assets, auth, timer, openapi } from "./middle/index.js";
 
 // Export the reply helpers
 export * from "./reply.js";
@@ -75,6 +75,10 @@ export default function server(options = {}) {
 
   this.use(timer);
   this.use(assets);
+  if (this.opts.openapi) {
+    const path = this.opts.openapi.path || "/docs";
+    this.get(path, openapi);
+  }
   if (this.opts.auth) {
     this.use(auth({ options: this.opts, app: this }));
   }

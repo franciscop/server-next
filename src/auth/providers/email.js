@@ -61,7 +61,7 @@ const createSession = async (user, ctx) => {
   throw new Error("Unknown auth type");
 };
 
-async function login(ctx) {
+async function emailLogin(ctx) {
   const { email, password } = ctx.body;
   if (!email) throw ServerError.LOGIN_NO_EMAIL();
   if (!/@/.test(email)) throw ServerError.LOGIN_INVALID_EMAIL();
@@ -78,7 +78,7 @@ async function login(ctx) {
   return createSession(user, ctx);
 }
 
-async function register(ctx) {
+async function emailRegister(ctx) {
   const { email, password, ...data } = ctx.body;
   if (!email) throw ServerError.REGISTER_NO_EMAIL();
   if (!/@/.test(email)) throw ServerError.REGISTER_INVALID_EMAIL();
@@ -101,7 +101,7 @@ async function register(ctx) {
   return createSession(user, ctx);
 }
 
-async function reset(ctx) {
+async function emailResetPassword(ctx) {
   // const reset = ctx.options.store.prefix("reset:");
   // // Already resetting
   // if (ctx.body.token) {
@@ -123,7 +123,7 @@ async function reset(ctx) {
   // }
 }
 
-async function password(ctx) {
+async function emailUpdatePassword(ctx) {
   const { previous, updated } = ctx.body;
 
   const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
@@ -137,4 +137,9 @@ async function password(ctx) {
   return 200;
 }
 
-export default { login, register, reset, password };
+export default {
+  login: emailLogin,
+  register: emailRegister,
+  reset: emailResetPassword,
+  password: emailUpdatePassword,
+};

@@ -45,16 +45,48 @@ type ServerOptions = {
 };
 
 type ExtractPathParams<Path extends string> =
-  Path extends `${string}:${infer Param}/${infer Rest}`
-    ? Param | ExtractPathParams<`/${Rest}`>
-    : Path extends `${string}:${infer Param}`
-      ? Param
-      : never;
+  Path extends `${string}:${infer Param}(${infer Type})?/${infer Rest}`
+    ? `${Param}:${Type}?` | ExtractPathParams<`/${Rest}`>
+    : Path extends `${string}:${infer Param}(${infer Type})?`
+      ? `${Param}:${Type}?`
+      : Path extends `${string}:${infer Param}(${infer Type})/${infer Rest}`
+        ? `${Param}:${Type}` | ExtractPathParams<`/${Rest}`>
+        : Path extends `${string}:${infer Param}(${infer Type})`
+          ? `${Param}:${Type}`
+          : Path extends `${string}:${infer Param}?/${infer Rest}`
+            ? `${Param}?` | ExtractPathParams<`/${Rest}`>
+            : Path extends `${string}:${infer Param}?`
+              ? `${Param}?`
+              : Path extends `${string}:${infer Param}/${infer Rest}`
+                ? Param | ExtractPathParams<`/${Rest}`>
+                : Path extends `${string}:${infer Param}`
+                  ? Param
+                  : never;
+
+type ParamTypeMap = {
+  string: string;
+  number: number;
+  boolean: boolean;
+};
+
+type InferParamType<T extends string> = T extends keyof ParamTypeMap
+  ? ParamTypeMap[T]
+  : string;
 
 type ParamsToObject<Params extends string> = {
-  [K in Params as K extends `${infer Key}?`
+  [K in Params as K extends `${infer Key}:${infer Type}?`
     ? Key
-    : K]: K extends `${infer Key}?` ? string | undefined : string;
+    : K extends `${infer Key}:${infer Type}`
+      ? Key
+      : K extends `${infer Key}?`
+        ? Key
+        : K]: K extends `${infer Key}:${infer Type}?`
+    ? InferParamType<Type> | undefined
+    : K extends `${infer Key}:${infer Type}`
+      ? InferParamType<Type>
+      : K extends `${infer Key}?`
+        ? string | undefined
+        : string;
 };
 
 type PathToParams<Path extends string> = ParamsToObject<
@@ -96,11 +128,11 @@ type InlineReply =
   | { body: Body; headers?: Headers }
   | string
   | number
-  | void;
+  | undefined;
 
 type Middleware<Path extends string = string> = (
   ctx: Context<Path>,
-) => InlineReply;
+) => InlineReply | void;
 
 declare interface Router {
   get<Path extends string>(path: Path, ...middle: Middleware<Path>[]): this;

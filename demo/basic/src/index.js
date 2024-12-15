@@ -2,9 +2,7 @@ import kv from "polystore";
 import z from "zod";
 
 import server, { cookies, file, json, status } from "../../../src/index.js";
-import authRouter from "./authRouter.js";
 import db from "./db.js";
-import api from "./middleware/api.js";
 
 const store = kv(`file://${process.cwd()}/src/data/store.json`);
 const sessionStore = kv(`file://${process.cwd()}/src/data/session.json`);
@@ -15,6 +13,7 @@ const options = {
   public: "public",
   store,
   session: { store: sessionStore },
+  openapi: true,
   auth: {
     type: "token",
     provider: "email",
@@ -28,57 +27,57 @@ const PetSchema = z.object({
 });
 
 export default server(options)
-  .get("/docs/", api)
-  .router("/auth", authRouter)
+  .get("/login", { tags: "Auth", title: "Get login page" }, () =>
+    file("src/views/login.html"),
+  )
+  .get("/register", { tags: "Auth", title: "Get register page" }, () =>
+    file("src/views/register.html"),
+  )
 
-  .get("/", () => file("src/views/home.html"))
-  .get("/login", () => file("src/views/login.html"))
-  .get("/register", () => file("src/views/register.html"))
-  .get("/socket", () => file("src/views/socket.html"))
+  .get("/", { tags: "Testing" }, () => file("src/views/home.html"))
+
+  .get("/socket", { tags: "Testing" }, () => file("src/views/socket.html"))
 
   .get(
     "/pets",
+    { tags: "Pets " },
     // { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
-      // @description Get a list of all the pets in the store
-      // @returns Pet[]
       const data = await db.pets.list();
       ctx.time("db-list");
-      console.log("DATA:", data);
       return json(data);
     },
   )
-  .get("/pets/:id", async (ctx) => {
+  .get("/pets/:id", { tags: "Pets " }, async (ctx) => {
     const id = Number(ctx.url.params.id);
     const pet = await db.pets.get(id);
     if (!pet) return status(404).json({ error: "Not found" });
     return json(pet);
   })
-  .patch("/pets/:id", async (ctx) => {
+  .patch("/pets/:id", { tags: "Pets " }, async (ctx) => {
     // DO SOMETHING
     return 200;
   })
-  .put("/pets/:id", async (ctx) => {
+  .put("/pets/:id", { tags: "Pets " }, async (ctx) => {
     // DO SOMETHING
     return 200;
   })
-  .post("/pets", { body: PetSchema }, (ctx) => {
-    // DO SOMETHING
+  .post("/pets", { body: PetSchema, tags: "Pets" }, (ctx) => {
     return status(201).json(ctx.body);
   })
 
-  .get("/query", (ctx) => {
+  .get("/query", { tags: "Testing" }, (ctx) => {
     return json(ctx.url.query);
   })
 
-  .get("/cookie", async () => {
+  .get("/cookie", { tags: "Testing" }, async () => {
     return cookies({
       mycookie: "myvalue",
       another: { value: "myvalue2", path: "/hello" },
     }).send("Hello world");
   })
 
-  .get("/session", async (ctx) => {
+  .get("/session", { tags: "Testing" }, async (ctx) => {
     return `<!DOCTYPE html>
     <html lang="en">
       <head>
@@ -100,28 +99,28 @@ export default server(options)
     </html>`;
   })
 
-  .post("/session", async (ctx) => {
+  .post("/session", { tags: "Testing" }, async (ctx) => {
     ctx.session.counter = Number(ctx.body);
     return { counter: ctx.session.counter };
   })
 
-  .get("/json", () => {
+  .get("/json", { tags: "Testing" }, () => {
     return json({ hello: "world" });
   })
 
-  .get("/file", () => {
+  .get("/file", { tags: "Testing" }, () => {
     return file("public/logo.png");
   })
 
-  .post("/json", (ctx) => {
+  .post("/json", { tags: "Testing" }, (ctx) => {
     return json(ctx.body);
   })
 
-  .post("/multipart", (ctx) => {
+  .post("/multipart", { tags: "Testing" }, (ctx) => {
     return json(ctx.body);
   })
 
-  .get("/hello", async () => {
+  .get("/hello", { tags: "Testing" }, async () => {
     return "Welcome page";
   })
 
@@ -134,4 +133,4 @@ export default server(options)
     ctx.socket.send(`They said: ${Math.random()}`);
   })
 
-  .get("/*", () => 404);
+  .get("/*", { tags: "Errors" }, () => 404);
