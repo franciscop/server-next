@@ -10,6 +10,10 @@ export default async function parseResponse(out, ctx) {
     out = await out(ctx);
   }
 
+  if (out instanceof Blob) {
+    out = new Response(out, { headers: { "Content-Type": blob.type } });
+  }
+
   // A plain number is a status code
   if (typeof out === "number") {
     out = new Response(undefined, { status: out });
@@ -25,11 +29,6 @@ export default async function parseResponse(out, ctx) {
   if (out?.constructor === Object || Array.isArray(out)) {
     out = json(out);
   }
-
-  // if (out instanceof Readable) {
-  // if (out?.prototype?.name === 'Readable') {
-  //   out = new Response(Readable.toWeb(out));
-  // }
 
   if (!(out instanceof Response)) {
     throw new Error(`Invalid response type ${out}`);

@@ -51,8 +51,10 @@ describe("parseBody", () => {
     const matchMd = expect.stringMatching(/^\w{16}.md$/);
     const matchTxt = expect.stringMatching(/^\w{16}.txt$/);
     expect(body).toMatchObject({
+      hello: "world",
       profile: matchMd,
-      gallery: [matchTxt, matchTxt],
+      gallery: matchTxt,
+      test: ["test message 123456", "test message number two"],
     });
   });
 });

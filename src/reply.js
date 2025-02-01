@@ -122,6 +122,7 @@ Reply.prototype.send = function (body = "") {
 
   // WebStream already, just pass it through
   if (name === "ReadableStream") {
+    const headers = this.generateHeaders();
     return new Response(body, { status, headers });
   }
 

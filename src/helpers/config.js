@@ -1,3 +1,4 @@
+import auth from "../auth/index.js";
 import Bucket from "./bucket.js";
 import createId from "./createId.js";
 
@@ -50,37 +51,7 @@ export default function config(options = {}) {
   }
 
   // AUTH
-  options.auth = options.auth || env.AUTH || null;
-  if (options.auth) {
-    if (typeof options.auth !== "object") {
-      const [type, provider] = options.auth.split(":");
-      options.auth = { type, provider };
-    }
-    if (typeof options.auth.provider === "string") {
-      options.auth.provider === options.auth.provider.split("|");
-    }
-    if (!options.auth.type) {
-      throw new Error("Auth options needs a type");
-    }
-    if (!options.auth.provider) {
-      throw new Error("Auth options needs a provider");
-    }
-    if (!options.auth.session && options.store) {
-      options.auth.session = options.store.prefix("auth:");
-    }
-    if (!options.auth.store && options.store) {
-      options.auth.store = options.store.prefix("user:");
-    }
-    if (!options.auth.cleanUser) {
-      options.auth.cleanUser = (fullUser) => {
-        const { password, token, ...user } = fullUser;
-        return user;
-      };
-    }
-    if (!options.auth.redirect) {
-      options.auth.redirect = "/user";
-    }
-  }
+  options.auth = auth.parseOptions(options.auth || env.AUTH || null, options);
 
   // OpenAPI
   if (options.openapi) {

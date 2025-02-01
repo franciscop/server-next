@@ -3,24 +3,18 @@ import { createId } from "../helpers/index.js";
 function getBoundary(header) {
   if (!header) return null;
   const items = header.split(";");
-  if (items)
-    for (let j = 0; j < items.length; j++) {
-      const item = new String(items[j]).trim();
-      if (item.indexOf("boundary") >= 0) {
-        const k = item.split("=");
-        return new String(k[1]).trim();
-      }
+  for (const item of items) {
+    const trimmedItem = item.trim();
+    if (trimmedItem.startsWith("boundary=")) {
+      return trimmedItem.split("=")[1].trim();
     }
+  }
   return null;
 }
 
 function getMatching(string, regex) {
-  // Helper function when using non-matching groups
   const matches = string.match(regex);
-  if (!matches || matches.length < 2) {
-    return "";
-  }
-  return matches[1];
+  return matches?.[1] ? matches[1] : "";
 }
 
 const saveFile = async (name, value, bucket) => {
@@ -30,48 +24,76 @@ const saveFile = async (name, value, bucket) => {
   return id;
 };
 
+// Utility function to split a buffer
+function splitBuffer(buffer, delimiter) {
+  const result = [];
+  let start = 0;
+  let index = buffer.indexOf(delimiter, start);
+
+  while (index !== -1) {
+    result.push(buffer.slice(start, index));
+    start = index + delimiter.length;
+    index = buffer.indexOf(delimiter, start);
+  }
+
+  result.push(buffer.slice(start));
+  return result;
+}
+
+const BREAK = "\r\n\r\n";
+
 export default async function parseBody(raw, contentType, bucket) {
-  const rawData = typeof raw === "string" ? raw : await raw.clone().text();
-  if (!rawData) return {};
+  const rawBuffer =
+    typeof raw === "string"
+      ? Buffer.from(raw)
+      : Buffer.from(await raw.arrayBuffer());
+  if (!rawBuffer) return {};
 
   if (!contentType || /text\/plain/.test(contentType)) {
-    return rawData;
+    return rawBuffer.toString(); // Return as plain text
   }
 
   if (/application\/json/.test(contentType)) {
-    return JSON.parse(rawData);
+    return JSON.parse(rawBuffer.toString()); // Parse JSON
   }
 
   const boundary = getBoundary(contentType);
   if (!boundary) return null;
 
   const body = {};
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const parts = splitBuffer(rawBuffer, boundaryBuffer);
 
-  const rawDataArray = rawData.split(boundary);
-  for (const item of rawDataArray) {
-    // Use non-matching groups to exclude part of the result
-    const name = getMatching(item, /(?:name=")(.+?)(?:")/)
+  for (const part of parts) {
+    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
+
+    const partString = part.toString();
+    const name = getMatching(partString, /(?:name=")(.+?)(?:")/)
       .trim()
       .replace(/\[\]$/, "");
     if (!name) continue;
 
-    let value = getMatching(item, /(?:\r\n\r\n)([\S\s]*)(?:\r\n--$)/);
-    if (!value) continue;
+    const filename = getMatching(partString, /(?:filename=")(.*?)(?:")/).trim();
 
-    // Check whether we have a filename. If we do, assign it to the value
-    const filename = getMatching(item, /(?:filename=")(.*?)(?:")/).trim();
+    if (!part.includes(BREAK)) continue;
+
+    // Content starts after headers and "\r\n\r\n",  remove trailing CRLF
+    const content = part.slice(part.indexOf(BREAK) + 4, part.length - 2);
+
     if (filename) {
-      value = await saveFile(filename, value, bucket);
-    }
-
-    // Save the key-value, accounting for possibly repeated keys
-    if (body[name]) {
-      if (!Array.isArray(body[name])) {
-        body[name] = [body[name]];
-      }
-      body[name].push(value);
+      // Save binary content as a file
+      body[name] = await saveFile(filename, content, bucket);
     } else {
-      body[name] = value;
+      // Treat content as text
+      const value = content.toString().trim();
+      if (body[name]) {
+        if (!Array.isArray(body[name])) {
+          body[name] = [body[name]];
+        }
+        body[name].push(value);
+      } else {
+        body[name] = value;
+      }
     }
   }
 

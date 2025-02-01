@@ -7,11 +7,19 @@ import server from "../index.js";
 const ID = "REqA2l022l8Q0tuI";
 
 describe("auth", () => {
-  it("requires a provider", () => {
-    const store = kv(new Map());
-    const api = server({ store, auth: "token:email" })
-      .get("/", (ctx) => ctx.auth)
-      .test();
+  it("requires a provider", async () => {
+    expect(() => server({ auth: "token" })).toThrow(
+      "Auth options needs a provider",
+    );
+    expect(() => server({ auth: "token:" })).toThrow(
+      "Auth options needs a provider",
+    );
+  });
+
+  it("requires a valid provider", async () => {
+    expect(() => server({ auth: "token:nonexisting" })).toThrow(
+      /Provider \"nonexisting\" not found, available ones are/,
+    );
   });
 
   it("provider must belong", async () => {

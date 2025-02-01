@@ -3,9 +3,11 @@ import { type } from "../reply.js";
 export default async function assets(ctx) {
   if (!ctx.options.public) return;
   if (ctx.method !== "get") return;
+  // The homepage _cannot_ be a file by definition. We could consider sending
+  // `index.html`, but that's easy with `.get('/', () => file('index.html'))
+  if (ctx.url.pathname === "/") return;
   try {
     // TODO: streaming
-    // Read it as buffer (null)
     const asset = await ctx.options.public.read(ctx.url.pathname, null);
     if (!asset) return;
     return type(ctx.url.pathname.split(".").pop()).send(asset);

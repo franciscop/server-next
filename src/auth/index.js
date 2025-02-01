@@ -4,6 +4,53 @@ import providers from "./providers/index.js";
 import session from "./session.js";
 import user from "./user.js";
 
+const parseOptions = (auth, all) => {
+  if (!auth) return null;
+
+  if (typeof auth === "string") {
+    const [type, provider] = auth.split(":");
+    auth = { type, provider };
+  }
+  // if (typeof auth.type === "string") {
+  //   auth.type = auth.type.split("|").filter(Boolean);
+  // }
+  if (typeof auth.provider === "string") {
+    auth.provider = auth.provider.split("|").filter(Boolean);
+  }
+  if (!auth.type) {
+    throw new Error("Auth options needs a type");
+  }
+  // if (!auth.type.length) {
+  //   throw new Error("Auth options needs a type");
+  // }
+  if (!auth.provider || !auth.provider.length) {
+    throw new Error("Auth options needs a provider");
+  }
+  const providerNotFound = auth.provider.find((p) => !providers[p]);
+  if (providerNotFound) {
+    throw new Error(
+      `Provider "${providerNotFound}" not found, available ones are "${Object.keys(providers).join('", "')}"`,
+    );
+  }
+
+  if (!auth.session && all.store) {
+    auth.session = all.store.prefix("auth:");
+  }
+  if (!auth.store && all.store) {
+    auth.store = all.store.prefix("user:");
+  }
+  if (!auth.cleanUser) {
+    auth.cleanUser = (fullUser) => {
+      const { password, token, ...user } = fullUser;
+      return user;
+    };
+  }
+  if (!auth.redirect) {
+    auth.redirect = "/user";
+  }
+  return auth;
+};
+
 const load = async (ctx) => {
   ctx.session = await session(ctx);
   ctx.auth = await auth(ctx);
@@ -54,4 +101,4 @@ const middle = async (ctx) => {
   }
 };
 
-export default { load, middle };
+export default { load, parseOptions, middle };
