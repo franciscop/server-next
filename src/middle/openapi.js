@@ -25,7 +25,7 @@ const getConfig = (routes) => {
   return config;
 };
 
-const pkg = await fsp
+const pkgProm = fsp
   .readFile("package.json", "utf-8")
   .then((data) => JSON.parse(data))
   .catch(() => ({}));
@@ -113,6 +113,7 @@ const generateOpenApiPaths = (handlers) => {
 };
 
 export default async (ctx) => {
+  const pkg = await pkgProm;
   const domain = pkg.homepage || ctx.url.origin;
   const openApi = {
     openapi: "3.0.0",
