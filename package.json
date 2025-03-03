@@ -37,7 +37,8 @@
   ],
   "exports": {
     ".": "./src/index.js",
-    "./jsx-runtime": "./src/helpers/jsx.js"
+    "./jsx-runtime": "./src/helpers/jsx.js",
+    "./jsx-dev-runtime": "./src/helpers/jsx.js"
   },
   "devDependencies": {
     "argon2": "^0.40.3",
