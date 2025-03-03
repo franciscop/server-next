@@ -35,6 +35,10 @@
     "src/",
     "jsx-dev-runtime.js"
   ],
+  "exports": {
+    ".": "./src/index.js",
+    "./jsx-runtime": "./src/helpers/jsx.js"
+  },
   "devDependencies": {
     "argon2": "^0.40.3",
     "check-dts": "^0.8.2",

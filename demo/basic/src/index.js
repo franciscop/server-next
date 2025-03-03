@@ -40,7 +40,7 @@ export default server(options)
 
   .get(
     "/pets",
-    { tags: "Pets " },
+    { tags: "Pets" },
     // { query: z.object({ name: z.string() }) },
     async function getAllPets(ctx) {
       const data = await db.pets.list();
@@ -48,17 +48,17 @@ export default server(options)
       return json(data);
     },
   )
-  .get("/pets/:id", { tags: "Pets " }, async (ctx) => {
+  .get("/pets/:id", { tags: "Pets" }, async (ctx) => {
     const id = Number(ctx.url.params.id);
     const pet = await db.pets.get(id);
     if (!pet) return status(404).json({ error: "Not found" });
     return json(pet);
   })
-  .patch("/pets/:id", { tags: "Pets " }, async (ctx) => {
+  .patch("/pets/:id", { tags: "Pets" }, async (ctx) => {
     // DO SOMETHING
     return 200;
   })
-  .put("/pets/:id", { tags: "Pets " }, async (ctx) => {
+  .put("/pets/:id", { tags: "Pets" }, async (ctx) => {
     // DO SOMETHING
     return 200;
   })
