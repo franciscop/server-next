@@ -71,5 +71,6 @@ export const jsx = (tag, { children, ...props }) => {
   const doctype = tag === "html" ? "<!DOCTYPE html>" : "";
   return () => `${doctype}<${tag}${attrStr}>${children}</${tag}>`;
 };
+export const jsxs = jsx;
 export const jsxDEV = jsx;
 export const Fragment = "";
