@@ -1,5 +1,3 @@
-import { jsx } from "./jsx.js";
-
 const $ = (code) => code();
 
 expect.extend({
