@@ -198,7 +198,7 @@ server.prototype.patch = function (path, ...middleware) {
 };
 
 server.prototype.del = function (path, ...middleware) {
-  return this.handle("del", path, ...middleware);
+  return this.handle("delete", path, ...middleware);
 };
 
 server.prototype.options = function (path, ...middleware) {
