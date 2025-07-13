@@ -33,6 +33,10 @@ function thinLocalBucket(root) {
       }
       return fs.createWriteStream(fullPath);
     },
+    del: (name) => {
+      const fullPath = absolute(name);
+      return fsp.unlink(fullPath);
+    },
   };
 }
 
@@ -50,6 +54,11 @@ function thinBunBucket(s3) {
         return name;
       }
       return s3.presign(name, { expiresIn: 3600, acl: "public-read-write" });
+    },
+    del: async (name) => {
+      const file = s3.file(name);
+      if (!(await file.exists())) return null;
+      return await file.delete();
     },
   };
 }
