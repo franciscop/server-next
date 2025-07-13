@@ -33,7 +33,7 @@ function thinLocalBucket(root) {
       }
       return fs.createWriteStream(fullPath);
     },
-    del: (name) => {
+    delete: (name) => {
       const fullPath = absolute(name);
       return fsp.unlink(fullPath);
     },
@@ -55,7 +55,7 @@ function thinBunBucket(s3) {
       }
       return s3.presign(name, { expiresIn: 3600, acl: "public-read-write" });
     },
-    del: async (name) => {
+    delete: async (name) => {
       const file = s3.file(name);
       if (!(await file.exists())) return null;
       return await file.delete();
