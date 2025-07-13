@@ -17,7 +17,21 @@ type Store = {
   ) => Promise<any>;
 };
 
-type Bucket = any;
+type Bucket =
+  | string
+  | {
+      read: (key: string) => ReadableStream;
+      write: (
+        key: string,
+        data:
+          | string
+          | NodeJS.ArrayBufferView
+          | Iterable<string | NodeJS.ArrayBufferView>
+          | AsyncIterable<string | NodeJS.ArrayBufferView>,
+        type: BufferEncoding,
+      ) => Promise<Boolean>;
+      delete: (key: string) => Promise<Boolean>;
+    };
 
 type Auth = {
   type: "cookie" | "token";

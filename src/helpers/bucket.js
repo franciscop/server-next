@@ -33,9 +33,14 @@ function thinLocalBucket(root) {
       }
       return fs.createWriteStream(fullPath);
     },
-    delete: (name) => {
+    delete: async (name) => {
       const fullPath = absolute(name);
-      return fsp.unlink(fullPath);
+      try {
+        await fsp.unlink(fullPath);
+        return true;
+      } catch (error) {
+        return false;
+      }
     },
   };
 }

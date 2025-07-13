@@ -37,4 +37,15 @@ describe("bucket", () => {
     const stream = await localBucket.read("testFile.txt");
     expect(stream).toBeNull();
   });
+
+  it("removes an existing file", async () => {
+    await localBucket.write("testFile.txt", "To be deleted");
+    const isDeleted = await localBucket.delete("testFile.txt");
+    expect(isDeleted).toBe(true);
+  });
+
+  it("tries to remove a non-existing file", async () => {
+    const isDeleted = await localBucket.delete("nonExistentFile.txt");
+    expect(isDeleted).toBe(false);
+  });
 });
