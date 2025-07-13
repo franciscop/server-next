@@ -1,0 +1,26 @@
+POST:
+<form action="/abc" method="POST" enc-type="multipart/form-data">
+  <input name="picture" type="file" />
+  <button>Send</button>
+</form>
+
+PUT:
+<form action="/abcd" method="PUT" enc-type="multipart/form-data">
+  <input name="picture2" type="file" />
+  <button>Send</button>
+</form>
+
+<script>
+  document.querySelectorAll("form").forEach((form) => {
+    console.log(form);
+    form.addEventListener("submit", async (e) => {
+      console.log("Form Sent");
+      e.preventDefault();
+      const body = new FormData(e.target);
+      await fetch("/abc", {
+        body,
+        method: form.getAttribute("method"),
+      });
+    });
+  });
+</script>

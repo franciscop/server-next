@@ -14,6 +14,10 @@ export default async function parseResponse(out, ctx) {
     out = new Response(out, { headers: { "Content-Type": blob.type } });
   }
 
+  if (out instanceof ReadableStream) {
+    out = new Response(out);
+  }
+
   // A plain number is a status code
   if (typeof out === "number") {
     out = new Response(undefined, { status: out });
@@ -28,6 +32,18 @@ export default async function parseResponse(out, ctx) {
   // https://stackoverflow.com/a/69745650/938236
   if (out?.constructor === Object || Array.isArray(out)) {
     out = json(out);
+  }
+
+  // The output from fetch(), create a copy of it into a new response
+  if (out instanceof Response && out.url && out.body) {
+    out = new Response(out.body, {
+      status: 200,
+      headers: out.headers,
+    });
+    if (/^(br|gzip)$/.test(out.headers.get("content-encoding"))) {
+      console.warn("Compression not yet supported for response");
+      out.headers.delete("content-encoding");
+    }
   }
 
   if (!(out instanceof Response)) {

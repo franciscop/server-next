@@ -2,6 +2,14 @@ import { createId } from "../helpers/index.js";
 
 function getBoundary(header) {
   if (!header) return null;
+
+  // When we set the `content-type` manually on fetch(), it won't include the
+  // boundary and it's recommended not to set it manually:
+  // https://stackoverflow.com/q/39280438/938236
+  if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
+    console.error("Do not set the `Content-Type` manually for FormData");
+  }
+
   const items = header.split(";");
   for (const item of items) {
     const trimmedItem = item.trim();
@@ -43,10 +51,8 @@ function splitBuffer(buffer, delimiter) {
 const BREAK = "\r\n\r\n";
 
 export default async function parseBody(raw, contentType, bucket) {
-  const rawBuffer =
-    typeof raw === "string"
-      ? Buffer.from(raw)
-      : Buffer.from(await raw.arrayBuffer());
+  const baseBuffer = typeof raw === "string" ? raw : await raw.arrayBuffer();
+  const rawBuffer = Buffer.from(baseBuffer);
   if (!rawBuffer) return {};
 
   if (!contentType || /text\/plain/.test(contentType)) {
