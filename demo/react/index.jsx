@@ -4,7 +4,7 @@ import styled from "./styled.jsx";
 
 const Container = styled.div`
   display: flex;
-  flex-gap: 10px;
+  gap: 4px;
 `;
 
 const Button = styled.button`
@@ -17,7 +17,7 @@ const Button = styled.button`
 `;
 
 const DynButton = styled.button`
-  background: ${(p) => (p.active ? "#faa" : "#fcc")};
+  background: ${(p) => (p.$active ? "#faa" : "#fcc")};
   color: white;
   padding: 6px 8px;
   border: none;
@@ -35,7 +35,7 @@ export default server()
         <Button>Click me</Button>
         <Button>Click me</Button>
         <DynButton>Click me</DynButton>
-        <DynButton active>Click me</DynButton>
+        <DynButton $active>Click me</DynButton>
       </Container>
     </div>
   ));

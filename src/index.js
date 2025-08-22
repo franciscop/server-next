@@ -5,6 +5,7 @@ import createNodeContext from "./context/node.js";
 import createWinterContext from "./context/winter.js";
 import {
   config,
+  createWebsocket,
   getMachine,
   handleRequest,
   iterate,
@@ -31,9 +32,6 @@ export default function server(options = {}) {
   this.opts = config(options);
   this.platform = getMachine();
 
-  // TODO: find a way to remove this hack
-  this.extended = false;
-
   // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
   this.handlers = {
     socket: [],
@@ -46,27 +44,11 @@ export default function server(options = {}) {
     options: [],
   };
 
+  // Keep a reference of the currently connected sockets
   this.sockets = [];
+
   // Note: required by Bun
-  this.websocket = {
-    message: async (socket, body) => {
-      this.handlers.socket
-        ?.filter((s) => s[1] === "message")
-        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
-    },
-    open: (ws) => {
-      this.sockets.push(ws);
-      this.handlers.socket
-        ?.filter((s) => s[1] === "open")
-        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
-    },
-    close: (ws) => {
-      this.sockets.splice(this.sockets.indexOf(ws), 1);
-      this.handlers.socket
-        ?.filter((s) => s[1] === "close")
-        ?.map((s) => s[2]({ socket, sockets: this.sockets, body }));
-    },
-  };
+  this.websocket = createWebsocket(this.sockets, this.handlers);
 
   // Initialize it right away for Node.js
   if (this.platform.runtime === "node") {

@@ -1,4 +1,9 @@
-import { cors, createId } from "./helpers/index.js";
+import {
+  cors,
+  createId,
+  iteratorToReadable,
+  iteratorAsyncToReadable,
+} from "./helpers/index.js";
 import { json } from "./reply.js";
 import ServerError from "./ServerError.js";
 
@@ -34,14 +39,25 @@ export default async function parseResponse(out, ctx) {
     out = json(out);
   }
 
+  // Sync and Async iterators
+  if (out[Symbol.iterator]) {
+    out = new Response(iteratorToReadable(out));
+  }
+
+  // The ReadableStream seems to be an asyncIterator, but we don't want to handle that yet
+  if (out[Symbol.asyncIterator] && !(out instanceof Response)) {
+    out = new Response(iteratorAsyncToReadable(out));
+  }
+
   // The output from fetch(), create a copy of it into a new response
   if (out instanceof Response && out.url && out.body) {
     out = new Response(out.body, {
-      status: 200,
+      status: out.status,
       headers: out.headers,
     });
+
+    // Compression not supported for streaming response, stripping header
     if (/^(br|gzip)$/.test(out.headers.get("content-encoding"))) {
-      console.warn("Compression not yet supported for response");
       out.headers.delete("content-encoding");
     }
   }

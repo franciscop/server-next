@@ -76,11 +76,11 @@ Reply.prototype.redirect = function (Location) {
   return this.headers({ Location }).status(302).send();
 };
 
-Reply.prototype.file = async function (path) {
+Reply.prototype.file = async function (path, renderer = (data) => data) {
   try {
     const data = await fs.readFile(path);
     const ext = path.split(".").pop();
-    return this.type(ext).send(data);
+    return this.type(ext).send(await renderer(data));
   } catch (error) {
     if (error.code === "ENOENT") {
       return status(404).send();
@@ -89,14 +89,14 @@ Reply.prototype.file = async function (path) {
   }
 };
 
-Reply.prototype.view = async function (path) {
+Reply.prototype.view = async function (path, renderer = (data) => data) {
   return async (ctx) => {
     if (!ctx.options.views) {
       throw new Error("Views not enabled");
     }
     const data = await ctx.options.views.read(path);
-    if (data) return this.type(path.split(".").pop()).send(data);
-    return this.status(404).send();
+    if (!data) return this.status(404).send();
+    return this.type(path.split(".").pop()).send(await renderer(data));
   };
 };
 

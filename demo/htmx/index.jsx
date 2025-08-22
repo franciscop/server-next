@@ -1,19 +1,19 @@
-import server from "../../";
-
-const home = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>HTMX Experiment</title>
-</head>
-<body>
-  <button hx-post="/clicked" hx-swap="outerHTML">
-    Click Me
-  </button>
-  <script src="https://unpkg.com/htmx.org@2"></script>
-</body>
-</html>`;
+import server, { file } from "@server/next";
 
 export default server()
-  .get("/", () => home)
-  .post("/clicked", () => <div>It works!</div>);
+  .get("/", () => file("index.html"))
+  .post("/clicked", () => (
+    <div>
+      <button hx-post="/clicked" hx-swap="outerHTML">
+        It works!
+      </button>
+      <div className="hello">With styles!</div>
+      <style>{`
+        .hello {
+          background: red;
+          color: white;
+          padding: 2px;
+        }
+      `}</style>
+    </div>
+  ));

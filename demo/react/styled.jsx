@@ -12,6 +12,13 @@ const tag = (strings, values, props) => {
   return str;
 };
 
+const removeDollar = (props) => {
+  return Object.fromEntries(
+    Object.entries(props).filter(([key, _]) => !key.startsWith("$")),
+  );
+};
+
+// For string templates that are just a string
 const staticGenerator = (Key, str) => {
   const name = "s" + createId(str, 6);
   const style = `.${name} {${str}}`;
@@ -20,12 +27,13 @@ const staticGenerator = (Key, str) => {
     return (
       <>
         <style>{style}</style>
-        <Key className={fullClass} {...props} />
+        <Key className={fullClass} {...removeDollar(props)} />
       </>
     );
   };
 };
 
+// For string templates with interpolated values
 const dynamicGenerator = (Key, str, values) => {
   return ({ className, ...props }) => {
     const content = tag(str, values, props);
@@ -35,7 +43,7 @@ const dynamicGenerator = (Key, str, values) => {
     return (
       <>
         <style>{style}</style>
-        <Key className={fullClass} {...props} />
+        <Key className={fullClass} {...removeDollar(props)} />
       </>
     );
   };
