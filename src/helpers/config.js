@@ -45,8 +45,8 @@ export default function config(options = {}) {
 
   // Stores
   options.store = options.store ?? null;
-  options.cookies = options.cookies ?? {};
-  if (options.store && options.cookies) {
+  options.cookies = options.cookies ?? null;
+  if (options.store && !options.session) {
     options.session = { store: options.store.prefix("session:") };
   }
 

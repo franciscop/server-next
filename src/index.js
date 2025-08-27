@@ -44,6 +44,11 @@ export default function server(options = {}) {
     options: [],
   };
 
+  // For Bun and other WinterCG to know which port to serve from
+  if (this.opts.port) {
+    this.port = this.opts.port;
+  }
+
   // Keep a reference of the currently connected sockets
   this.sockets = [];
 
@@ -218,7 +223,7 @@ server.prototype.test = function () {
       options.headers.cookie = cookie;
     }
     const res = await this.fetch(
-      new Request(`http://localhost:3000${path}`, options),
+      new Request(`http://localhost:${this.opts.port}${path}`, options),
     );
 
     const headers = parseHeaders(res.headers);

@@ -50,12 +50,14 @@ type Cors = {
 
 type ServerOptions = {
   port?: number;
+  secret?: string;
   views?: string | Bucket;
   public?: string | Bucket;
   uploads?: string | Bucket;
+  store?: Store;
+  session?: Store;
   cors?: boolean | Origin | Cors;
   auth?: AuthString | Auth;
-  store?: Store;
 };
 
 type ExtractPathParams<Path extends string> =
