@@ -25,6 +25,35 @@ const getConfig = (routes) => {
   return config;
 };
 
+// Convert Zod to OpenAPI requestBody without external libraries
+function zodToSchema(schema) {
+  const type = schema?.def?.type || "string";
+
+  if (type === "object") {
+    const shape = schema.def.shape;
+    const properties = {};
+    const req = [];
+
+    for (const key in shape) {
+      const field = shape[key];
+      properties[key] = zodToSchema(field);
+
+      if (!field.isOptional() && !field.isNullable()) {
+        req.push(key);
+      }
+    }
+    const required = req.length ? req : undefined;
+
+    return { type, properties, required };
+  }
+
+  if (type === "array") {
+    return { type, items: zodToSchema(schema.def.element) };
+  }
+
+  return { type };
+}
+
 const pkgProm = fsp
   .readFile("package.json", "utf-8")
   .then((data) => JSON.parse(data))
@@ -42,7 +71,7 @@ const getTag = (name, fn) => {
 };
 
 const getDescription = (fn) => getTag("@description", fn) || "";
-const getReturn = (fn) => getTag("@returns", fn) || "200 OK";
+const getReturn = (fn) => getTag("@returns", fn) || "OK";
 
 const generateOpenApiPaths = (handlers) => {
   const paths = {};
@@ -58,10 +87,14 @@ const generateOpenApiPaths = (handlers) => {
 
       const config = getConfig(route);
 
-      if (typeof path !== "string" || path === "*" || !fn) continue;
+      if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
+        continue;
+      }
 
       // Normalize path (convert ":id" to "{id}" for OpenAPI)
-      const normalizedPath = path.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
+      const normalizedPath = path
+        .replaceAll(/\(\w+\)/gi, "")
+        .replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
 
       if (!paths[normalizedPath]) {
         paths[normalizedPath] = {};
@@ -81,30 +114,58 @@ const generateOpenApiPaths = (handlers) => {
         return name[0].toUpperCase() + name.slice(1);
       };
 
+      let requestBody;
+      if (meta?.body) {
+        const schema = zodToSchema(meta.body);
+        requestBody = { content: { "application/json": { schema } } };
+      }
+
+      let responses;
+      if (meta?.response) {
+        const schema = zodToSchema(meta.response);
+        const description = getReturn(fn);
+        responses = {
+          200: { description, content: { "application/json": { schema } } },
+        };
+      }
+
+      const parameters = [];
+
+      // Extract the query parameters
+      const matched = path.matchAll(/\:[\w\(\)]+/gi);
+      matched.forEach((match) => {
+        const [name, type = "string"] = match[0]
+          .slice(1)
+          .replace(/\)/, "")
+          .split("(");
+        parameters.push({
+          name,
+          in: "path",
+          required: true,
+          schema: { type },
+        });
+      });
+
+      if (meta?.query) {
+        Object.entries(meta.query).map(([key, value]) => ({
+          name: key,
+          in: "query",
+          required: false,
+          schema: { type: typeof value },
+          example: value,
+        }));
+      }
+
       paths[normalizedPath][method] = {
         tags: config.tags,
         summary:
           config.title ||
-          getTitle(fn) ||
           getTag("@title", fn) ||
-          `${method.toUpperCase()} ${path}`,
-        description: getDescription(fn),
-        responses: {
-          200: {
-            description: getReturn(fn),
-          },
-        },
-        ...(meta
-          ? {
-              parameters: Object.entries(meta).map(([key, value]) => ({
-                name: key,
-                in: "query",
-                required: false,
-                schema: { type: typeof value },
-                example: value,
-              })),
-            }
-          : {}),
+          `${method.toUpperCase()} ${normalizedPath}`,
+        description: getTitle(fn) || getDescription(fn),
+        requestBody,
+        parameters,
+        responses,
       };
     }
   }

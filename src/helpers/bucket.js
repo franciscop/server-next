@@ -9,6 +9,7 @@ function thinLocalBucket(root) {
   };
 
   return {
+    location: path.resolve(root),
     read: async (name) => {
       const fullPath = absolute(name);
       const stats = await fsp.stat(fullPath).catch(() => null);

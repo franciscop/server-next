@@ -14,9 +14,17 @@ export default function router() {
   };
 }
 
-// INTERNAL
 router.prototype.handle = function (method, path, ...middleware) {
-  this.handlers[method].push([method, path, ...middleware]);
+  // Do not try to optimize, we NEED the method to remain '*' here so that
+  // it doesn't auto-finish
+  if (method === "*") {
+    for (const m in this.handlers) {
+      this.handlers[m].push([method, path, ...middleware]);
+    }
+  } else {
+    this.handlers[method].push([method, path, ...middleware]);
+  }
+
   return this;
 };
 
@@ -50,4 +58,11 @@ router.prototype.del = function (path, ...middleware) {
 
 router.prototype.options = function (path, ...middleware) {
   return this.handle("options", path, ...middleware);
+};
+
+router.prototype.use = function (...middleware) {
+  if (typeof middleware[0] === "string") {
+    return this.handle("*", ...middleware);
+  }
+  return this.handle("*", "*", ...middleware);
 };

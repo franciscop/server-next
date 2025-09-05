@@ -1,0 +1,17 @@
+{
+  "name": "openapi",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "zod": "^4.0.17"
+  }
+}

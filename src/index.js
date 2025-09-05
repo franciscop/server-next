@@ -144,10 +144,9 @@ server.prototype.fetch = async function (request, env) {
   return res;
 };
 
-// #region HTTP methods
 // INTERNAL
 server.prototype.handle = function (method, path, ...middleware) {
-  // Do not try to optimize, we NEED the method to remain '*' here so that
+  // Don't try to optimize, we NEED the method to remain '*' here so that
   // it doesn't auto-finish
   if (method === "*") {
     for (const m in this.handlers) {
@@ -201,10 +200,13 @@ server.prototype.use = function (...middleware) {
 
 // Unwind the children routers into the main router
 server.prototype.router = function (basePath, router) {
-  basePath = `/${basePath}/`.replace(/^\/+/, "/").replace(/\/+$/, "/");
+  basePath = `/${basePath.replace(/\*$/, "")}/`
+    .replace(/^\/+/, "/")
+    .replace(/\/+$/, "/");
   for (const m in router.handlers) {
-    for (const [method, path, ...callbacks] of router.handlers[m]) {
-      this.handle(method, basePath + path.replace(/^\//, ""), ...callbacks);
+    for (const [method, path, ...middleware] of router.handlers[m]) {
+      const fullPath = basePath + path.replace(/^\//, "");
+      this.handlers[m].push([method, fullPath, ...middleware]);
     }
   }
   return this.self();
