@@ -29,35 +29,59 @@ router.prototype.handle = function (method, path, ...middleware) {
 };
 
 router.prototype.socket = function (path, ...middleware) {
-  return this.handle("socket", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("socket", path, ...middleware);
+  }
+  return this.handle("socket", "*", path, ...middleware);
 };
 
 router.prototype.get = function (path, ...middleware) {
-  return this.handle("get", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("get", path, ...middleware);
+  }
+  return this.handle("get", "*", path, ...middleware);
 };
 
 router.prototype.head = function (path, ...middleware) {
-  return this.handle("head", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("head", path, ...middleware);
+  }
+  return this.handle("head", "*", path, ...middleware);
 };
 
 router.prototype.post = function (path, ...middleware) {
-  return this.handle("post", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("post", path, ...middleware);
+  }
+  return this.handle("post", "*", path, ...middleware);
 };
 
 router.prototype.put = function (path, ...middleware) {
-  return this.handle("put", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("put", path, ...middleware);
+  }
+  return this.handle("put", "*", path, ...middleware);
 };
 
 router.prototype.patch = function (path, ...middleware) {
-  return this.handle("patch", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("patch", path, ...middleware);
+  }
+  return this.handle("patch", "*", path, ...middleware);
 };
 
 router.prototype.del = function (path, ...middleware) {
-  return this.handle("del", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("del", path, ...middleware);
+  }
+  return this.handle("del", "*", path, ...middleware);
 };
 
 router.prototype.options = function (path, ...middleware) {
-  return this.handle("options", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("options", path, ...middleware);
+  }
+  return this.handle("head", "*", path, ...middleware);
 };
 
 router.prototype.use = function (...middleware) {

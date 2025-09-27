@@ -4,14 +4,17 @@ function expandHandlers(handlers) {
   const expandedHandlers = [];
   const middlewareStack = [];
 
-  // Extract and process middleware
   handlers.forEach((handler) => {
-    if (handler[0] === "*") {
-      middlewareStack.push(handler.slice(2));
+    const verb = handler[0];
+    const path = handler[1];
+    const fns = handler.slice(2);
+
+    if (verb === "*") {
+      // accumulate middleware
+      middlewareStack.push(...fns);
     } else {
-      const path = handler[1];
-      const fns = handler.slice(2);
-      expandedHandlers.push([path, ...middlewareStack.flat(), ...fns]);
+      // leaf route
+      expandedHandlers.push([path, ...middlewareStack, ...fns]);
     }
   });
 
@@ -88,42 +91,41 @@ describe("can route properly", () => {
     const mid12 = () => null;
     const mid13 = () => null;
     const mid14 = () => null;
+    const mid15 = () => null;
 
     const router1 = router()
       .use(mid6)
       .get("/path2", mid7, mid8)
-      .get("/path3", mid9);
+      .get("/path3", mid9)
+      .get(mid10);
 
     const router2 = router()
-      .use(mid11)
-      .get("/path2", mid12, mid13)
-      .get("/path3", mid14);
+      .use(mid12)
+      .get("/path2", mid13, mid14)
+      .get("/path3", mid15);
 
     const api = server()
       .use(mid1)
       .use(mid2, mid3)
       .get("/path1", mid4)
       .use(mid5)
-      .router("/sub1/*", router1)
-      .use(mid10)
-      .router("/sub2/*", router2);
+      .use("/sub1/*", router1)
+      .use(mid11)
+      .use("/sub2/*", router2);
 
     // api.handlers.get.map((g) => console.log(g));
     const handlers = expandHandlers(api.handlers.get);
     const part1 = handlers.find((h) => h[0] === "/path1");
     const part2 = handlers.find((h) => h[0] === "/sub1/path2");
 
-    // console.log(handlers.map((h) => h[0]));
-    // expect(handlers.map((h) => h[0])).toEqual([
-    //   "/path1",
-    //   "/sub1/path2",
-    //   "/sub1/path3",
-    //   "/sub1/*",
-    //   "/sub2/path2",
-    //   "/sub2/path3",
-    //   "/sub2/*",
-    //   "/*",
-    // ]);
+    expect(handlers.map((h) => h[0])).toEqual([
+      "/path1",
+      "/sub1/path2",
+      "/sub1/path3",
+      "/sub1/*",
+      "/sub2/path2",
+      "/sub2/path3",
+    ]);
 
     const timer = part1[1];
     const assets = part1[2];

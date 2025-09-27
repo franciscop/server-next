@@ -13,6 +13,7 @@ import {
 } from "./helpers/index.js";
 
 import { assets, auth, timer, openapi } from "./middle/index.js";
+import router from "./router.js";
 
 // Export the reply helpers
 export * from "./reply.js";
@@ -160,40 +161,70 @@ server.prototype.handle = function (method, path, ...middleware) {
 };
 
 server.prototype.socket = function (path, ...middleware) {
-  return this.handle("socket", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("socket", path, ...middleware);
+  }
+  return this.handle("socket", "*", path, ...middleware);
 };
 
 server.prototype.get = function (path, ...middleware) {
-  return this.handle("get", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("get", path, ...middleware);
+  }
+  return this.handle("get", "*", path, ...middleware);
 };
 
 server.prototype.head = function (path, ...middleware) {
-  return this.handle("head", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("head", path, ...middleware);
+  }
+  return this.handle("head", "*", path, ...middleware);
 };
 
 server.prototype.post = function (path, ...middleware) {
-  return this.handle("post", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("post", path, ...middleware);
+  }
+  return this.handle("post", "*", path, ...middleware);
 };
 
 server.prototype.put = function (path, ...middleware) {
-  return this.handle("put", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("put", path, ...middleware);
+  }
+  return this.handle("put", "*", path, ...middleware);
 };
 
 server.prototype.patch = function (path, ...middleware) {
-  return this.handle("patch", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("patch", path, ...middleware);
+  }
+  return this.handle("patch", "*", path, ...middleware);
 };
 
 server.prototype.del = function (path, ...middleware) {
-  return this.handle("delete", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("delete", path, ...middleware);
+  }
+  return this.handle("delete", "*", path, ...middleware);
 };
 
 server.prototype.options = function (path, ...middleware) {
-  return this.handle("options", path, ...middleware);
+  if (typeof path === "string") {
+    return this.handle("options", path, ...middleware);
+  }
+  return this.handle("options", "*", path, ...middleware);
 };
 
 server.prototype.use = function (...middleware) {
   if (typeof middleware[0] === "string") {
+    if (middleware[1] instanceof router) {
+      return this.router(...middleware);
+    }
     return this.handle("*", ...middleware);
+  }
+  if (middleware[0] instanceof router) {
+    return this.router("*", ...middleware);
   }
   return this.handle("*", "*", ...middleware);
 };
