@@ -20,14 +20,12 @@ describe("exports", () => {
     expect(typeof server().get).toBe("function");
     expect(typeof server().post).toBe("function");
     expect(typeof server().use).toBe("function");
-    expect(typeof server().router).toBe("function");
   });
 
   it("export has the basic nested methods", () => {
     expect(typeof server().get().get).toBe("function");
     expect(typeof server().post().post).toBe("function");
     expect(typeof server().use().use).toBe("function");
-    expect(typeof server().get().router).toBe("function");
   });
 
   it("nested is also a function", () => {
@@ -44,8 +42,7 @@ describe("return different types", () => {
     .get("/status", () => 201)
     .test();
 
-  it.only("can get the plain text", async () => {
-    console.log("RESULT:", await api.get("/text"));
+  it("can get the plain text", async () => {
     const { body } = await api.get("/text");
     expect(body).toBe("Hello world");
   });

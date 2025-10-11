@@ -4,43 +4,47 @@ import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
 
 export default async (request, app) => {
-  const ctx = {};
-  ctx.init = performance.now();
-  ctx.options = app.opts || {};
-  ctx.req = request;
-  ctx.res = { status: null, headers: {}, cookies: {} };
-  ctx.method = request.method.toLowerCase();
+  try {
+    const ctx = {};
+    ctx.init = performance.now();
+    ctx.options = app.opts || {};
+    ctx.req = request;
+    ctx.res = { status: null, headers: {}, cookies: {} };
+    ctx.method = request.method.toLowerCase();
 
-  // Private
-  const events = {};
-  ctx.unstableOn = (name, callback) => {
-    events[name] = events[name] || [];
-    events[name].push(callback);
-  };
-  ctx.unstableFire = (name, data) => {
-    if (!events[name]) return;
-    for (const cb of events[name]) {
-      cb(data);
+    // Private
+    const events = {};
+    ctx.on = (name, callback) => {
+      events[name] = events[name] || [];
+      events[name].push(callback);
+    };
+    ctx.trigger = (name, data) => {
+      if (!events[name]) return;
+      for (const cb of events[name]) {
+        cb(data);
+      }
+    };
+
+    ctx.headers = parseHeaders(request.headers);
+    ctx.cookies = parseCookies(ctx.headers.cookie);
+    await auth.load(ctx);
+
+    ctx.url = new URL(request.url.replace(/\/$/, ""));
+    define(ctx.url, "query", (url) =>
+      Object.fromEntries(url.searchParams.entries()),
+    );
+
+    if (request.body) {
+      const type = ctx.headers["content-type"];
+      ctx.body = await parseBody(request, type, ctx.options.uploads);
     }
-  };
 
-  ctx.headers = parseHeaders(request.headers);
-  ctx.cookies = parseCookies(ctx.headers.cookie);
-  await auth.load(ctx);
+    ctx.app = app;
+    ctx.platform = app.platform;
+    ctx.machine = app.platform;
 
-  ctx.url = new URL(request.url.replace(/\/$/, ""));
-  define(ctx.url, "query", (url) =>
-    Object.fromEntries(url.searchParams.entries()),
-  );
-
-  if (request.body) {
-    const type = ctx.headers["content-type"];
-    ctx.body = await parseBody(request, type, ctx.options.uploads);
+    return ctx;
+  } catch (error) {
+    return { error };
   }
-
-  ctx.app = app;
-  ctx.platform = app.platform;
-  ctx.machine = app.platform;
-
-  return ctx;
 };

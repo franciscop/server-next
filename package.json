@@ -19,7 +19,8 @@
   "scripts": {
     "start": "bun test --watch",
     "lint": "npx @biomejs/biome lint ./src --skip=lint/style/noParameterAssign --skip=lint/suspicious/noExplicitAny --skip=lint/suspicious/noConfusingVoidType",
-    "test": "bun test && check-dts ./src/**",
+    "test": "npm run test:bun && check-dts ./src/**",
+    "test:bun": "bun test",
     "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "keywords": [

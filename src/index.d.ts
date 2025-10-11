@@ -195,6 +195,6 @@ declare interface Server {
 type headers = (obj?: Headers) => any;
 
 declare const server: Server;
-// export const router: Router;
+export const router: Router;
 export const headers: headers;
 export default server;

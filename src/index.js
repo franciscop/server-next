@@ -1,45 +1,17 @@
 import "./polyfill.js";
 import "./errors/index.js";
 
-import createNodeContext from "./context/node.js";
-import createWinterContext from "./context/winter.js";
-import {
-  config,
-  createWebsocket,
-  getMachine,
-  handleRequest,
-  iterate,
-  parseHeaders,
-} from "./helpers/index.js";
+import { config, createWebsocket, getMachine } from "./helpers/index.js";
 
 import { assets, auth, timer, openapi } from "./middle/index.js";
 import { Router } from "./router.js";
+import ServerTest from "./ServerTest.js";
+import * as handlers from "./context/handlers.js";
 
-// Export the reply helpers
-export * from "./reply.js";
-
-export { default as ServerError } from "./ServerError.js";
-
-// Allow to create a sub-router
-export { default as router } from "./router.js";
-
-class Server {
-  // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
-  handlers = {
-    socket: [],
-    get: [],
-    head: [],
-    post: [],
-    put: [],
-    patch: [],
-    delete: [],
-    options: [],
-  };
-
-  // A reference of the currently connected sockets
-  sockets = [];
-
+class Server extends Router {
   constructor(options = {}) {
+    super();
+
     // Keep a copy of the options in the instance
     this.opts = config(options);
     this.platform = getMachine();
@@ -49,245 +21,57 @@ class Server {
       this.port = this.opts.port;
     }
 
-    // Note: required by Bun
-    this.websocket = createWebsocket(this.sockets, this.handlers);
+    this.sockets = []; // A reference of the currently connected sockets
+    this.websocket = createWebsocket(this.sockets, this.handlers); // Bun
 
     // Initialize it right away for Node.js
     if (this.platform.runtime === "node") {
       this.node();
     }
 
+    // Middleware that is always available
     this.use(timer);
     this.use(assets);
+
+    // Optional middleware
     if (this.opts.openapi) {
-      const path = this.opts.openapi.path || "/docs";
-      this.get(path, openapi);
+      this.get(this.opts.openapi.path || "/docs", openapi);
     }
     if (this.opts.auth) {
       this.use(auth({ options: this.opts, app: this }));
     }
   }
+
+  // We need to return a function; some environment expect the default export
+  // to be a function that is called with the request, but we also want to
+  // allow chaining, so we return a function that "extends" the instance
+  self() {
+    const cb = this.callback.bind(this);
+    const proto = Object.getPrototypeOf(this);
+    const keys = Object.keys({ ...this.handlers, ...proto, ...this });
+    for (const key of ["use", ...keys]) {
+      if (typeof this[key] === "function") {
+        cb[key] = this[key].bind(this);
+      } else {
+        cb[key] = this[key];
+      }
+    }
+    return cb;
+  }
 }
 
-Server.prototype.self = function () {
-  const cb = this.callback.bind(this);
-  const proto = Object.getPrototypeOf(this);
-  for (const key in { ...proto, ...this }) {
-    if (typeof this[key] === "function") {
-      cb[key] = this[key].bind(this);
-    } else {
-      cb[key] = this[key];
-    }
-  }
-  return cb;
-};
+// The different handlers for different platforms/runtimes
+Server.prototype.node = handlers.Node;
+Server.prototype.callback = handlers.Netlify;
+Server.prototype.fetch = handlers.Winter; // WinterCG, Bun, Cloudflare Workers
 
-// #region Runtimes
-// Node.js
-Server.prototype.node = async function () {
-  const http = await import("node:http");
-  http
-    .createServer(async (request, response) => {
-      try {
-        const ctx = await createNodeContext(request, this);
-        const out = await handleRequest(this.handlers, ctx);
-
-        response.writeHead(out.status || 200, parseHeaders(out.headers));
-        if (out.body instanceof ReadableStream) {
-          await iterate(out.body, (chunk) => response.write(chunk));
-        } else {
-          response.write(out.body || "");
-        }
-        response.end();
-      } catch (error) {
-        response.writeHead(error.status || 500);
-        response.write(error.message || "");
-        response.end();
-      }
-    })
-    .listen(this.opts.port);
-};
-
-// Netlify
-Server.prototype.callback = async function (request, context) {
-  // Consider simply renaming to "ctx.next()"
-  request.context = context;
-  try {
-    if (typeof Netlify === "undefined") {
-      throw new Error("Netlify doesn't exist");
-    }
-    const ctx = await createWinterContext(request, this);
-    return await handleRequest(this.handlers, ctx);
-  } catch (error) {
-    return new Response(error.message, { status: error.status || 500 });
-  }
-};
-
-// WinterCG, Bun, Cloudflare Workers
-Server.prototype.fetch = async function (request, env) {
-  if (env?.upgrade(request)) return;
-  Object.assign(globalThis.env, env); // Extend env with the passed vars
-
-  let ctx;
-  let res;
-  let error;
-  try {
-    ctx = await createWinterContext(request, this);
-    res = await handleRequest(this.handlers, ctx);
-  } catch (err) {
-    error = err;
-    res = new Response(error.message, { status: error.status || 500 });
-  }
-  ctx?.unstableFire("finish", { ...ctx, error, res, end: performance.now() });
-  return res;
-};
-
-// INTERNAL
-Server.prototype.handle = function (method, path, ...middleware) {
-  // Do not try to optimize, we NEED the method to remain '*' here so that
-  // it doesn't auto-close the request
-  if (method === "*") {
-    for (const m in this.handlers) {
-      this.handlers[m].push([method, path, ...middleware]);
-    }
-  } else {
-    this.handlers[method].push([method, path, ...middleware]);
-  }
-
-  return this.self();
-};
-
-Server.prototype.socket = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("socket", path, ...middleware);
-  }
-  return this.handle("socket", "*", path, ...middleware);
-};
-
-Server.prototype.get = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("get", path, ...middleware);
-  }
-  return this.handle("get", "*", path, ...middleware);
-};
-
-Server.prototype.head = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("head", path, ...middleware);
-  }
-  return this.handle("head", "*", path, ...middleware);
-};
-
-Server.prototype.post = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("post", path, ...middleware);
-  }
-  return this.handle("post", "*", path, ...middleware);
-};
-
-Server.prototype.put = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("put", path, ...middleware);
-  }
-  return this.handle("put", "*", path, ...middleware);
-};
-
-Server.prototype.patch = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("patch", path, ...middleware);
-  }
-  return this.handle("patch", "*", path, ...middleware);
-};
-
-Server.prototype.del = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("delete", path, ...middleware);
-  }
-  return this.handle("delete", "*", path, ...middleware);
-};
-
-Server.prototype.options = function (path, ...middleware) {
-  if (typeof path === "string") {
-    return this.handle("options", path, ...middleware);
-  }
-  return this.handle("options", "*", path, ...middleware);
-};
-
-Server.prototype.use = function (path, ...middleware) {
-  // .use('/hello', router)
-  if (typeof path === "string" && middleware[0] instanceof Router) {
-    return this.router(path, middleware[0]);
-  }
-
-  // .use('/hello', ...middleware)
-  if (typeof path === "string") {
-    return this.handle("*", path, ...middleware);
-  }
-
-  // .use(router)
-  if (path instanceof Router) {
-    return this.router("*", path);
-  }
-
-  // .use(...middleware)
-  return this.handle("*", "*", path, ...middleware);
-};
-
-// Unwind the children routers into the main router
-Server.prototype.router = function (basePath, router) {
-  basePath = `/${basePath.replace(/\*$/, "")}/`
-    .replace(/^\/+/, "/")
-    .replace(/\/+$/, "/");
-  for (const m in router.handlers) {
-    for (const [method, path, ...middleware] of router.handlers[m]) {
-      const fullPath = basePath + path.replace(/^\//, "");
-      this.handlers[m].push([method, fullPath, ...middleware]);
-    }
-  }
-  return this.self();
-};
-
-// #region Testing helper
-Server.prototype.test = function () {
-  let cookie = "";
-  const fetch = async (path, method, options = {}) => {
-    if (!options.headers) options.headers = {};
-    if (options.body && typeof options.body !== "string") {
-      options.headers["content-type"] = "application/json";
-      options.body = JSON.stringify(options.body);
-    }
-    if (cookie && !options.headers.cookie) {
-      options.headers.cookie = cookie;
-    }
-    const res = await this.fetch(
-      new Request(`http://localhost:${this.opts.port}${path}`, options),
-    );
-
-    const headers = parseHeaders(res.headers);
-    let body;
-    if (headers["set-cookie"]) {
-      // TODO: this should really be a smart merge of the 2
-      cookie = headers["set-cookie"];
-    }
-    if (headers["content-type"]?.includes("application/json")) {
-      body = await res.json();
-    } else {
-      body = await res.text();
-    }
-    return { status: res.status, headers, body };
-  };
-  return {
-    get: (path, options) => fetch(path, "get", options),
-    head: (path, options) => fetch(path, "head", options),
-    post: (path, body, options) => fetch(path, "post", { body, ...options }),
-    put: (path, body, options) => fetch(path, "put", { body, ...options }),
-    patch: (path, body, options) => fetch(path, "patch", { body, ...options }),
-    delete: (path, options) => fetch(path, "delete", options),
-    options: (path, options) => fetch(path, "options", options),
-  };
-};
+// Helper purely for testing
+Server.prototype.test = ServerTest;
 
 export default function server(options = {}) {
-  // Make it so that the exported one is a prototype of function()
   return new Server(options).self();
 }
+
+export * from "./reply.js";
+export { default as ServerError } from "./ServerError.js";
+export { default as router } from "./router.js";

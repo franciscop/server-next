@@ -29,8 +29,8 @@ describe("can route properly", () => {
     .post("/hello", (ctx) => `Hello ${ctx.url.pathname}`);
 
   const app = server()
-    .router("/", apiRouter)
-    .router("/api/", apiRouter)
+    .use("/", apiRouter)
+    .use("/api/", apiRouter)
     .get("/", () => "Fallback");
   const api = app.test();
 

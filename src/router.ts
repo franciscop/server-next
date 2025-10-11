@@ -16,6 +16,12 @@ export class Router {
     options: [],
   };
 
+  // For the router we can just return itself since it's not the final export,
+  // but then on the root it'll return some fancy wrappers
+  self() {
+    return this;
+  }
+
   handle(
     method: RouterMethod,
     path: PathOrMiddle,
@@ -35,7 +41,7 @@ export class Router {
       this.handlers[m].push([method, path, ...middleware]);
     }
 
-    return this;
+    return this.self();
   }
 
   socket(path: PathOrMiddle, ...middleware: Middleware[]) {
@@ -78,19 +84,20 @@ export class Router {
     // .use('/', router) or .use('/', mid1, mid2)
     const path = (typeof args[0] === "string" ? args.shift() : "*") as string;
 
-    // .use(router)
+    // .use(router), need to bring the methods in
     if (args[0] instanceof Router) {
+      // Create a base path like `/users/` so that we can concatenate later on
       const basePath = `/${path.replace(/\*$/, "")}/`
         .replace(/^\/+/, "/")
         .replace(/\/+$/, "/");
-      for (const m in args[0].handlers) {
-        for (const [method, path, ...middleware] of args[0].handlers[m]) {
+      const handlers = args[0].handlers;
+      for (const m in handlers) {
+        for (const [method, path, ...middleware] of handlers[m as Method]) {
           const fullPath = basePath + path.replace(/^\//, "");
-          this.handlers[m].push([method, fullPath, ...middleware]);
-          // this.handle(method, fullPath, ...(middleware as Middleware[]));
+          this.handlers[m as Method].push([method, fullPath, ...middleware]);
         }
       }
-      return this;
+      return this.self();
     }
 
     // .use(mid1, mid2)
