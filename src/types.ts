@@ -20,6 +20,7 @@ export type Context = {
     query: Record<string, string>;
   };
   options: Record<string, string>;
+  time: { (name: string): void; times: [string, number][]; headers: () => {} };
 };
 
 export type InlineReply =
