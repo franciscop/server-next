@@ -44,7 +44,8 @@ describe("return different types", () => {
     .get("/status", () => 201)
     .test();
 
-  it("can get the plain text", async () => {
+  it.only("can get the plain text", async () => {
+    console.log("RESULT:", await api.get("/text"));
     const { body } = await api.get("/text");
     expect(body).toBe("Hello world");
   });

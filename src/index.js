@@ -13,7 +13,7 @@ import {
 } from "./helpers/index.js";
 
 import { assets, auth, timer, openapi } from "./middle/index.js";
-import router from "./router.js";
+import { Router } from "./router.js";
 
 // Export the reply helpers
 export * from "./reply.js";
@@ -23,18 +23,9 @@ export { default as ServerError } from "./ServerError.js";
 // Allow to create a sub-router
 export { default as router } from "./router.js";
 
-export default function server(options = {}) {
-  // Make it so that the exported one is a prototype of function()
-  if (!(this instanceof server)) {
-    return new server(options).self();
-  }
-
-  // Keep a copy of the options in the instance
-  this.opts = config(options);
-  this.platform = getMachine();
-
+class Server {
   // Skip "forbidden methods" https://fetch.spec.whatwg.org/#concept-method
-  this.handlers = {
+  handlers = {
     socket: [],
     get: [],
     head: [],
@@ -45,34 +36,40 @@ export default function server(options = {}) {
     options: [],
   };
 
-  // For Bun and other WinterCG to know which port to serve from
-  if (this.opts.port) {
-    this.port = this.opts.port;
-  }
+  // A reference of the currently connected sockets
+  sockets = [];
 
-  // Keep a reference of the currently connected sockets
-  this.sockets = [];
+  constructor(options = {}) {
+    // Keep a copy of the options in the instance
+    this.opts = config(options);
+    this.platform = getMachine();
 
-  // Note: required by Bun
-  this.websocket = createWebsocket(this.sockets, this.handlers);
+    // For Bun and other WinterCG to know which port to serve from
+    if (this.opts.port) {
+      this.port = this.opts.port;
+    }
 
-  // Initialize it right away for Node.js
-  if (this.platform.runtime === "node") {
-    this.node();
-  }
+    // Note: required by Bun
+    this.websocket = createWebsocket(this.sockets, this.handlers);
 
-  this.use(timer);
-  this.use(assets);
-  if (this.opts.openapi) {
-    const path = this.opts.openapi.path || "/docs";
-    this.get(path, openapi);
-  }
-  if (this.opts.auth) {
-    this.use(auth({ options: this.opts, app: this }));
+    // Initialize it right away for Node.js
+    if (this.platform.runtime === "node") {
+      this.node();
+    }
+
+    this.use(timer);
+    this.use(assets);
+    if (this.opts.openapi) {
+      const path = this.opts.openapi.path || "/docs";
+      this.get(path, openapi);
+    }
+    if (this.opts.auth) {
+      this.use(auth({ options: this.opts, app: this }));
+    }
   }
 }
 
-server.prototype.self = function () {
+Server.prototype.self = function () {
   const cb = this.callback.bind(this);
   const proto = Object.getPrototypeOf(this);
   for (const key in { ...proto, ...this }) {
@@ -87,7 +84,7 @@ server.prototype.self = function () {
 
 // #region Runtimes
 // Node.js
-server.prototype.node = async function () {
+Server.prototype.node = async function () {
   const http = await import("node:http");
   http
     .createServer(async (request, response) => {
@@ -112,7 +109,7 @@ server.prototype.node = async function () {
 };
 
 // Netlify
-server.prototype.callback = async function (request, context) {
+Server.prototype.callback = async function (request, context) {
   // Consider simply renaming to "ctx.next()"
   request.context = context;
   try {
@@ -127,7 +124,7 @@ server.prototype.callback = async function (request, context) {
 };
 
 // WinterCG, Bun, Cloudflare Workers
-server.prototype.fetch = async function (request, env) {
+Server.prototype.fetch = async function (request, env) {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
@@ -146,9 +143,9 @@ server.prototype.fetch = async function (request, env) {
 };
 
 // INTERNAL
-server.prototype.handle = function (method, path, ...middleware) {
-  // Don't try to optimize, we NEED the method to remain '*' here so that
-  // it doesn't auto-finish
+Server.prototype.handle = function (method, path, ...middleware) {
+  // Do not try to optimize, we NEED the method to remain '*' here so that
+  // it doesn't auto-close the request
   if (method === "*") {
     for (const m in this.handlers) {
       this.handlers[m].push([method, path, ...middleware]);
@@ -160,77 +157,84 @@ server.prototype.handle = function (method, path, ...middleware) {
   return this.self();
 };
 
-server.prototype.socket = function (path, ...middleware) {
+Server.prototype.socket = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("socket", path, ...middleware);
   }
   return this.handle("socket", "*", path, ...middleware);
 };
 
-server.prototype.get = function (path, ...middleware) {
+Server.prototype.get = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("get", path, ...middleware);
   }
   return this.handle("get", "*", path, ...middleware);
 };
 
-server.prototype.head = function (path, ...middleware) {
+Server.prototype.head = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("head", path, ...middleware);
   }
   return this.handle("head", "*", path, ...middleware);
 };
 
-server.prototype.post = function (path, ...middleware) {
+Server.prototype.post = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("post", path, ...middleware);
   }
   return this.handle("post", "*", path, ...middleware);
 };
 
-server.prototype.put = function (path, ...middleware) {
+Server.prototype.put = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("put", path, ...middleware);
   }
   return this.handle("put", "*", path, ...middleware);
 };
 
-server.prototype.patch = function (path, ...middleware) {
+Server.prototype.patch = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("patch", path, ...middleware);
   }
   return this.handle("patch", "*", path, ...middleware);
 };
 
-server.prototype.del = function (path, ...middleware) {
+Server.prototype.del = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("delete", path, ...middleware);
   }
   return this.handle("delete", "*", path, ...middleware);
 };
 
-server.prototype.options = function (path, ...middleware) {
+Server.prototype.options = function (path, ...middleware) {
   if (typeof path === "string") {
     return this.handle("options", path, ...middleware);
   }
   return this.handle("options", "*", path, ...middleware);
 };
 
-server.prototype.use = function (...middleware) {
-  if (typeof middleware[0] === "string") {
-    if (middleware[1] instanceof router) {
-      return this.router(...middleware);
-    }
-    return this.handle("*", ...middleware);
+Server.prototype.use = function (path, ...middleware) {
+  // .use('/hello', router)
+  if (typeof path === "string" && middleware[0] instanceof Router) {
+    return this.router(path, middleware[0]);
   }
-  if (middleware[0] instanceof router) {
-    return this.router("*", ...middleware);
+
+  // .use('/hello', ...middleware)
+  if (typeof path === "string") {
+    return this.handle("*", path, ...middleware);
   }
-  return this.handle("*", "*", ...middleware);
+
+  // .use(router)
+  if (path instanceof Router) {
+    return this.router("*", path);
+  }
+
+  // .use(...middleware)
+  return this.handle("*", "*", path, ...middleware);
 };
 
 // Unwind the children routers into the main router
-server.prototype.router = function (basePath, router) {
+Server.prototype.router = function (basePath, router) {
   basePath = `/${basePath.replace(/\*$/, "")}/`
     .replace(/^\/+/, "/")
     .replace(/\/+$/, "/");
@@ -244,9 +248,9 @@ server.prototype.router = function (basePath, router) {
 };
 
 // #region Testing helper
-server.prototype.test = function () {
+Server.prototype.test = function () {
   let cookie = "";
-  const fetch = async (path, options = {}) => {
+  const fetch = async (path, method, options = {}) => {
     if (!options.headers) options.headers = {};
     if (options.body && typeof options.body !== "string") {
       options.headers["content-type"] = "application/json";
@@ -273,16 +277,17 @@ server.prototype.test = function () {
     return { status: res.status, headers, body };
   };
   return {
-    app: this,
-    get: (path, options) => fetch(path, { method: "get", ...options }),
-    head: (path, options) => fetch(path, { method: "head", ...options }),
-    post: (path, body, options) =>
-      fetch(path, { method: "post", body, ...options }),
-    put: (path, body, options) =>
-      fetch(path, { method: "put", body, ...options }),
-    patch: (path, body, options) =>
-      fetch(path, { method: "patch", body, ...options }),
-    delete: (path, options) => fetch(path, { method: "delete", ...options }),
-    options: (path, options) => fetch(path, { method: "options", ...options }),
+    get: (path, options) => fetch(path, "get", options),
+    head: (path, options) => fetch(path, "head", options),
+    post: (path, body, options) => fetch(path, "post", { body, ...options }),
+    put: (path, body, options) => fetch(path, "put", { body, ...options }),
+    patch: (path, body, options) => fetch(path, "patch", { body, ...options }),
+    delete: (path, options) => fetch(path, "delete", options),
+    options: (path, options) => fetch(path, "options", options),
   };
 };
+
+export default function server(options = {}) {
+  // Make it so that the exported one is a prototype of function()
+  return new Server(options).self();
+}
