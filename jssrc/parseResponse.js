@@ -84,7 +84,7 @@ export default async function parseResponse(out, ctx) {
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
-  if (ctx.time?.times?.length > 1) {
+  if (ctx.time.times.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
 

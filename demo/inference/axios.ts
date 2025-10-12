@@ -18,7 +18,7 @@ type ApiRoutes = <P extends keyof Routes, M extends Routes[P]>(
   },
 ) => ReturnType<typeof axios.request>;
 
-// Implement `typedAxios` using the inferred `ApiRoutes` type
+// Implement `typedAxios` using the inferred `ApiRoutes` string
 const typedAxios: ApiRoutes = ((path: string, config?: any) => {
   return axios.request({ url: path, ...config });
 }) as ApiRoutes;

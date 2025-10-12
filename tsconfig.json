@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    "types": ["jest", "bun", "node"],
+    "lib": ["es2021"]
+  }
+}

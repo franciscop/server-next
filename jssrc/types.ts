@@ -16,18 +16,6 @@ export type Bucket = {
   delete: (path: string) => Promise<boolean>;
 };
 
-export type Options = {
-  port?: number;
-  secret?: string;
-  public?: string | Bucket;
-};
-
-export type Settings = {
-  port: number;
-  secret: string;
-  public?: Bucket;
-};
-
 export type Context = {
   method: Method;
   headers: Record<string, string | string[]>;
@@ -37,7 +25,9 @@ export type Context = {
     params: Record<string, string>;
     query: Record<string, string>;
   };
-  options: Settings;
+  options: Record<string, string> & {
+    public: Bucket;
+  };
   time: { (name: string): void; times: [string, number][]; headers: () => {} };
 };
 

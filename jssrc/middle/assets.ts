@@ -1,6 +1,7 @@
 import { type } from "../reply.js";
+import { Context } from "../types.js";
 
-export default async function assets(ctx) {
+export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;
   if (ctx.method !== "get") return;
   // The homepage _cannot_ be a file by definition. We could consider sending
@@ -8,7 +9,7 @@ export default async function assets(ctx) {
   if (ctx.url.pathname === "/") return;
   try {
     // TODO: streaming
-    const asset = await ctx.options.public.read(ctx.url.pathname, null);
+    const asset = await ctx.options.public.read(ctx.url.pathname);
     if (!asset) return;
     return type(ctx.url.pathname.split(".").pop()).send(asset);
   } catch (error) {
