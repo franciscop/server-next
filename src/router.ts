@@ -44,42 +44,58 @@ export class Router {
     return this.self();
   }
 
-  socket(path: PathOrMiddle, ...middleware: Middleware[]) {
+  socket(path: string, ...middleware: Middleware[]): this;
+  socket(...middleware: Middleware[]): this;
+  socket(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("socket", path, ...middleware);
   }
 
-  get(path: PathOrMiddle, ...middleware: Middleware[]) {
+  get(path: string, ...middleware: Middleware[]): this;
+  get(...middleware: Middleware[]): this;
+  get(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("get", path, ...middleware);
   }
 
-  head(path: PathOrMiddle, ...middleware: Middleware[]) {
+  head(path: string, ...middleware: Middleware[]): this;
+  head(...middleware: Middleware[]): this;
+  head(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("head", path, ...middleware);
   }
 
-  post(path: PathOrMiddle, ...middleware: Middleware[]) {
+  post(path: string, ...middleware: Middleware[]): this;
+  post(...middleware: Middleware[]): this;
+  post(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("post", path, ...middleware);
   }
 
-  put(path: PathOrMiddle, ...middleware: Middleware[]) {
+  put(path: string, ...middleware: Middleware[]): this;
+  put(...middleware: Middleware[]): this;
+  put(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("put", path, ...middleware);
   }
 
-  patch(path: PathOrMiddle, ...middleware: Middleware[]) {
+  patch(path: string, ...middleware: Middleware[]): this;
+  patch(...middleware: Middleware[]): this;
+  patch(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("patch", path, ...middleware);
   }
 
-  del(path: PathOrMiddle, ...middleware: Middleware[]) {
+  del(path: string, ...middleware: Middleware[]): this;
+  del(...middleware: Middleware[]): this;
+  del(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("delete", path, ...middleware);
   }
 
-  options(path: PathOrMiddle, ...middleware: Middleware[]) {
+  options(path: string, ...middleware: Middleware[]): this;
+  options(...middleware: Middleware[]): this;
+  options(path: string | Middleware, ...middleware: Middleware[]) {
     return this.handle("options", path, ...middleware);
   }
 
-  use(...middleware: Middleware[]): void;
-  use(path: string, ...middleware: Middleware[]): void;
-  use(router: Router): void;
-  use(path: string, router: Router): void;
+  use(...middleware: Middleware[]): this;
+  use(path: string, ...middleware: Middleware[]): this;
+  use(router: Router): this;
+  use(path: string, router: Router): this;
   use(...args: [string | Router | Middleware, ...(Router | Middleware)[]]) {
     // .use('/', router) or .use('/', mid1, mid2)
     const path = (typeof args[0] === "string" ? args.shift() : "*") as string;

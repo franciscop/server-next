@@ -19,12 +19,11 @@ class Server extends Router {
 
     // Keep a copy of the options in the instance
     this.settings = config(options);
-    // this.opts = config(options);
     // this.platform = getMachine();
 
     // // For Bun and other WinterCG to know which port to serve from
-    // if (this.opts.port) {
-    //   this.port = this.opts.port;
+    // if (this.settings.port) {
+    //   this.port = this.settings.port;
     // }
 
     // this.sockets = []; // A reference of the currently connected sockets
@@ -40,11 +39,11 @@ class Server extends Router {
     // this.use(assets);
 
     // // Optional middleware
-    // if (this.opts.openapi) {
-    //   this.get(this.opts.openapi.path || "/docs", openapi);
+    // if (this.settings.openapi) {
+    //   this.get(this.settings.openapi.path || "/docs", openapi);
     // }
-    // if (this.opts.auth) {
-    //   this.use(auth({ options: this.opts, app: this }));
+    // if (this.settings.auth) {
+    //   this.use(auth({ options: this.settings, app: this }));
     // }
   }
 

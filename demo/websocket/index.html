@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <body>
+    <div>Hello world</div>
+    <ul></ul>
+    <input />
+    <script>
+      const socket1 = new WebSocket("ws://localhost:3000/somepath1");
+      const socket2 = new WebSocket("ws://localhost:3000/somepath2");
+
+      socket1.onopen = function (event) {
+        console.log("WebSocket is open now.");
+        socket1.send("Hello Server!");
+      };
+
+      socket1.onmessage = function (event) {
+        console.log("Message from server:", event.data);
+      };
+
+      socket1.onclose = function (event) {
+        console.log("WebSocket is closed now.");
+      };
+
+      socket1.onerror = function (error) {
+        console.error("WebSocket error:", error);
+      };
+    </script>
+  </body>
+</html>

@@ -28,7 +28,7 @@ export const Node = async function () {
       }
       response.end();
     })
-    .listen(this.opts.port);
+    .listen(this.settings.port);
 };
 
 export const Netlify = async function (request, context) {

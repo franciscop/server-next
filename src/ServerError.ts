@@ -15,6 +15,7 @@ export default class ServerError extends Error {
       message = message(vars);
     }
     if (typeof message !== "string") throw Error(`Invalid error ${message}`);
+
     for (const key in vars) {
       let value = vars[key];
       value = Array.isArray(value) ? value.join(",") : value;
@@ -32,10 +33,10 @@ export default class ServerError extends Error {
     for (const code in errors) {
       const error = errors[code];
       if (typeof error === "string") {
-        ServerError[code] = (vars: Variables) =>
-          new ServerError(code, undefined, error, vars);
+        (ServerError as any)[code] = (vars: Variables = {}) =>
+          new ServerError(code, 500, error, vars);
       } else {
-        ServerError[code] = (vars: Variables) =>
+        (ServerError as any)[code] = (vars: Variables = {}) =>
           new ServerError(code, error.status, error.message, vars);
       }
     }

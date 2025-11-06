@@ -4,6 +4,8 @@ import { Method } from "./types";
 
 // A function that can be triggered for testing
 export default function ServerTest() {
+  const port = this.settings.port;
+
   // let cookie = "";
   const fetch = async (
     path: string,
@@ -19,7 +21,7 @@ export default function ServerTest() {
     //   options.headers.cookie = cookie;
     // }
     const res = await this.fetch(
-      new Request(`http://localhost:${this.settings.port}${path}`, {
+      new Request(`http://localhost:${port}${path}`, {
         method,
         ...options,
       }),
