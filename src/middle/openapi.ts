@@ -141,7 +141,7 @@ const generateOpenApiPaths = (
       const parameters: any[] = [];
 
       // Extract the query parameters
-      const matched = path.matchAll(/\:[\w\(\)]+/gi);
+      const matched = Array.from(path.matchAll(/\:[\w\(\)]+/gi));
       matched.forEach((match: RegExpMatchArray) => {
         const [name, type = "string"] = match[0]
           .slice(1)
