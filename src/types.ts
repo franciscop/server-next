@@ -12,7 +12,7 @@ export type RouterMethod = "*" | Method;
 
 export type Bucket = {
   read: (path: string) => Promise<ReadableStream | null>;
-  write: (path: string, data: string) => Promise<void>;
+  write: (path: string, data: string) => Promise<void | string>;
   delete: (path: string) => Promise<boolean>;
 };
 

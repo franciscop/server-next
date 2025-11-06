@@ -40,7 +40,7 @@ const getBody = () => {
 describe("parseBody", () => {
   it("can parse the example body", async () => {
     const mockBucket: Bucket = {
-      read: async (id: string) => {},
+      read: async (id: string) => null,
       write: async (id: string) => {},
       delete: async (id: string) => false,
     };

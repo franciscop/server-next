@@ -1,4 +1,9 @@
-const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+const entities: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
 const encode = (str: string | number = ""): string => {
   if (typeof str === "number") str = String(str);
   if (typeof str !== "string") return ""; // nullify not-strings
@@ -14,9 +19,11 @@ const altAttrs: Record<string, string> = {
 };
 
 // "" and 0 are valid children, false and null and undefined are not
-const isValidChild = (child: any): boolean => child || child === "" || child === 0;
+const isValidChild = (child: any): boolean =>
+  child || child === "" || child === 0;
 
-const escapeCSS = (value: any): string => String(value).replace(/[<>&"'`]/g, "\\$&");
+const escapeCSS = (value: any): string =>
+  String(value).replace(/[<>&"'`]/g, "\\$&");
 const minifyCss = (str: string): string =>
   str
     .replace(/\s+/g, " ")
@@ -33,7 +40,10 @@ const minifyCss = (str: string): string =>
     .replace(/(\{) (\w)/g, "$1$2")
     .trim();
 
-export const jsx = (tag: string | Function, { children, ...props }: any): (() => string) | string => {
+export const jsx = (
+  tag: string | Function,
+  { children, ...props }: any,
+): (() => string) | string => {
   if (typeof tag === "function") return tag({ children, ...props });
 
   // If they include an explicit <script>, let them be, just render it
@@ -63,7 +73,7 @@ export const jsx = (tag: string | Function, { children, ...props }: any): (() =>
     .map(([k, v]) =>
       v === true
         ? altAttrs[k.toLowerCase()] || encode(k)
-        : `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(v)}"`,
+        : `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(String(v))}"`,
     )
     .join(" ");
   if (attrStr) attrStr = ` ${attrStr}`;

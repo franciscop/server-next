@@ -15,7 +15,9 @@ describe("bucket", () => {
 
   it("writes a file", async () => {
     const filePath = await localBucket!.write("testFile.txt", "Hello, World!");
-    expect(filePath.endsWith("testFile.txt")).toBe(true);
+    expect(
+      typeof filePath === "string" && filePath.endsWith("testFile.txt"),
+    ).toBe(true);
   });
 
   it("reads a file", async () => {

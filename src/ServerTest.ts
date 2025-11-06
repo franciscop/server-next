@@ -1,4 +1,3 @@
-import { BodyInit } from "bun";
 import { Method } from "./types";
 import { parseHeaders } from "./helpers";
 
