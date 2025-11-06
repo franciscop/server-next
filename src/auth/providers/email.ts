@@ -2,31 +2,54 @@ import { createId } from "../../helpers/index.js";
 import { ServerError, status } from "../../index.js";
 import updateUser from "../updateUser.js";
 import type { Context } from "../../types.js";
+import { argon2, getRandomValues, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
-const hash = new Proxy({} as any, {
-  get: (self: any, key: string) => {
-    const load = async () =>
-      Object.assign(
-        self,
-        await import("argon2").catch(() => {
-          throw ServerError.AUTH_ARGON_NEEDED();
-        }),
-      );
-    if (key === "verify" && !self.verify) {
-      return async (hash: string, pass: string) => {
-        await load();
-        return self.verify(hash, pass);
-      };
-    }
-    if (key === "hash" && !self.hash) {
-      return async (pass: string) => {
-        await load();
-        return self.hash(pass);
-      };
-    }
-    return self[key];
+const argon2prom = promisify(argon2);
+
+const hash = {
+  hash: async (password: string): Promise<string> => {
+    // Using argon2id with recommended parameters
+    return (
+      await argon2prom("argon2id", {
+        message: Buffer.from(password),
+        nonce: getRandomValues(new Uint8Array(16)),
+        parallelism: 4,
+        tagLength: 64,
+        memory: 65536,
+        passes: 3,
+      })
+    ).toString("base64");
   },
-});
+  verify: async (encoded: string, password: string): Promise<boolean> => {
+    try {
+      // Extract the salt from the encoded hash
+      // Argon2 PHC format: $argon2id$v=19$m=19456,t=2,p=1$salt$hash
+      const parts = encoded.split("$");
+      if (parts.length < 6 || parts[1] !== "argon2id") {
+        return false;
+      }
+
+      const params = Object.fromEntries(
+        parts[3].split(",").map((p) => p.split("=")),
+      );
+      const expectedHash = Buffer.from(parts[5], "base64");
+
+      const actualHash = await argon2prom("argon2id", {
+        message: Buffer.from(password),
+        nonce: Buffer.from(parts[4], "base64"),
+        memory: parseInt(params.m),
+        passes: parseInt(params.t),
+        parallelism: parseInt(params.p),
+        tagLength: expectedHash.length,
+      });
+
+      return timingSafeEqual(expectedHash, actualHash);
+    } catch {
+      return false;
+    }
+  },
+};
 
 const createSession = async (user: any, ctx: Context) => {
   const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;
