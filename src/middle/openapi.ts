@@ -102,7 +102,7 @@ const generateOpenApiPaths = (
 
       // Normalize path (convert ":id" to "{id}" for OpenAPI)
       const normalizedPath = path
-        .replaceAll(/\(\w+\)/gi, "")
+        .replace(/\(\w+\)/gi, "")
         .replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
 
       if (!paths[normalizedPath]) {
@@ -115,7 +115,7 @@ const generateOpenApiPaths = (
         const wrongNames = ["default"];
         if (wrongNames.includes(fn.name)) return null;
         if (fn.name.length <= 3) return null;
-        if (fn.name.includes("_")) return fn.name.replaceAll("_", " ");
+        if (fn.name.includes("_")) return fn.name.replace(/_/g, " ");
         const name = fn.name
           .split(/(?=[A-Z])/)
           .join(" ")

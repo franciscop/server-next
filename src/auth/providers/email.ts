@@ -3,33 +3,30 @@ import { ServerError, status } from "../../index.js";
 import updateUser from "../updateUser.js";
 import type { Context } from "../../types.js";
 
-const hash = new Proxy(
-  {} as any,
-  {
-    get: (self: any, key: string) => {
-      const load = async () =>
-        Object.assign(
-          self,
-          await import("argon2").catch(() => {
-            throw new ServerError.AUTH_ARGON_NEEDED();
-          }),
-        );
-      if (key === "verify" && !self.verify) {
-        return async (hash: string, pass: string) => {
-          await load();
-          return self.verify(hash, pass);
-        };
-      }
-      if (key === "hash" && !self.hash) {
-        return async (pass: string) => {
-          await load();
-          return self.hash(pass);
-        };
-      }
-      return self[key];
-    },
+const hash = new Proxy({} as any, {
+  get: (self: any, key: string) => {
+    const load = async () =>
+      Object.assign(
+        self,
+        await import("argon2").catch(() => {
+          throw ServerError.AUTH_ARGON_NEEDED();
+        }),
+      );
+    if (key === "verify" && !self.verify) {
+      return async (hash: string, pass: string) => {
+        await load();
+        return self.verify(hash, pass);
+      };
+    }
+    if (key === "hash" && !self.hash) {
+      return async (pass: string) => {
+        await load();
+        return self.hash(pass);
+      };
+    }
+    return self[key];
   },
-);
+});
 
 const createSession = async (user: any, ctx: Context) => {
   const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;

@@ -18,11 +18,14 @@ const replace = (k: string): string => {
   return `\x1b[${map[k]}m`;
 };
 
-export default function color(str: string | TemplateStringsArray, ...vals: any[]): string {
+export default function color(
+  str: string | TemplateStringsArray,
+  ...vals: any[]
+): string {
   if (typeof str === "string") {
     return str
-      .replaceAll(/\{(\w+)\}/g, (m, k) => replace(k))
-      .replaceAll(/\{\/\w*\}/g, replace("reset"));
+      .replace(/\{(\w+)\}/g, (m, k) => replace(k))
+      .replace(/\{\/\w*\}/g, () => replace("reset"));
   }
 
   // Template literals, put them together first and then color them
