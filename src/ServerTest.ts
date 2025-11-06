@@ -1,9 +1,9 @@
 import { BodyInit } from "bun";
-import { parseHeaders } from "./helpers";
 import { Method } from "./types";
+import { parseHeaders } from "./helpers";
 
 // A function that can be triggered for testing
-export default function ServerTest() {
+export default function ServerTest(this: any) {
   const port = this.settings.port;
 
   // let cookie = "";
@@ -41,17 +41,17 @@ export default function ServerTest() {
     return { status: res.status, headers, body };
   };
   return {
-    get: (path: string, options: RequestInit) => fetch(path, "get", options),
-    head: (path: string, options: RequestInit) => fetch(path, "head", options),
-    post: (path: string, body: BodyInit, options: RequestInit) =>
+    get: (path: string, options?: RequestInit) => fetch(path, "get", options),
+    head: (path: string, options?: RequestInit) => fetch(path, "head", options),
+    post: (path: string, body?: BodyInit, options?: RequestInit) =>
       fetch(path, "post", { body, ...options }),
-    put: (path: string, body: BodyInit, options: RequestInit) =>
+    put: (path: string, body?: BodyInit, options?: RequestInit) =>
       fetch(path, "put", { body, ...options }),
-    patch: (path: string, body: BodyInit, options: RequestInit) =>
+    patch: (path: string, body?: BodyInit, options?: RequestInit) =>
       fetch(path, "patch", { body, ...options }),
-    delete: (path: string, options: RequestInit) =>
+    delete: (path: string, options?: RequestInit) =>
       fetch(path, "delete", options),
-    options: (path: string, options: RequestInit) =>
+    options: (path: string, options?: RequestInit) =>
       fetch(path, "options", options),
   };
 }

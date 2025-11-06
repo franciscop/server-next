@@ -1,6 +1,18 @@
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | { message: string; status: number };
 
+// Extended error methods added dynamically
+interface ServerErrorConstructor {
+  new (
+    code: string,
+    status: number,
+    message: string | ((vars: Variables) => string),
+    vars?: Variables,
+  ): ServerError;
+  extend(errors: Record<string, ExtendError>): Record<string, ExtendError>;
+  [key: string]: any; // For dynamically added error methods
+}
+
 export default class ServerError extends Error {
   code: string;
   status: number;
@@ -11,20 +23,24 @@ export default class ServerError extends Error {
     message: string | ((vars: Variables) => string),
     vars: Variables = {},
   ) {
+    let messageStr: string;
     if (typeof message === "function") {
-      message = message(vars);
+      messageStr = message(vars);
+    } else {
+      messageStr = message;
     }
-    if (typeof message !== "string") throw Error(`Invalid error ${message}`);
+    if (typeof messageStr !== "string")
+      throw Error(`Invalid error ${messageStr}`);
 
     for (const key in vars) {
       let value = vars[key];
       value = Array.isArray(value) ? value.join(",") : value;
-      message = message.replaceAll(`{${key}}`, value);
+      messageStr = messageStr.replaceAll(`{${key}}`, value);
     }
 
-    super(message);
+    super(messageStr);
     this.code = code;
-    this.message = message;
+    this.message = messageStr;
     this.status = status;
   }
 

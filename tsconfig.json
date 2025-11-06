@@ -1,6 +1,17 @@
 {
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "types": ["jest", "bun", "node"],
-    "lib": ["es2021"]
-  }
+    "typeRoots": ["./node_modules/@types", "./src/test"]
+  },
+  "include": ["src/**/*"]
 }

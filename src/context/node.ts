@@ -1,19 +1,49 @@
 import auth from "../auth/index.js";
-import { define, parseHeaders } from "../helpers/index.js";
+import { define, parseHeaders } from "../helpers";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
-import type { Context } from "../types.js";
+import type { Context, Method } from "../types.js";
 import type { IncomingMessage } from "node:http";
 
 type EventCallback = (data: any) => void;
 
-interface NodeContext extends Partial<Context> {
+function isValidMethod(method: string): method is Method {
+  return [
+    "get",
+    "post",
+    "put",
+    "patch",
+    "delete",
+    "head",
+    "options",
+    "socket",
+  ].includes(method);
+}
+
+interface NodeContext {
+  method: Method;
+  headers: Record<string, string | string[]>;
+  cookies: Record<string, string>;
+  body?: any;
+  url: URL & {
+    params: Record<string, string>;
+    query: Record<string, string>;
+  };
   options: any;
+  time?: any;
+  session?: Record<string, any>;
+  auth?: any;
+  user?: any;
+  res?: {
+    headers: Record<string, string>;
+    cookies: Record<string, any>;
+  };
   req: IncomingMessage;
-  res: { status: number | null; headers: Record<string, any>; cookies: Record<string, any> };
-  method: string;
   on: (name: string, callback: EventCallback) => void;
   trigger: (name: string, data?: any) => void;
+  app?: any;
+  platform?: any;
+  machine?: any;
 }
 
 // Headers come like [title1, value1, title2, value2, ...]
@@ -23,13 +53,24 @@ const chunkArray = (arr: string[], size: number): string[][] =>
     ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
     : [arr];
 
-export default async (request: IncomingMessage & { rawHeaders: string[] }, app: any): Promise<NodeContext | { error: Error }> => {
+export default async (
+  request: IncomingMessage & { rawHeaders: string[] },
+  app: any,
+): Promise<NodeContext | { error: Error }> => {
   try {
-    const ctx: NodeContext = {} as NodeContext;
-    ctx.options = app.opts || {};
-    ctx.req = request;
-    ctx.res = { status: null, headers: {}, cookies: {} };
-    ctx.method = request.method?.toLowerCase() || "get";
+    const ctx: NodeContext = {
+      headers: {},
+      cookies: {},
+      url: undefined!,
+      options: app.opts || {},
+      method: "get",
+      req: request,
+    } as NodeContext;
+    const method = request.method?.toLowerCase() || "get";
+    if (!isValidMethod(method)) {
+      throw new Error(`Invalid HTTP method: ${method}`);
+    }
+    ctx.method = method;
 
     // Private
     const events: Record<string, EventCallback[]> = {};
@@ -44,7 +85,9 @@ export default async (request: IncomingMessage & { rawHeaders: string[] }, app: 
       }
     };
 
-    ctx.headers = parseHeaders(new Headers(chunkArray(request.rawHeaders, 2) as any));
+    ctx.headers = parseHeaders(
+      new Headers(chunkArray(request.rawHeaders, 2) as any),
+    );
     ctx.cookies = parseCookies(ctx.headers.cookie);
     await auth.load(ctx as Context);
 
@@ -57,15 +100,16 @@ export default async (request: IncomingMessage & { rawHeaders: string[] }, app: 
     );
 
     await new Promise<void>((resolve, reject) => {
-      const body: Buffer[] = [];
+      const body: Uint8Array[] = [];
       request
-        .on("data", (chunk: Buffer) => {
+        .on("data", (chunk: Uint8Array) => {
           body.push(chunk);
         })
         .on("end", async () => {
           const type = ctx.headers["content-type"];
+          const concatenated = Buffer.concat(body);
           ctx.body = await parseBody(
-            Buffer.concat(body).toString(),
+            concatenated.toString(),
             type,
             ctx.options.uploads,
           );

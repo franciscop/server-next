@@ -1,6 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-import fsp from "node:fs/promises";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as fsp from "node:fs/promises";
 import type { Bucket } from "../types.js";
 
 function thinLocalBucket(root: string): Bucket {

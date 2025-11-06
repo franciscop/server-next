@@ -1,4 +1,4 @@
-import { createId } from "../helpers/index.js";
+import { createId } from "../helpers";
 import type { Bucket } from "../types.js";
 
 function getBoundary(header?: string): string | null {
@@ -26,7 +26,11 @@ function getMatching(string: string, regex: RegExp): string {
   return matches?.[1] ? matches[1] : "";
 }
 
-const saveFile = async (name: string, value: Buffer, bucket: Bucket): Promise<string> => {
+const saveFile = async (
+  name: string,
+  value: Buffer,
+  bucket: Bucket,
+): Promise<string> => {
   const ext = name.split(".").pop();
   const id = `${createId()}.${ext}`;
   await bucket.write(id, value.toString("binary"));
@@ -37,12 +41,12 @@ const saveFile = async (name: string, value: Buffer, bucket: Bucket): Promise<st
 function splitBuffer(buffer: Buffer, delimiter: Buffer): Buffer[] {
   const result: Buffer[] = [];
   let start = 0;
-  let index = buffer.indexOf(delimiter, start);
+  let index = buffer.indexOf(delimiter as any, start);
 
   while (index !== -1) {
     result.push(buffer.slice(start, index));
     start = index + delimiter.length;
-    index = buffer.indexOf(delimiter, start);
+    index = buffer.indexOf(delimiter as any, start);
   }
 
   result.push(buffer.slice(start));
@@ -53,22 +57,27 @@ const BREAK = "\r\n\r\n";
 
 export default async function parseBody(
   raw: string | Request | { arrayBuffer: () => Promise<ArrayBuffer> },
-  contentType?: string,
-  bucket?: Bucket
+  contentType?: string | string[],
+  bucket?: Bucket,
 ): Promise<any> {
+  // If contentType is an array, use the first one
+  const contentTypeStr = Array.isArray(contentType)
+    ? contentType[0]
+    : contentType;
+
   const baseBuffer = typeof raw === "string" ? raw : await raw.arrayBuffer();
-  const rawBuffer = Buffer.from(baseBuffer);
+  const rawBuffer = Buffer.from(baseBuffer as any);
   if (!rawBuffer) return {};
 
-  if (!contentType || /text\/plain/.test(contentType)) {
+  if (!contentTypeStr || /text\/plain/.test(contentTypeStr)) {
     return rawBuffer.toString(); // Return as plain text
   }
 
-  if (/application\/json/.test(contentType)) {
+  if (/application\/json/.test(contentTypeStr)) {
     return JSON.parse(rawBuffer.toString()); // Parse JSON
   }
 
-  const boundary = getBoundary(contentType);
+  const boundary = getBoundary(contentTypeStr);
   if (!boundary) return null;
 
   const body: Record<string, any> = {};
@@ -76,7 +85,8 @@ export default async function parseBody(
   const parts = splitBuffer(rawBuffer, boundaryBuffer);
 
   for (const part of parts) {
-    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
+    if (part.length === 0 || part.equals(Buffer.from("--\r\n") as any))
+      continue;
 
     const partString = part.toString();
     const name = getMatching(partString, /(?:name=")(.+?)(?:")/)

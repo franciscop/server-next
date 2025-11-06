@@ -1,7 +1,7 @@
 import auth from "../auth/index.js";
 import Bucket from "./bucket.js";
 import createId from "./createId";
-import debugInfo from "./debugInfo.ts";
+import debugInfo from "./debugInfo.js";
 
 import { Cors, Options, Settings } from "../types";
 
@@ -62,13 +62,18 @@ export default function config(options: Options = {}): Settings {
 
   // Stores
   settings.store = options.store ?? null;
-  debugInfo(options, "store", (store) => store?.name || "working");
+  debugInfo(options, "store", (store) => store?.name || "working", "📦");
   settings.cookies = options.cookies ?? null;
-  debugInfo(options, "cookies");
+  debugInfo(options, "cookies", (cookies) => cookies?.name || "working", "🍪");
   if (options.store && !options.session) {
     settings.session = { store: options.store.prefix("session:") };
   }
-  debugInfo(options, "session");
+  debugInfo(
+    options,
+    "session",
+    (session) => session?.store?.name || "working",
+    "🔐",
+  );
 
   // AUTH
   settings.auth = auth.parseOptions(options.auth || env.AUTH || null, options);

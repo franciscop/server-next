@@ -1,50 +1,56 @@
 import "./polyfill.js";
-// import "./errors/index.js";
+import "./errors/index.js";
 
-import config from "./helpers/config";
-// import { config, createWebsocket, getMachine } from "./helpers/index.js";
-
-// import { assets, auth, timer, openapi } from "./middle/index.js";
+import { config, createWebsocket, getMachine } from "./helpers";
+import { assets, auth, timer, openapi } from "./middle/index.js";
 
 import { Router } from "./router.js";
-import ServerTest from "./ServerTest";
-import * as handlers from "./context/handlers";
-import { Settings } from "./types";
+import ServerTest from "./ServerTest.js";
+import * as handlers from "./context/handlers.js";
+import { Settings } from "./types.js";
 
 class Server extends Router {
   settings: Settings;
+  platform: {
+    provider: string | null;
+    runtime: string | null;
+    production: boolean;
+  };
+  port?: number;
+  sockets: any[];
+  websocket: any;
 
   constructor(options = {}) {
     super();
 
     // Keep a copy of the options in the instance
     this.settings = config(options);
-    // this.platform = getMachine();
+    this.platform = getMachine();
 
-    // // For Bun and other WinterCG to know which port to serve from
-    // if (this.settings.port) {
-    //   this.port = this.settings.port;
-    // }
+    // For Bun and other WinterCG to know which port to serve from
+    if (this.settings.port) {
+      this.port = this.settings.port;
+    }
 
-    // this.sockets = []; // A reference of the currently connected sockets
-    // this.websocket = createWebsocket(this.sockets, this.handlers); // Bun
+    this.sockets = []; // A reference of the currently connected sockets
+    this.websocket = createWebsocket(this.sockets, this.handlers); // Bun
 
-    // // Initialize it right away for Node.js
-    // if (this.platform.runtime === "node") {
-    //   this.node();
-    // }
+    // Initialize it right away for Node.js
+    if (this.platform.runtime === "node") {
+      (this as any).node();
+    }
 
-    // // Middleware that is always available
-    // this.use(timer);
-    // this.use(assets);
+    // Middleware that is always available
+    this.use(timer as any);
+    this.use(assets as any);
 
-    // // Optional middleware
-    // if (this.settings.openapi) {
-    //   this.get(this.settings.openapi.path || "/docs", openapi);
-    // }
-    // if (this.settings.auth) {
-    //   this.use(auth({ options: this.settings, app: this }));
-    // }
+    // Optional middleware
+    if (this.settings.openapi) {
+      this.get(this.settings.openapi.path || "/docs", openapi as any);
+    }
+    if (this.settings.auth) {
+      this.use(auth as any);
+    }
   }
 
   // We need to return a function; some environment expect the default export
@@ -56,9 +62,9 @@ class Server extends Router {
     const keys = Object.keys({ ...this.handlers, ...proto, ...this });
     for (const key of ["use", ...keys]) {
       if (typeof this[key] === "function") {
-        cb[key] = this[key].bind(this);
+        (cb as any)[key] = (this as any)[key].bind(this);
       } else {
-        cb[key] = this[key];
+        (cb as any)[key] = (this as any)[key];
       }
     }
     return cb;
@@ -70,13 +76,13 @@ class Server extends Router {
   callback = handlers.Netlify;
 
   // Helper purely for testing
-  test = ServerTest;
+  test: typeof ServerTest = ServerTest;
 }
 
 export default function server(options = {}) {
   return new Server(options).self();
 }
 
-export * from "./reply";
-export { default as ServerError } from "./ServerError";
-export { default as router } from "./router";
+export * from "./reply.js";
+export { default as ServerError } from "./ServerError.js";
+export { default as router } from "./router.js";

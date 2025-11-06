@@ -16,8 +16,6 @@ export const createTime = () => {
   return time;
 };
 
-export default function timer(
-  ctx: Partial<Context>,
-): asserts ctx is Partial<Context> & { time: ReturnType<typeof createTime> } {
-  ctx.time = createTime();
+export default function timer(ctx: Partial<Context>): void {
+  (ctx as any).time = createTime();
 }

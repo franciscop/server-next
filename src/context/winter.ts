@@ -1,29 +1,70 @@
 import auth from "../auth/index.js";
-import { define, parseHeaders } from "../helpers/index.js";
+import { define, parseHeaders } from "../helpers";
 import parseBody from "./parseBody.js";
 import parseCookies from "./parseCookies.js";
-import type { Context } from "../types.js";
+import type { Context, Method } from "../types.js";
 
 type EventCallback = (data: any) => void;
 
-interface WinterContext extends Partial<Context> {
-  init: number;
-  options: any;
-  req: Request;
-  res: { status: number | null; headers: Record<string, any>; cookies: Record<string, any> };
-  method: string;
-  on: (name: string, callback: EventCallback) => void;
-  trigger: (name: string, data?: any) => void;
+function isValidMethod(method: string): method is Method {
+  return [
+    "get",
+    "post",
+    "put",
+    "patch",
+    "delete",
+    "head",
+    "options",
+    "socket",
+  ].includes(method);
 }
 
-export default async (request: Request, app: any): Promise<WinterContext | { error: Error }> => {
+interface WinterContext {
+  method: Method;
+  headers: Record<string, string | string[]>;
+  cookies: Record<string, string>;
+  body?: any;
+  url: URL & {
+    params: Record<string, string>;
+    query: Record<string, string>;
+  };
+  options: any;
+  time?: any;
+  session?: Record<string, any>;
+  auth?: any;
+  user?: any;
+  res?: {
+    headers: Record<string, string>;
+    cookies: Record<string, any>;
+  };
+  init: number;
+  req: Request;
+  on: (name: string, callback: EventCallback) => void;
+  trigger: (name: string, data?: any) => void;
+  app?: any;
+  platform?: any;
+  machine?: any;
+}
+
+export default async (
+  request: Request,
+  app: any,
+): Promise<WinterContext | { error: Error }> => {
   try {
-    const ctx: WinterContext = {} as WinterContext;
-    ctx.init = performance.now();
-    ctx.options = app.opts || {};
-    ctx.req = request;
-    ctx.res = { status: null, headers: {}, cookies: {} };
-    ctx.method = request.method.toLowerCase();
+    const ctx: WinterContext = {
+      headers: {},
+      cookies: {},
+      url: undefined!,
+      options: app.opts || {},
+      method: "get",
+      init: performance.now(),
+      req: request,
+    } as WinterContext;
+    const method = request.method.toLowerCase();
+    if (!isValidMethod(method)) {
+      throw new Error(`Invalid HTTP method: ${method}`);
+    }
+    ctx.method = method;
 
     // Private
     const events: Record<string, EventCallback[]> = {};

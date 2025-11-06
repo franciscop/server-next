@@ -11,7 +11,7 @@ export type Method =
 export type RouterMethod = "*" | Method;
 
 export type Bucket = {
-  read: (path: string) => Promise<void>;
+  read: (path: string) => Promise<ReadableStream | null>;
   write: (path: string, data: string) => Promise<void>;
   delete: (path: string) => Promise<boolean>;
 };
@@ -35,6 +35,11 @@ type CorsOptions =
 type KVStore = {
   name: string;
   prefix: (key: string) => KVStore;
+  get: (key: string) => Promise<any>;
+  set: (key: string, value: any, options?: any) => Promise<void>;
+  has: (key: string) => Promise<boolean>;
+  del: (key: string) => Promise<void>;
+  keys: () => Promise<string[]>;
 };
 
 export type Options = {
@@ -65,6 +70,12 @@ export type Settings = {
   openapi?: any;
 };
 
+export type Time = {
+  (name: string): void;
+  times: [string, number][];
+  headers: () => string;
+};
+
 export type Context = {
   method: Method;
   headers: Record<string, string | string[]>;
@@ -75,7 +86,7 @@ export type Context = {
     query: Record<string, string>;
   };
   options: Settings;
-  time: { (name: string): void; times: [string, number][]; headers: () => {} };
+  time?: Time;
   session?: Record<string, any>;
   auth?: any;
   user?: any;

@@ -1,7 +1,12 @@
-import fsp from "node:fs/promises";
+import * as fsp from "node:fs/promises";
 import type { Context } from "../types.js";
 
-const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+const entities: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
 const encode = (str: string | number = ""): string => {
   if (typeof str === "number") str = String(str);
   if (typeof str !== "string") return ""; // nullify not-strings
@@ -71,10 +76,13 @@ const getTag = (name: string, fn: Function): string => {
   return encode(found.replace(name, "").trim());
 };
 
-const getDescription = (fn: Function): string => getTag("@description", fn) || "";
+const getDescription = (fn: Function): string =>
+  getTag("@description", fn) || "";
 const getReturn = (fn: Function): string => getTag("@returns", fn) || "OK";
 
-const generateOpenApiPaths = (handlers: Record<string, any[]>): Record<string, any> => {
+const generateOpenApiPaths = (
+  handlers: Record<string, any[]>,
+): Record<string, any> => {
   const paths: Record<string, any> = {};
 
   for (const [method, routes] of Object.entries(handlers)) {

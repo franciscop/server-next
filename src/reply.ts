@@ -1,4 +1,4 @@
-import { createCookies, toWeb, types } from "./helpers/index.js";
+import { createCookies, toWeb, types } from "./helpers";
 
 interface ResponseData {
   headers: Record<string, string>;

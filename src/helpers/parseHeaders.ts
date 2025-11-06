@@ -1,6 +1,6 @@
 export default (raw: Headers): Record<string, string | string[]> => {
   const headers: Record<string, string | string[]> = {};
-  for (let [key, value] of raw.entries()) {
+  for (let [key, value] of Array.from(raw.entries())) {
     key = key.toLowerCase();
     if (headers[key]) {
       if (!Array.isArray(headers[key])) {

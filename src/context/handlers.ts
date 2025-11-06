@@ -1,4 +1,4 @@
-import { handleRequest } from "../helpers";
+import { handleRequest, parseHeaders, iterate } from "../helpers";
 
 import createWinterContext from "./winter";
 import createNodeContext from "./node";
@@ -8,8 +8,11 @@ export const Winter = async function (request, env) {
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
   const ctx = await createWinterContext(request, this);
+  if ("error" in ctx) {
+    throw ctx.error;
+  }
   const res = await handleRequest(this.handlers, ctx);
-  ctx?.trigger?.("finish", { ...ctx, res, end: performance.now() });
+  ctx.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 
@@ -18,6 +21,9 @@ export const Node = async function () {
   http
     .createServer(async (request, response) => {
       const ctx = await createNodeContext(request, this);
+      if ("error" in ctx) {
+        throw ctx.error;
+      }
       const out = await handleRequest(this.handlers, ctx);
 
       response.writeHead(out.status || 200, parseHeaders(out.headers));
@@ -38,5 +44,8 @@ export const Netlify = async function (request, context) {
     throw new Error("Netlify doesn't exist");
   }
   const ctx = await createWinterContext(request, this);
+  if ("error" in ctx) {
+    throw ctx.error;
+  }
   return await handleRequest(this.handlers, ctx);
 };

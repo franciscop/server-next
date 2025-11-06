@@ -2,18 +2,17 @@ import {
   createId,
   iteratorToReadable,
   iteratorAsyncToReadable,
-} from "./helpers/index.js";
+  cors,
+} from "./helpers";
 import { json } from "./reply.js";
 import ServerError from "./ServerError.js";
-import cors from "./helpers/cors.js";
 import type { Context } from "./types.js";
 
 export default async function parseResponse(
   out: any,
   ctx: Context,
 ): Promise<Response | null> {
-  // undefined || null || 0 || false || ~""~ -> empty string is still 200
-  if (!out && typeof out !== "string") return null;
+  if (!out && typeof out !== "string") return;
 
   if (typeof out === "function") {
     out = await out(ctx);
@@ -88,7 +87,7 @@ export default async function parseResponse(
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
-  if (ctx.time.times.length > 1) {
+  if (ctx.time && ctx.time.times && ctx.time.times.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers() as any);
   }
 
