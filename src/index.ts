@@ -60,7 +60,7 @@ class Server extends Router {
     const cb = this.callback.bind(this);
     const proto = Object.getPrototypeOf(this);
     const keys = Object.keys({ ...this.handlers, ...proto, ...this });
-    for (const key of ["use", ...keys]) {
+    for (const key of ["use", "fetch", "callback", ...keys]) {
       if (typeof this[key] === "function") {
         (cb as any)[key] = (this as any)[key].bind(this);
       } else {
@@ -80,8 +80,6 @@ class Server extends Router {
   callback(request, context) {
     return handlers.Netlify(this, request, context);
   }
-  // fetch = handlers.Winter;
-  // callback = handlers.Netlify;
 
   // Helper purely for testing
   test: typeof ServerTest = ServerTest;
