@@ -12,18 +12,18 @@ const parseOptions = (auth: any, all: any): any => {
     const [type, provider] = auth.split(":");
     auth = { type, provider };
   }
-  // if (typeof auth.type === "string") {
-  //   auth.type = auth.type.split("|").filter(Boolean);
-  // }
+  if (typeof auth.type === "string") {
+    auth.type = auth.type.split("|").filter(Boolean);
+  }
   if (typeof auth.provider === "string") {
     auth.provider = auth.provider.split("|").filter(Boolean);
   }
   if (!auth.type) {
     throw new Error("Auth options needs a type");
   }
-  // if (!auth.type.length) {
-  //   throw new Error("Auth options needs a type");
-  // }
+  if (!auth.type.length) {
+    throw new Error("Auth options needs a type");
+  }
   if (!auth.provider || !auth.provider.length) {
     throw new Error("Auth options needs a provider");
   }

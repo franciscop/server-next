@@ -4,8 +4,10 @@ import server from "./index.js";
 describe("session", () => {
   const store = kv(new Map());
   const api = server({ store })
-    .get("/hello", (ctx) => `Hello ${ctx.session.a}`)
-    .post("/hello", (ctx) => {
+    .get("/hello", async (ctx) => {
+      return `Hello ${ctx.session.a}`;
+    })
+    .post("/hello", async (ctx) => {
       if (!ctx.session.a) ctx.session.a = 0;
       ctx.session.a += 1;
       return `Bye ${ctx.session.a}`;

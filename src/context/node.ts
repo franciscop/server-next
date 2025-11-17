@@ -30,6 +30,7 @@ interface NodeContext {
     query: Record<string, string>;
   };
   options: any;
+  settings: any;
   time?: any;
   session?: Record<string, any>;
   auth?: any;
@@ -63,6 +64,7 @@ export default async (
       cookies: {},
       url: undefined!,
       options: app.opts || {},
+      settings: app.settings || {},
       method: "get",
       req: request,
     } as NodeContext;
@@ -92,7 +94,7 @@ export default async (
     await auth.load(ctx as Context);
 
     const https = (request as any).connection?.encrypted ? "https" : "http";
-    const host = ctx.headers.host || `localhost:${ctx.options.port}`;
+    const host = ctx.headers.host || `localhost:${ctx.settings.port}`;
     const path = (request.url || "/").replace(/\/$/, "") || "/";
     ctx.url = new URL(path, `${https}://${host}`) as any;
     define(ctx.url, "query", (url: URL) =>
@@ -111,7 +113,7 @@ export default async (
           ctx.body = await parseBody(
             concatenated.toString(),
             type,
-            ctx.options.uploads,
+            ctx.settings.uploads,
           );
           resolve();
         })

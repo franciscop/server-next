@@ -7,9 +7,10 @@ import { assets, auth, timer, openapi } from "./middle/index.js";
 import { Router } from "./router.js";
 import ServerTest from "./ServerTest.js";
 import * as handlers from "./context/handlers.js";
-import { Settings } from "./types.js";
+import { Options, Settings } from "./types.js";
 
 class Server extends Router {
+  opts: Options;
   settings: Settings;
   platform: {
     provider: string | null;
@@ -20,10 +21,11 @@ class Server extends Router {
   sockets: any[];
   websocket: any;
 
-  constructor(options = {}) {
+  constructor(options: Options = {}) {
     super();
 
     // Keep a copy of the options in the instance
+    this.opts = options;
     this.settings = config(options);
     this.platform = getMachine();
 
@@ -71,9 +73,18 @@ class Server extends Router {
   }
 
   // The different handlers for different platforms/runtimes
-  node = handlers.Node;
-  fetch = handlers.Winter;
-  callback = handlers.Netlify;
+  node() {
+    return handlers.Node(this);
+  }
+  fetch(request, env) {
+    console.log(this);
+    return handlers.Winter(this, request, env);
+  }
+  callback(request, context) {
+    return handlers.Netlify(this, request, context);
+  }
+  // fetch = handlers.Winter;
+  // callback = handlers.Netlify;
 
   // Helper purely for testing
   test: typeof ServerTest = ServerTest;

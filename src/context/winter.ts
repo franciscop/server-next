@@ -29,6 +29,7 @@ interface WinterContext {
     query: Record<string, string>;
   };
   options: any;
+  settings: any;
   time?: any;
   session?: Record<string, any>;
   auth?: any;
@@ -56,6 +57,7 @@ export default async (
       cookies: {},
       url: undefined!,
       options: app.opts || {},
+      settings: app.settings || {},
       method: "get",
       init: performance.now(),
       req: request,
@@ -90,7 +92,7 @@ export default async (
 
     if (request.body) {
       const type = ctx.headers["content-type"];
-      ctx.body = await parseBody(request, type, ctx.options.uploads);
+      ctx.body = await parseBody(request, type, ctx.settings.uploads);
     }
 
     ctx.app = app;

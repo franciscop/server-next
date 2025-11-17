@@ -1,4 +1,4 @@
-import NoSession from "./NoSession.js";
+import createNoSession from "./NoSession.js";
 import type { Context } from "../types.js";
 
 export default async function session(ctx: Context): Promise<any> {
@@ -6,7 +6,7 @@ export default async function session(ctx: Context): Promise<any> {
 
   // If there's no store at all, we don't have session available;
   // but that's okay, since it's only a problem if you try to use it
-  if (!store) return NoSession;
+  if (!store) return createNoSession();
 
   // There's a session cookie; use it as the key to get the data
   // from the store
