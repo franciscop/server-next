@@ -63,8 +63,7 @@ export default async (
       headers: {},
       cookies: {},
       url: undefined!,
-      options: app.opts || {},
-      settings: app.settings || {},
+      options: app.settings || {},
       method: "get",
       req: request,
     } as NodeContext;
@@ -94,7 +93,7 @@ export default async (
     await auth.load(ctx as Context);
 
     const https = (request as any).connection?.encrypted ? "https" : "http";
-    const host = ctx.headers.host || `localhost:${ctx.settings.port}`;
+    const host = ctx.headers.host || `localhost:${ctx.options.port}`;
     const path = (request.url || "/").replace(/\/$/, "") || "/";
     ctx.url = new URL(path, `${https}://${host}`) as any;
     define(ctx.url, "query", (url: URL) =>
@@ -113,7 +112,7 @@ export default async (
           ctx.body = await parseBody(
             concatenated.toString(),
             type,
-            ctx.settings.uploads,
+            ctx.options.uploads,
           );
           resolve();
         })

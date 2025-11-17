@@ -56,8 +56,7 @@ export default async (
       headers: {},
       cookies: {},
       url: undefined!,
-      options: app.opts || {},
-      settings: app.settings || {},
+      options: app.settings || {},
       method: "get",
       init: performance.now(),
       req: request,
@@ -92,7 +91,7 @@ export default async (
 
     if (request.body) {
       const type = ctx.headers["content-type"];
-      ctx.body = await parseBody(request, type, ctx.settings.uploads);
+      ctx.body = await parseBody(request, type, ctx.options.uploads);
     }
 
     ctx.app = app;

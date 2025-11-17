@@ -10,7 +10,6 @@ import * as handlers from "./context/handlers.js";
 import { Options, Settings } from "./types.js";
 
 class Server extends Router {
-  opts: Options;
   settings: Settings;
   platform: {
     provider: string | null;
@@ -25,7 +24,6 @@ class Server extends Router {
     super();
 
     // Keep a copy of the options in the instance
-    this.opts = options;
     this.settings = config(options);
     this.platform = getMachine();
 
@@ -77,7 +75,6 @@ class Server extends Router {
     return handlers.Node(this);
   }
   fetch(request, env) {
-    console.log(this);
     return handlers.Winter(this, request, env);
   }
   callback(request, context) {
