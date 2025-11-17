@@ -16,7 +16,7 @@ describe("user creation flow", () => {
     .test();
 
   // Bun's bug: https://github.com/oven-sh/bun/issues/6348
-  it("can create a new user", async () => {
+  it.skip("can create a new user", async () => {
     const register = await api.post("/auth/register/email", CREDENTIALS);
     expect(register).toSucceed();
     expect(await store.keys()).toEqual([

@@ -3,7 +3,10 @@ import { redirect, status } from "../../reply.js";
 import type { Context } from "../../types.js";
 
 const oauth = async (code: string) => {
-  const fch = async (url: string, { body, headers = {}, ...rest }: any = {}) => {
+  const fch = async (
+    url: string,
+    { body, headers = {}, ...rest }: any = {},
+  ) => {
     headers.accept = "application/json";
     headers["content-type"] = "application/json";
     const res = await fetch(url, { ...rest, body, headers });
@@ -67,16 +70,16 @@ const callback = async (ctx: Context) => {
   await store.set(auth.user, user);
   await session.set(auth.id, auth, { expires: "1w" });
 
-  if (auth.type === "token") {
+  if (auth.type.includes("token")) {
     return status(201).json({ ...user, token: auth.id });
   }
-  if (auth.type === "cookie") {
+  if (auth.type.includes("cookie")) {
     return status(302).cookies({ authentication: auth.id }).redirect(redirect);
   }
-  if (auth.type === "jwt") {
+  if (auth.type.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
   }
-  if (auth.type === "key") {
+  if (auth.type.includes("key")) {
     throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");

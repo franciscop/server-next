@@ -6,7 +6,7 @@ export default async function verify(
   hash: string,
 ): Promise<boolean> {
   if ("Bun" in globalThis) {
-    return Bun.password.verify(password, hash);
+    return Bun.password.verify(password, hash, "argon2id");
   }
 
   // Example format:

@@ -19,16 +19,16 @@ const createSession = async (user: any, ctx: Context) => {
   };
   await session.set(id, ctx.auth, { expires: "1w" });
 
-  if (type === "token") {
+  if (type.includes("token")) {
     return status(201).json({ ...user, token: id });
   }
-  if (type === "cookie") {
+  if (type.includes("cookie")) {
     return status(302).cookies({ authentication: id }).redirect(redirect);
   }
-  if (type === "jwt") {
+  if (type.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
   }
-  if (type === "key") {
+  if (type.includes("key")) {
     throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");
@@ -45,7 +45,7 @@ async function emailLogin(ctx: Context) {
   if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
   const user = await store.get(email);
-  const isValid = await verify(user.password, password);
+  const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
   return createSession(user, ctx);
@@ -101,7 +101,7 @@ async function emailUpdatePassword(ctx: Context) {
 
   const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
 
-  const isValid = await verify(fullUser.password, previous);
+  const isValid = await verify(previous, fullUser.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
   fullUser.password = await hash(updated);

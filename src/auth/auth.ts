@@ -30,7 +30,7 @@ const findSessionId = (ctx: Context): string | undefined => {
     return validateToken(ctx.headers.authorization as string);
   }
 
-  if (type === "cookie") {
+  if (type.includes("cookie")) {
     // If the user is not authenticated, there's no auth to retrieve
     if (!ctx.cookies.authentication) return;
 
