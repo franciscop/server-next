@@ -1,55 +1,7 @@
-import { createId } from "../../helpers/index.js";
+import { createId, hash, verify } from "../../helpers/index.js";
 import { ServerError, status } from "../../index.js";
 import updateUser from "../updateUser.js";
 import type { Context } from "../../types.js";
-import { argon2, getRandomValues, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
-
-const argon2prom = promisify(argon2);
-
-const hash = {
-  hash: async (password: string): Promise<string> => {
-    // Using argon2id with recommended parameters
-    return (
-      await argon2prom("argon2id", {
-        message: Buffer.from(password),
-        nonce: getRandomValues(new Uint8Array(16)),
-        parallelism: 4,
-        tagLength: 64,
-        memory: 65536,
-        passes: 3,
-      })
-    ).toString("base64");
-  },
-  verify: async (encoded: string, password: string): Promise<boolean> => {
-    try {
-      // Extract the salt from the encoded hash
-      // Argon2 PHC format: $argon2id$v=19$m=19456,t=2,p=1$salt$hash
-      const parts = encoded.split("$");
-      if (parts.length < 6 || parts[1] !== "argon2id") {
-        return false;
-      }
-
-      const params = Object.fromEntries(
-        parts[3].split(",").map((p) => p.split("=")),
-      );
-      const expectedHash = Buffer.from(parts[5], "base64");
-
-      const actualHash = await argon2prom("argon2id", {
-        message: Buffer.from(password),
-        nonce: Buffer.from(parts[4], "base64"),
-        memory: parseInt(params.m),
-        passes: parseInt(params.t),
-        parallelism: parseInt(params.p),
-        tagLength: expectedHash.length,
-      });
-
-      return timingSafeEqual(expectedHash, actualHash);
-    } catch {
-      return false;
-    }
-  },
-};
 
 const createSession = async (user: any, ctx: Context) => {
   const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;
@@ -93,7 +45,7 @@ async function emailLogin(ctx: Context) {
   if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
   const user = await store.get(email);
-  const isValid = await hash.verify(user.password, password);
+  const isValid = await verify(user.password, password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
   return createSession(user, ctx);
@@ -113,7 +65,7 @@ async function emailRegister(ctx: Context) {
   const user = {
     id: createId(email),
     email,
-    password: await hash.hash(password),
+    password: await hash(password),
     time,
     ...data,
   };
@@ -149,10 +101,10 @@ async function emailUpdatePassword(ctx: Context) {
 
   const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
 
-  const isValid = await hash.verify(fullUser.password, previous);
+  const isValid = await verify(fullUser.password, previous);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
-  fullUser.password = await hash.hash(updated);
+  fullUser.password = await hash(updated);
   await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
 
   return 200;
