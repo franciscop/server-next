@@ -1,4 +1,5 @@
-import { argon2, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
+import * as crypto from "node:crypto";
 
 export default async function verify(
   password: string,
@@ -22,7 +23,7 @@ export default async function verify(
   const expected = Buffer.from(hashB64, "base64");
 
   return new Promise((resolve, reject) => {
-    argon2(
+    crypto.argon2(
       `argon2${variant as "i" | "d" | "id"}`,
       {
         message: password,
