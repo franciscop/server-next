@@ -60,7 +60,7 @@ class Server extends Router {
     const cb = this.callback.bind(this);
     const proto = Object.getPrototypeOf(this);
     const keys = Object.keys({ ...this.handlers, ...proto, ...this });
-    for (const key of ["use", "fetch", "callback", ...keys]) {
+    for (const key of ["use", "node", "fetch", "callback", "test", ...keys]) {
       if (typeof this[key] === "function") {
         (cb as any)[key] = (this as any)[key].bind(this);
       } else {
@@ -82,7 +82,9 @@ class Server extends Router {
   }
 
   // Helper purely for testing
-  test: typeof ServerTest = ServerTest;
+  test() {
+    return ServerTest(this);
+  }
 }
 
 export default function server(options = {}) {

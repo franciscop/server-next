@@ -22,7 +22,7 @@ const validateCookie = (authorization: string): string => {
 const findSessionId = (ctx: Context): string | undefined => {
   const type = ctx.options.auth.type;
 
-  if (type === "token") {
+  if (type.includes("token")) {
     // If the user is not authenticated, there's no auth to retrieve
     if (!ctx.headers.authorization) return;
 

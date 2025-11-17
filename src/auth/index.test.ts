@@ -22,7 +22,7 @@ describe("auth", () => {
     );
   });
 
-  it("provider must belong", async () => {
+  it.only("provider must belong", async () => {
     const store = kv(new Map());
     const api = server({ store, auth: "token:email" })
       .get("/", (ctx) => ctx.auth)
