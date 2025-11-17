@@ -17,7 +17,7 @@ export type Bucket = {
 };
 
 export type Cors = {
-  origin: string;
+  origin: string | boolean;
   methods: string;
   headers: string;
 };

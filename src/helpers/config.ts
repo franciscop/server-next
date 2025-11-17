@@ -20,33 +20,42 @@ export default function config(options: Options = {}): Settings {
   if (options.cors) {
     const cors: Cors = {
       origin: "",
-      methods: "",
-      headers: "",
+      methods: "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
+      headers: "*",
     };
 
     // TODO: replace '*' for request url
     if (options.cors === true) {
-      cors.origin = "*";
+      cors.origin = true;
     } else if (typeof options.cors === "string") {
       cors.origin = options.cors;
     } else if (Array.isArray(options.cors)) {
       cors.origin = options.cors.join(",");
-    } else if (!options.cors.origin) {
-      // cors is defined {}, but no explicit origin
-      cors.origin = "*";
-    } else if (typeof options.cors.origin === "string") {
-      options.cors.origin = options.cors.origin;
-    } else if (Array.isArray(options.cors.origin)) {
-      cors.origin = options.cors.origin.join(",");
-    }
-    cors.origin = cors.origin.toLowerCase();
+    } else if (typeof options.cors === "object") {
+      if (!options.cors.origin) {
+        // cors is defined {}, but no explicit origin
+        cors.origin = "*";
+      } else if (typeof options.cors.origin === "string") {
+        cors.origin = options.cors.origin;
+      } else if (Array.isArray(options.cors.origin)) {
+        cors.origin = options.cors.origin.join(",");
+      }
 
-    if (typeof options.cors === "object" && !("methods" in options.cors)) {
-      cors.methods = "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS";
+      if ("methods" in options.cors) {
+        cors.methods = Array.isArray(options.cors.methods)
+          ? options.cors.methods.join(",")
+          : options.cors.methods;
+      }
+
+      if ("headers" in options.cors) {
+        cors.headers = Array.isArray(options.cors.headers)
+          ? options.cors.headers.join(",")
+          : options.cors.headers;
+      }
     }
-    // TODO: I don't think this is it
-    if (typeof options.cors === "object" && !("headers" in options.cors)) {
-      cors.headers = "*";
+
+    if (typeof cors.origin === "string") {
+      cors.origin = cors.origin.toLowerCase();
     }
 
     settings.cors = cors;
