@@ -1,10 +1,4 @@
 // Type declarations for custom test matchers
-
-interface Request {
-  status: number;
-  body: any;
-}
-
 declare global {
   namespace jest {
     interface Matchers<R = void> {
@@ -15,7 +9,7 @@ declare global {
 
 // For Bun test runner
 declare module "bun:test" {
-  interface Matchers<T = unknown> {
+  interface Matchers {
     toSucceed(message?: any): void;
   }
 }

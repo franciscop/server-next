@@ -3,16 +3,6 @@ declare global {
   var env: Record<string, any>;
 }
 
-// Polyfill the Response if needed
-if (typeof Response === "undefined") {
-  (global as any).Response = function Response(
-    body?: any,
-    other: any = {},
-  ): any {
-    return { body, ...other };
-  };
-}
-
 // Polyfill Netlify's environment variables
 (globalThis as any).env = {};
 
