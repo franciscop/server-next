@@ -1,4 +1,4 @@
-import "../../tests/toSucceed.js";
+import "../tests/toSucceed.js";
 
 import kv from "polystore";
 

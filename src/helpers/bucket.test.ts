@@ -3,11 +3,12 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import fs from "node:fs";
 
-const localBucket = bucket("./tests/uploads/");
+const bucketPath = new URL("../tests/uploads/", import.meta.url).pathname;
+const localBucket = bucket(bucketPath);
 
 describe("bucket", () => {
   afterAll(async () => {
-    const filePath = path.resolve("./tests/uploads/testFile.txt");
+    const filePath = path.join(bucketPath, "testFile.txt");
     if (fs.existsSync(filePath)) {
       await fsp.unlink(filePath);
     }
@@ -34,7 +35,7 @@ describe("bucket", () => {
   });
 
   it("deletes a file", async () => {
-    const filePath = path.resolve("./tests/uploads/testFile.txt");
+    const filePath = path.join(bucketPath, "testFile.txt");
     await fsp.unlink(filePath);
     const stream = await localBucket.read("testFile.txt");
     expect(stream).toBeNull();

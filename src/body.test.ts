@@ -1,4 +1,4 @@
-import "../tests/toSucceed.js";
+import "./tests/toSucceed.js";
 
 import server from "./index.js";
 import type { Context } from "./types.js";
@@ -7,7 +7,7 @@ import fsp from "node:fs/promises";
 import toWeb from "./helpers/toWeb.js";
 
 describe("request body formats", () => {
-  const api = server({ uploads: "./tests/uploads" })
+  const api = server({ uploads: "./src/tests/uploads" })
     .post("/", (ctx: Context) => {
       return ctx.body;
     })
@@ -35,7 +35,7 @@ describe("request body formats", () => {
   it("accepts a FormData with a file", async () => {
     const reqBody = new FormData();
     reqBody.append("hello", "world");
-    const fileBuffer = await fsp.readFile("./tests/nero.jpg");
+    const fileBuffer = await fsp.readFile("./src/tests/nero.jpg");
     const blob = new Blob([fileBuffer], { type: "image/jpeg" });
     reqBody.append("file", blob, "nero.jpg");
     const { body } = await api.post("/", reqBody);
