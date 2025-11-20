@@ -1,5 +1,3 @@
-const $ = (code) => code();
-
 expect.extend({
   toRender(fn, rendered) {
     const html = fn();

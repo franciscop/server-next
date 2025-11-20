@@ -1,4 +1,4 @@
-import "../test/toSucceed.js";
+import "../../tests/toSucceed.js";
 
 import kv from "polystore";
 
@@ -18,11 +18,11 @@ describe("auth", () => {
 
   it("requires a valid provider", async () => {
     expect(() => server({ auth: "token:nonexisting" })).toThrow(
-      /Provider \"nonexisting\" not found, available ones are/,
+      /Provider "nonexisting" not found, available ones are/,
     );
   });
 
-  it.only("provider must belong", async () => {
+  it("provider must belong", async () => {
     const store = kv(new Map());
     const api = server({ store, auth: "token:email" })
       .get("/", (ctx) => ctx.auth)

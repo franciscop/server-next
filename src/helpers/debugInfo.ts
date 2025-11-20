@@ -11,10 +11,11 @@ export default function debugInfo<T extends Record<string, any>>(
   if (!isDebug) return;
 
   if (!options[name]) {
-    return console.log(color`options:${String(name)}\t→ {dim}[not set]{/}`);
+    console.log(color`options:${String(name)}\t→ {dim}[not set]{/}`);
+    return;
   }
 
   console.log(
-    color`options:${String(name)}\t→ ${icon ? icon + " " : ""}${cb(options[name])}`,
+    color`options:${String(name)}\t→ ${icon ? `${icon} ` : ""}${cb(options[name])}`,
   );
 }

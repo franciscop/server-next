@@ -40,12 +40,12 @@ const getBody = () => {
 describe("parseBody", () => {
   it("can parse the example body", async () => {
     const mockBucket: Bucket = {
-      read: async (id: string) => null,
-      write: async (id: string) => {},
-      delete: async (id: string) => false,
+      read: async () => null,
+      write: async () => {},
+      delete: async () => false,
     };
     const body = await parseBody(
-      getBody(),
+      Buffer.from(getBody(), "utf-8"),
       "multipart/form-data; boundary=----WebKitFormBoundaryvef1fLxmoUdYZWXp",
       mockBucket,
     );

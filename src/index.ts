@@ -7,7 +7,7 @@ import { assets, auth, timer, openapi } from "./middle/index.js";
 import { Router } from "./router.js";
 import ServerTest from "./ServerTest.js";
 import * as handlers from "./context/handlers.js";
-import { Options, Settings } from "./types.js";
+import type { Options, Settings } from "./types.js";
 
 class Server extends Router {
   settings: Settings;

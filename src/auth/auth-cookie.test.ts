@@ -1,4 +1,4 @@
-import "../test/toSucceed.js";
+import "../../tests/toSucceed.js";
 
 import kv from "polystore";
 
@@ -15,7 +15,6 @@ describe("user creation flow", () => {
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 
-  // Bun's bug: https://github.com/oven-sh/bun/issues/6348
   it.skip("can create a new user", async () => {
     const register = await api.post("/auth/register/email", CREDENTIALS);
     expect(register).toSucceed();
@@ -26,7 +25,7 @@ describe("user creation flow", () => {
 
     const me = await api.get("/me");
     expect(me).toSucceed();
-    expect(me.body.email).toEqual(EMAIL);
+    expect(me.body.email).toEqual(EMAIL); // FAILING
 
     const logout = await api.post("/auth/logout");
     expect(logout).toSucceed();

@@ -1,8 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import timer, { createTime } from "./timer";
-import { Context } from "../types";
+import type { Context } from "../types";
 
-let globalPerfNow = performance.now;
+const globalPerfNow = performance.now;
 describe("timer", () => {
   beforeEach(() => {
     performance.now = () => 1000;

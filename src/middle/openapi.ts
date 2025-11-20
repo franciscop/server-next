@@ -21,7 +21,7 @@ const getConfig = (routes: any[]): any => {
   if (!config) return {};
   if (config.tags) {
     if (typeof config.tags === "string") {
-      config.tags = config.tags.split(/\s*\,\s*/g);
+      config.tags = config.tags.split(/\s*,\s*/g);
     }
     if (!Array.isArray(config.tags)) {
       throw new Error("invalid tags");
@@ -65,7 +65,7 @@ const pkgProm = fsp
   .then((data) => JSON.parse(data))
   .catch(() => ({}));
 
-const getTag = (name: string, fn: Function): string => {
+const getTag = (name: string, fn: () => void): string => {
   const found = fn
     .toString()
     .split("\n")
@@ -76,9 +76,9 @@ const getTag = (name: string, fn: Function): string => {
   return encode(found.replace(name, "").trim());
 };
 
-const getDescription = (fn: Function): string =>
+const getDescription = (fn: () => string): string =>
   getTag("@description", fn) || "";
-const getReturn = (fn: Function): string => getTag("@returns", fn) || "OK";
+const getReturn = (fn: () => string): string => getTag("@returns", fn) || "OK";
 
 const generateOpenApiPaths = (
   handlers: Record<string, any[]>,
@@ -109,7 +109,7 @@ const generateOpenApiPaths = (
         paths[normalizedPath] = {};
       }
 
-      const getTitle = (fn: Function): string | null => {
+      const getTitle = (fn: () => string): string | null => {
         if (!fn.name) return null;
         // Well, we shouldn't really rely on these, e.g. automatic names from export default
         const wrongNames = ["default"];
@@ -123,13 +123,22 @@ const generateOpenApiPaths = (
         return name[0].toUpperCase() + name.slice(1);
       };
 
-      let requestBody;
+      let requestBody:
+        | { content: { "application/json": { schema: any } } }
+        | undefined;
       if (meta?.body) {
         const schema = zodToSchema(meta.body);
         requestBody = { content: { "application/json": { schema } } };
       }
 
-      let responses;
+      let responses:
+        | {
+            200: {
+              description: string;
+              content: { "application/json": { schema: any } };
+            };
+          }
+        | undefined;
       if (meta?.response) {
         const schema = zodToSchema(meta.response);
         const description = getReturn(fn);
@@ -141,7 +150,7 @@ const generateOpenApiPaths = (
       const parameters: any[] = [];
 
       // Extract the query parameters
-      const matched = Array.from(path.matchAll(/\:[\w\(\)]+/gi));
+      const matched = Array.from(path.matchAll(/:[\w()]+/gi));
       matched.forEach((match: RegExpMatchArray) => {
         const [name, type = "string"] = match[0]
           .slice(1)

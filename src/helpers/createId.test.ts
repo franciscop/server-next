@@ -30,7 +30,7 @@ describe("createId", () => {
 
   it("should use the alphabet characters only", () => {
     const id = createId();
-    for (let char of id) {
+    for (const char of id) {
       expect(
         "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict",
       ).toContain(char);

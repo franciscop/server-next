@@ -1,5 +1,13 @@
-import { Method } from "./types";
+import type { Method } from "./types";
 import { parseHeaders } from "./helpers";
+
+function isSerializable(body: any): boolean {
+  if (!body) return false;
+  if (typeof body === "string") return false;
+  if (body instanceof ReadableStream) return false;
+  if (body instanceof FormData) return false;
+  return true;
+}
 
 // A function that can be triggered for testing
 export default function ServerTest(app: any) {
@@ -13,7 +21,7 @@ export default function ServerTest(app: any) {
   ) => {
     try {
       if (!options.headers) options.headers = {};
-      if (options.body && typeof options.body !== "string") {
+      if (isSerializable(options.body)) {
         options.headers["content-type"] = "application/json";
         options.body = JSON.stringify(options.body);
       }
@@ -28,7 +36,7 @@ export default function ServerTest(app: any) {
       );
 
       const headers = parseHeaders(res.headers);
-      let body;
+      let body: any;
       // if (headers["set-cookie"]) {
       //   // TODO: app should really be a smart merge of the 2
       //   cookie = headers["set-cookie"];

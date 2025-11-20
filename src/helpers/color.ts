@@ -24,7 +24,7 @@ export default function color(
 ): string {
   if (typeof str === "string") {
     return str
-      .replace(/\{(\w+)\}/g, (m, k) => replace(k))
+      .replace(/\{(\w+)\}/g, (_m, k) => replace(k))
       .replace(/\{\/\w*\}/g, () => replace("reset"));
   }
 

@@ -1,5 +1,5 @@
 import { type } from "../reply.js";
-import { Context } from "../types.js";
+import type { Context } from "../types.js";
 
 export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;
@@ -12,7 +12,7 @@ export default async function assets(ctx: Context) {
     const asset = await ctx.options.public.read(ctx.url.pathname);
     if (!asset) return;
     return type(ctx.url.pathname.split(".").pop()).send(asset);
-  } catch (error) {
+  } catch {
     // NO-OP; if there's no file, keep going the normal flow
   }
 }

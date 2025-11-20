@@ -42,7 +42,7 @@ const parseOptions = (auth: any, all: any): any => {
   }
   if (!auth.cleanUser) {
     auth.cleanUser = (fullUser: any) => {
-      const { password, token, ...user } = fullUser;
+      const { password: _password, ...user } = fullUser;
       return user;
     };
   }

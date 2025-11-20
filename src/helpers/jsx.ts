@@ -27,21 +27,21 @@ const escapeCSS = (value: any): string =>
 const minifyCss = (str: string): string =>
   str
     .replace(/\s+/g, " ")
-    .replace(/(?!<\")\/\*[^\*]+\*\/(?!\")/g, "")
+    .replace(/(?!<")\/\*[^*]+\*\/(?!")/g, "")
     .replace(/(\w|\*) (\{)/g, "$1$2")
     .replace(/(\}) (\w|\*)/g, "$1$2")
     .replace(/(\{) (\w)/g, "$1$2")
-    .replace(/(\w)(\:) /g, "$1$2")
-    .replace(/(\;) (\})/g, "$1$2")
-    .replace(/(\;) (\w)/g, "$1$2")
-    .replace(/\;(\})/g, "$1")
+    .replace(/(\w)(:) /g, "$1$2")
+    .replace(/(;) (\})/g, "$1$2")
+    .replace(/(;) (\w)/g, "$1$2")
+    .replace(/;(\})/g, "$1")
     .replace(/(\w), (\w)/g, "$1,$2")
     .replace(/(\w), (\w)/g, "$1,$2")
     .replace(/(\{) (\w)/g, "$1$2")
     .trim();
 
 export const jsx = (
-  tag: string | Function,
+  tag: string | (({ children }) => string),
   { children, ...props }: any,
 ): (() => string) | string => {
   if (typeof tag === "function") return tag({ children, ...props });
@@ -67,9 +67,9 @@ export const jsx = (
     .join("");
   if (!tag) return () => children;
   let attrStr = Object.entries(props || {})
-    .filter(([k, v]) => k !== "dangerouslySetInnerHTML")
+    .filter(([k]) => k !== "dangerouslySetInnerHTML")
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
-    .filter(([k, v]) => v !== false)
+    .filter(([, v]) => v !== false)
     .map(([k, v]) =>
       v === true
         ? altAttrs[k.toLowerCase()] || encode(k)

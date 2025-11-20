@@ -14,17 +14,17 @@ describe("bucket", () => {
   });
 
   it("writes a file", async () => {
-    const filePath = await localBucket!.write("testFile.txt", "Hello, World!");
+    const filePath = await localBucket.write("testFile.txt", "Hello, World!");
     expect(
       typeof filePath === "string" && filePath.endsWith("testFile.txt"),
     ).toBe(true);
   });
 
   it("reads a file", async () => {
-    const stream = await localBucket!.read("testFile.txt");
+    const stream = await localBucket.read("testFile.txt");
     expect(stream).not.toBeNull();
     let data = "";
-    const reader = stream!.getReader();
+    const reader = stream.getReader();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -36,18 +36,18 @@ describe("bucket", () => {
   it("deletes a file", async () => {
     const filePath = path.resolve("./tests/uploads/testFile.txt");
     await fsp.unlink(filePath);
-    const stream = await localBucket!.read("testFile.txt");
+    const stream = await localBucket.read("testFile.txt");
     expect(stream).toBeNull();
   });
 
   it("removes an existing file", async () => {
-    await localBucket!.write("testFile.txt", "To be deleted");
-    const isDeleted = await localBucket!.delete("testFile.txt");
+    await localBucket.write("testFile.txt", "To be deleted");
+    const isDeleted = await localBucket.delete("testFile.txt");
     expect(isDeleted).toBe(true);
   });
 
   it("tries to remove a non-existing file", async () => {
-    const isDeleted = await localBucket!.delete("nonExistentFile.txt");
+    const isDeleted = await localBucket.delete("nonExistentFile.txt");
     expect(isDeleted).toBe(false);
   });
 });

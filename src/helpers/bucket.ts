@@ -40,7 +40,7 @@ function thinLocalBucket(root: string): Bucket {
       try {
         await fsp.unlink(fullPath);
         return true;
-      } catch (error) {
+      } catch {
         return false;
       }
     },

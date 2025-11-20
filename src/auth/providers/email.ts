@@ -74,7 +74,7 @@ async function emailRegister(ctx: Context) {
   return createSession(user, ctx);
 }
 
-async function emailResetPassword(ctx: Context) {
+async function emailResetPassword() {
   // const reset = ctx.options.store.prefix("reset:");
   // // Already resetting
   // if (ctx.body.token) {

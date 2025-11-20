@@ -3,7 +3,7 @@ import Bucket from "./bucket.js";
 import createId from "./createId";
 import debugInfo from "./debugInfo.js";
 
-import { Cors, Options, Settings } from "../types";
+import type { Cors, Options, Settings } from "../types";
 
 const env = globalThis.env;
 

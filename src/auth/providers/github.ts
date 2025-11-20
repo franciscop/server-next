@@ -29,7 +29,7 @@ const oauth = async (code: string) => {
   };
 };
 
-const login = function githubLogin(ctx: Context) {
+const login = function githubLogin() {
   return redirect(
     `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_ID}&scope=user:email`,
   );

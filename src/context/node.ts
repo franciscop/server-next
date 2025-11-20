@@ -62,7 +62,7 @@ export default async (
     const ctx: NodeContext = {
       headers: {},
       cookies: {},
-      url: undefined!,
+      url: undefined,
       options: app.settings || {},
       method: "get",
       req: request,
@@ -109,11 +109,7 @@ export default async (
         .on("end", async () => {
           const type = ctx.headers["content-type"];
           const concatenated = Buffer.concat(body);
-          ctx.body = await parseBody(
-            concatenated.toString(),
-            type,
-            ctx.options.uploads,
-          );
+          ctx.body = await parseBody(concatenated, type, ctx.options.uploads);
           resolve();
         })
         .on("error", reject);

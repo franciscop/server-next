@@ -55,7 +55,7 @@ export default async (
     const ctx: WinterContext = {
       headers: {},
       cookies: {},
-      url: undefined!,
+      url: undefined,
       options: app.settings || {},
       method: "get",
       init: performance.now(),

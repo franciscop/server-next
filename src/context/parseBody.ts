@@ -4,9 +4,6 @@ import type { Bucket } from "../types.js";
 function getBoundary(header?: string): string | null {
   if (!header) return null;
 
-  // When we set the `content-type` manually on fetch(), it won't include the
-  // boundary and it's recommended not to set it manually:
-  // https://stackoverflow.com/q/39280438/938236
   if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
     console.error("Do not set the `Content-Type` manually for FormData");
   }
@@ -23,7 +20,7 @@ function getBoundary(header?: string): string | null {
 
 function getMatching(string: string, regex: RegExp): string {
   const matches = string.match(regex);
-  return matches?.[1] ? matches[1] : "";
+  return matches?.[1] ?? "";
 }
 
 const saveFile = async (
@@ -33,7 +30,7 @@ const saveFile = async (
 ): Promise<string> => {
   const ext = name.split(".").pop();
   const id = `${createId()}.${ext}`;
-  await bucket.write(id, value.toString("binary"));
+  await bucket.write(id, value);
   return id;
 };
 
@@ -41,42 +38,61 @@ const saveFile = async (
 function splitBuffer(buffer: Buffer, delimiter: Buffer): Buffer[] {
   const result: Buffer[] = [];
   let start = 0;
-  let index = buffer.indexOf(delimiter as any, start);
+  let index = buffer.indexOf(delimiter);
 
   while (index !== -1) {
     result.push(buffer.slice(start, index));
     start = index + delimiter.length;
-    index = buffer.indexOf(delimiter as any, start);
+    index = buffer.indexOf(delimiter, start);
   }
 
   result.push(buffer.slice(start));
   return result;
 }
 
-const BREAK = "\r\n\r\n";
+const BREAK_BUFFER = Buffer.from("\r\n\r\n");
+
+// Simple heuristic to guess if a buffer is text
+function isProbablyText(buffer: Buffer): boolean {
+  for (let i = 0; i < Math.min(buffer.length, 512); i++) {
+    const byte = buffer[i];
+    if (byte === 0) return false; // null byte → binary
+    if (byte < 0x07 || (byte > 0x0d && byte < 0x20)) return false;
+  }
+  return true;
+}
 
 export default async function parseBody(
-  raw: string | Request | { arrayBuffer: () => Promise<ArrayBuffer> },
+  raw: Buffer | Request | { arrayBuffer: () => Promise<ArrayBuffer> },
   contentType?: string | string[],
   bucket?: Bucket,
 ): Promise<any> {
-  // If contentType is an array, use the first one
   const contentTypeStr = Array.isArray(contentType)
     ? contentType[0]
     : contentType;
 
-  const baseBuffer = typeof raw === "string" ? raw : await raw.arrayBuffer();
-  const rawBuffer = Buffer.from(baseBuffer as any);
+  let rawBuffer: Buffer;
+
+  if (raw instanceof Buffer) {
+    rawBuffer = raw;
+  } else if ("arrayBuffer" in raw && typeof raw.arrayBuffer === "function") {
+    const arrayBuf = await raw.arrayBuffer();
+    rawBuffer = Buffer.from(arrayBuf);
+  } else {
+    throw new Error("Unsupported raw type");
+  }
+
   if (!rawBuffer) return {};
 
+  // Handle plain text or JSON first
   if (!contentTypeStr || /text\/plain/.test(contentTypeStr)) {
-    return rawBuffer.toString(); // Return as plain text
+    return rawBuffer.toString("utf-8");
   }
-
   if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(rawBuffer.toString()); // Parse JSON
+    return JSON.parse(rawBuffer.toString("utf-8"));
   }
 
+  // Multipart
   const boundary = getBoundary(contentTypeStr);
   if (!boundary) return null;
 
@@ -85,35 +101,30 @@ export default async function parseBody(
   const parts = splitBuffer(rawBuffer, boundaryBuffer);
 
   for (const part of parts) {
-    if (part.length === 0 || part.equals(Buffer.from("--\r\n") as any))
-      continue;
+    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
 
-    const partString = part.toString();
-    const name = getMatching(partString, /(?:name=")(.+?)(?:")/)
+    const idx = part.indexOf(BREAK_BUFFER);
+    if (idx === -1) continue;
+
+    const headerStr = part.slice(0, idx).toString("utf-8");
+    const contentBuf = part.slice(idx + BREAK_BUFFER.length, part.length - 2);
+
+    const name = getMatching(headerStr, /name="(.+?)"/)
       .trim()
       .replace(/\[\]$/, "");
     if (!name) continue;
 
-    const filename = getMatching(partString, /(?:filename=")(.*?)(?:")/).trim();
-
-    if (!part.includes(BREAK)) continue;
-
-    // Content starts after headers and "\r\n\r\n",  remove trailing CRLF
-    const content = part.slice(part.indexOf(BREAK) + 4, part.length - 2);
+    const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
 
     if (filename) {
-      // Save binary content as a file
-      if (!bucket) {
-        throw new Error("Bucket is required to save files");
-      }
-      body[name] = await saveFile(filename, content, bucket);
+      if (!bucket) throw new Error("Bucket is required to save files");
+      body[name] = await saveFile(filename, contentBuf, bucket);
     } else {
-      // Treat content as text
-      const value = content.toString().trim();
+      const value = isProbablyText(contentBuf)
+        ? contentBuf.toString("utf-8").trim()
+        : contentBuf; // keep as Buffer if unknown
       if (body[name]) {
-        if (!Array.isArray(body[name])) {
-          body[name] = [body[name]];
-        }
+        if (!Array.isArray(body[name])) body[name] = [body[name]];
         body[name].push(value);
       } else {
         body[name] = value;

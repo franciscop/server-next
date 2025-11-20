@@ -3,7 +3,7 @@ import { handleRequest, parseHeaders, iterate } from "../helpers";
 import createWinterContext from "./winter";
 import createNodeContext from "./node";
 
-export const Winter = async function (app, request, env) {
+export const Winter = async (app, request, env) => {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
@@ -16,7 +16,7 @@ export const Winter = async function (app, request, env) {
   return res;
 };
 
-export const Node = async function (app) {
+export const Node = async (app) => {
   const http = await import("node:http");
   http
     .createServer(async (request, response) => {
@@ -37,7 +37,7 @@ export const Node = async function (app) {
     .listen(app.settings.port);
 };
 
-export const Netlify = async function (app, request, context) {
+export const Netlify = async (app, request, context) => {
   // Consider simply renaming to "ctx.next()"
   request.context = context;
   if (typeof Netlify === "undefined") {

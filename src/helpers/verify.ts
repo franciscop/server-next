@@ -1,5 +1,17 @@
-import { timingSafeEqual } from "node:crypto";
 import * as crypto from "node:crypto";
+
+function timingSafeEqual(a, b) {
+  const len = Math.max(a.length, b.length);
+  let mismatch = a.length ^ b.length;
+
+  for (let i = 0; i < len; i++) {
+    const ca = a.charCodeAt(i) || 0;
+    const cb = b.charCodeAt(i) || 0;
+    mismatch |= ca ^ cb;
+  }
+
+  return mismatch === 0;
+}
 
 export default async function verify(
   password: string,

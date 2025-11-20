@@ -19,7 +19,7 @@ describe("can match the url", () => {
       .get("/*", (ctx) => ctx.url.params)
       .test();
 
-    const { body, headers, ...rest } = await api.get("/hello");
+    const { body, headers } = await api.get("/hello");
     expect(body).toEqual({ id: "hello" });
     expect(headers["content-type"]).toEqual("application/json");
   });

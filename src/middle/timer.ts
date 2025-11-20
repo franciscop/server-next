@@ -1,4 +1,4 @@
-import { Context } from "../types";
+import type { Context } from "../types";
 
 export const createTime = () => {
   const times: [string, number][] = [["init", performance.now()]];

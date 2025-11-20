@@ -33,7 +33,7 @@ export default async function parseResponse(
 
   // A plain string will be converted to either html or plain
   if (typeof out === "string") {
-    const type = /^\s*\</.test(out) ? "text/html" : "text/plain";
+    const type = /^\s*</.test(out) ? "text/html" : "text/plain";
     out = new Response(out, { headers: { "content-type": type } });
   }
 
@@ -87,7 +87,7 @@ export default async function parseResponse(
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
-  if (ctx.time && ctx.time.times && ctx.time.times.length > 1) {
+  if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers() as any);
   }
 
