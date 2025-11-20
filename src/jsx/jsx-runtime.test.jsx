@@ -1,3 +1,5 @@
+/** @jsxImportSource . */
+
 expect.extend({
   toRender(fn, rendered) {
     const html = fn();

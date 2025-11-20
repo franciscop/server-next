@@ -40,7 +40,7 @@ const minifyCss = (str) =>
     .replace(/(\{) (\w)/g, "$1$2")
     .trim();
 
-const jsx = (tag, { children, ...props } = {}) => {
+const jsx = (tag, { children, ...props }) => {
   if (typeof tag === "function") return tag({ children, ...props });
 
   if (tag === "script" && children) {
@@ -86,6 +86,6 @@ const jsx = (tag, { children, ...props } = {}) => {
   return () => `${doctype}<${tag}${attrStr}>${children}</${tag}>`;
 };
 
-export const jsxs = jsx;
-export const jsxDEV = jsx;
-export const Fragment = "";
+const Fragment = "";
+
+export { jsx, jsx as jsxs, jsx as jsxDEV, Fragment };
