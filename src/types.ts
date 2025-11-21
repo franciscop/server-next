@@ -113,17 +113,17 @@ export type InferParamType<T extends string> = T extends keyof ParamTypeMap
   : string;
 
 export type ParamsToObject<Params extends string> = {
-  [K in Params as K extends `${infer Key}:${infer Type}?`
+  [K in Params as K extends `${infer Key}:${infer _Type}?`
     ? Key
-    : K extends `${infer Key}:${infer Type}`
+    : K extends `${infer Key}:${infer _Type}`
       ? Key
       : K extends `${infer Key}?`
         ? Key
-        : K]: K extends `${infer Key}:${infer Type}?`
+        : K]: K extends `${infer _Key}:${infer Type}?`
     ? InferParamType<Type> | undefined
-    : K extends `${infer Key}:${infer Type}`
+    : K extends `${infer _Key}:${infer Type}`
       ? InferParamType<Type>
-      : K extends `${infer Key}?`
+      : K extends `${infer _Key}?`
         ? string | undefined
         : string;
 };
@@ -132,7 +132,9 @@ export type PathToParams<Path extends string> = ParamsToObject<
   ExtractPathParams<Path>
 >;
 
-export type Context<Params extends Record<string, any> = Record<string, string>> = {
+export type Context<
+  Params extends Record<string, any> = Record<string, string>,
+> = {
   method: Method;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
@@ -161,4 +163,6 @@ export type InlineReply =
   | number
   | undefined;
 
-export type Middleware<Params extends Record<string, any> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
+export type Middleware<
+  Params extends Record<string, any> = Record<string, string>,
+> = (ctx: Context<Params>) => InlineReply | void;
