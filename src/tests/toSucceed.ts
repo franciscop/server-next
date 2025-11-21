@@ -1,15 +1,25 @@
 import { expect } from "@jest/globals";
+import type { MatcherContext } from "expect";
 
 const reset = "\x1b[0m";
 
-const spaceOrEnter = (msg: any): string => {
+const spaceOrEnter = (msg: unknown): string => {
   if (typeof msg === "string") {
     return " ";
   }
   return "\n";
 };
 
-export default function toSucceed(this, request: Request, message?: any) {
+interface Request {
+  status: number;
+  body: unknown;
+}
+
+export default function toSucceed(
+  this: MatcherContext,
+  request: Request,
+  message?: unknown,
+) {
   const pass = request.status >= 200 && request.status < 400;
 
   if (message && JSON.stringify(request.body) !== JSON.stringify(message)) {
