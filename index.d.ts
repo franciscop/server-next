@@ -1,3 +1,131 @@
+type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
+type RouterMethod = "*" | Method;
+type Bucket = {
+    read: (path: string) => Promise<ReadableStream | null>;
+    write: (path: string, data: string | Buffer) => Promise<void | string>;
+    delete: (path: string) => Promise<boolean>;
+};
+type Cors = {
+    origin: string | boolean;
+    methods: string;
+    headers: string;
+};
+type CorsOptions = boolean | string | string[] | {
+    origin?: string | string[];
+    methods?: string | Method[];
+    headers?: string | string[];
+};
+type BasicValue = string | number | boolean | null;
+type SerializableValue = BasicValue | {
+    [key: string]: SerializableValue;
+} | Array<SerializableValue>;
+type KVStore = {
+    name: string;
+    prefix: (key: string) => KVStore;
+    get: <T = SerializableValue>(key: string) => Promise<T>;
+    set: <T = SerializableValue>(key: string, value: T, options?: Record<string, any>) => Promise<void>;
+    has: (key: string) => Promise<boolean>;
+    del: (key: string) => Promise<void>;
+    keys: () => Promise<string[]>;
+};
+type AuthOption = string | {
+    type?: string | string[];
+    provider?: string | string[];
+    session?: KVStore;
+    store?: KVStore;
+    redirect?: string;
+    cleanUser?: <T = UserRecord>(user: T) => T | Promise<T>;
+};
+type Options = {
+    port?: number;
+    secret?: string;
+    views?: string | Bucket;
+    public?: string | Bucket;
+    uploads?: string | Bucket;
+    store?: KVStore;
+    cookies?: KVStore;
+    session?: KVStore | {
+        store: KVStore;
+    };
+    cors?: CorsOptions;
+    auth?: AuthOption;
+    openapi?: any;
+};
+type UserRecord = {
+    email: string;
+    password: string;
+};
+type Auth = {
+    store: KVStore;
+    type: string;
+    user?: string;
+    provider: string;
+    session: KVStore;
+    cleanUser: <T = UserRecord>(user: T) => T | Promise<T>;
+    redirect: string;
+};
+type Settings = {
+    port: number;
+    secret: string;
+    views?: Bucket;
+    public?: Bucket;
+    uploads?: Bucket;
+    store?: KVStore;
+    cookies?: KVStore;
+    session?: {
+        store: KVStore;
+    };
+    cors?: Cors;
+    auth?: Auth;
+    openapi?: any;
+};
+type Time = {
+    (name: string): void;
+    times: [string, number][];
+    headers: () => string;
+};
+type Platform = {
+    provider: string | null;
+    runtime: string | null;
+    production: boolean;
+};
+type ExtractPathParams<Path extends string> = Path extends `${string}:${infer Param}(${infer Type})?/${infer Rest}` ? `${Param}:${Type}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})?` ? `${Param}:${Type}?` : Path extends `${string}:${infer Param}(${infer Type})/${infer Rest}` ? `${Param}:${Type}` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})` ? `${Param}:${Type}` : Path extends `${string}:${infer Param}?/${infer Rest}` ? `${Param}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}?` ? `${Param}?` : Path extends `${string}:${infer Param}/${infer Rest}` ? Param | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}` ? Param : never;
+type ParamTypeMap = {
+    string: string;
+    number: number;
+    date: Date;
+};
+type InferParamType<T extends string> = T extends keyof ParamTypeMap ? ParamTypeMap[T] : string;
+type ParamsToObject<Params extends string> = {
+    [K in Params as K extends `${infer Key}:${infer _Type}?` ? Key : K extends `${infer Key}:${infer _Type}` ? Key : K extends `${infer Key}?` ? Key : K]: K extends `${infer _Key}:${infer Type}?` ? InferParamType<Type> | undefined : K extends `${infer _Key}:${infer Type}` ? InferParamType<Type> : K extends `${infer _Key}?` ? string | undefined : string;
+};
+type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>;
+type Context<Params extends Record<string, string> = Record<string, string>> = {
+    method: Method;
+    headers: Record<string, string | string[]>;
+    cookies: Record<string, string>;
+    body?: unknown;
+    url: URL & {
+        params: Params;
+        query: Record<string, string>;
+    };
+    options: Settings;
+    time?: Time;
+    session?: Record<string, BasicValue>;
+    auth?: Auth;
+    user?: UserRecord;
+    res?: {
+        headers: Record<string, string>;
+        cookies: Record<string, string>;
+    };
+};
+type Body = string;
+type InlineReply = Response | {
+    body: Body;
+    headers?: Headers;
+} | string | number | undefined;
+type Middleware<Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
+
 declare global {
     var env: Record<string, any>;
 }
@@ -35,109 +163,6 @@ declare class ServerError extends Error {
     static REGISTER_INVALID_PASSWORD: (vars?: Variables) => ServerError;
     static REGISTER_EMAIL_EXISTS: (vars?: Variables) => ServerError;
 }
-
-type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
-type RouterMethod = "*" | Method;
-type Bucket = {
-    read: (path: string) => Promise<ReadableStream | null>;
-    write: (path: string, data: string | Buffer) => Promise<void | string>;
-    delete: (path: string) => Promise<boolean>;
-};
-type Cors = {
-    origin: string | boolean;
-    methods: string;
-    headers: string;
-};
-type CorsOptions = boolean | string | string[] | {
-    origin?: string | string[];
-    methods?: string | Method[];
-    headers?: string | string[];
-};
-type KVStore = {
-    name: string;
-    prefix: (key: string) => KVStore;
-    get: (key: string) => Promise<any>;
-    set: (key: string, value: any, options?: any) => Promise<void>;
-    has: (key: string) => Promise<boolean>;
-    del: (key: string) => Promise<void>;
-    keys: () => Promise<string[]>;
-};
-type Options = {
-    port?: number;
-    secret?: string;
-    views?: string | Bucket;
-    public?: string | Bucket;
-    uploads?: string | Bucket;
-    store?: KVStore;
-    cookies?: KVStore;
-    session?: KVStore | {
-        store: KVStore;
-    };
-    cors?: CorsOptions;
-    auth?: any;
-    openapi?: any;
-};
-type Settings = {
-    port: number;
-    secret: string;
-    views?: Bucket;
-    public?: Bucket;
-    uploads?: Bucket;
-    store?: KVStore;
-    cookies?: KVStore;
-    session?: {
-        store: KVStore;
-    };
-    cors?: Cors;
-    auth?: any;
-    openapi?: any;
-};
-type Time = {
-    (name: string): void;
-    times: [string, number][];
-    headers: () => string;
-};
-type Platform = {
-    provider: string | null;
-    runtime: string | null;
-    production: boolean;
-};
-type ExtractPathParams<Path extends string> = Path extends `${string}:${infer Param}(${infer Type})?/${infer Rest}` ? `${Param}:${Type}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})?` ? `${Param}:${Type}?` : Path extends `${string}:${infer Param}(${infer Type})/${infer Rest}` ? `${Param}:${Type}` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})` ? `${Param}:${Type}` : Path extends `${string}:${infer Param}?/${infer Rest}` ? `${Param}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}?` ? `${Param}?` : Path extends `${string}:${infer Param}/${infer Rest}` ? Param | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}` ? Param : never;
-type ParamTypeMap = {
-    string: string;
-    number: number;
-    date: Date;
-};
-type InferParamType<T extends string> = T extends keyof ParamTypeMap ? ParamTypeMap[T] : string;
-type ParamsToObject<Params extends string> = {
-    [K in Params as K extends `${infer Key}:${infer Type}?` ? Key : K extends `${infer Key}:${infer Type}` ? Key : K extends `${infer Key}?` ? Key : K]: K extends `${infer Key}:${infer Type}?` ? InferParamType<Type> | undefined : K extends `${infer Key}:${infer Type}` ? InferParamType<Type> : K extends `${infer Key}?` ? string | undefined : string;
-};
-type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>;
-type Context<Params extends Record<string, any> = Record<string, string>> = {
-    method: Method;
-    headers: Record<string, string | string[]>;
-    cookies: Record<string, string>;
-    body?: any;
-    url: URL & {
-        params: Params;
-        query: Record<string, string>;
-    };
-    options: Settings;
-    time?: Time;
-    session?: Record<string, any>;
-    auth?: any;
-    user?: any;
-    res?: {
-        headers: Record<string, string>;
-        cookies: Record<string, any>;
-    };
-};
-type Body = string;
-type InlineReply = Response | {
-    body: Body;
-    headers?: Headers;
-} | string | number | undefined;
-type Middleware<Params extends Record<string, any> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
 
 type PathOrMiddle = string | Middleware;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
@@ -231,42 +256,70 @@ declare class Server extends Router {
     callback(request: any, context: any): Promise<Response>;
     test(): {
         get: (path: string, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         head: (path: string, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         post: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         put: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         patch: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         delete: (path: string, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
         options: (path: string, options?: RequestInit) => Promise<{
-            status: any;
+            status: number;
             headers: Record<string, string | string[]>;
+            body: SerializableValue;
+        } | {
+            status: number;
+            headers: {};
             body: any;
         }>;
     };
 }
 declare function server(options?: {}): Server & ((request: any, context?: any) => any);
 
-export { type Body, type Bucket, type Context, type Cors, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, ServerError, type Settings, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type Auth, type AuthOption, type BasicValue, type Body, type Bucket, type Context, type Cors, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, type SerializableValue, Server, ServerError, type Settings, type Time, type UserRecord, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };

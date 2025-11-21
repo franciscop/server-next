@@ -1,4 +1,4 @@
-import type { Method, SerializableValue } from ".";
+import type { Method, SerializableValue, Server } from ".";
 import { parseHeaders } from "./helpers";
 
 function isSerializable(body: unknown): boolean {
@@ -10,10 +10,7 @@ function isSerializable(body: unknown): boolean {
 }
 
 // A function that can be triggered for testing
-export default function ServerTest(app: {
-  settings: { port: number };
-  fetch: (req: Request) => Promise<Response>;
-}) {
+export default function ServerTest(app: Server) {
   const port = app.settings.port;
 
   // let cookie = "";

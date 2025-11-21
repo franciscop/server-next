@@ -23,7 +23,7 @@ interface WinterContext {
   method: Method;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: any;
+  body?: unknown;
   url: URL & {
     params: Record<string, string>;
     query: Record<string, string>;
@@ -47,10 +47,10 @@ interface WinterContext {
   machine?: any;
 }
 
-export default async (
+export default async function createWinter(
   request: Request,
   app: any,
-): Promise<WinterContext | { error: Error }> => {
+): Promise<WinterContext | { error: Error }> {
   try {
     const ctx: WinterContext = {
       headers: {},
@@ -102,4 +102,4 @@ export default async (
   } catch (error) {
     return { error: error as Error };
   }
-};
+}

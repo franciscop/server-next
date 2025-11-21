@@ -366,7 +366,7 @@ async function updateUser(user2, auth3, store) {
 // src/auth/providers/email.ts
 var createSession = async (user2, ctx) => {
   const { type: type2, session: session2, cleanUser, redirect: redirect2 = "/user" } = ctx.options.auth;
-  user2 = cleanUser(user2);
+  user2 = await cleanUser(user2);
   const id = createId();
   const provider = "email";
   const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
@@ -535,9 +535,8 @@ function createNoSession() {
       if (target[key] || key === "then" || typeof key === "symbol") {
         target[key] = value;
         return true;
-      } else {
-        throw ServerError_default.NO_STORE_WRITE({ key: String(key) });
       }
+      throw ServerError_default.NO_STORE_WRITE({ key: String(key) });
     }
   });
 }
@@ -1992,6 +1991,7 @@ function server(options = {}) {
 }
 export {
   Reply,
+  Server,
   ServerError_default as ServerError,
   cookies,
   server as default,

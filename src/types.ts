@@ -46,12 +46,23 @@ type KVStore = {
   set: <T = SerializableValue>(
     key: string,
     value: T,
-    options?: any,
+    options?: Record<string, any>,
   ) => Promise<void>;
   has: (key: string) => Promise<boolean>;
   del: (key: string) => Promise<void>;
   keys: () => Promise<string[]>;
 };
+
+export type AuthOption =
+  | string
+  | {
+      type?: string | string[];
+      provider?: string | string[];
+      session?: KVStore;
+      store?: KVStore;
+      redirect?: string;
+      cleanUser?: <T = UserRecord>(user: T) => T | Promise<T>;
+    };
 
 export type Options = {
   port?: number;
@@ -63,7 +74,7 @@ export type Options = {
   cookies?: KVStore;
   session?: KVStore | { store: KVStore };
   cors?: CorsOptions;
-  auth?: any;
+  auth?: AuthOption;
   openapi?: any;
 };
 
@@ -75,6 +86,8 @@ export type UserRecord = {
 export type Auth = {
   store: KVStore;
   type: string;
+  user?: string;
+  provider: string;
   session: KVStore;
   cleanUser: <T = UserRecord>(user: T) => T | Promise<T>;
   redirect: string;
@@ -157,12 +170,12 @@ export type PathToParams<Path extends string> = ParamsToObject<
 >;
 
 export type Context<
-  Params extends Record<string, any> = Record<string, string>,
+  Params extends Record<string, string> = Record<string, string>,
 > = {
   method: Method;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: any;
+  body?: unknown;
   url: URL & {
     params: Params;
     query: Record<string, string>;
@@ -174,7 +187,7 @@ export type Context<
   user?: UserRecord;
   res?: {
     headers: Record<string, string>;
-    cookies: Record<string, any>;
+    cookies: Record<string, string>;
   };
 };
 
@@ -188,5 +201,5 @@ export type InlineReply =
   | undefined;
 
 export type Middleware<
-  Params extends Record<string, any> = Record<string, string>,
+  Params extends Record<string, string> = Record<string, string>,
 > = (ctx: Context<Params>) => InlineReply | void;

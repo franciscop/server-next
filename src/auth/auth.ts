@@ -1,4 +1,4 @@
-import { ServerError } from "..";
+import { Auth, ServerError } from "..";
 import type { Context } from "..";
 
 const validateToken = (authorization: string): string => {
@@ -47,7 +47,7 @@ export default async function auth(ctx: Context): Promise<any> {
   const sessionId = findSessionId(ctx);
   if (!sessionId) return; // NO SESSION FOUND; no auth
 
-  const auth = await options.session.get(sessionId);
+  const auth = await options.session.get<Auth>(sessionId);
   // Mmh, which one to do...
   // if (!auth) throw ServerError.AUTH_NO_SESSION();
   if (!auth) return; // SESSION ALREADY INVALID; no auth

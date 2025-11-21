@@ -9,7 +9,7 @@ import ServerTest from "./ServerTest";
 import * as handlers from "./context/handlers";
 import type { Options, Platform, Settings } from "./types";
 
-class Server extends Router {
+export class Server extends Router {
   settings: Settings;
   platform: Platform;
 

@@ -3,9 +3,9 @@ import logout from "./logout";
 import providers from "./providers";
 import session from "./session";
 import user from "./user";
-import type { Context } from "..";
+import type { Context, Options } from "..";
 
-const parseOptions = (auth: any, all: any): any => {
+const parseOptions = (auth: Options["auth"], all: any): any => {
   if (!auth) return null;
 
   if (typeof auth === "string") {
