@@ -9,19 +9,7 @@ const spaceOrEnter = (msg: any): string => {
   return "\n";
 };
 
-interface MatcherContext {
-  utils: {
-    printExpected: (value: any) => string;
-    printReceived: (value: any, indent?: any, depth?: number) => string;
-  };
-}
-
-interface Request {
-  status: number;
-  body: any;
-}
-
-export default function toSucceed(this: MatcherContext, request: Request, message?: any) {
+export default function toSucceed(this, request: Request, message?: any) {
   const pass = request.status >= 200 && request.status < 400;
 
   if (message && JSON.stringify(request.body) !== JSON.stringify(message)) {

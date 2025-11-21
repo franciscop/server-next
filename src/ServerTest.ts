@@ -1,4 +1,4 @@
-import type { Method } from ".";
+import type { Method, SerializableValue } from ".";
 import { parseHeaders } from "./helpers";
 
 function isSerializable(body: unknown): boolean {
@@ -39,7 +39,7 @@ export default function ServerTest(app: {
       );
 
       const headers = parseHeaders(res.headers);
-      let body: any;
+      let body: SerializableValue;
       // if (headers["set-cookie"]) {
       //   // TODO: app should really be a smart merge of the 2
       //   cookie = headers["set-cookie"];
