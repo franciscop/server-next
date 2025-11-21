@@ -82,13 +82,63 @@ export type Platform = {
   production: boolean;
 };
 
-export type Context = {
+// Path parameter type inference utilities
+export type ExtractPathParams<Path extends string> =
+  Path extends `${string}:${infer Param}(${infer Type})?/${infer Rest}`
+    ? `${Param}:${Type}?` | ExtractPathParams<`/${Rest}`>
+    : Path extends `${string}:${infer Param}(${infer Type})?`
+      ? `${Param}:${Type}?`
+      : Path extends `${string}:${infer Param}(${infer Type})/${infer Rest}`
+        ? `${Param}:${Type}` | ExtractPathParams<`/${Rest}`>
+        : Path extends `${string}:${infer Param}(${infer Type})`
+          ? `${Param}:${Type}`
+          : Path extends `${string}:${infer Param}?/${infer Rest}`
+            ? `${Param}?` | ExtractPathParams<`/${Rest}`>
+            : Path extends `${string}:${infer Param}?`
+              ? `${Param}?`
+              : Path extends `${string}:${infer Param}/${infer Rest}`
+                ? Param | ExtractPathParams<`/${Rest}`>
+                : Path extends `${string}:${infer Param}`
+                  ? Param
+                  : never;
+
+export type ParamTypeMap = {
+  string: string;
+  number: number;
+  date: Date;
+};
+
+export type InferParamType<T extends string> = T extends keyof ParamTypeMap
+  ? ParamTypeMap[T]
+  : string;
+
+export type ParamsToObject<Params extends string> = {
+  [K in Params as K extends `${infer Key}:${infer Type}?`
+    ? Key
+    : K extends `${infer Key}:${infer Type}`
+      ? Key
+      : K extends `${infer Key}?`
+        ? Key
+        : K]: K extends `${infer Key}:${infer Type}?`
+    ? InferParamType<Type> | undefined
+    : K extends `${infer Key}:${infer Type}`
+      ? InferParamType<Type>
+      : K extends `${infer Key}?`
+        ? string | undefined
+        : string;
+};
+
+export type PathToParams<Path extends string> = ParamsToObject<
+  ExtractPathParams<Path>
+>;
+
+export type Context<Params extends Record<string, any> = Record<string, string>> = {
   method: Method;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
   body?: any;
   url: URL & {
-    params: Record<string, string>;
+    params: Params;
     query: Record<string, string>;
   };
   options: Settings;
@@ -111,4 +161,4 @@ export type InlineReply =
   | number
   | undefined;
 
-export type Middleware = (ctx: Context) => InlineReply | void;
+export type Middleware<Params extends Record<string, any> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;

@@ -55,15 +55,15 @@ class Server extends Router {
   // We need to return a function; some environment expect the default export
   // to be a function that is called with the request, but we also want to
   // allow chaining, so we return a function that "extends" the instance
-  self() {
-    const cb = this.callback.bind(this);
+  self(): this & ((request: any, context?: any) => any) {
+    const cb = this.callback.bind(this) as any;
     const proto = Object.getPrototypeOf(this);
     const keys = Object.keys({ ...this.handlers, ...proto, ...this });
     for (const key of ["use", "node", "fetch", "callback", "test", ...keys]) {
       if (typeof this[key] === "function") {
-        (cb as any)[key] = (this as any)[key].bind(this);
+        cb[key] = (this as any)[key].bind(this);
       } else {
-        (cb as any)[key] = (this as any)[key];
+        cb[key] = (this as any)[key];
       }
     }
     return cb;

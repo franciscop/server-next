@@ -102,13 +102,24 @@ type Platform = {
     runtime: string | null;
     production: boolean;
 };
-type Context = {
+type ExtractPathParams<Path extends string> = Path extends `${string}:${infer Param}(${infer Type})?/${infer Rest}` ? `${Param}:${Type}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})?` ? `${Param}:${Type}?` : Path extends `${string}:${infer Param}(${infer Type})/${infer Rest}` ? `${Param}:${Type}` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}(${infer Type})` ? `${Param}:${Type}` : Path extends `${string}:${infer Param}?/${infer Rest}` ? `${Param}?` | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}?` ? `${Param}?` : Path extends `${string}:${infer Param}/${infer Rest}` ? Param | ExtractPathParams<`/${Rest}`> : Path extends `${string}:${infer Param}` ? Param : never;
+type ParamTypeMap = {
+    string: string;
+    number: number;
+    date: Date;
+};
+type InferParamType<T extends string> = T extends keyof ParamTypeMap ? ParamTypeMap[T] : string;
+type ParamsToObject<Params extends string> = {
+    [K in Params as K extends `${infer Key}:${infer Type}?` ? Key : K extends `${infer Key}:${infer Type}` ? Key : K extends `${infer Key}?` ? Key : K]: K extends `${infer Key}:${infer Type}?` ? InferParamType<Type> | undefined : K extends `${infer Key}:${infer Type}` ? InferParamType<Type> : K extends `${infer Key}?` ? string | undefined : string;
+};
+type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>;
+type Context<Params extends Record<string, any> = Record<string, string>> = {
     method: Method;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
     body?: any;
     url: URL & {
-        params: Record<string, string>;
+        params: Params;
         query: Record<string, string>;
     };
     options: Settings;
@@ -126,7 +137,36 @@ type InlineReply = Response | {
     body: Body;
     headers?: Headers;
 } | string | number | undefined;
-type Middleware = (ctx: Context) => InlineReply | void;
+type Middleware<Params extends Record<string, any> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
+
+type PathOrMiddle = string | Middleware;
+type FullRoute = [RouterMethod, string, ...Middleware[]][];
+declare class Router {
+    handlers: Record<Method, FullRoute>;
+    self(): this;
+    handle(method: RouterMethod, path: PathOrMiddle, ...middleware: Middleware[]): this;
+    socket<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    socket(...middleware: Middleware[]): this;
+    get<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    get(...middleware: Middleware[]): this;
+    head<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    head(...middleware: Middleware[]): this;
+    post<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    post(...middleware: Middleware[]): this;
+    put<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    put(...middleware: Middleware[]): this;
+    patch<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    patch(...middleware: Middleware[]): this;
+    del<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    del(...middleware: Middleware[]): this;
+    options<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
+    options(...middleware: Middleware[]): this;
+    use(...middleware: Middleware[]): this;
+    use(path: string, ...middleware: Middleware[]): this;
+    use(router: Router): this;
+    use(path: string, router: Router): this;
+}
+declare function router(): Router;
 
 interface ResponseData {
     headers: Record<string, string>;
@@ -178,35 +218,55 @@ declare const view: (...args: [string, ((data: Buffer) => Promise<Buffer | strin
     };
 }?]) => Promise<Response>;
 
-type PathOrMiddle = string | Middleware;
-type FullRoute = [RouterMethod, string, ...Middleware[]][];
-declare class Router {
-    handlers: Record<Method, FullRoute>;
-    self(): this;
-    handle(method: RouterMethod, path: PathOrMiddle, ...middleware: Middleware[]): this;
-    socket(path: string, ...middleware: Middleware[]): this;
-    socket(...middleware: Middleware[]): this;
-    get(path: string, ...middleware: Middleware[]): this;
-    get(...middleware: Middleware[]): this;
-    head(path: string, ...middleware: Middleware[]): this;
-    head(...middleware: Middleware[]): this;
-    post(path: string, ...middleware: Middleware[]): this;
-    post(...middleware: Middleware[]): this;
-    put(path: string, ...middleware: Middleware[]): this;
-    put(...middleware: Middleware[]): this;
-    patch(path: string, ...middleware: Middleware[]): this;
-    patch(...middleware: Middleware[]): this;
-    del(path: string, ...middleware: Middleware[]): this;
-    del(...middleware: Middleware[]): this;
-    options(path: string, ...middleware: Middleware[]): this;
-    options(...middleware: Middleware[]): this;
-    use(...middleware: Middleware[]): this;
-    use(path: string, ...middleware: Middleware[]): this;
-    use(router: Router): this;
-    use(path: string, router: Router): this;
+declare class Server extends Router {
+    settings: Settings;
+    platform: Platform;
+    sockets: any[];
+    websocket: any;
+    port?: number;
+    constructor(options?: Options);
+    self(): this & ((request: any, context?: any) => any);
+    node(): Promise<void>;
+    fetch(request: any, env: any): Promise<Response>;
+    callback(request: any, context: any): Promise<Response>;
+    test(): {
+        get: (path: string, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        head: (path: string, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        post: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        put: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        patch: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        delete: (path: string, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+        options: (path: string, options?: RequestInit) => Promise<{
+            status: any;
+            headers: Record<string, string | string[]>;
+            body: any;
+        }>;
+    };
 }
-declare function router(): Router;
+declare function server(options?: {}): Server & ((request: any, context?: any) => any);
 
-declare function server(options?: {}): any;
-
-export { type Body, type Bucket, type Context, type Cors, type InlineReply, type Method, type Middleware, type Options, type Platform, Reply, type RouterMethod, ServerError, type Settings, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type Body, type Bucket, type Context, type Cors, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, ServerError, type Settings, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
