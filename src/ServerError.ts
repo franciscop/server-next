@@ -38,10 +38,10 @@ class ServerError extends Error {
     for (const code in errors) {
       const error = errors[code];
       if (typeof error === "string") {
-        (ServerError as any)[code] = (vars: Variables = {}) =>
+        ServerError[code] = (vars: Variables = {}) =>
           new ServerError(code, 500, error, vars);
       } else {
-        (ServerError as any)[code] = (vars: Variables = {}) =>
+        ServerError[code] = (vars: Variables = {}) =>
           new ServerError(code, error.status, error.message, vars);
       }
     }

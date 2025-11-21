@@ -32,11 +32,22 @@ type CorsOptions =
       headers?: string | string[];
     };
 
+export type BasicValue = string | number | boolean | null;
+
+export type SerializableValue =
+  | BasicValue
+  | { [key: string]: SerializableValue }
+  | Array<SerializableValue>;
+
 type KVStore = {
   name: string;
   prefix: (key: string) => KVStore;
-  get: (key: string) => Promise<any>;
-  set: (key: string, value: any, options?: any) => Promise<void>;
+  get: <T = SerializableValue>(key: string) => Promise<T>;
+  set: <T = SerializableValue>(
+    key: string,
+    value: T,
+    options?: any,
+  ) => Promise<void>;
   has: (key: string) => Promise<boolean>;
   del: (key: string) => Promise<void>;
   keys: () => Promise<string[]>;
@@ -56,6 +67,19 @@ export type Options = {
   openapi?: any;
 };
 
+export type UserRecord = {
+  email: string;
+  password: string;
+};
+
+export type Auth = {
+  store: KVStore;
+  type: string;
+  session: KVStore;
+  cleanUser: <T = UserRecord>(user: T) => T | Promise<T>;
+  redirect: string;
+};
+
 export type Settings = {
   port: number;
   secret: string;
@@ -66,7 +90,7 @@ export type Settings = {
   cookies?: KVStore;
   session?: { store: KVStore };
   cors?: Cors;
-  auth?: any;
+  auth?: Auth;
   openapi?: any;
 };
 
@@ -145,9 +169,9 @@ export type Context<
   };
   options: Settings;
   time?: Time;
-  session?: Record<string, any>;
-  auth?: any;
-  user?: any;
+  session?: Record<string, BasicValue>;
+  auth?: Auth;
+  user?: UserRecord;
   res?: {
     headers: Record<string, string>;
     cookies: Record<string, any>;

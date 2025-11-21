@@ -1,11 +1,11 @@
 import { createId, hash, verify } from "../../helpers";
 import { ServerError, status } from "../..";
 import updateUser from "../updateUser";
-import type { Context } from "../..";
+import type { Context, UserRecord } from "../..";
 
-const createSession = async (user: any, ctx: Context) => {
+const createSession = async (user: UserRecord, ctx: Context) => {
   const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;
-  user = cleanUser(user);
+  user = await cleanUser(user);
   const id = createId();
   const provider = "email";
   const time = new Date().toISOString().replace(/\.[0-9]*/, "");
@@ -44,7 +44,7 @@ async function emailLogin(ctx: Context) {
   const store = ctx.options.auth.store;
   if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
-  const user = await store.get(email);
+  const user = await store.get<UserRecord>(email);
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 

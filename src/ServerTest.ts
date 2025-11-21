@@ -1,7 +1,7 @@
 import type { Method } from ".";
 import { parseHeaders } from "./helpers";
 
-function isSerializable(body: any): boolean {
+function isSerializable(body: unknown): boolean {
   if (!body) return false;
   if (typeof body === "string") return false;
   if (body instanceof ReadableStream) return false;
@@ -10,7 +10,10 @@ function isSerializable(body: any): boolean {
 }
 
 // A function that can be triggered for testing
-export default function ServerTest(app: any) {
+export default function ServerTest(app: {
+  settings: { port: number };
+  fetch: (req: Request) => Promise<Response>;
+}) {
   const port = app.settings.port;
 
   // let cookie = "";
