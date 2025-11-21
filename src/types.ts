@@ -1,3 +1,5 @@
+import type { Server } from ".";
+
 export type Method =
   | "get"
   | "post"
@@ -84,6 +86,7 @@ export type UserRecord = {
 };
 
 export type Auth = {
+  id: string; // ID of the session
   store: KVStore;
   type: string;
   user?: string;
@@ -169,6 +172,16 @@ export type PathToParams<Path extends string> = ParamsToObject<
   ExtractPathParams<Path>
 >;
 
+export type BunEnv = Record<string, string> & {
+  upgrade?: (req: Request) => boolean;
+};
+
+export type EventCallback = (data: Context & SerializableValue) => void;
+type Events = Record<string, EventCallback[]> & {
+  on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
+  trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
+};
+
 export type Context<
   Params extends Record<string, string> = Record<string, string>,
 > = {
@@ -181,14 +194,16 @@ export type Context<
     query: Record<string, string>;
   };
   options: Settings;
+  platform: Platform;
   time?: Time;
   session?: Record<string, BasicValue>;
   auth?: Auth;
   user?: UserRecord;
-  res?: {
-    headers: Record<string, string>;
-    cookies: Record<string, string>;
-  };
+  init: number;
+  events: Events;
+  req?: Request;
+  res?: Response;
+  app: Server;
 };
 
 export type Body = string;

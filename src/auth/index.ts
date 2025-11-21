@@ -52,10 +52,11 @@ const parseOptions = (auth: Options["auth"], all: any): any => {
   return auth;
 };
 
-const load = async (ctx: Context): Promise<void> => {
+const load = async (ctx: Context): Promise<Context> => {
   ctx.session = await session(ctx);
   ctx.auth = await auth(ctx);
   ctx.user = await user(ctx);
+  return ctx;
 };
 
 const middle = async (ctx: Context): Promise<void> => {
@@ -63,17 +64,17 @@ const middle = async (ctx: Context): Promise<void> => {
     if (ctx.options.auth.provider.includes("github")) {
       if (!env.GITHUB_ID) throw new Error("GITHUB_ID not defined");
       if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
-      (ctx as any).app.get(
+      ctx.app.get(
         "/auth/logout",
-        { tags: "Auth", title: "Github logout" },
+        // { tags: "Auth", title: "Github logout" },
         logout,
       );
-      (ctx as any).app.get(
+      ctx.app.get(
         "/auth/login/github",
         { tags: "Auth" },
         providers.github.login,
       );
-      (ctx as any).app.get(
+      ctx.app.get(
         "/auth/callback/github",
         { tags: "Auth", title: "Github callback" },
         providers.github.callback,
@@ -81,27 +82,23 @@ const middle = async (ctx: Context): Promise<void> => {
     }
 
     if (ctx.options.auth.provider.includes("email")) {
-      (ctx as any).app.post("/auth/logout", { tags: "Auth" }, logout);
-      (ctx as any).app.post(
+      ctx.app.post("/auth/logout", { tags: "Auth" }, logout);
+      ctx.app.post(
         "/auth/register/email",
         { tags: "Auth" },
         providers.email.register,
       );
-      (ctx as any).app.post(
+      ctx.app.post(
         "/auth/login/email",
         { tags: "Auth" },
         providers.email.login,
       );
-      (ctx as any).app.put(
+      ctx.app.put(
         "/auth/password/email",
         { tags: "Auth" },
         providers.email.password,
       );
-      (ctx as any).app.put(
-        "/auth/reset/email",
-        { tags: "Auth" },
-        providers.email.reset,
-      );
+      ctx.app.put("/auth/reset/email", { tags: "Auth" }, providers.email.reset);
     }
   }
 };

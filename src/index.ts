@@ -7,7 +7,7 @@ import { assets, auth, timer, openapi } from "./middle/index";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
 import * as handlers from "./context/handlers";
-import type { Options, Platform, Settings } from "./types";
+import type { BunEnv, Options, Platform, Settings } from "./types";
 
 export class Server extends Router {
   settings: Settings;
@@ -36,7 +36,7 @@ export class Server extends Router {
 
     // Initialize it right away for Node.js
     if (this.platform.runtime === "node") {
-      (this as any).node();
+      this.node();
     }
 
     // Middleware that is always available
@@ -73,10 +73,10 @@ export class Server extends Router {
   node() {
     return handlers.Node(this);
   }
-  fetch(request, env) {
+  fetch(request: Request, env?: BunEnv) {
     return handlers.Winter(this, request, env);
   }
-  callback(request, context) {
+  callback(request: Request, context: unknown) {
     return handlers.Netlify(this, request, context);
   }
 

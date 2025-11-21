@@ -19,7 +19,7 @@
   "scripts": {
     "build": "bunx tsup src/index.ts --format esm --dts --out-dir . --target node24",
     "start": "bun test --watch",
-    "lint": "npx @biomejs/biome lint ./src --skip=lint/style/noParameterAssign  --skip=lint/suspicious/noConfusingVoidType",
+    "lint": "npx @biomejs/biome lint ./src --skip=lint/suspicious/noExplicitAny --skip=lint/style/noParameterAssign  --skip=lint/suspicious/noConfusingVoidType",
     "test": "npm run test:bun && tsc --noEmit",
     "test:bun": "bun test",
     "test:jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js"

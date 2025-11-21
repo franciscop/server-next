@@ -1,5 +1,5 @@
-import { Auth, ServerError } from "..";
-import type { Context } from "..";
+import { ServerError } from "..";
+import type { Auth, Context } from "..";
 
 const validateToken = (authorization: string): string => {
   const [type, id] = authorization.trim().split(" ");
@@ -40,7 +40,7 @@ const findSessionId = (ctx: Context): string | undefined => {
   throw new Error(`Invalid auth type "${type}"`);
 };
 
-export default async function auth(ctx: Context): Promise<any> {
+export default async function auth(ctx: Context): Promise<Auth> {
   if (!ctx.options.auth) return; // NO AUTH AT ALL; nothing to do here
   const options = ctx.options.auth;
 

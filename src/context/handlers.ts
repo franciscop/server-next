@@ -1,29 +1,27 @@
 import { handleRequest, parseHeaders, iterate } from "../helpers";
 
-import createWinterContext from "./winter";
-import createNodeContext from "./node";
+import createWinter from "./winter";
+import createNode from "./node";
+import type { IncomingMessage } from "node:http";
+import type { BunEnv, Server } from "..";
 
-export const Winter = async (app, request, env) => {
+export const Winter = async (app: Server, request: Request, env: BunEnv) => {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
-  const ctx = await createWinterContext(request, app);
-  if ("error" in ctx) {
-    throw ctx.error;
-  }
+  const ctx = await createWinter(request, app);
   const res = await handleRequest(app.handlers, ctx);
-  ctx.trigger("finish", { ...ctx, res, end: performance.now() });
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 
-export const Node = async (app) => {
+export const Node = async (app: Server) => {
   const http = await import("node:http");
   http
-    .createServer(async (request, response) => {
-      const ctx = await createNodeContext(request, app);
-      if ("error" in ctx) {
-        throw ctx.error;
-      }
+    .createServer(async (request: IncomingMessage, response) => {
+      const ctx = await createNode(request, app);
+      if ("error" in ctx) throw ctx.error;
+
       const out = await handleRequest(app.handlers, ctx);
 
       response.writeHead(out.status || 200, parseHeaders(out.headers));
@@ -37,15 +35,19 @@ export const Node = async (app) => {
     .listen(app.settings.port);
 };
 
-export const Netlify = async (app, request, context) => {
-  // Consider simply renaming to "ctx.next()"
-  request.context = context;
+export const Netlify = async (
+  app: Server,
+  request: Request,
+  context: unknown,
+) => {
+  // ?? consider simply renaming to "ctx.next()"
+  // request.context = context;
+  console.log("Unknown context", context);
   if (typeof Netlify === "undefined") {
     throw new Error("Netlify doesn't exist");
   }
-  const ctx = await createWinterContext(request, app);
-  if ("error" in ctx) {
-    throw ctx.error;
-  }
-  return await handleRequest(app.handlers, ctx);
+  const ctx = await createWinter(request, app);
+  const res = await handleRequest(app.handlers, ctx);
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
+  return res;
 };

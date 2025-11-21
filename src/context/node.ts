@@ -2,50 +2,11 @@ import auth from "../auth";
 import { define, parseHeaders } from "../helpers";
 import parseBody from "./parseBody";
 import parseCookies from "./parseCookies";
-import type { Context, Method } from "..";
+import type { Context, Server } from "..";
+import { TLSSocket } from "node:tls";
+import createEvents from "./createEvents";
+import isValidMethod from "./isValidMethod";
 import type { IncomingMessage } from "node:http";
-
-type EventCallback = (data: any) => void;
-
-function isValidMethod(method: string): method is Method {
-  return [
-    "get",
-    "post",
-    "put",
-    "patch",
-    "delete",
-    "head",
-    "options",
-    "socket",
-  ].includes(method);
-}
-
-interface NodeContext {
-  method: Method;
-  headers: Record<string, string | string[]>;
-  cookies: Record<string, string>;
-  body?: any;
-  url: URL & {
-    params: Record<string, string>;
-    query: Record<string, string>;
-  };
-  options: any;
-  settings: any;
-  time?: any;
-  session?: Record<string, any>;
-  auth?: any;
-  user?: any;
-  res?: {
-    headers: Record<string, string>;
-    cookies: Record<string, any>;
-  };
-  req: IncomingMessage;
-  on: (name: string, callback: EventCallback) => void;
-  trigger: (name: string, data?: any) => void;
-  app?: any;
-  platform?: any;
-  machine?: any;
-}
 
 // Headers come like [title1, value1, title2, value2, ...]
 // https://stackoverflow.com/a/54029307/938236
@@ -54,73 +15,54 @@ const chunkArray = (arr: string[], size: number): string[][] =>
     ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
     : [arr];
 
-export default async (
-  request: IncomingMessage & { rawHeaders: string[] },
-  app: any,
-): Promise<NodeContext | { error: Error }> => {
-  try {
-    const ctx: NodeContext = {
-      headers: {},
-      cookies: {},
-      url: undefined,
-      options: app.settings || {},
-      method: "get",
-      req: request,
-    } as NodeContext;
-    const method = request.method?.toLowerCase() || "get";
-    if (!isValidMethod(method)) {
-      throw new Error(`Invalid HTTP method: ${method}`);
-    }
-    ctx.method = method;
+export default async function createNode(
+  req: IncomingMessage,
+  app: Server,
+): Promise<Context> {
+  const init = performance.now();
 
-    // Private
-    const events: Record<string, EventCallback[]> = {};
-    ctx.on = (name: string, callback: EventCallback) => {
-      events[name] = events[name] || [];
-      events[name].push(callback);
-    };
-    ctx.trigger = (name: string, data?: any) => {
-      if (!events[name]) return;
-      for (const cb of events[name]) {
-        cb(data);
-      }
-    };
-
-    ctx.headers = parseHeaders(
-      new Headers(chunkArray(request.rawHeaders, 2) as any),
-    );
-    ctx.cookies = parseCookies(ctx.headers.cookie);
-    await auth.load(ctx as Context);
-
-    const https = (request as any).connection?.encrypted ? "https" : "http";
-    const host = ctx.headers.host || `localhost:${ctx.options.port}`;
-    const path = (request.url || "/").replace(/\/$/, "") || "/";
-    ctx.url = new URL(path, `${https}://${host}`) as any;
-    define(ctx.url, "query", (url: URL) =>
-      Object.fromEntries(url.searchParams.entries()),
-    );
-
-    await new Promise<void>((resolve, reject) => {
-      const body: Uint8Array[] = [];
-      request
-        .on("data", (chunk: Uint8Array) => {
-          body.push(chunk);
-        })
-        .on("end", async () => {
-          const type = ctx.headers["content-type"];
-          const concatenated = Buffer.concat(body);
-          ctx.body = await parseBody(concatenated, type, ctx.options.uploads);
-          resolve();
-        })
-        .on("error", reject);
-    });
-
-    ctx.app = app;
-    ctx.platform = app.platform;
-    ctx.machine = app.platform;
-
-    return ctx;
-  } catch (error) {
-    return { error: error as Error };
+  const method = req.method?.toLowerCase() || "get";
+  if (!isValidMethod(method)) {
+    throw new Error(`Invalid HTTP method: ${method}`);
   }
-};
+
+  const headers = parseHeaders(
+    new Headers(chunkArray(req.rawHeaders, 2) as any),
+  );
+  const cookies = parseCookies(headers.cookie);
+
+  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
+  const host = headers.host || `localhost:${app.settings.port}`;
+  const path = (req.url || "/").replace(/\/$/, "") || "/";
+  const baseUrl = `${scheme}://${host}`;
+  const url = new URL(path, baseUrl) as Context["url"];
+  define(url, "query", (url: URL) =>
+    Object.fromEntries(url.searchParams.entries()),
+  );
+
+  const rawBody = await new Promise<Buffer<ArrayBuffer>>((resolve, reject) => {
+    const body: Uint8Array[] = [];
+    req
+      .on("data", (chunk: Uint8Array) => body.push(chunk))
+      .on("end", () => resolve(Buffer.concat(body)))
+      .on("error", reject);
+  });
+  const body = rawBody
+    ? await parseBody(rawBody, headers["content-type"], app.settings.uploads)
+    : undefined;
+
+  const events = createEvents();
+
+  return await auth.load({
+    options: app.settings,
+    platform: app.platform,
+    url,
+    method,
+    body,
+    headers,
+    cookies,
+    init,
+    events,
+    app,
+  });
+}

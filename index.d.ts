@@ -56,6 +56,7 @@ type UserRecord = {
     password: string;
 };
 type Auth = {
+    id: string;
     store: KVStore;
     type: string;
     user?: string;
@@ -100,6 +101,14 @@ type ParamsToObject<Params extends string> = {
     [K in Params as K extends `${infer Key}:${infer _Type}?` ? Key : K extends `${infer Key}:${infer _Type}` ? Key : K extends `${infer Key}?` ? Key : K]: K extends `${infer _Key}:${infer Type}?` ? InferParamType<Type> | undefined : K extends `${infer _Key}:${infer Type}` ? InferParamType<Type> : K extends `${infer _Key}?` ? string | undefined : string;
 };
 type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>;
+type BunEnv = Record<string, string> & {
+    upgrade?: (req: Request) => boolean;
+};
+type EventCallback = (data: Context & SerializableValue) => void;
+type Events = Record<string, EventCallback[]> & {
+    on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
+    trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
+};
 type Context<Params extends Record<string, string> = Record<string, string>> = {
     method: Method;
     headers: Record<string, string | string[]>;
@@ -110,14 +119,16 @@ type Context<Params extends Record<string, string> = Record<string, string>> = {
         query: Record<string, string>;
     };
     options: Settings;
+    platform: Platform;
     time?: Time;
     session?: Record<string, BasicValue>;
     auth?: Auth;
     user?: UserRecord;
-    res?: {
-        headers: Record<string, string>;
-        cookies: Record<string, string>;
-    };
+    init: number;
+    events: Events;
+    req?: Request;
+    res?: Response;
+    app: Server;
 };
 type Body = string;
 type InlineReply = Response | {
@@ -252,8 +263,8 @@ declare class Server extends Router {
     constructor(options?: Options);
     self(): this & ((request: any, context?: any) => any);
     node(): Promise<void>;
-    fetch(request: any, env: any): Promise<Response>;
-    callback(request: any, context: any): Promise<Response>;
+    fetch(request: Request, env?: BunEnv): Promise<Response>;
+    callback(request: Request, context: unknown): Promise<Response>;
     test(): {
         get: (path: string, options?: RequestInit) => Promise<{
             status: number;
@@ -322,4 +333,4 @@ declare class Server extends Router {
 }
 declare function server(options?: {}): Server & ((request: any, context?: any) => any);
 
-export { type Auth, type AuthOption, type BasicValue, type Body, type Bucket, type Context, type Cors, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, type SerializableValue, Server, ServerError, type Settings, type Time, type UserRecord, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type Auth, type AuthOption, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cors, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, type SerializableValue, Server, ServerError, type Settings, type Time, type UserRecord, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };

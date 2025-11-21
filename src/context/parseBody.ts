@@ -63,7 +63,7 @@ function isProbablyText(buffer: Buffer): boolean {
 }
 
 export default async function parseBody(
-  raw: Buffer | Request | { arrayBuffer: () => Promise<ArrayBuffer> },
+  raw: Buffer,
   contentType?: string | string[],
   bucket?: Bucket,
 ): Promise<any> {
@@ -71,25 +71,14 @@ export default async function parseBody(
     ? contentType[0]
     : contentType;
 
-  let rawBuffer: Buffer;
-
-  if (raw instanceof Buffer) {
-    rawBuffer = raw;
-  } else if ("arrayBuffer" in raw && typeof raw.arrayBuffer === "function") {
-    const arrayBuf = await raw.arrayBuffer();
-    rawBuffer = Buffer.from(arrayBuf);
-  } else {
-    throw new Error("Unsupported raw type");
-  }
-
-  if (!rawBuffer) return {};
+  if (!raw) return {};
 
   // Handle plain text or JSON first
-  if (!contentTypeStr || /text\/plain/.test(contentTypeStr)) {
-    return rawBuffer.toString("utf-8");
+  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
+    return raw.toString("utf-8");
   }
   if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(rawBuffer.toString("utf-8"));
+    return JSON.parse(raw.toString("utf-8"));
   }
 
   // Multipart
@@ -98,7 +87,7 @@ export default async function parseBody(
 
   const body: Record<string, any> = {};
   const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(rawBuffer, boundaryBuffer);
+  const parts = splitBuffer(raw, boundaryBuffer);
 
   for (const part of parts) {
     if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;

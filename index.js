@@ -609,6 +609,7 @@ var load = async (ctx) => {
   ctx.session = await session(ctx);
   ctx.auth = await auth(ctx);
   ctx.user = await user(ctx);
+  return ctx;
 };
 var middle = async (ctx) => {
   if (ctx.options.auth) {
@@ -617,7 +618,7 @@ var middle = async (ctx) => {
       if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
       ctx.app.get(
         "/auth/logout",
-        { tags: "Auth", title: "Github logout" },
+        // { tags: "Auth", title: "Github logout" },
         logout
       );
       ctx.app.get(
@@ -648,11 +649,7 @@ var middle = async (ctx) => {
         { tags: "Auth" },
         providers_default.email.password
       );
-      ctx.app.put(
-        "/auth/reset/email",
-        { tags: "Auth" },
-        providers_default.email.reset
-      );
+      ctx.app.put("/auth/reset/email", { tags: "Auth" }, providers_default.email.reset);
     }
   }
 };
@@ -1546,8 +1543,8 @@ var Router = class _Router {
       middleware.unshift(path2);
       path2 = "*";
     }
-    const methods = method === "*" ? Object.keys(this.handlers) : [method];
-    for (const m of methods) {
+    const methods2 = method === "*" ? Object.keys(this.handlers) : [method];
+    for (const m of methods2) {
       this.handlers[m].push([method, path2, ...middleware]);
     }
     return this.self();
@@ -1690,27 +1687,18 @@ function isProbablyText(buffer) {
 }
 async function parseBody(raw, contentType, bucket) {
   const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-  let rawBuffer;
-  if (raw instanceof Buffer) {
-    rawBuffer = raw;
-  } else if ("arrayBuffer" in raw && typeof raw.arrayBuffer === "function") {
-    const arrayBuf = await raw.arrayBuffer();
-    rawBuffer = Buffer.from(arrayBuf);
-  } else {
-    throw new Error("Unsupported raw type");
-  }
-  if (!rawBuffer) return {};
-  if (!contentTypeStr || /text\/plain/.test(contentTypeStr)) {
-    return rawBuffer.toString("utf-8");
+  if (!raw) return {};
+  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
+    return raw.toString("utf-8");
   }
   if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(rawBuffer.toString("utf-8"));
+    return JSON.parse(raw.toString("utf-8"));
   }
   const boundary = getBoundary(contentTypeStr);
   if (!boundary) return null;
   const body = {};
   const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(rawBuffer, boundaryBuffer);
+  const parts = splitBuffer(raw, boundaryBuffer);
   for (const part of parts) {
     if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
     const idx = part.indexOf(BREAK_BUFFER);
@@ -1749,161 +1737,127 @@ function parseCookies(cookies2) {
   );
 }
 
-// src/context/winter.ts
-function isValidMethod(method) {
-  return [
-    "get",
-    "post",
-    "put",
-    "patch",
-    "delete",
-    "head",
-    "options",
-    "socket"
-  ].includes(method);
+// src/context/createEvents.ts
+function createEvents() {
+  const events = {};
+  events.on = (name, callback2) => {
+    events[name] = events[name] || [];
+    events[name].push(callback2);
+  };
+  events.trigger = (name, data) => {
+    if (!events[name]) return;
+    for (const cb of events[name]) {
+      cb(data);
+    }
+  };
+  return events;
 }
-var winter_default = async (request, app) => {
-  try {
-    const ctx = {
-      headers: {},
-      cookies: {},
-      url: void 0,
-      options: app.settings || {},
-      method: "get",
-      init: performance.now(),
-      req: request
-    };
-    const method = request.method.toLowerCase();
-    if (!isValidMethod(method)) {
-      throw new Error(`Invalid HTTP method: ${method}`);
-    }
-    ctx.method = method;
-    const events = {};
-    ctx.on = (name, callback2) => {
-      events[name] = events[name] || [];
-      events[name].push(callback2);
-    };
-    ctx.trigger = (name, data) => {
-      if (!events[name]) return;
-      for (const cb of events[name]) {
-        cb(data);
-      }
-    };
-    ctx.headers = parseHeaders_default(request.headers);
-    ctx.cookies = parseCookies(ctx.headers.cookie);
-    await auth_default.load(ctx);
-    ctx.url = new URL(request.url.replace(/\/$/, ""));
-    define(
-      ctx.url,
-      "query",
-      (url) => Object.fromEntries(url.searchParams.entries())
-    );
-    if (request.body) {
-      const type2 = ctx.headers["content-type"];
-      ctx.body = await parseBody(request, type2, ctx.options.uploads);
-    }
-    ctx.app = app;
-    ctx.platform = app.platform;
-    ctx.machine = app.platform;
-    return ctx;
-  } catch (error) {
-    return { error };
+
+// src/context/isValidMethod.ts
+var methods = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "socket"
+];
+function isValidMethod(method) {
+  return methods.includes(method);
+}
+
+// src/context/winter.ts
+async function createWinter(req, app) {
+  const init = performance.now();
+  const method = req.method.toLowerCase();
+  if (!isValidMethod(method)) {
+    throw new Error(`Invalid HTTP method: ${method}`);
   }
-};
+  const headers2 = parseHeaders_default(req.headers);
+  const cookies2 = parseCookies(headers2.cookie);
+  const baseUrl = req.url.replace(/\/$/, "") || "/";
+  const url = new URL(baseUrl);
+  define(
+    url,
+    "query",
+    (url2) => Object.fromEntries(url2.searchParams.entries())
+  );
+  const rawBody = Buffer.from(await req.arrayBuffer());
+  const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const events = createEvents();
+  return await auth_default.load({
+    options: app.settings,
+    platform: app.platform,
+    url,
+    method,
+    body,
+    headers: headers2,
+    cookies: cookies2,
+    init,
+    events,
+    app
+  });
+}
 
 // src/context/node.ts
-function isValidMethod2(method) {
-  return [
-    "get",
-    "post",
-    "put",
-    "patch",
-    "delete",
-    "head",
-    "options",
-    "socket"
-  ].includes(method);
-}
+import { TLSSocket } from "tls";
 var chunkArray = (arr, size) => arr.length > size ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [arr];
-var node_default = async (request, app) => {
-  try {
-    const ctx = {
-      headers: {},
-      cookies: {},
-      url: void 0,
-      options: app.settings || {},
-      method: "get",
-      req: request
-    };
-    const method = request.method?.toLowerCase() || "get";
-    if (!isValidMethod2(method)) {
-      throw new Error(`Invalid HTTP method: ${method}`);
-    }
-    ctx.method = method;
-    const events = {};
-    ctx.on = (name, callback2) => {
-      events[name] = events[name] || [];
-      events[name].push(callback2);
-    };
-    ctx.trigger = (name, data) => {
-      if (!events[name]) return;
-      for (const cb of events[name]) {
-        cb(data);
-      }
-    };
-    ctx.headers = parseHeaders_default(
-      new Headers(chunkArray(request.rawHeaders, 2))
-    );
-    ctx.cookies = parseCookies(ctx.headers.cookie);
-    await auth_default.load(ctx);
-    const https = request.connection?.encrypted ? "https" : "http";
-    const host = ctx.headers.host || `localhost:${ctx.options.port}`;
-    const path2 = (request.url || "/").replace(/\/$/, "") || "/";
-    ctx.url = new URL(path2, `${https}://${host}`);
-    define(
-      ctx.url,
-      "query",
-      (url) => Object.fromEntries(url.searchParams.entries())
-    );
-    await new Promise((resolve2, reject) => {
-      const body = [];
-      request.on("data", (chunk) => {
-        body.push(chunk);
-      }).on("end", async () => {
-        const type2 = ctx.headers["content-type"];
-        const concatenated = Buffer.concat(body);
-        ctx.body = await parseBody(concatenated, type2, ctx.options.uploads);
-        resolve2();
-      }).on("error", reject);
-    });
-    ctx.app = app;
-    ctx.platform = app.platform;
-    ctx.machine = app.platform;
-    return ctx;
-  } catch (error) {
-    return { error };
+async function createNode(req, app) {
+  const init = performance.now();
+  const method = req.method?.toLowerCase() || "get";
+  if (!isValidMethod(method)) {
+    throw new Error(`Invalid HTTP method: ${method}`);
   }
-};
+  const headers2 = parseHeaders_default(
+    new Headers(chunkArray(req.rawHeaders, 2))
+  );
+  const cookies2 = parseCookies(headers2.cookie);
+  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
+  const host = headers2.host || `localhost:${app.settings.port}`;
+  const path2 = (req.url || "/").replace(/\/$/, "") || "/";
+  const baseUrl = `${scheme}://${host}`;
+  const url = new URL(path2, baseUrl);
+  define(
+    url,
+    "query",
+    (url2) => Object.fromEntries(url2.searchParams.entries())
+  );
+  const rawBody = await new Promise((resolve2, reject) => {
+    const body2 = [];
+    req.on("data", (chunk) => body2.push(chunk)).on("end", () => resolve2(Buffer.concat(body2))).on("error", reject);
+  });
+  const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const events = createEvents();
+  return await auth_default.load({
+    options: app.settings,
+    platform: app.platform,
+    url,
+    method,
+    body,
+    headers: headers2,
+    cookies: cookies2,
+    init,
+    events,
+    app
+  });
+}
 
 // src/context/handlers.ts
 var Winter = async (app, request, env3) => {
   if (env3?.upgrade(request)) return;
   Object.assign(globalThis.env, env3);
-  const ctx = await winter_default(request, app);
-  if ("error" in ctx) {
-    throw ctx.error;
-  }
+  const ctx = await createWinter(request, app);
   const res = await handleRequest(app.handlers, ctx);
-  ctx.trigger("finish", { ...ctx, res, end: performance.now() });
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 var Node = async (app) => {
   const http = await import("http");
   http.createServer(async (request, response) => {
-    const ctx = await node_default(request, app);
-    if ("error" in ctx) {
-      throw ctx.error;
-    }
+    const ctx = await createNode(request, app);
+    if ("error" in ctx) throw ctx.error;
     const out = await handleRequest(app.handlers, ctx);
     response.writeHead(out.status || 200, parseHeaders_default(out.headers));
     if (out.body instanceof ReadableStream) {
@@ -1915,15 +1869,14 @@ var Node = async (app) => {
   }).listen(app.settings.port);
 };
 var Netlify = async (app, request, context) => {
-  request.context = context;
+  console.log("Unknown context", context);
   if (typeof Netlify === "undefined") {
     throw new Error("Netlify doesn't exist");
   }
-  const ctx = await winter_default(request, app);
-  if ("error" in ctx) {
-    throw ctx.error;
-  }
-  return await handleRequest(app.handlers, ctx);
+  const ctx = await createWinter(request, app);
+  const res = await handleRequest(app.handlers, ctx);
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
+  return res;
 };
 
 // src/index.ts
