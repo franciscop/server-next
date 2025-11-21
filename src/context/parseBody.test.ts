@@ -1,5 +1,5 @@
-import parseBody from "./parseBody.js";
-import type { Bucket } from "../types.js";
+import parseBody from "./parseBody";
+import type { Bucket } from "..";
 
 const getBody = () => {
   let body = "trash1\r\n";

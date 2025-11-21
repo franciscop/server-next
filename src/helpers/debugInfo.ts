@@ -1,4 +1,4 @@
-import color from "./color.js";
+import color from "./color";
 
 const isDebug = process.argv.includes("--debug");
 

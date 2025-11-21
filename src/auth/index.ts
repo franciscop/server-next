@@ -1,9 +1,9 @@
-import auth from "./auth.js";
-import logout from "./logout.js";
-import providers from "./providers/index.js";
-import session from "./session.js";
-import user from "./user.js";
-import type { Context } from "../types.js";
+import auth from "./auth";
+import logout from "./logout";
+import providers from "./providers";
+import session from "./session";
+import user from "./user";
+import type { Context } from "..";
 
 const parseOptions = (auth: any, all: any): any => {
   if (!auth) return null;

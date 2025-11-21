@@ -1,5 +1,5 @@
-import createNoSession from "./NoSession.js";
-import type { Context } from "../types.js";
+import createNoSession from "./NoSession";
+import type { Context } from "..";
 
 export default async function session(ctx: Context): Promise<any> {
   const store = ctx.options.session?.store;

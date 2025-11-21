@@ -1062,7 +1062,9 @@ function validate(ctx, schema) {
     }
   } catch (error) {
     if (error.name === "ZodError" || error.constructor.name === "ZodError") {
-      const message = error.issues.map(({ path: path2, message: message2 }) => `[${base}.${path2.join(".")}]: ${message2}`).sort().join("\n");
+      const message = error.issues.map(
+        ({ path: path2, message: message2 }) => `[${base}.${path2.join(".")}]: ${message2}`
+      ).sort().join("\n");
       throw new StatusError(message, 422);
     }
     throw error;
@@ -1929,9 +1931,10 @@ var Netlify = async (app, request, context) => {
 var Server = class extends Router {
   settings;
   platform;
-  port;
   sockets;
   websocket;
+  // Needed to be explicit for Bun/WinterCG
+  port;
   constructor(options = {}) {
     super();
     this.settings = config(options);

@@ -1,4 +1,4 @@
-import pathPattern from "./pathPattern.js";
+import pathPattern from "./pathPattern";
 
 describe("pathPattern.js", () => {
   it("matches the same string", () => {

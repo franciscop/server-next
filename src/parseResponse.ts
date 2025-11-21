@@ -4,9 +4,9 @@ import {
   iteratorAsyncToReadable,
   cors,
 } from "./helpers";
-import { json } from "./reply.js";
-import ServerError from "./ServerError.js";
-import type { Context } from "./types.js";
+import { json } from "./reply";
+import ServerError from "./ServerError";
+import type { Context } from ".";
 
 export default async function parseResponse(
   out: any,

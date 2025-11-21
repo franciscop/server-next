@@ -1,4 +1,4 @@
-import server from "./index.js";
+import server from ".";
 
 describe("can match the url", () => {
   it("stops at the first matching route", async () => {

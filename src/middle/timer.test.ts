@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import timer, { createTime } from "./timer";
-import type { Context } from "../types";
+import type { Context } from "..";
 
 const globalPerfNow = performance.now;
 describe("timer", () => {

@@ -1,24 +1,23 @@
-import "./polyfill.js";
-import "./errors/index.js";
+import "./polyfill";
+import "./errors/index";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import { assets, auth, timer, openapi } from "./middle/index.js";
+import { assets, auth, timer, openapi } from "./middle/index";
 
-import { Router } from "./router.js";
-import ServerTest from "./ServerTest.js";
-import * as handlers from "./context/handlers.js";
-import type { Options, Settings } from "./types.js";
+import { Router } from "./router";
+import ServerTest from "./ServerTest";
+import * as handlers from "./context/handlers";
+import type { Options, Platform, Settings } from "./types";
 
 class Server extends Router {
   settings: Settings;
-  platform: {
-    provider: string | null;
-    runtime: string | null;
-    production: boolean;
-  };
-  port?: number;
+  platform: Platform;
+
   sockets: any[];
   websocket: any;
+
+  // Needed to be explicit for Bun/WinterCG
+  port?: number;
 
   constructor(options: Options = {}) {
     super();
@@ -91,6 +90,7 @@ export default function server(options = {}) {
   return new Server(options).self();
 }
 
-export * from "./reply.js";
-export { default as ServerError } from "./ServerError.js";
-export { default as router } from "./router.js";
+export type * from "./types";
+export * from "./reply";
+export { default as ServerError } from "./ServerError";
+export { default as router } from "./router";

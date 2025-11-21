@@ -1,5 +1,5 @@
 import { createId } from "../helpers";
-import type { Bucket } from "../types.js";
+import type { Bucket } from "..";
 
 function getBoundary(header?: string): string | null {
   if (!header) return null;

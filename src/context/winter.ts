@@ -1,8 +1,8 @@
-import auth from "../auth/index.js";
+import auth from "../auth";
 import { define, parseHeaders } from "../helpers";
-import parseBody from "./parseBody.js";
-import parseCookies from "./parseCookies.js";
-import type { Context, Method } from "../types.js";
+import parseBody from "./parseBody";
+import parseCookies from "./parseCookies";
+import type { Context, Method } from "..";
 
 type EventCallback = (data: any) => void;
 

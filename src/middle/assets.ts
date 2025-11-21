@@ -1,5 +1,5 @@
-import { type } from "../reply.js";
-import type { Context } from "../types.js";
+import { type } from "../reply";
+import type { Context } from "../types";
 
 export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;

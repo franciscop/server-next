@@ -1,4 +1,4 @@
-import { default as email } from "./email.js";
-import { default as github } from "./github.js";
+import { default as email } from "./email";
+import { default as github } from "./github";
 
 export default { email, github } as Record<string, any>;

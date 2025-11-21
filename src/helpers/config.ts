@@ -1,9 +1,9 @@
-import auth from "../auth/index.js";
-import Bucket from "./bucket.js";
+import auth from "../auth";
+import Bucket from "./bucket";
 import createId from "./createId";
-import debugInfo from "./debugInfo.js";
+import debugInfo from "./debugInfo";
 
-import type { Cors, Options, Settings } from "../types";
+import type { Cors, Options, Settings } from "..";
 
 const env = globalThis.env;
 

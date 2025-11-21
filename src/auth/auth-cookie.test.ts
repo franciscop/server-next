@@ -1,8 +1,8 @@
-import "../tests/toSucceed.js";
+import "../tests/toSucceed";
 
 import kv from "polystore";
 
-import server from "../index.js";
+import server from "..";
 
 describe("user creation flow", () => {
   // These are obviously mock data

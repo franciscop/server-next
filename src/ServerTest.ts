@@ -1,4 +1,4 @@
-import type { Method } from "./types";
+import type { Method } from ".";
 import { parseHeaders } from "./helpers";
 
 function isSerializable(body: any): boolean {

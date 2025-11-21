@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as fsp from "node:fs/promises";
-import type { Bucket } from "../types.js";
+import type { Bucket } from "..";
 
 function thinLocalBucket(root: string): Bucket {
   const absolute = (name: string): string => {

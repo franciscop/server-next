@@ -1,5 +1,5 @@
-import ServerError from "../ServerError.js";
-import type { Context } from "../types.js";
+import ServerError from "../ServerError";
+import type { Context } from "..";
 
 export default async function user(ctx: Context): Promise<any> {
   if (!ctx.auth) return;

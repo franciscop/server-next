@@ -1,5 +1,5 @@
 import kv from "polystore";
-import server from "./index.js";
+import server from ".";
 
 describe("session", () => {
   const store = kv(new Map());

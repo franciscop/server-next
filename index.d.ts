@@ -36,6 +36,98 @@ declare class ServerError extends Error {
     static REGISTER_EMAIL_EXISTS: (vars?: Variables) => ServerError;
 }
 
+type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
+type RouterMethod = "*" | Method;
+type Bucket = {
+    read: (path: string) => Promise<ReadableStream | null>;
+    write: (path: string, data: string | Buffer) => Promise<void | string>;
+    delete: (path: string) => Promise<boolean>;
+};
+type Cors = {
+    origin: string | boolean;
+    methods: string;
+    headers: string;
+};
+type CorsOptions = boolean | string | string[] | {
+    origin?: string | string[];
+    methods?: string | Method[];
+    headers?: string | string[];
+};
+type KVStore = {
+    name: string;
+    prefix: (key: string) => KVStore;
+    get: (key: string) => Promise<any>;
+    set: (key: string, value: any, options?: any) => Promise<void>;
+    has: (key: string) => Promise<boolean>;
+    del: (key: string) => Promise<void>;
+    keys: () => Promise<string[]>;
+};
+type Options = {
+    port?: number;
+    secret?: string;
+    views?: string | Bucket;
+    public?: string | Bucket;
+    uploads?: string | Bucket;
+    store?: KVStore;
+    cookies?: KVStore;
+    session?: KVStore | {
+        store: KVStore;
+    };
+    cors?: CorsOptions;
+    auth?: any;
+    openapi?: any;
+};
+type Settings = {
+    port: number;
+    secret: string;
+    views?: Bucket;
+    public?: Bucket;
+    uploads?: Bucket;
+    store?: KVStore;
+    cookies?: KVStore;
+    session?: {
+        store: KVStore;
+    };
+    cors?: Cors;
+    auth?: any;
+    openapi?: any;
+};
+type Time = {
+    (name: string): void;
+    times: [string, number][];
+    headers: () => string;
+};
+type Platform = {
+    provider: string | null;
+    runtime: string | null;
+    production: boolean;
+};
+type Context = {
+    method: Method;
+    headers: Record<string, string | string[]>;
+    cookies: Record<string, string>;
+    body?: any;
+    url: URL & {
+        params: Record<string, string>;
+        query: Record<string, string>;
+    };
+    options: Settings;
+    time?: Time;
+    session?: Record<string, any>;
+    auth?: any;
+    user?: any;
+    res?: {
+        headers: Record<string, string>;
+        cookies: Record<string, any>;
+    };
+};
+type Body = string;
+type InlineReply = Response | {
+    body: Body;
+    headers?: Headers;
+} | string | number | undefined;
+type Middleware = (ctx: Context) => InlineReply | void;
+
 interface ResponseData {
     headers: Record<string, string>;
     cookies: Record<string, {
@@ -86,73 +178,6 @@ declare const view: (...args: [string, ((data: Buffer) => Promise<Buffer | strin
     };
 }?]) => Promise<Response>;
 
-type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
-type RouterMethod = "*" | Method;
-type Bucket = {
-    read: (path: string) => Promise<ReadableStream | null>;
-    write: (path: string, data: string | Buffer) => Promise<void | string>;
-    delete: (path: string) => Promise<boolean>;
-};
-type Cors = {
-    origin: string | boolean;
-    methods: string;
-    headers: string;
-};
-type KVStore = {
-    name: string;
-    prefix: (key: string) => KVStore;
-    get: (key: string) => Promise<any>;
-    set: (key: string, value: any, options?: any) => Promise<void>;
-    has: (key: string) => Promise<boolean>;
-    del: (key: string) => Promise<void>;
-    keys: () => Promise<string[]>;
-};
-type Settings = {
-    port: number;
-    secret: string;
-    views?: Bucket;
-    public?: Bucket;
-    uploads?: Bucket;
-    store?: KVStore;
-    cookies?: KVStore;
-    session?: {
-        store: KVStore;
-    };
-    cors?: Cors;
-    auth?: any;
-    openapi?: any;
-};
-type Time = {
-    (name: string): void;
-    times: [string, number][];
-    headers: () => string;
-};
-type Context = {
-    method: Method;
-    headers: Record<string, string | string[]>;
-    cookies: Record<string, string>;
-    body?: any;
-    url: URL & {
-        params: Record<string, string>;
-        query: Record<string, string>;
-    };
-    options: Settings;
-    time?: Time;
-    session?: Record<string, any>;
-    auth?: any;
-    user?: any;
-    res?: {
-        headers: Record<string, string>;
-        cookies: Record<string, any>;
-    };
-};
-type Body = string;
-type InlineReply = Response | {
-    body: Body;
-    headers?: Headers;
-} | string | number | undefined;
-type Middleware = (ctx: Context) => InlineReply | void;
-
 type PathOrMiddle = string | Middleware;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 declare class Router {
@@ -184,4 +209,4 @@ declare function router(): Router;
 
 declare function server(options?: {}): any;
 
-export { Reply, ServerError, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type Body, type Bucket, type Context, type Cors, type InlineReply, type Method, type Middleware, type Options, type Platform, Reply, type RouterMethod, ServerError, type Settings, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };

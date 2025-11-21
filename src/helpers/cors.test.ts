@@ -1,4 +1,4 @@
-import server from "../index.js";
+import server from "..";
 
 const origin = "http://localhost:3000/";
 

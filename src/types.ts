@@ -76,6 +76,12 @@ export type Time = {
   headers: () => string;
 };
 
+export type Platform = {
+  provider: string | null;
+  runtime: string | null;
+  production: boolean;
+};
+
 export type Context = {
   method: Method;
   headers: Record<string, string | string[]>;

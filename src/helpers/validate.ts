@@ -1,5 +1,5 @@
-import StatusError from "./StatusError.js";
-import type { Context } from "../types.js";
+import StatusError from "./StatusError";
+import type { Context } from "..";
 
 export default function validate(ctx: Context, schema: any): void {
   if (!schema || typeof schema !== "object") return;
@@ -25,7 +25,9 @@ export default function validate(ctx: Context, schema: any): void {
   } catch (error: any) {
     if (error.name === "ZodError" || error.constructor.name === "ZodError") {
       const message = error.issues
-        .map(({ path, message }: any) => `[${base}.${path.join(".")}]: ${message}`)
+        .map(
+          ({ path, message }: any) => `[${base}.${path.join(".")}]: ${message}`,
+        )
         .sort()
         .join("\n");
       throw new StatusError(message, 422);

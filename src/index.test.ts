@@ -1,6 +1,6 @@
-import "./tests/toSucceed.js";
+import "./tests/toSucceed";
 
-import server, { status } from "./index.js";
+import server, { status } from ".";
 
 describe("exports", () => {
   it("exports as a function", () => {

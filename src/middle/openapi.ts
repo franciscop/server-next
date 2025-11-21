@@ -1,5 +1,5 @@
 import * as fsp from "node:fs/promises";
-import type { Context } from "../types.js";
+import type { Context } from "../types";
 
 const entities: Record<string, string> = {
   "&": "&amp;",

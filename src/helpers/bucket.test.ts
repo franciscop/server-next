@@ -1,4 +1,4 @@
-import bucket from "./bucket.js";
+import bucket from "./bucket";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import fs from "node:fs";

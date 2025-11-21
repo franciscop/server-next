@@ -1,5 +1,5 @@
-import server, { status } from "./index.js";
-import router from "./router.js";
+import server, { status } from ".";
+import router from "./router";
 
 function expandHandlers(handlers) {
   const expandedHandlers = [];

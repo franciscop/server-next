@@ -1,10 +1,13 @@
-import parseResponse from "../parseResponse.js";
-import pathPattern from "../pathPattern.js";
-import define from "./define.js";
-import validate from "./validate.js";
-import type { Context } from "../types.js";
+import parseResponse from "../parseResponse";
+import pathPattern from "../pathPattern";
+import define from "./define";
+import validate from "./validate";
+import type { Context } from "..";
 
-export default async function handleRequest(handlers: Record<string, any[]>, ctx: Context): Promise<Response | undefined> {
+export default async function handleRequest(
+  handlers: Record<string, any[]>,
+  ctx: Context,
+): Promise<Response | undefined> {
   try {
     if ((ctx as any).error) {
       throw (ctx as any).error;

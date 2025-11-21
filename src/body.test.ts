@@ -1,10 +1,10 @@
-import "./tests/toSucceed.js";
+import "./tests/toSucceed";
 
-import server from "./index.js";
-import type { Context } from "./types.js";
+import server from ".";
+import type { Context } from ".";
+import { toWeb } from "./helpers";
 import { createReadStream } from "node:fs";
 import fsp from "node:fs/promises";
-import toWeb from "./helpers/toWeb.js";
 
 describe("request body formats", () => {
   const api = server({ uploads: "./src/tests/uploads" })

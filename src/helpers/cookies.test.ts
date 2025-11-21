@@ -1,4 +1,4 @@
-import server, { cookies } from "../index.js";
+import server, { cookies } from "..";
 
 describe("set-cookie", () => {
   const app = server()

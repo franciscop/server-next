@@ -1,4 +1,4 @@
-import ServerError from "../ServerError.js";
+import ServerError from "../ServerError";
 
 ServerError.extend({
   NO_STORE: "You need a 'store' to write 'ctx.session'",
