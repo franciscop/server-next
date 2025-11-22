@@ -1,15 +1,3 @@
-// src/polyfill.ts
-globalThis.env = {};
-if (typeof globalThis.Netlify !== "undefined") {
-  Object.assign(
-    globalThis.env,
-    globalThis.Netlify.env.toObject()
-  );
-}
-if (typeof process !== "undefined") {
-  Object.assign(globalThis.env, process.env);
-}
-
 // src/ServerError.ts
 var ServerError = class _ServerError extends Error {
   code;
@@ -101,79 +89,16 @@ ServerError_default.extend({
   REGISTER_EMAIL_EXISTS: "Email is already registered"
 });
 
-// src/helpers/createCookies.ts
-function createCookies(cookies2) {
-  if (!cookies2 || !Object.keys(cookies2).length) return [];
-  return Object.entries(cookies2).map(([key, val]) => {
-    if (!val) {
-      val = { value: "", expires: (/* @__PURE__ */ new Date(0)).toUTCString() };
-    }
-    if (typeof val === "string") {
-      val = { value: val };
-    }
-    const { value, path: path2, expires } = val;
-    const pathPart = `;Path=${path2 || "/"}`;
-    const expiresPart = expires ? `;Expires=${expires}` : "";
-    return `${key}=${value || ""}${pathPart}${expiresPart}`;
-  });
+// src/polyfill.ts
+globalThis.env = {};
+if (typeof globalThis.Netlify !== "undefined") {
+  Object.assign(
+    globalThis.env,
+    globalThis.Netlify.env.toObject()
+  );
 }
-
-// src/helpers/createId.ts
-var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
-var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
-var cyrb53 = (str, seed = 0) => {
-  if (typeof str !== "string") str = String(str);
-  let h1 = 3735928559 ^ seed;
-  let h2 = 1103547991 ^ seed;
-  for (let i = 0, ch; i < str.length; i++) {
-    ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
-  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
-  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
-  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
-  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-};
-var hash = (str, size) => {
-  let chars = "";
-  let num = cyrb53(str);
-  for (let i = 0; i < size; i++) {
-    if (num < alphabet.length) num = cyrb53(str, i);
-    chars += alphabet[num % alphabet.length];
-    num = Math.floor(num / alphabet.length);
-  }
-  return chars;
-};
-var randomId = (size = 16) => {
-  let id = "";
-  const bytes = random(size);
-  while (size--) {
-    id += alphabet[bytes[size] & 61];
-  }
-  return id;
-};
-function createId(source, size = 16) {
-  if (source) return hash(source, size);
-  return randomId(size);
-}
-
-// src/helpers/createWebsocket.ts
-function createWebsocket(sockets, handlers) {
-  return {
-    message: async (socket, body) => {
-      handlers.socket?.filter((s) => s[1] === "message")?.map((s) => s[2]({ socket, sockets, body }));
-    },
-    open: (socket) => {
-      sockets.push(socket);
-      handlers.socket?.filter((s) => s[1] === "open")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
-    },
-    close: (socket) => {
-      sockets.splice(sockets.indexOf(socket), 1);
-      handlers.socket?.filter((s) => s[1] === "close")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
-    }
-  };
+if (typeof process !== "undefined") {
+  Object.assign(globalThis.env, process.env);
 }
 
 // src/auth/auth.ts
@@ -418,7 +343,7 @@ async function emailRegister(ctx) {
   const user2 = {
     id: createId(email),
     email,
-    password: await hash2(password),
+    password: await hash(password),
     time,
     ...data
   };
@@ -432,7 +357,7 @@ async function emailUpdatePassword(ctx) {
   const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
   const isValid = await verify(previous, fullUser.password);
   if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  fullUser.password = await hash2(updated);
+  fullUser.password = await hash(updated);
   await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
   return 200;
 }
@@ -657,8 +582,8 @@ var auth_default = { load, parseOptions, middle };
 
 // src/helpers/bucket.ts
 import * as fs from "fs";
-import * as path from "path";
 import * as fsp from "fs/promises";
+import * as path from "path";
 function thinLocalBucket(root) {
   const absolute = (name) => {
     if (!name) throw new Error("File name is required");
@@ -731,6 +656,47 @@ function bucket_default(root) {
     return thinBunBucket(root);
   }
   return root;
+}
+
+// src/helpers/createId.ts
+var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
+var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
+var cyrb53 = (str, seed = 0) => {
+  if (typeof str !== "string") str = String(str);
+  let h1 = 3735928559 ^ seed;
+  let h2 = 1103547991 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
+  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
+  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+};
+var hash2 = (str, size) => {
+  let chars = "";
+  let num = cyrb53(str);
+  for (let i = 0; i < size; i++) {
+    if (num < alphabet.length) num = cyrb53(str, i);
+    chars += alphabet[num % alphabet.length];
+    num = Math.floor(num / alphabet.length);
+  }
+  return chars;
+};
+var randomId = (size = 16) => {
+  let id = "";
+  const bytes = random(size);
+  while (size--) {
+    id += alphabet[bytes[size] & 61];
+  }
+  return id;
+};
+function createId(source, size = 16) {
+  if (source) return hash2(source, size);
+  return randomId(size);
 }
 
 // src/helpers/color.ts
@@ -863,6 +829,40 @@ function cors(config2, origin = "") {
   if (arr.includes(origin)) return origin;
   console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
   return null;
+}
+
+// src/helpers/createCookies.ts
+function createCookies(cookies2) {
+  if (!cookies2 || !Object.keys(cookies2).length) return [];
+  return Object.entries(cookies2).map(([key, val]) => {
+    if (!val) {
+      val = { value: "", expires: (/* @__PURE__ */ new Date(0)).toUTCString() };
+    }
+    if (typeof val === "string") {
+      val = { value: val };
+    }
+    const { value, path: path2, expires } = val;
+    const pathPart = `;Path=${path2 || "/"}`;
+    const expiresPart = expires ? `;Expires=${expires}` : "";
+    return `${key}=${value || ""}${pathPart}${expiresPart}`;
+  });
+}
+
+// src/helpers/createWebsocket.ts
+function createWebsocket(sockets, handlers) {
+  return {
+    message: async (socket, body) => {
+      handlers.socket?.filter((s) => s[1] === "message")?.map((s) => s[2]({ socket, sockets, body }));
+    },
+    open: (socket) => {
+      sockets.push(socket);
+      handlers.socket?.filter((s) => s[1] === "open")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
+    },
+    close: (socket) => {
+      sockets.splice(sockets.indexOf(socket), 1);
+      handlers.socket?.filter((s) => s[1] === "close")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
+    }
+  };
 }
 
 // src/helpers/define.ts
@@ -1099,7 +1099,7 @@ async function handleRequest(handlers, ctx) {
 import * as crypto2 from "crypto";
 import { getRandomValues } from "crypto";
 import { promisify } from "util";
-async function hash2(password) {
+async function hash(password) {
   if ("argon2" in crypto2) {
     const argon23 = promisify(crypto2.argon2);
     const buf = await argon23("argon2id", {
@@ -1129,18 +1129,6 @@ async function iterate(stream, cb) {
   }
 }
 
-// src/helpers/iteratorToReadable.ts
-function iteratorToReadable(generator) {
-  return new ReadableStream({
-    async start(controller) {
-      for await (const chunk of generator) {
-        controller.enqueue(chunk);
-      }
-      controller.close();
-    }
-  });
-}
-
 // src/helpers/iteratorAsyncToReadable.ts
 function iteratorAsyncToReadable(asyncGenerator) {
   return new ReadableStream({
@@ -1161,6 +1149,116 @@ function iteratorAsyncToReadable(asyncGenerator) {
       console.log("Stream cancelled");
     }
   });
+}
+
+// src/helpers/iteratorToReadable.ts
+function iteratorToReadable(generator) {
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of generator) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    }
+  });
+}
+
+// src/helpers/parseBody.ts
+function getBoundary(header) {
+  if (!header) return null;
+  if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
+    console.error("Do not set the `Content-Type` manually for FormData");
+  }
+  const items = header.split(";");
+  for (const item of items) {
+    const trimmedItem = item.trim();
+    if (trimmedItem.startsWith("boundary=")) {
+      return trimmedItem.split("=")[1].trim();
+    }
+  }
+  return null;
+}
+function getMatching(string, regex) {
+  const matches = string.match(regex);
+  return matches?.[1] ?? "";
+}
+var saveFile = async (name, value, bucket) => {
+  const ext = name.split(".").pop();
+  const id = `${createId()}.${ext}`;
+  await bucket.write(id, value);
+  return id;
+};
+function splitBuffer(buffer, delimiter) {
+  const result = [];
+  let start = 0;
+  let index = buffer.indexOf(delimiter);
+  while (index !== -1) {
+    result.push(buffer.slice(start, index));
+    start = index + delimiter.length;
+    index = buffer.indexOf(delimiter, start);
+  }
+  result.push(buffer.slice(start));
+  return result;
+}
+var BREAK_BUFFER = Buffer.from("\r\n\r\n");
+function isProbablyText(buffer) {
+  for (let i = 0; i < Math.min(buffer.length, 512); i++) {
+    const byte = buffer[i];
+    if (byte === 0) return false;
+    if (byte < 7 || byte > 13 && byte < 32) return false;
+  }
+  return true;
+}
+async function parseBody(raw, contentType, bucket) {
+  const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
+  if (!raw) return {};
+  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
+    return raw.toString("utf-8");
+  }
+  if (/application\/json/.test(contentTypeStr)) {
+    return JSON.parse(raw.toString("utf-8"));
+  }
+  const boundary = getBoundary(contentTypeStr);
+  if (!boundary) return null;
+  const body = {};
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const parts = splitBuffer(raw, boundaryBuffer);
+  for (const part of parts) {
+    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
+    const idx = part.indexOf(BREAK_BUFFER);
+    if (idx === -1) continue;
+    const headerStr = part.slice(0, idx).toString("utf-8");
+    const contentBuf = part.slice(idx + BREAK_BUFFER.length, part.length - 2);
+    const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
+    if (!name) continue;
+    const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
+    if (filename) {
+      if (!bucket) throw new Error("Bucket is required to save files");
+      body[name] = await saveFile(filename, contentBuf, bucket);
+    } else {
+      const value = isProbablyText(contentBuf) ? contentBuf.toString("utf-8").trim() : contentBuf;
+      if (body[name]) {
+        if (!Array.isArray(body[name])) body[name] = [body[name]];
+        body[name].push(value);
+      } else {
+        body[name] = value;
+      }
+    }
+  }
+  return body;
+}
+
+// src/helpers/parseCookies.ts
+function parseCookies(cookies2) {
+  if (!cookies2) return {};
+  const cookieStr = Array.isArray(cookies2) ? cookies2[0] : cookies2;
+  if (!cookieStr) return {};
+  return Object.fromEntries(
+    cookieStr.split(/;\s*/).map((part) => {
+      const [key, ...rest] = part.split("=");
+      return [key, decodeURIComponent(rest.join("="))];
+    })
+  );
 }
 
 // src/helpers/parseHeaders.ts
@@ -1339,23 +1437,6 @@ async function assets(ctx) {
   }
 }
 
-// src/middle/timer.ts
-var createTime = () => {
-  const times = [["init", performance.now()]];
-  const time = (name) => times.push([name, performance.now()]);
-  time.times = times;
-  time.headers = () => {
-    const r = (t) => Math.round(t);
-    const times2 = time.times;
-    const timing = times2.slice(1).map(([name, time2], i) => `${name};dur=${r(time2 - times2[i][1])}`).join(", ");
-    return timing;
-  };
-  return time;
-};
-function timer(ctx) {
-  ctx.time = createTime();
-}
-
 // src/middle/openapi.ts
 import * as fsp2 from "fs/promises";
 var entities = {
@@ -1518,8 +1599,169 @@ var openapi_default = async (ctx) => {
 </html> `;
 };
 
+// src/middle/timer.ts
+var createTime = () => {
+  const times = [["init", performance.now()]];
+  const time = (name) => times.push([name, performance.now()]);
+  time.times = times;
+  time.headers = () => {
+    const r = (t) => Math.round(t);
+    const times2 = time.times;
+    const timing = times2.slice(1).map(([name, time2], i) => `${name};dur=${r(time2 - times2[i][1])}`).join(", ");
+    return timing;
+  };
+  return time;
+};
+function timer(ctx) {
+  ctx.time = createTime();
+}
+
 // src/middle/index.ts
 var auth2 = auth_default.middle;
+
+// src/context/node.ts
+import { TLSSocket } from "tls";
+
+// src/context/createEvents.ts
+function createEvents() {
+  const events = {};
+  events.on = (name, callback2) => {
+    events[name] = events[name] || [];
+    events[name].push(callback2);
+  };
+  events.trigger = (name, data) => {
+    if (!events[name]) return;
+    for (const cb of events[name]) {
+      cb(data);
+    }
+  };
+  return events;
+}
+
+// src/context/isValidMethod.ts
+var methods = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "socket"
+];
+function isValidMethod(method) {
+  return methods.includes(method);
+}
+
+// src/context/node.ts
+var chunkArray = (arr, size) => arr.length > size ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [arr];
+async function createNode(req, app) {
+  const init = performance.now();
+  const method = req.method?.toLowerCase() || "get";
+  if (!isValidMethod(method)) {
+    throw new Error(`Invalid HTTP method: ${method}`);
+  }
+  const headers2 = parseHeaders_default(
+    new Headers(chunkArray(req.rawHeaders, 2))
+  );
+  const cookies2 = parseCookies(headers2.cookie);
+  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
+  const host = headers2.host || `localhost:${app.settings.port}`;
+  const path2 = (req.url || "/").replace(/\/$/, "") || "/";
+  const baseUrl = `${scheme}://${host}`;
+  const url = new URL(path2, baseUrl);
+  define(
+    url,
+    "query",
+    (url2) => Object.fromEntries(url2.searchParams.entries())
+  );
+  const rawBody = await new Promise((resolve2, reject) => {
+    const body2 = [];
+    req.on("data", (chunk) => body2.push(chunk)).on("end", () => resolve2(Buffer.concat(body2))).on("error", reject);
+  });
+  const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const events = createEvents();
+  return await auth_default.load({
+    options: app.settings,
+    platform: app.platform,
+    url,
+    method,
+    body,
+    headers: headers2,
+    cookies: cookies2,
+    init,
+    events,
+    app
+  });
+}
+
+// src/context/winter.ts
+async function createWinter(req, app) {
+  const init = performance.now();
+  const method = req.method.toLowerCase();
+  if (!isValidMethod(method)) {
+    throw new Error(`Invalid HTTP method: ${method}`);
+  }
+  const headers2 = parseHeaders_default(req.headers);
+  const cookies2 = parseCookies(headers2.cookie);
+  const baseUrl = req.url.replace(/\/$/, "") || "/";
+  const url = new URL(baseUrl);
+  define(
+    url,
+    "query",
+    (url2) => Object.fromEntries(url2.searchParams.entries())
+  );
+  const rawBody = Buffer.from(await req.arrayBuffer());
+  const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const events = createEvents();
+  return await auth_default.load({
+    options: app.settings,
+    platform: app.platform,
+    url,
+    method,
+    body,
+    headers: headers2,
+    cookies: cookies2,
+    init,
+    events,
+    app
+  });
+}
+
+// src/context/handlers.ts
+var Winter = async (app, request, env3) => {
+  if (env3?.upgrade(request)) return;
+  Object.assign(globalThis.env, env3);
+  const ctx = await createWinter(request, app);
+  const res = await handleRequest(app.handlers, ctx);
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
+  return res;
+};
+var Node = async (app) => {
+  const http = await import("http");
+  http.createServer(async (request, response) => {
+    const ctx = await createNode(request, app);
+    if ("error" in ctx) throw ctx.error;
+    const out = await handleRequest(app.handlers, ctx);
+    response.writeHead(out.status || 200, parseHeaders_default(out.headers));
+    if (out.body instanceof ReadableStream) {
+      await iterate(out.body, (chunk) => response.write(chunk));
+    } else {
+      response.write(out.body || "");
+    }
+    response.end();
+  }).listen(app.settings.port);
+};
+var Netlify = async (app, request, context) => {
+  console.log("Unknown context", context);
+  if (typeof Netlify === "undefined") {
+    throw new Error("Netlify doesn't exist");
+  }
+  const ctx = await createWinter(request, app);
+  const res = await handleRequest(app.handlers, ctx);
+  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
+  return res;
+};
 
 // src/router.ts
 var Router = class _Router {
@@ -1638,246 +1880,6 @@ function ServerTest(app) {
     options: (path2, options) => fetch2(path2, "options", options)
   };
 }
-
-// src/context/parseBody.ts
-function getBoundary(header) {
-  if (!header) return null;
-  if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
-    console.error("Do not set the `Content-Type` manually for FormData");
-  }
-  const items = header.split(";");
-  for (const item of items) {
-    const trimmedItem = item.trim();
-    if (trimmedItem.startsWith("boundary=")) {
-      return trimmedItem.split("=")[1].trim();
-    }
-  }
-  return null;
-}
-function getMatching(string, regex) {
-  const matches = string.match(regex);
-  return matches?.[1] ?? "";
-}
-var saveFile = async (name, value, bucket) => {
-  const ext = name.split(".").pop();
-  const id = `${createId()}.${ext}`;
-  await bucket.write(id, value);
-  return id;
-};
-function splitBuffer(buffer, delimiter) {
-  const result = [];
-  let start = 0;
-  let index = buffer.indexOf(delimiter);
-  while (index !== -1) {
-    result.push(buffer.slice(start, index));
-    start = index + delimiter.length;
-    index = buffer.indexOf(delimiter, start);
-  }
-  result.push(buffer.slice(start));
-  return result;
-}
-var BREAK_BUFFER = Buffer.from("\r\n\r\n");
-function isProbablyText(buffer) {
-  for (let i = 0; i < Math.min(buffer.length, 512); i++) {
-    const byte = buffer[i];
-    if (byte === 0) return false;
-    if (byte < 7 || byte > 13 && byte < 32) return false;
-  }
-  return true;
-}
-async function parseBody(raw, contentType, bucket) {
-  const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-  if (!raw) return {};
-  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
-    return raw.toString("utf-8");
-  }
-  if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(raw.toString("utf-8"));
-  }
-  const boundary = getBoundary(contentTypeStr);
-  if (!boundary) return null;
-  const body = {};
-  const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(raw, boundaryBuffer);
-  for (const part of parts) {
-    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
-    const idx = part.indexOf(BREAK_BUFFER);
-    if (idx === -1) continue;
-    const headerStr = part.slice(0, idx).toString("utf-8");
-    const contentBuf = part.slice(idx + BREAK_BUFFER.length, part.length - 2);
-    const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
-    if (!name) continue;
-    const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
-    if (filename) {
-      if (!bucket) throw new Error("Bucket is required to save files");
-      body[name] = await saveFile(filename, contentBuf, bucket);
-    } else {
-      const value = isProbablyText(contentBuf) ? contentBuf.toString("utf-8").trim() : contentBuf;
-      if (body[name]) {
-        if (!Array.isArray(body[name])) body[name] = [body[name]];
-        body[name].push(value);
-      } else {
-        body[name] = value;
-      }
-    }
-  }
-  return body;
-}
-
-// src/context/parseCookies.ts
-function parseCookies(cookies2) {
-  if (!cookies2) return {};
-  const cookieStr = Array.isArray(cookies2) ? cookies2[0] : cookies2;
-  if (!cookieStr) return {};
-  return Object.fromEntries(
-    cookieStr.split(/;\s*/).map((part) => {
-      const [key, ...rest] = part.split("=");
-      return [key, decodeURIComponent(rest.join("="))];
-    })
-  );
-}
-
-// src/context/createEvents.ts
-function createEvents() {
-  const events = {};
-  events.on = (name, callback2) => {
-    events[name] = events[name] || [];
-    events[name].push(callback2);
-  };
-  events.trigger = (name, data) => {
-    if (!events[name]) return;
-    for (const cb of events[name]) {
-      cb(data);
-    }
-  };
-  return events;
-}
-
-// src/context/isValidMethod.ts
-var methods = [
-  "get",
-  "post",
-  "put",
-  "patch",
-  "delete",
-  "head",
-  "options",
-  "socket"
-];
-function isValidMethod(method) {
-  return methods.includes(method);
-}
-
-// src/context/winter.ts
-async function createWinter(req, app) {
-  const init = performance.now();
-  const method = req.method.toLowerCase();
-  if (!isValidMethod(method)) {
-    throw new Error(`Invalid HTTP method: ${method}`);
-  }
-  const headers2 = parseHeaders_default(req.headers);
-  const cookies2 = parseCookies(headers2.cookie);
-  const baseUrl = req.url.replace(/\/$/, "") || "/";
-  const url = new URL(baseUrl);
-  define(
-    url,
-    "query",
-    (url2) => Object.fromEntries(url2.searchParams.entries())
-  );
-  const rawBody = Buffer.from(await req.arrayBuffer());
-  const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
-  const events = createEvents();
-  return await auth_default.load({
-    options: app.settings,
-    platform: app.platform,
-    url,
-    method,
-    body,
-    headers: headers2,
-    cookies: cookies2,
-    init,
-    events,
-    app
-  });
-}
-
-// src/context/node.ts
-import { TLSSocket } from "tls";
-var chunkArray = (arr, size) => arr.length > size ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [arr];
-async function createNode(req, app) {
-  const init = performance.now();
-  const method = req.method?.toLowerCase() || "get";
-  if (!isValidMethod(method)) {
-    throw new Error(`Invalid HTTP method: ${method}`);
-  }
-  const headers2 = parseHeaders_default(
-    new Headers(chunkArray(req.rawHeaders, 2))
-  );
-  const cookies2 = parseCookies(headers2.cookie);
-  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
-  const host = headers2.host || `localhost:${app.settings.port}`;
-  const path2 = (req.url || "/").replace(/\/$/, "") || "/";
-  const baseUrl = `${scheme}://${host}`;
-  const url = new URL(path2, baseUrl);
-  define(
-    url,
-    "query",
-    (url2) => Object.fromEntries(url2.searchParams.entries())
-  );
-  const rawBody = await new Promise((resolve2, reject) => {
-    const body2 = [];
-    req.on("data", (chunk) => body2.push(chunk)).on("end", () => resolve2(Buffer.concat(body2))).on("error", reject);
-  });
-  const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
-  const events = createEvents();
-  return await auth_default.load({
-    options: app.settings,
-    platform: app.platform,
-    url,
-    method,
-    body,
-    headers: headers2,
-    cookies: cookies2,
-    init,
-    events,
-    app
-  });
-}
-
-// src/context/handlers.ts
-var Winter = async (app, request, env3) => {
-  if (env3?.upgrade(request)) return;
-  Object.assign(globalThis.env, env3);
-  const ctx = await createWinter(request, app);
-  const res = await handleRequest(app.handlers, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
-  return res;
-};
-var Node = async (app) => {
-  const http = await import("http");
-  http.createServer(async (request, response) => {
-    const ctx = await createNode(request, app);
-    if ("error" in ctx) throw ctx.error;
-    const out = await handleRequest(app.handlers, ctx);
-    response.writeHead(out.status || 200, parseHeaders_default(out.headers));
-    if (out.body instanceof ReadableStream) {
-      await iterate(out.body, (chunk) => response.write(chunk));
-    } else {
-      response.write(out.body || "");
-    }
-    response.end();
-  }).listen(app.settings.port);
-};
-var Netlify = async (app, request, context) => {
-  console.log("Unknown context", context);
-  if (typeof Netlify === "undefined") {
-    throw new Error("Netlify doesn't exist");
-  }
-  const ctx = await createWinter(request, app);
-  const res = await handleRequest(app.handlers, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
-  return res;
-};
 
 // src/index.ts
 var Server = class extends Router {

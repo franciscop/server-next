@@ -5,7 +5,9 @@ interface CookieValue {
 }
 
 // Takes an object and returns a string with the proper cookie values
-export default function createCookies(cookies: Record<string, string | CookieValue | null>): string[] {
+export default function createCookies(
+  cookies: Record<string, string | CookieValue | null>,
+): string[] {
   if (!cookies || !Object.keys(cookies).length) return [];
   return Object.entries(cookies).map(([key, val]) => {
     if (!val) {

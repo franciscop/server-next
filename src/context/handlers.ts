@@ -1,9 +1,9 @@
-import { handleRequest, parseHeaders, iterate } from "../helpers";
+import { handleRequest, iterate, parseHeaders } from "../helpers";
 
-import createWinter from "./winter";
-import createNode from "./node";
 import type { IncomingMessage } from "node:http";
 import type { BunEnv, Server } from "..";
+import createNode from "./node";
+import createWinter from "./winter";
 
 export const Winter = async (app: Server, request: Request, env: BunEnv) => {
   if (env?.upgrade(request)) return;

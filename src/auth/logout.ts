@@ -1,5 +1,5 @@
-import { cookies } from "../reply";
 import type { Context } from "..";
+import { cookies } from "../reply";
 
 export default async function logout(ctx: Context): Promise<any> {
   const { id, type } = ctx.auth;

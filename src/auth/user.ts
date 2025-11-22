@@ -1,5 +1,5 @@
-import ServerError from "../ServerError";
 import type { Context, UserRecord } from "..";
+import ServerError from "../ServerError";
 
 export default async function user(ctx: Context): Promise<UserRecord> {
   if (!ctx.auth) return;

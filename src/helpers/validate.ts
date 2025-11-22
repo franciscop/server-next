@@ -1,5 +1,5 @@
-import StatusError from "./StatusError";
 import type { Context } from "..";
+import StatusError from "./StatusError";
 
 export default function validate(ctx: Context, schema: any): void {
   if (!schema || typeof schema !== "object") return;

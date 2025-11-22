@@ -1,4 +1,6 @@
-export default function iteratorAsyncToReadable(asyncGenerator: AsyncGenerator<any>): ReadableStream {
+export default function iteratorAsyncToReadable(
+  asyncGenerator: AsyncGenerator<any>,
+): ReadableStream {
   return new ReadableStream({
     async pull(controller) {
       try {

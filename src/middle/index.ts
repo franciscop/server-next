@@ -1,7 +1,7 @@
 import authMod from "../auth";
 import assets from "./assets";
-import timer from "./timer";
 import openapi from "./openapi";
+import timer from "./timer";
 
 const auth = authMod.middle;
-export { assets, auth, timer, openapi };
+export { assets, auth, openapi, timer };

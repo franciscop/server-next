@@ -1,16 +1,14 @@
 import "./tests/toSucceed";
 
-import server from ".";
-import type { Context } from ".";
-import { toWeb } from "./helpers";
 import { createReadStream } from "node:fs";
 import fsp from "node:fs/promises";
+import type { Context } from ".";
+import server from ".";
+import { toWeb } from "./helpers";
 
 describe("request body formats", () => {
   const api = server({ uploads: "./src/tests/uploads" })
-    .post("/", (ctx: Context) => {
-      return ctx.body;
-    })
+    .post("/", (ctx: Context) => ctx.body)
     .test();
 
   it("accepts plain text", async () => {

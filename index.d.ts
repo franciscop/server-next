@@ -137,10 +137,6 @@ type InlineReply = Response | {
 } | string | number | undefined;
 type Middleware<Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
 
-declare global {
-    var env: Record<string, any>;
-}
-
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | {
     message: string;
@@ -173,6 +169,10 @@ declare class ServerError extends Error {
     static REGISTER_NO_PASSWORD: (vars?: Variables) => ServerError;
     static REGISTER_INVALID_PASSWORD: (vars?: Variables) => ServerError;
     static REGISTER_EMAIL_EXISTS: (vars?: Variables) => ServerError;
+}
+
+declare global {
+    var env: Record<string, any>;
 }
 
 type PathOrMiddle = string | Middleware;

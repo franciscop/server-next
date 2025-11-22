@@ -1,7 +1,7 @@
-import { createId, hash, verify } from "../../helpers";
-import { ServerError, status } from "../..";
-import updateUser from "../updateUser";
 import type { Context, UserRecord } from "../..";
+import { ServerError, status } from "../..";
+import { createId, hash, verify } from "../../helpers";
+import updateUser from "../updateUser";
 
 const createSession = async (user: UserRecord, ctx: Context) => {
   const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;

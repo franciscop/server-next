@@ -1,9 +1,9 @@
+import type { Context, Options } from "..";
 import auth from "./auth";
 import logout from "./logout";
 import providers from "./providers";
 import session from "./session";
 import user from "./user";
-import type { Context, Options } from "..";
 
 const parseOptions = (auth: Options["auth"], all: any): any => {
   if (!auth) return null;

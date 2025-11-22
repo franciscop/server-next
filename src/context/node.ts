@@ -1,12 +1,10 @@
-import auth from "../auth";
-import { define, parseHeaders } from "../helpers";
-import parseBody from "./parseBody";
-import parseCookies from "./parseCookies";
-import type { Context, Server } from "..";
+import type { IncomingMessage } from "node:http";
 import { TLSSocket } from "node:tls";
+import type { Context, Server } from "..";
+import auth from "../auth";
+import { define, parseBody, parseCookies, parseHeaders } from "../helpers";
 import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
-import type { IncomingMessage } from "node:http";
 
 // Headers come like [title1, value1, title2, value2, ...]
 // https://stackoverflow.com/a/54029307/938236

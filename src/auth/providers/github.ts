@@ -1,6 +1,6 @@
+import type { Context } from "../..";
 import { createId } from "../../helpers";
 import { redirect, status } from "../../reply";
-import type { Context } from "../..";
 
 const oauth = async (code: string) => {
   const fch = async (

@@ -1,12 +1,12 @@
-import "./polyfill";
 import "./errors/index";
+import "./polyfill";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import { assets, auth, timer, openapi } from "./middle/index";
+import { assets, auth, openapi, timer } from "./middle/index";
 
+import * as handlers from "./context/handlers";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
-import * as handlers from "./context/handlers";
 import type { BunEnv, Options, Platform, Settings } from "./types";
 
 export class Server extends Router {
@@ -90,7 +90,7 @@ export default function server(options = {}) {
   return new Server(options).self();
 }
 
-export type * from "./types";
 export * from "./reply";
-export { default as ServerError } from "./ServerError";
 export { default as router } from "./router";
+export { default as ServerError } from "./ServerError";
+export type * from "./types";

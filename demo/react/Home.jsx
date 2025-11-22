@@ -38,6 +38,9 @@ export default function Home() {
       <p id={`world "'> quote`}>
         HTML {"<strong>gets escaped</strong>"} properly.
       </p>
+      <div>
+        <a href="/hello">Go to see some design</a>
+      </div>
       <Card.Text>Some more weird stuff</Card.Text>
       <script>{`
         console.log("Hello world");

@@ -1,5 +1,5 @@
-import { ServerError } from "..";
 import type { Auth, Context } from "..";
+import { ServerError } from "..";
 
 const validateToken = (authorization: string): string => {
   const [type, id] = authorization.trim().split(" ");

@@ -1,8 +1,8 @@
+import type { Context } from "..";
 import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
 import define from "./define";
 import validate from "./validate";
-import type { Context } from "..";
 
 export default async function handleRequest(
   handlers: Record<string, any[]>,

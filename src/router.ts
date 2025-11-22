@@ -1,4 +1,4 @@
-import type { Method, Middleware, RouterMethod, PathToParams } from "./types";
+import type { Method, Middleware, PathToParams, RouterMethod } from "./types";
 
 type PathOrMiddle = string | Middleware;
 // This is "Method" and NOT "Method" on purpose

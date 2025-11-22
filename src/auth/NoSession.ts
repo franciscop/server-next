@@ -1,5 +1,5 @@
-import { ServerError } from "..";
 import type { SerializableValue } from "..";
+import { ServerError } from "..";
 
 class NoSession {}
 
