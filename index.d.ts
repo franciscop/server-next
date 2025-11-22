@@ -150,12 +150,12 @@ type Context<Params extends Record<string, string> = Record<string, string>, O e
     res?: Response;
     app: Server;
 };
-type Body = string;
 type InlineReply = Response | {
-    body: Body;
+    body: string;
     headers?: Headers;
 } | SerializableValue;
-type Middleware<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = object> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
+type Body = InlineReply;
+type Middleware<O extends ServerConfig = object, Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | {
@@ -196,35 +196,45 @@ declare global {
     var env: Record<string, any>;
 }
 
-type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<any, O>;
+type Mids<O, Path extends string> = Middleware<O, PathToParams<Path>>[];
+type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 declare class Router<O extends ServerConfig = object> {
     handlers: Record<Method, FullRoute>;
     self(): this;
-    handle(method: RouterMethod, path: PathOrMiddle<O>, ...middleware: Middleware<any, O>[]): this;
-    socket<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    socket(...middleware: Middleware<any, O>[]): this;
-    get<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    get<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    get(...middleware: Middleware<any, O>[]): this;
-    head<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    head<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    head(...middleware: Middleware<any, O>[]): this;
-    post<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    post<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    post(...middleware: Middleware<any, O>[]): this;
-    put<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    put<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    put(...middleware: Middleware<any, O>[]): this;
-    patch<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    patch<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    patch(...middleware: Middleware<any, O>[]): this;
-    del<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    del<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    del(...middleware: Middleware<any, O>[]): this;
-    options<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    options<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
-    options(...middleware: Middleware<any, O>[]): this;
+    handle(method: RouterMethod, path: PathOrMiddle<O>, ...middleware: Middleware<O>[]): this;
+    socket<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    socket<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    socket(...middleware: Middleware<O>[]): this;
+    socket(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    get<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    get<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    get(...middleware: Middleware<O>[]): this;
+    get(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    head<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    head<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    head(...middleware: Middleware<O>[]): this;
+    head(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    post<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    post<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    post(...middleware: Middleware<O>[]): this;
+    post(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    put<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    put<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    put(...middleware: Middleware<O>[]): this;
+    put(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    patch<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    patch<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    patch(...middleware: Middleware<O>[]): this;
+    patch(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    del<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    del<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    del(...middleware: Middleware<O>[]): this;
+    del(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    options<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    options<Path extends string>(path: Path, options: RouteOptions, ...mid: Mids<O, Path>): this;
+    options(...middleware: Middleware<O>[]): this;
+    options(options: RouteOptions, ...middleware: Middleware<O>[]): this;
     use(...middleware: Middleware[]): this;
     use(path: string, ...middleware: Middleware[]): this;
     use(router: Router): this;
@@ -294,7 +304,7 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
     fetch(request: Request, env?: BunEnv): Promise<Response>;
     callback(request: Request, context: unknown): Promise<Response>;
     test(): {
-        get: (path: string, options?: RequestInit) => Promise<{
+        get: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -303,7 +313,7 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        head: (path: string, options?: RequestInit) => Promise<{
+        head: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -312,7 +322,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        post: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+        post: (path: string, body?: string | number | boolean | {
+            [key: string]: SerializableValue;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -321,7 +333,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        put: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+        put: (path: string, body?: string | number | boolean | {
+            [key: string]: SerializableValue;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -330,7 +344,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        patch: (path: string, body?: BodyInit, options?: RequestInit) => Promise<{
+        patch: (path: string, body?: string | number | boolean | {
+            [key: string]: SerializableValue;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -339,7 +355,7 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        delete: (path: string, options?: RequestInit) => Promise<{
+        delete: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -348,7 +364,7 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        options: (path: string, options?: RequestInit) => Promise<{
+        options: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;

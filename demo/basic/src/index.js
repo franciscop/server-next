@@ -56,10 +56,12 @@ export default server(options)
   })
   .patch("/pets/:id", { tags: "Pets" }, async (ctx) => {
     // DO SOMETHING
+    console.log(ctx.url.params.id);
     return 200;
   })
-  .put("/pets/:id", { tags: "Pets" }, async (ctx) => {
+  .put("/pets/:id(number)", async (ctx) => {
     // DO SOMETHING
+    console.log(ctx.url.params.id);
     return 200;
   })
   .post("/pets", { body: PetSchema, tags: "Pets" }, (ctx) => {

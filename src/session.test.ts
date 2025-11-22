@@ -9,7 +9,7 @@ describe("session", () => {
     })
     .post("/hello", async (ctx) => {
       if (!ctx.session.a) ctx.session.a = 0;
-      ctx.session.a += 1;
+      ctx.session.a = Number(ctx.session.a) + 1;
       return `Bye ${ctx.session.a}`;
     })
     .get("/", () => "Fallback")

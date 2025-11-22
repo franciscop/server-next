@@ -244,8 +244,8 @@ export type InlineReply =
 export type Body = InlineReply;
 
 export type Middleware<
-  Params extends Record<string, string> = Record<string, string>,
   O extends ServerConfig = object,
+  Params extends Record<string, string> = Record<string, string>,
 > = (
   ctx: Context<Params, O>,
 ) => InlineReply | Promise<InlineReply> | void | Promise<void>;

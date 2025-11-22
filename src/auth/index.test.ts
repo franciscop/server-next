@@ -29,6 +29,7 @@ describe("auth", () => {
     store.set<AuthSession>(`auth:${ID}`, {
       id: ID,
       strategy: "token",
+      // @ts-expect-error
       provider: "wrong",
       user: "QypOn5SQApyOPdUp",
     });

@@ -1745,6 +1745,9 @@ var Netlify = async (app, request, context) => {
 };
 
 // src/router.ts
+function isMiddleware(x) {
+  return typeof x === "function";
+}
 var Router = class _Router {
   handlers = {
     socket: [],
@@ -1772,99 +1775,53 @@ var Router = class _Router {
     }
     return this.self();
   }
-  socket(path2, ...middleware) {
-    return this.handle("socket", path2, ...middleware);
-  }
-  get(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("get", path2, ...middleware);
+  socket(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "get",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("socket", pathOrMid, ...middleware);
   }
-  head(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("head", path2, ...middleware);
+  get(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("get", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "head",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("get", pathOrMid, ...middleware);
   }
-  post(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("post", path2, ...middleware);
+  head(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("head", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "post",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("head", pathOrMid, ...middleware);
   }
-  put(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("put", path2, ...middleware);
+  post(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("post", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "put",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("post", pathOrMid, ...middleware);
   }
-  patch(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("patch", path2, ...middleware);
+  put(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("put", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "patch",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("put", pathOrMid, ...middleware);
   }
-  del(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("delete", path2, ...middleware);
+  patch(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("patch", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "delete",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("patch", pathOrMid, ...middleware);
   }
-  options(path2, optionsOrMiddleware, ...middleware) {
-    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
-      return this.handle("options", path2, ...middleware);
+  del(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
     }
-    return this.handle(
-      "options",
-      path2,
-      ...optionsOrMiddleware ? [
-        optionsOrMiddleware,
-        ...middleware
-      ] : middleware
-    );
+    return this.handle("delete", pathOrMid, ...middleware);
+  }
+  options(pathOrMid, optionsOrMid, ...middleware) {
+    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
+      return this.handle("options", pathOrMid, optionsOrMid, ...middleware);
+    }
+    return this.handle("options", pathOrMid, ...middleware);
   }
   use(...args) {
     const path2 = typeof args[0] === "string" ? args.shift() : "*";
@@ -1892,6 +1849,10 @@ function isSerializable(body) {
   if (typeof body === "string") return false;
   if (body instanceof ReadableStream) return false;
   if (body instanceof FormData) return false;
+  if (body instanceof Blob) return false;
+  if (body instanceof ArrayBuffer) return false;
+  if (ArrayBuffer.isView(body)) return false;
+  if (body instanceof URLSearchParams) return false;
   return true;
 }
 function ServerTest(app) {

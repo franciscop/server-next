@@ -1,8 +1,10 @@
+import { Body } from "../types";
+
 // Type declarations for custom test matchers
 declare global {
   namespace jest {
     interface Matchers<R = void> {
-      toSucceed(message?: string): R;
+      toSucceed(message?: Body): R;
     }
   }
 }
@@ -10,7 +12,7 @@ declare global {
 // For Bun test runner
 declare module "bun:test" {
   interface Matchers {
-    toSucceed(message?: string): void;
+    toSucceed(message?: Body): void;
   }
 }
 
