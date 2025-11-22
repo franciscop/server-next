@@ -16,7 +16,7 @@ import type {
   Settings,
 } from "./types";
 
-export class Server<O extends ServerConfig = {}> extends Router<O> {
+export class Server<O extends ServerConfig = object> extends Router<O> {
   settings: Settings;
   platform: Platform;
 

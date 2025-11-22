@@ -1,4 +1,4 @@
-import { BasicValue, type Context } from "..";
+import type { BasicValue, Context } from "..";
 import createNoSession from "./NoSession";
 
 type StoreReturn = Record<string, BasicValue>;

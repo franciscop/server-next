@@ -1,12 +1,11 @@
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 type ServerConfig = {
-    User?: any;
+    User?: Record<string, string | number | boolean | Date | null | undefined>;
 };
 type RouteOptions = {
     tags?: string | string[];
     title?: string;
     description?: string;
-    [key: string]: any;
 };
 type RouterMethod = "*" | Method;
 type Bucket = {
@@ -32,7 +31,9 @@ type KVStore = {
     name: string;
     prefix: (key: string) => KVStore;
     get: <T = SerializableValue>(key: string) => Promise<T>;
-    set: <T = SerializableValue>(key: string, value: T, options?: Record<string, any>) => Promise<void>;
+    set: <T = SerializableValue>(key: string, value: T, options?: {
+        expires: string | number;
+    }) => Promise<void>;
     has: (key: string) => Promise<boolean>;
     del: (key: string) => Promise<void>;
     keys: () => Promise<string[]>;
@@ -45,7 +46,7 @@ type AuthSession = {
     strategy: Strategy;
     user: string;
 };
-type AuthUser<T = {}> = T & {
+type AuthUser<T = object> = T & {
     id: string | number;
     provider: Provider;
     strategy: Strategy;
@@ -127,7 +128,7 @@ type Events = Record<string, EventCallback[]> & {
     on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
     trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
 };
-type Context<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = {}> = {
+type Context<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
@@ -154,7 +155,7 @@ type InlineReply = Response | {
     body: Body;
     headers?: Headers;
 } | SerializableValue;
-type Middleware<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = {}> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
+type Middleware<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = object> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | {
@@ -195,9 +196,9 @@ declare global {
     var env: Record<string, any>;
 }
 
-type PathOrMiddle<O extends ServerConfig = {}> = string | Middleware<any, O>;
+type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<any, O>;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
-declare class Router<O extends ServerConfig = {}> {
+declare class Router<O extends ServerConfig = object> {
     handlers: Record<Method, FullRoute>;
     self(): this;
     handle(method: RouterMethod, path: PathOrMiddle<O>, ...middleware: Middleware<any, O>[]): this;
@@ -281,7 +282,7 @@ declare const view: (...args: [string, ((data: Buffer) => Promise<Buffer | strin
     };
 }?]) => Promise<Response>;
 
-declare class Server<O extends ServerConfig = {}> extends Router<O> {
+declare class Server<O extends ServerConfig = object> extends Router<O> {
     settings: Settings;
     platform: Platform;
     sockets: any[];

@@ -1,4 +1,4 @@
-import { Options, Provider, Strategy } from "../types";
+import type { Options, Provider, Strategy } from "../types";
 import providers from "./providers";
 
 export default function parseAuthOptions(auth: Options["auth"], all: any): any {

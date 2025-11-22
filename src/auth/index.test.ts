@@ -2,7 +2,8 @@ import "../tests/toSucceed";
 
 import kv from "polystore";
 
-import server, { AuthSession, AuthUser } from "..";
+import type { AuthSession, AuthUser } from "..";
+import server from "..";
 
 const ID = "REqA2l022l8Q0tuI";
 

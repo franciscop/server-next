@@ -1636,16 +1636,15 @@ function isValidMethod(method) {
 }
 
 // src/context/node.ts
-var chunkArray = (arr, size) => arr.length > size ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [arr];
+var chunkArray = (arr) => arr.length > 2 ? [[arr[0], arr[1]], ...chunkArray(arr.slice(2))] : [arr];
 async function createNode(req, app) {
   const init = performance.now();
   const method = req.method?.toLowerCase() || "get";
   if (!isValidMethod(method)) {
     throw new Error(`Invalid HTTP method: ${method}`);
   }
-  const headers2 = parseHeaders_default(
-    new Headers(chunkArray(req.rawHeaders, 2))
-  );
+  const chunks = chunkArray(req.rawHeaders);
+  const headers2 = parseHeaders_default(new Headers(chunks));
   const cookies2 = parseCookies(headers2.cookie);
   const scheme = req.socket instanceof TLSSocket ? "https" : "http";
   const host = headers2.host || `localhost:${app.settings.port}`;
@@ -1735,6 +1734,7 @@ var Node = async (app) => {
   }).listen(app.settings.port);
 };
 var Netlify = async (app, request, context) => {
+  request.context = context;
   if (typeof Netlify === "undefined") {
     throw new Error("Netlify doesn't exist");
   }

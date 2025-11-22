@@ -7,10 +7,10 @@ import isValidMethod from "./isValidMethod";
 
 // Headers come like [title1, value1, title2, value2, ...]
 // https://stackoverflow.com/a/54029307/938236
-const chunkArray = (arr: string[], size: number): string[][] =>
-  arr.length > size
-    ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
-    : [arr];
+const chunkArray = (arr: string[]): [string, string][] =>
+  arr.length > 2
+    ? [[arr[0], arr[1]] as const, ...chunkArray(arr.slice(2))]
+    : [arr as [string, string]];
 
 export default async function createNode(
   req: IncomingMessage,
@@ -23,9 +23,8 @@ export default async function createNode(
     throw new Error(`Invalid HTTP method: ${method}`);
   }
 
-  const headers = parseHeaders(
-    new Headers(chunkArray(req.rawHeaders, 2) as any),
-  );
+  const chunks = chunkArray(req.rawHeaders);
+  const headers = parseHeaders(new Headers(chunks));
   const cookies = parseCookies(headers.cookie);
 
   const scheme = req.socket instanceof TLSSocket ? "https" : "http";

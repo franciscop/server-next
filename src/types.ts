@@ -13,14 +13,14 @@ export type Method =
   | "socket";
 
 export type ServerConfig = {
-  User?: any;
+  User?: Record<string, string | number | boolean | Date | null | undefined>;
 };
 
 export type RouteOptions = {
   tags?: string | string[];
   title?: string;
   description?: string;
-  [key: string]: any;
+  // [key: string]: any;
 };
 
 export type RouterMethod = "*" | Method;
@@ -61,7 +61,7 @@ export type KVStore = {
   set: <T = SerializableValue>(
     key: string,
     value: T,
-    options?: Record<string, any>,
+    options?: { expires: string | number },
   ) => Promise<void>;
   has: (key: string) => Promise<boolean>;
   del: (key: string) => Promise<void>;
@@ -78,7 +78,7 @@ export type AuthSession = {
   user: string;
 };
 
-export type AuthUser<T = {}> = T & {
+export type AuthUser<T = object> = T & {
   id: string | number;
   provider: Provider;
   strategy: Strategy;
@@ -213,7 +213,7 @@ type Events = Record<string, EventCallback[]> & {
 
 export type Context<
   Params extends Record<string, string> = Record<string, string>,
-  O extends ServerConfig = {},
+  O extends ServerConfig = object,
 > = {
   method: Method;
   headers: Record<string, string | string[]>;
@@ -245,7 +245,7 @@ export type InlineReply =
 
 export type Middleware<
   Params extends Record<string, string> = Record<string, string>,
-  O extends ServerConfig = {},
+  O extends ServerConfig = object,
 > = (
   ctx: Context<Params, O>,
 ) => InlineReply | Promise<InlineReply> | void | Promise<void>;

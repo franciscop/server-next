@@ -7,11 +7,13 @@ import type {
   ServerConfig,
 } from "./types";
 
-type PathOrMiddle<O extends ServerConfig = {}> = string | Middleware<any, O>;
+type PathOrMiddle<O extends ServerConfig = object> =
+  | string
+  | Middleware<any, O>;
 // This is "Method" and NOT "Method" on purpose
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 
-export class Router<O extends ServerConfig = {}> {
+export class Router<O extends ServerConfig = object> {
   handlers: Record<Method, FullRoute> = {
     socket: [],
     get: [],

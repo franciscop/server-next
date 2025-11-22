@@ -2,10 +2,10 @@
 // until needed, and once it has parsed them, it'll replace itself
 // with the value at once, hence it's called 0-1 times even if the
 // properties are accessed 0-N times
-export default function define(
-  obj: any,
-  key: string,
-  cb: (obj: any) => any,
+export default function define<T extends object, K extends PropertyKey, V>(
+  obj: T,
+  key: K,
+  cb: (obj: T) => V,
 ): void {
   Object.defineProperty(obj, key, {
     configurable: true,
@@ -16,7 +16,7 @@ export default function define(
         writable: true,
         value,
       });
-      return obj[key];
+      return (obj as Record<K, V>)[key];
     },
   });
 }

@@ -2,7 +2,7 @@
 declare global {
   namespace jest {
     interface Matchers<R = void> {
-      toSucceed(message?: any): R;
+      toSucceed(message?: string): R;
     }
   }
 }
@@ -10,7 +10,7 @@ declare global {
 // For Bun test runner
 declare module "bun:test" {
   interface Matchers {
-    toSucceed(message?: any): void;
+    toSucceed(message?: string): void;
   }
 }
 

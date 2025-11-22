@@ -1,11 +1,19 @@
 import type { Method, SerializableValue, Server } from ".";
 import { parseHeaders } from "./helpers";
 
-function isSerializable(body: unknown): boolean {
+type BodyValue = SerializableValue | BodyInit;
+
+function isSerializable(
+  body: BodyValue,
+): body is Exclude<SerializableValue, string | null | undefined> {
   if (!body) return false;
   if (typeof body === "string") return false;
   if (body instanceof ReadableStream) return false;
   if (body instanceof FormData) return false;
+  if (body instanceof Blob) return false;
+  if (body instanceof ArrayBuffer) return false;
+  if (ArrayBuffer.isView(body)) return false;
+  if (body instanceof URLSearchParams) return false;
   return true;
 }
 
@@ -17,7 +25,7 @@ export default function ServerTest(app: Server) {
   const fetch = async (
     path: string,
     method: Method,
-    options: RequestInit = {},
+    options: Omit<RequestInit, "body"> & { body?: BodyValue } = {},
   ) => {
     try {
       if (!options.headers) options.headers = {};
@@ -31,7 +39,7 @@ export default function ServerTest(app: Server) {
       const res = await app.fetch(
         new Request(`http://localhost:${port}${path}`, {
           method,
-          ...options,
+          ...(options as RequestInit),
         }),
       );
 
@@ -52,17 +60,28 @@ export default function ServerTest(app: Server) {
     }
   };
   return {
-    get: (path: string, options?: RequestInit) => fetch(path, "get", options),
-    head: (path: string, options?: RequestInit) => fetch(path, "head", options),
-    post: (path: string, body?: BodyInit, options?: RequestInit) =>
-      fetch(path, "post", { body, ...options }),
-    put: (path: string, body?: BodyInit, options?: RequestInit) =>
-      fetch(path, "put", { body, ...options }),
-    patch: (path: string, body?: BodyInit, options?: RequestInit) =>
-      fetch(path, "patch", { body, ...options }),
-    delete: (path: string, options?: RequestInit) =>
+    get: (path: string, options?: Omit<RequestInit, "body">) =>
+      fetch(path, "get", options),
+    head: (path: string, options?: Omit<RequestInit, "body">) =>
+      fetch(path, "head", options),
+    post: (
+      path: string,
+      body?: BodyValue,
+      options?: Omit<RequestInit, "body">,
+    ) => fetch(path, "post", { body, ...options }),
+    put: (
+      path: string,
+      body?: BodyValue,
+      options?: Omit<RequestInit, "body">,
+    ) => fetch(path, "put", { body, ...options }),
+    patch: (
+      path: string,
+      body?: BodyValue,
+      options?: Omit<RequestInit, "body">,
+    ) => fetch(path, "patch", { body, ...options }),
+    delete: (path: string, options?: Omit<RequestInit, "body">) =>
       fetch(path, "delete", options),
-    options: (path: string, options?: RequestInit) =>
+    options: (path: string, options?: Omit<RequestInit, "body">) =>
       fetch(path, "options", options),
   };
 }

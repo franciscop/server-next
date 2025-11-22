@@ -28,10 +28,10 @@ function thinLocalBucket(root: string): Bucket {
         },
       });
     },
-    write: (name: string, value?: any, type?: string): any => {
+    write: (name: string, value?: any, type?: BufferEncoding): any => {
       const fullPath = absolute(name);
       if (value) {
-        return fsp.writeFile(fullPath, value, type as any).then(() => fullPath);
+        return fsp.writeFile(fullPath, value, type).then(() => fullPath);
       }
       return fs.createWriteStream(fullPath);
     },
@@ -82,7 +82,7 @@ export default function (root?: string | Bucket): Bucket | null {
   }
 
   // Bun's S3
-  if ((root as any).file && (root as any).write) {
+  if ((root as Bucket & { file: string }).file && root.write) {
     return thinBunBucket(root);
   }
 

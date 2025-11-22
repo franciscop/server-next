@@ -1,11 +1,11 @@
-import type { BasicValue, KVStore } from "..";
+import type { BasicValue } from "..";
 import { ServerError } from "..";
 
 class NoSession {}
 
 // Factory function to create a new NoSession proxy for each request
 // This prevents state pollution between different server instances
-export default function createNoSession(): KVStore {
+export default function createNoSession(): Record<string, BasicValue> {
   return new Proxy(NoSession, {
     get(target: NoSession, key: string | symbol): BasicValue {
       if (target[key]) return target[key];
@@ -20,5 +20,5 @@ export default function createNoSession(): KVStore {
       }
       throw ServerError.NO_STORE_WRITE({ key: String(key) });
     },
-  }) as KVStore;
+  }) as Record<string, BasicValue>;
 }
