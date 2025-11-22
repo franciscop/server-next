@@ -89,7 +89,10 @@ export class Router<O extends ServerConfig = {}> {
       "get",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -120,7 +123,10 @@ export class Router<O extends ServerConfig = {}> {
       "head",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -155,7 +161,10 @@ export class Router<O extends ServerConfig = {}> {
       "post",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -186,7 +195,10 @@ export class Router<O extends ServerConfig = {}> {
       "put",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -217,7 +229,10 @@ export class Router<O extends ServerConfig = {}> {
       "patch",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -248,7 +263,10 @@ export class Router<O extends ServerConfig = {}> {
       "delete",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }
@@ -279,7 +297,10 @@ export class Router<O extends ServerConfig = {}> {
       "options",
       path as any,
       ...(optionsOrMiddleware
-        ? [optionsOrMiddleware, ...middleware]
+        ? [
+            optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
+            ...middleware,
+          ]
         : middleware),
     );
   }

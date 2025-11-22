@@ -166,6 +166,8 @@ async function emailRegister(ctx) {
   const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
   const user = {
     id: createId(email),
+    strategy: ctx.options.auth.strategy,
+    provider: "email",
     email,
     password: await hash(password),
     time,
@@ -921,7 +923,6 @@ function validate(ctx, schema) {
 // src/helpers/handleRequest.ts
 async function handleRequest(handlers, ctx) {
   try {
-    if (ctx.error) throw ctx.error;
     for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
       const match = pathPattern(matcher, ctx.url.pathname || "/");
       if (!match) continue;
@@ -1569,7 +1570,7 @@ function timer(ctx) {
 var NoSession = class {
 };
 function createNoSession() {
-  return new Proxy(new NoSession(), {
+  return new Proxy(NoSession, {
     get(target, key) {
       if (target[key]) return target[key];
       if (key === "then") return target[key];
@@ -1781,7 +1782,10 @@ var Router = class _Router {
     return this.handle(
       "get",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   head(path2, optionsOrMiddleware, ...middleware) {
@@ -1791,7 +1795,10 @@ var Router = class _Router {
     return this.handle(
       "head",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   post(path2, optionsOrMiddleware, ...middleware) {
@@ -1801,7 +1808,10 @@ var Router = class _Router {
     return this.handle(
       "post",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   put(path2, optionsOrMiddleware, ...middleware) {
@@ -1811,7 +1821,10 @@ var Router = class _Router {
     return this.handle(
       "put",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   patch(path2, optionsOrMiddleware, ...middleware) {
@@ -1821,7 +1834,10 @@ var Router = class _Router {
     return this.handle(
       "patch",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   del(path2, optionsOrMiddleware, ...middleware) {
@@ -1831,7 +1847,10 @@ var Router = class _Router {
     return this.handle(
       "delete",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   options(path2, optionsOrMiddleware, ...middleware) {
@@ -1841,7 +1860,10 @@ var Router = class _Router {
     return this.handle(
       "options",
       path2,
-      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+      ...optionsOrMiddleware ? [
+        optionsOrMiddleware,
+        ...middleware
+      ] : middleware
     );
   }
   use(...args) {

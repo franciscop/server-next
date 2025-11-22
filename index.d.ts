@@ -1,11 +1,20 @@
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
+type ServerConfig = {
+    User?: any;
+};
+type RouteOptions = {
+    tags?: string | string[];
+    title?: string;
+    description?: string;
+    [key: string]: any;
+};
 type RouterMethod = "*" | Method;
 type Bucket = {
     read: (path: string) => Promise<ReadableStream | null>;
     write: (path: string, data: string | Buffer) => Promise<void | string>;
     delete: (path: string) => Promise<boolean>;
 };
-type Cors = {
+type CorsSettings = {
     origin: string | boolean;
     methods: string;
     headers: string;
@@ -28,13 +37,36 @@ type KVStore = {
     del: (key: string) => Promise<void>;
     keys: () => Promise<string[]>;
 };
-type AuthOption = string | {
-    type?: string | string[];
-    provider?: string | string[];
+type Provider = "email" | "github";
+type Strategy = "cookies" | "jwt" | "token";
+type AuthSession = {
+    id: string;
+    provider: Provider;
+    strategy: Strategy;
+    user: string;
+};
+type AuthUser<T = {}> = T & {
+    id: string | number;
+    provider: Provider;
+    strategy: Strategy;
+    email: string;
+};
+type AuthOption = `${Strategy}:${Provider}` | {
+    provider?: Provider | Provider[];
+    strategy?: Strategy;
     session?: KVStore;
     store?: KVStore;
     redirect?: string;
-    cleanUser?: <T = UserRecord>(user: T) => T | Promise<T>;
+    cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
+};
+type AuthSettings = {
+    id: string;
+    provider: Provider[];
+    strategy: Strategy;
+    store: KVStore;
+    session: KVStore;
+    cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
+    redirect: string;
 };
 type Options = {
     port?: number;
@@ -51,20 +83,6 @@ type Options = {
     auth?: AuthOption;
     openapi?: any;
 };
-type UserRecord = {
-    email: string;
-    password: string;
-};
-type Auth = {
-    id: string;
-    store: KVStore;
-    type: string;
-    user?: string;
-    provider: string;
-    session: KVStore;
-    cleanUser: <T = UserRecord>(user: T) => T | Promise<T>;
-    redirect: string;
-};
 type Settings = {
     port: number;
     secret: string;
@@ -76,8 +94,8 @@ type Settings = {
     session?: {
         store: KVStore;
     };
-    cors?: Cors;
-    auth?: Auth;
+    cors?: CorsSettings;
+    auth?: AuthSettings;
     openapi?: any;
 };
 type Time = {
@@ -109,11 +127,11 @@ type Events = Record<string, EventCallback[]> & {
     on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
     trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
 };
-type Context<Params extends Record<string, string> = Record<string, string>> = {
+type Context<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = {}> = {
     method: Method;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
-    body?: unknown;
+    body?: SerializableValue;
     url: URL & {
         params: Params;
         query: Record<string, string>;
@@ -122,8 +140,9 @@ type Context<Params extends Record<string, string> = Record<string, string>> = {
     platform: Platform;
     time?: Time;
     session?: Record<string, BasicValue>;
-    auth?: Auth;
-    user?: UserRecord;
+    user?: O extends {
+        User: infer U;
+    } ? U & AuthUser : AuthUser;
     init: number;
     events: Events;
     req?: Request;
@@ -134,8 +153,8 @@ type Body = string;
 type InlineReply = Response | {
     body: Body;
     headers?: Headers;
-} | string | number | undefined;
-type Middleware<Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params>) => InlineReply | void;
+} | SerializableValue;
+type Middleware<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = {}> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | {
@@ -151,7 +170,8 @@ declare class ServerError extends Error {
     static NO_STORE_WRITE: (vars?: Variables) => ServerError;
     static NO_STORE_READ: (vars?: Variables) => ServerError;
     static AUTH_ARGON_NEEDED: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_TYPE: (vars?: Variables) => ServerError;
+    static AUTH_INVALID_HEADER: (vars?: Variables) => ServerError;
+    static AUTH_INVALID_STRATEGY: (vars?: Variables) => ServerError;
     static AUTH_INVALID_TOKEN: (vars?: Variables) => ServerError;
     static AUTH_INVALID_COOKIE: (vars?: Variables) => ServerError;
     static AUTH_NO_PROVIDER: (vars?: Variables) => ServerError;
@@ -175,28 +195,35 @@ declare global {
     var env: Record<string, any>;
 }
 
-type PathOrMiddle = string | Middleware;
+type PathOrMiddle<O extends ServerConfig = {}> = string | Middleware<any, O>;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
-declare class Router {
+declare class Router<O extends ServerConfig = {}> {
     handlers: Record<Method, FullRoute>;
     self(): this;
-    handle(method: RouterMethod, path: PathOrMiddle, ...middleware: Middleware[]): this;
-    socket<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    socket(...middleware: Middleware[]): this;
-    get<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    get(...middleware: Middleware[]): this;
-    head<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    head(...middleware: Middleware[]): this;
-    post<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    post(...middleware: Middleware[]): this;
-    put<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    put(...middleware: Middleware[]): this;
-    patch<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    patch(...middleware: Middleware[]): this;
-    del<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    del(...middleware: Middleware[]): this;
-    options<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>>[]): this;
-    options(...middleware: Middleware[]): this;
+    handle(method: RouterMethod, path: PathOrMiddle<O>, ...middleware: Middleware<any, O>[]): this;
+    socket<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    socket(...middleware: Middleware<any, O>[]): this;
+    get<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    get<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    get(...middleware: Middleware<any, O>[]): this;
+    head<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    head<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    head(...middleware: Middleware<any, O>[]): this;
+    post<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    post<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    post(...middleware: Middleware<any, O>[]): this;
+    put<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    put<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    put(...middleware: Middleware<any, O>[]): this;
+    patch<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    patch<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    patch(...middleware: Middleware<any, O>[]): this;
+    del<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    del<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    del(...middleware: Middleware<any, O>[]): this;
+    options<Path extends string>(path: Path, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    options<Path extends string>(path: Path, options: RouteOptions, ...middleware: Middleware<PathToParams<Path>, O>[]): this;
+    options(...middleware: Middleware<any, O>[]): this;
     use(...middleware: Middleware[]): this;
     use(path: string, ...middleware: Middleware[]): this;
     use(router: Router): this;
@@ -254,7 +281,7 @@ declare const view: (...args: [string, ((data: Buffer) => Promise<Buffer | strin
     };
 }?]) => Promise<Response>;
 
-declare class Server extends Router {
+declare class Server<O extends ServerConfig = {}> extends Router<O> {
     settings: Settings;
     platform: Platform;
     sockets: any[];
@@ -331,6 +358,6 @@ declare class Server extends Router {
         }>;
     };
 }
-declare function server(options?: {}): Server & ((request: any, context?: any) => any);
+declare function server<Options>(options?: {}): Server<Options> & ((request: any, context?: any) => any);
 
-export { type Auth, type AuthOption, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cors, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, Reply, type RouterMethod, type SerializableValue, Server, ServerError, type Settings, type Time, type UserRecord, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
