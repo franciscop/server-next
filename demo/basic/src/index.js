@@ -15,7 +15,7 @@ const options = {
   session: { store: sessionStore },
   openapi: true,
   auth: {
-    type: "token",
+    strategy: "token",
     provider: "email",
     store: authStore,
   },

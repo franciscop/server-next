@@ -1,4 +1,4 @@
-import server, { file } from "../../jssrc/index.js";
+import server, { file } from "../..";
 
 export default server()
   .get("/", () => file("./index.html"))

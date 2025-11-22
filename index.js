@@ -22,7 +22,6 @@ var ServerError = class _ServerError extends Error {
     this.message = messageStr;
     this.status = status2;
   }
-  // Add error codes dynamically to the global object
   static extend(errors) {
     for (const code in errors) {
       const error = errors[code];
@@ -34,32 +33,9 @@ var ServerError = class _ServerError extends Error {
     }
     return errors;
   }
-  // Dynamically added error methods from errors/index.ts
-  static NO_STORE;
-  static NO_STORE_WRITE;
-  static NO_STORE_READ;
-  static AUTH_ARGON_NEEDED;
-  static AUTH_INVALID_HEADER;
-  static AUTH_INVALID_STRATEGY;
-  static AUTH_INVALID_TOKEN;
-  static AUTH_INVALID_COOKIE;
-  static AUTH_NO_PROVIDER;
-  static AUTH_INVALID_PROVIDER;
-  static AUTH_NO_SESSION;
-  static AUTH_NO_USER;
-  static LOGIN_NO_EMAIL;
-  static LOGIN_INVALID_EMAIL;
-  static LOGIN_NO_PASSWORD;
-  static LOGIN_INVALID_PASSWORD;
-  static LOGIN_WRONG_EMAIL;
-  static LOGIN_WRONG_PASSWORD;
-  static REGISTER_NO_EMAIL;
-  static REGISTER_INVALID_EMAIL;
-  static REGISTER_NO_PASSWORD;
-  static REGISTER_INVALID_PASSWORD;
-  static REGISTER_EMAIL_EXISTS;
 };
-var ServerError_default = ServerError;
+var TypedServerError = ServerError;
+var ServerError_default = TypedServerError;
 
 // src/errors/index.ts
 ServerError_default.extend({

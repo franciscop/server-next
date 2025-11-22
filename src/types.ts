@@ -226,6 +226,8 @@ export type Context<
   options: Settings;
   platform: Platform;
   time?: Time;
+  socket?: WebSocket;
+  sockets?: WebSocket[];
   session?: Record<string, BasicValue>;
   // The value of the authorized user
   user?: O extends { User: infer U } ? U & AuthUser : AuthUser;

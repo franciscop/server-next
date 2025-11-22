@@ -13,10 +13,6 @@ type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
 // This is "Method" and NOT "Method" on purpose
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 
-function isOptions(x: unknown): x is Options {
-  return x != null && typeof x === "object" && !("length" in x);
-}
-
 function isMiddleware<O>(x: unknown): x is Middleware<O> {
   return typeof x === "function";
 }

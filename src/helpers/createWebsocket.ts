@@ -1,21 +1,35 @@
-export default function createWebsocket(sockets: any[], handlers: any) {
+import type { Middleware, RouterMethod } from "../types";
+
+type FullRoute = [RouterMethod, string, ...Middleware[]][];
+
+type WebSocketHandlers = {
+  socket?: FullRoute;
+};
+
+export default function createWebsocket(
+  sockets: WebSocket[],
+  handlers: WebSocketHandlers,
+) {
   return {
-    message: async (socket: any, body: any) => {
+    message: async (socket: WebSocket, body: string | Buffer) => {
       handlers.socket
-        ?.filter((s: any) => s[1] === "message")
-        ?.map((s: any) => s[2]({ socket, sockets, body }));
+        ?.filter((s) => s[1] === "message")
+        // @ts-expect-error
+        ?.map((s) => s[2]({ socket, sockets, body }));
     },
-    open: (socket: any) => {
+    open: (socket: WebSocket) => {
       sockets.push(socket);
       handlers.socket
-        ?.filter((s: any) => s[1] === "open")
-        ?.map((s: any) => s[2]({ socket, sockets, body: undefined }));
+        ?.filter((s) => s[1] === "open")
+        // @ts-expect-error
+        ?.map((s) => s[2]({ socket, sockets, body: undefined }));
     },
-    close: (socket: any) => {
+    close: (socket: WebSocket) => {
       sockets.splice(sockets.indexOf(socket), 1);
       handlers.socket
-        ?.filter((s: any) => s[1] === "close")
-        ?.map((s: any) => s[2]({ socket, sockets, body: undefined }));
+        ?.filter((s) => s[1] === "close")
+        // @ts-expect-error
+        ?.map((s) => s[2]({ socket, sockets, body: undefined }));
     },
   };
 }

@@ -140,6 +140,8 @@ type Context<Params extends Record<string, string> = Record<string, string>, O e
     options: Settings;
     platform: Platform;
     time?: Time;
+    socket?: WebSocket;
+    sockets?: WebSocket[];
     session?: Record<string, BasicValue>;
     user?: O extends {
         User: infer U;
@@ -162,35 +164,17 @@ type ExtendError = string | {
     message: string;
     status: number;
 };
+interface ServerErrorConstructor {
+    extend(errors: Record<string, ExtendError>): Record<string, ExtendError>;
+    [key: string]: ((vars?: Variables) => ServerError) | any;
+}
 declare class ServerError extends Error {
     code: string;
     status: number;
     constructor(code: string, status: number, message: string | ((vars: Variables) => string), vars?: Variables);
     static extend(errors: Record<string, ExtendError>): Record<string, ExtendError>;
-    static NO_STORE: (vars?: Variables) => ServerError;
-    static NO_STORE_WRITE: (vars?: Variables) => ServerError;
-    static NO_STORE_READ: (vars?: Variables) => ServerError;
-    static AUTH_ARGON_NEEDED: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_HEADER: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_STRATEGY: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_TOKEN: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_COOKIE: (vars?: Variables) => ServerError;
-    static AUTH_NO_PROVIDER: (vars?: Variables) => ServerError;
-    static AUTH_INVALID_PROVIDER: (vars?: Variables) => ServerError;
-    static AUTH_NO_SESSION: (vars?: Variables) => ServerError;
-    static AUTH_NO_USER: (vars?: Variables) => ServerError;
-    static LOGIN_NO_EMAIL: (vars?: Variables) => ServerError;
-    static LOGIN_INVALID_EMAIL: (vars?: Variables) => ServerError;
-    static LOGIN_NO_PASSWORD: (vars?: Variables) => ServerError;
-    static LOGIN_INVALID_PASSWORD: (vars?: Variables) => ServerError;
-    static LOGIN_WRONG_EMAIL: (vars?: Variables) => ServerError;
-    static LOGIN_WRONG_PASSWORD: (vars?: Variables) => ServerError;
-    static REGISTER_NO_EMAIL: (vars?: Variables) => ServerError;
-    static REGISTER_INVALID_EMAIL: (vars?: Variables) => ServerError;
-    static REGISTER_NO_PASSWORD: (vars?: Variables) => ServerError;
-    static REGISTER_INVALID_PASSWORD: (vars?: Variables) => ServerError;
-    static REGISTER_EMAIL_EXISTS: (vars?: Variables) => ServerError;
 }
+declare const TypedServerError: typeof ServerError & ServerErrorConstructor;
 
 declare global {
     var env: Record<string, any>;
@@ -322,9 +306,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        post: (path: string, body?: string | number | boolean | {
+        post: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -333,9 +317,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        put: (path: string, body?: string | number | boolean | {
+        put: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -344,9 +328,9 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
             headers: {};
             body: any;
         }>;
-        patch: (path: string, body?: string | number | boolean | {
+        patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBuffer | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
             status: number;
             headers: Record<string, string | string[]>;
             body: SerializableValue;
@@ -377,4 +361,4 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
 }
 declare function server<Options>(options?: {}): Server<Options> & ((request: any, context?: any) => any);
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };

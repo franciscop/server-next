@@ -15,5 +15,3 @@ declare module "bun:test" {
     toSucceed(message?: Body): void;
   }
 }
-
-export {};
