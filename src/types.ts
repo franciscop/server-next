@@ -188,7 +188,7 @@ export type Context<
   method: Method;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: unknown;
+  body?: SerializableValue;
   url: URL & {
     params: Params;
     query: Record<string, string>;
