@@ -1,41 +1,43 @@
-import type { Context, UserRecord } from "../..";
+import type { AuthSession, AuthUser, Context } from "../..";
 import { ServerError, status } from "../..";
 import { createId, hash, verify } from "../../helpers";
 import updateUser from "../updateUser";
 
-const createSession = async (user: UserRecord, ctx: Context) => {
-  const { type, session, cleanUser, redirect = "/user" } = ctx.options.auth;
+const createSession = async (user: AuthUser, ctx: Context) => {
+  const { strategy, session, cleanUser, redirect = "/user" } = ctx.options.auth;
   user = await cleanUser(user);
   const id = createId();
   const provider = "email";
-  const time = new Date().toISOString().replace(/\.[0-9]*/, "");
-  ctx.auth = {
+  ctx.user = {
     id,
-    type,
+    strategy,
     provider,
-    user: user.email,
     email: user.email,
-    time,
   };
-  await session.set(id, ctx.auth, { expires: "1w" });
+  await session.set<AuthSession>(
+    id,
+    { id, strategy, provider, user: user.email },
+    { expires: "1w" },
+  );
 
-  if (type.includes("token")) {
+  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
+  if (strategy.includes("token")) {
     return status(201).json({ ...user, token: id });
   }
-  if (type.includes("cookie")) {
+  if (strategy.includes("cookie")) {
     return status(302).cookies({ authentication: id }).redirect(redirect);
   }
-  if (type.includes("jwt")) {
+  if (strategy.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
   }
-  if (type.includes("key")) {
+  if (strategy.includes("key")) {
     throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");
 };
 
 async function emailLogin(ctx: Context) {
-  const { email, password } = ctx.body;
+  const { email, password } = ctx.body as { email: string; password: string };
   if (!email) throw ServerError.LOGIN_NO_EMAIL();
   if (!/@/.test(email)) throw ServerError.LOGIN_INVALID_EMAIL();
   if (!password) throw ServerError.LOGIN_NO_PASSWORD();
@@ -44,7 +46,7 @@ async function emailLogin(ctx: Context) {
   const store = ctx.options.auth.store;
   if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
-  const user = await store.get<UserRecord>(email);
+  const user = await store.get<AuthUser & { password: string }>(email);
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
@@ -52,7 +54,10 @@ async function emailLogin(ctx: Context) {
 }
 
 async function emailRegister(ctx: Context) {
-  const { email, password, ...data } = ctx.body;
+  const { email, password, ...data } = ctx.body as {
+    email: string;
+    password: string;
+  };
   if (!email) throw ServerError.REGISTER_NO_EMAIL();
   if (!/@/.test(email)) throw ServerError.REGISTER_INVALID_EMAIL();
   if (!password) throw ServerError.REGISTER_NO_PASSWORD();
@@ -64,6 +69,8 @@ async function emailRegister(ctx: Context) {
   const time = new Date().toISOString().replace(/\.[0-9]*/, "");
   const user = {
     id: createId(email),
+    strategy: ctx.options.auth.strategy,
+    provider: "email" as const,
     email,
     password: await hash(password),
     time,
@@ -97,15 +104,19 @@ async function emailResetPassword() {
 }
 
 async function emailUpdatePassword(ctx: Context) {
-  const { previous, updated } = ctx.body;
+  const passwords = ctx.body as { previous: string; updated: string };
 
-  const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
+  const fullUser = (await ctx.options.auth.store.get(ctx.user.email)) as {
+    email: string;
+    password: string;
+  };
+  if (!fullUser) throw ServerError.AUTH_NO_USER();
 
-  const isValid = await verify(previous, fullUser.password);
+  const isValid = await verify(passwords.previous, fullUser.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
-  fullUser.password = await hash(updated);
-  await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
+  fullUser.password = await hash(passwords.updated);
+  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
 
   return 200;
 }

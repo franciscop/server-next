@@ -2,7 +2,7 @@ import "../tests/toSucceed";
 
 import kv from "polystore";
 
-import server, { AuthUser } from "..";
+import server, { AuthSession, AuthUser } from "..";
 
 const ID = "REqA2l022l8Q0tuI";
 
@@ -24,27 +24,27 @@ describe("auth", () => {
 
   it("provider must belong", async () => {
     const store = kv(new Map());
+
+    store.set<AuthSession>(`auth:${ID}`, {
+      id: ID,
+      strategy: "token",
+      provider: "wrong",
+      user: "QypOn5SQApyOPdUp",
+    });
+
     const api = server({ store, auth: "token:email" })
       .get("/", (ctx) => ctx.user)
       .test();
 
-    store.set(`auth:${ID}`, {
-      id: ID,
-      type: "token",
-      provider: "wrong",
-      user: "QypOn5SQApyOPdUp",
-      email: "abc@test.com",
-      time: "2024-07-01T03:21:40Z",
-    });
-    const authorization = "Bearer REqA2l022l8Q0tuI";
-    const req = await api.get("/", { headers: { authorization } });
-    expect(req).not.toSucceed(
+    const authorization = `Bearer ${ID}`;
+    const res = await api.get("/", { headers: { authorization } });
+    expect(res).not.toSucceed(
       "Invalid provider 'wrong', valid ones are: 'email'",
     );
   });
 });
 
-describe("tyes", () => {
+describe("types", () => {
   const store = kv(new Map());
 
   type User = AuthUser<{ firstName: string; lastName: string; age: number }>;
@@ -63,12 +63,15 @@ describe("token", () => {
 
   afterEach(async () => {
     await store.del(`auth:${ID}`);
+    await store.del(`user:QypOn5SQApyOPdUp`);
   });
 
   it("should be Bearer", async () => {
-    const authorization = "Basic REqA2l022l8Q0tuI";
+    const authorization = `Basic ${ID}`;
     const req = await api.get("/", { headers: { authorization } });
-    expect(req).not.toSucceed("Invalid Authorization type, 'Basic'");
+    expect(req).not.toSucceed(
+      "Invalid authorization header Basic, must send 'Bearer {TOKEN}' (with space)",
+    );
   });
 
   it("should have the proper token", async () => {
@@ -78,7 +81,7 @@ describe("token", () => {
   });
 
   it("cannot get the session", async () => {
-    const authorization = "Bearer REqA2l022l8Q0tuI";
+    const authorization = `Bearer ${ID}`;
     const req = await api.get("/", { headers: { authorization } });
     expect(req.status).toBe(404);
     // expect(req).not.toSucceed("Invalid session");
@@ -87,28 +90,27 @@ describe("token", () => {
   it("cannot get the user", async () => {
     store.set(`auth:${ID}`, {
       id: ID,
-      type: "token",
+      strategy: "token",
       provider: "email",
       user: "QypOn5SQApyOPdUp",
       email: "abc@test.com",
       time: "2024-07-01T03:21:40Z",
     });
-    const authorization = "Bearer REqA2l022l8Q0tuI";
+    const authorization = `Bearer ${ID}`;
     const req = await api.get("/", { headers: { authorization } });
     expect(req).not.toSucceed("Credentials do not correspond to a user");
   });
 
-  it("cannot get the user", async () => {
-    store.set("auth:REqA2l022l8Q0tuI", {
-      id: "REqA2l022l8Q0tuI",
-      type: "token",
+  it("can get the user", async () => {
+    store.set(`auth:${ID}`, {
+      id: ID,
+      strategy: "token",
       provider: "email",
       user: "QypOn5SQApyOPdUp",
-      email: "abc@test.com",
-      time: "2024-07-01T03:21:40Z",
     });
     store.set("user:QypOn5SQApyOPdUp", {
       id: "QypOn5SQApyOPdUp",
+      provider: "email",
       email: "abc@test.com",
     });
     const authorization = "Bearer REqA2l022l8Q0tuI";

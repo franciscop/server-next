@@ -1,5 +1,4 @@
 import type { Context, Server } from "..";
-import auth from "../auth";
 import { define, parseBody, parseCookies, parseHeaders } from "../helpers";
 import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
@@ -31,7 +30,7 @@ export default async function createWinter(
 
   const events = createEvents();
 
-  return await auth.load({
+  return {
     options: app.settings,
     platform: app.platform,
     url,
@@ -42,5 +41,5 @@ export default async function createWinter(
     init,
     events,
     app,
-  });
+  };
 }

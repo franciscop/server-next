@@ -2,6 +2,8 @@ export default function pathPattern(
   pattern: string,
   path: string,
 ): Record<string, any> | null {
+  if (pattern === "*" && path === "/") return {};
+
   pattern = `/${pattern.replace(/^\//, "")}`;
   pattern = pattern.replace(/\/$/, "") || "/";
   path = path.replace(/\/$/, "") || "/";

@@ -2,6 +2,7 @@ import type {
   Method,
   Middleware,
   PathToParams,
+  RouteOptions,
   RouterMethod,
   ServerConfig,
 } from "./types";
@@ -66,84 +67,221 @@ export class Router<O extends ServerConfig = {}> {
     path: Path,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
+  get<Path extends string>(
+    path: Path,
+    options: RouteOptions,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
   get(...middleware: Middleware<any, O>[]): this;
   get<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("get", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("get", path as any, ...middleware);
+    }
+    return this.handle(
+      "get",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   head<Path extends string>(
     path: Path,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
+  head<Path extends string>(
+    path: Path,
+    options: RouteOptions,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
   head(...middleware: Middleware<any, O>[]): this;
   head<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("head", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("head", path as any, ...middleware);
+    }
+    return this.handle(
+      "head",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   post<Path extends string>(
     path: Path,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
+  post<Path extends string>(
+    path: Path,
+    options: RouteOptions,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
   post(...middleware: Middleware<any, O>[]): this;
   post<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("post", path as any, ...middleware);
+    // If second argument is an options object, skip it for now
+    // (it would be used for OpenAPI docs generation)
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      // It's RouteOptions, just pass through the middleware
+      return this.handle("post", path as any, ...middleware);
+    }
+    // Otherwise, it's middleware
+    return this.handle(
+      "post",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   put<Path extends string>(
     path: Path,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
+  put<Path extends string>(
+    path: Path,
+    options: RouteOptions,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
   put(...middleware: Middleware<any, O>[]): this;
   put<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("put", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("put", path as any, ...middleware);
+    }
+    return this.handle(
+      "put",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   patch<Path extends string>(
     path: Path,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
+  patch<Path extends string>(
+    path: Path,
+    options: RouteOptions,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
   patch(...middleware: Middleware<any, O>[]): this;
   patch<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("patch", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("patch", path as any, ...middleware);
+    }
+    return this.handle(
+      "patch",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   del<Path extends string>(
     path: Path,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
+  del<Path extends string>(
+    path: Path,
+    options: RouteOptions,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
   del(...middleware: Middleware<any, O>[]): this;
   del<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("delete", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("delete", path as any, ...middleware);
+    }
+    return this.handle(
+      "delete",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   options<Path extends string>(
     path: Path,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
+  options<Path extends string>(
+    path: Path,
+    options: RouteOptions,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
+  ): this;
   options(...middleware: Middleware<any, O>[]): this;
   options<Path extends string>(
     path: Path | Middleware<any, O>,
+    optionsOrMiddleware?: RouteOptions | Middleware<PathToParams<Path>, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("options", path as any, ...middleware);
+    if (
+      optionsOrMiddleware &&
+      typeof optionsOrMiddleware === "object" &&
+      !("length" in optionsOrMiddleware)
+    ) {
+      return this.handle("options", path as any, ...middleware);
+    }
+    return this.handle(
+      "options",
+      path as any,
+      ...(optionsOrMiddleware
+        ? [optionsOrMiddleware, ...middleware]
+        : middleware),
+    );
   }
 
   use(...middleware: Middleware[]): this;

@@ -42,7 +42,6 @@ export const Netlify = async (
 ) => {
   // ?? consider simply renaming to "ctx.next()"
   // request.context = context;
-  console.log("Unknown context", context);
   if (typeof Netlify === "undefined") {
     throw new Error("Netlify doesn't exist");
   }

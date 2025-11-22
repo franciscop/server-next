@@ -1,9 +1,9 @@
-import auth from "../auth";
+import parseAuthOptions from "../auth/parseAuthOptions";
 import Bucket from "./bucket";
 import createId from "./createId";
 import debugInfo from "./debugInfo";
 
-import type { Cors, Options, Settings } from "..";
+import type { CorsSettings, Options, Settings } from "..";
 
 const env = globalThis.env;
 
@@ -18,7 +18,7 @@ export default function config(options: Options = {}): Settings {
   // CORS
   options.cors = options.cors || env.CORS || null;
   if (options.cors) {
-    const cors: Cors = {
+    const cors: CorsSettings = {
       origin: "",
       methods: "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
       headers: "*",
@@ -84,8 +84,9 @@ export default function config(options: Options = {}): Settings {
     "🔐",
   );
 
-  // AUTH
-  settings.auth = auth.parseOptions(options.auth || env.AUTH || null, options);
+  if (options.auth || env.AUTH) {
+    settings.auth = parseAuthOptions(options.auth || env.AUTH || null, options);
+  }
 
   // OpenAPI
   if (options.openapi) {

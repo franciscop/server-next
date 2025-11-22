@@ -1,3 +1,5 @@
+// Through this file, "options" refers to the ones that are accepted
+// by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
 
 export type Method =
@@ -14,6 +16,13 @@ export type ServerConfig = {
   User?: any;
 };
 
+export type RouteOptions = {
+  tags?: string | string[];
+  title?: string;
+  description?: string;
+  [key: string]: any;
+};
+
 export type RouterMethod = "*" | Method;
 
 export type Bucket = {
@@ -22,7 +31,7 @@ export type Bucket = {
   delete: (path: string) => Promise<boolean>;
 };
 
-export type Cors = {
+export type CorsSettings = {
   origin: string | boolean;
   methods: string;
   headers: string;
@@ -45,7 +54,7 @@ export type SerializableValue =
   | { [key: string]: SerializableValue }
   | Array<SerializableValue>;
 
-type KVStore = {
+export type KVStore = {
   name: string;
   prefix: (key: string) => KVStore;
   get: <T = SerializableValue>(key: string) => Promise<T>;
@@ -62,6 +71,13 @@ type KVStore = {
 export type Provider = "email" | "github";
 export type Strategy = "cookies" | "jwt" | "token";
 
+export type AuthSession = {
+  id: string;
+  provider: Provider;
+  strategy: Strategy;
+  user: string;
+};
+
 export type AuthUser<T = {}> = T & {
   id: string | number;
   provider: Provider;
@@ -73,12 +89,27 @@ export type AuthOption =
   | `${Strategy}:${Provider}`
   | {
       provider?: Provider | Provider[];
-      strategy?: Strategy | Strategy[];
+      strategy?: Strategy;
       session?: KVStore;
       store?: KVStore;
       redirect?: string;
       cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
     };
+
+export type AuthSettings = {
+  id: string; // ID of the session
+  provider: Provider[];
+  strategy: Strategy;
+
+  // The store with the original source of users
+  store: KVStore;
+
+  // The temporal information of active sessions/devices
+  session: KVStore;
+
+  cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
+  redirect: string;
+};
 
 export type Options = {
   port?: number;
@@ -94,16 +125,6 @@ export type Options = {
   openapi?: any;
 };
 
-export type Auth = {
-  id: string; // ID of the session
-  store: KVStore;
-  provider: string;
-  strategy: string;
-  session: KVStore;
-  cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
-  redirect: string;
-};
-
 export type Settings = {
   port: number;
   secret: string;
@@ -113,8 +134,8 @@ export type Settings = {
   store?: KVStore;
   cookies?: KVStore;
   session?: { store: KVStore };
-  cors?: Cors;
-  auth?: Auth;
+  cors?: CorsSettings;
+  auth?: AuthSettings;
   openapi?: any;
 };
 
@@ -225,4 +246,6 @@ export type InlineReply =
 export type Middleware<
   Params extends Record<string, string> = Record<string, string>,
   O extends ServerConfig = {},
-> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void;
+> = (
+  ctx: Context<Params, O>,
+) => InlineReply | Promise<InlineReply> | void | Promise<void>;

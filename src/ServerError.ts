@@ -53,7 +53,8 @@ class ServerError extends Error {
   static NO_STORE_WRITE: (vars?: Variables) => ServerError;
   static NO_STORE_READ: (vars?: Variables) => ServerError;
   static AUTH_ARGON_NEEDED: (vars?: Variables) => ServerError;
-  static AUTH_INVALID_TYPE: (vars?: Variables) => ServerError;
+  static AUTH_INVALID_HEADER: (vars?: Variables) => ServerError;
+  static AUTH_INVALID_STRATEGY: (vars?: Variables) => ServerError;
   static AUTH_INVALID_TOKEN: (vars?: Variables) => ServerError;
   static AUTH_INVALID_COOKIE: (vars?: Variables) => ServerError;
   static AUTH_NO_PROVIDER: (vars?: Variables) => ServerError;

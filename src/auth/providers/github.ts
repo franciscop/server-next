@@ -46,13 +46,13 @@ const getUserProfile = async (code: string) => {
 };
 
 const callback = async (ctx: Context) => {
-  const { type, cleanUser, store, session, redirect } = ctx.options.auth;
+  const { strategy, cleanUser, store, session, redirect } = ctx.options.auth;
 
   const profile = await getUserProfile(ctx.url.query.code);
 
   const auth = {
     id: createId(),
-    type,
+    strategy,
     provider: "github",
     user: createId(profile.email),
     email: profile.email,
@@ -70,16 +70,16 @@ const callback = async (ctx: Context) => {
   await store.set(auth.user, user);
   await session.set(auth.id, auth, { expires: "1w" });
 
-  if (auth.type.includes("token")) {
+  if (auth.strategy.includes("token")) {
     return status(201).json({ ...user, token: auth.id });
   }
-  if (auth.type.includes("cookie")) {
+  if (auth.strategy.includes("cookie")) {
     return status(302).cookies({ authentication: auth.id }).redirect(redirect);
   }
-  if (auth.type.includes("jwt")) {
+  if (auth.strategy.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
   }
-  if (auth.type.includes("key")) {
+  if (auth.strategy.includes("key")) {
     throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");

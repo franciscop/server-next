@@ -1,4 +1,5 @@
 import server, { status } from ".";
+import session from "./auth/session";
 import router from "./router";
 
 function expandHandlers(handlers) {
@@ -37,7 +38,14 @@ describe("can route properly", () => {
   // INTERNAL - so this might change in the future
   it("has the correct structure", () => {
     const registeredPaths = app.handlers.get.map((h) => h[1]);
-    expect(registeredPaths).toEqual(["*", "*", "/hello", "/api/hello", "/"]);
+    expect(registeredPaths).toEqual([
+      "*",
+      "*",
+      "*",
+      "/hello",
+      "/api/hello",
+      "/",
+    ]);
   });
 
   it("can get fallback when nothing matches", async () => {
@@ -135,11 +143,21 @@ describe("complex routing", () => {
     const timer = part1[1];
     const assets = part1[2];
 
-    expect(part1).toEqual(["/path1", timer, assets, mid1, mid2, mid3, mid4]);
+    expect(part1).toEqual([
+      "/path1",
+      timer,
+      assets,
+      session,
+      mid1,
+      mid2,
+      mid3,
+      mid4,
+    ]);
     expect(part2).toEqual([
       "/sub1/path2",
       timer,
       assets,
+      session,
       mid1,
       mid2,
       mid3,
@@ -180,17 +198,27 @@ describe("nested routing", () => {
     const timer = home[1];
     const assets = home[2];
 
-    expect(home).toEqual(["/", timer, assets, mid1, mid2, mid3]);
+    expect(home).toEqual(["/", timer, assets, session, mid1, mid2, mid3]);
     expect(userMe).toEqual([
       "/users/me",
       timer,
       assets,
+      session,
       mid1,
       mid2,
       mid4,
       mid5,
       mid6,
     ]);
-    expect(nested).toEqual(["/a/b/c/d", timer, assets, mid1, mid2, mid4, mid7]);
+    expect(nested).toEqual([
+      "/a/b/c/d",
+      timer,
+      assets,
+      session,
+      mid1,
+      mid2,
+      mid4,
+      mid7,
+    ]);
   });
 });

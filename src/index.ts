@@ -2,13 +2,13 @@ import "./errors/index";
 import "./polyfill";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import { assets, auth, openapi, timer } from "./middle/index";
+import { assets, auth, openapi, timer } from "./middle";
 
+import session from "./auth/session";
 import * as handlers from "./context/handlers";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
 import type {
-  AuthUser,
   BunEnv,
   Options,
   Platform,
@@ -47,15 +47,17 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
     }
 
     // Middleware that is always available
-    this.use(timer as any);
-    this.use(assets as any);
+    this.use(timer);
+    this.use(assets);
+    this.use(session);
 
     // Optional middleware
+    if (this.settings.auth) {
+      auth(this);
+    }
+
     if (this.settings.openapi) {
       this.get(this.settings.openapi.path || "/docs", openapi as any);
-    }
-    if (this.settings.auth) {
-      this.use(auth as any);
     }
   }
 
@@ -74,10 +76,6 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
       }
     }
     return cb;
-  }
-
-  withUser<User>(): Server<O & { User: AuthUser & User }> {
-    return this as any as Server<O & { User: AuthUser & User }>;
   }
 
   // The different handlers for different platforms/runtimes

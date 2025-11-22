@@ -71,8 +71,11 @@ describe("pathPattern.js", () => {
   });
 
   it("correctly matches the asterisk as an array of parts", () => {
+    expect(pathPattern("*", "/")).toEqual({});
+    expect(pathPattern("*", "/john")).toEqual({ "*": ["john"] });
     expect(pathPattern("/*", "/john")).toEqual({ "*": ["john"] });
     expect(pathPattern("/*", "/john/doe")).toEqual({ "*": ["john", "doe"] });
+    expect(pathPattern("*", "/john/doe")).toEqual({ "*": ["john", "doe"] });
     expect(pathPattern("/*/*", "/john/doe")).toEqual({ "*": ["john", "doe"] });
 
     expect(pathPattern("/hello/*", "/hello/john")).toEqual({ "*": ["john"] });

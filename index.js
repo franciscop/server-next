@@ -39,7 +39,8 @@ var ServerError = class _ServerError extends Error {
   static NO_STORE_WRITE;
   static NO_STORE_READ;
   static AUTH_ARGON_NEEDED;
-  static AUTH_INVALID_TYPE;
+  static AUTH_INVALID_HEADER;
+  static AUTH_INVALID_STRATEGY;
   static AUTH_INVALID_TOKEN;
   static AUTH_INVALID_COOKIE;
   static AUTH_NO_PROVIDER;
@@ -66,9 +67,10 @@ ServerError_default.extend({
   NO_STORE_WRITE: "You need a 'store' to write 'ctx.session.{key}'",
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
   AUTH_ARGON_NEEDED: "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
-  AUTH_INVALID_TYPE: "Invalid Authorization type, '{type}'",
   AUTH_INVALID_TOKEN: "Invalid Authorization token",
   AUTH_INVALID_COOKIE: "Invalid Authorization cookie",
+  AUTH_INVALID_HEADER: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)",
+  AUTH_INVALID_STRATEGY: "Invalid Authorization type '{strategy}', valid one is '{valid}'",
   AUTH_NO_PROVIDER: "No provider passed to the option 'auth.provider'",
   AUTH_INVALID_PROVIDER: "Invalid provider '{provider}', valid ones are: '{valid}'",
   AUTH_NO_SESSION: { status: 401, message: "Invalid session" },
@@ -101,51 +103,95 @@ if (typeof process !== "undefined") {
   Object.assign(globalThis.env, process.env);
 }
 
-// src/auth/auth.ts
-var validateToken = (authorization) => {
-  const [type2, id] = authorization.trim().split(" ");
-  if (type2.toLowerCase() !== "bearer") {
-    throw ServerError_default.AUTH_INVALID_TYPE({ type: type2 });
+// src/auth/updateUser.ts
+async function updateUser(user, auth2, store) {
+  if (auth2.provider === "email") {
+    return await store.set(auth2.email, user);
   }
-  if (id.length !== 16) {
-    throw ServerError_default.AUTH_INVALID_TOKEN();
-  }
-  return id;
-};
-var validateCookie = (authorization) => {
-  if (authorization.length !== 16) {
-    throw ServerError_default.AUTH_INVALID_COOKIE();
-  }
-  return authorization;
-};
-var findSessionId = (ctx) => {
-  const type2 = ctx.options.auth.type;
-  if (type2.includes("token")) {
-    if (!ctx.headers.authorization) return;
-    return validateToken(ctx.headers.authorization);
-  }
-  if (type2.includes("cookie")) {
-    if (!ctx.cookies.authentication) return;
-    return validateCookie(ctx.cookies.authentication);
-  }
-  throw new Error(`Invalid auth type "${type2}"`);
-};
-async function auth(ctx) {
-  if (!ctx.options.auth) return;
-  const options = ctx.options.auth;
-  const sessionId = findSessionId(ctx);
-  if (!sessionId) return;
-  const auth3 = await options.session.get(sessionId);
-  if (!auth3) return;
-  if (!auth3.provider) throw ServerError_default.AUTH_NO_PROVIDER();
-  if (!options.provider.includes(auth3.provider)) {
-    throw ServerError_default.AUTH_INVALID_PROVIDER({
-      provider: auth3.provider,
-      valid: options.provider
-    });
-  }
-  return auth3;
 }
+
+// src/auth/providers/email.ts
+var createSession = async (user, ctx) => {
+  const { strategy, session: session2, cleanUser, redirect: redirect2 = "/user" } = ctx.options.auth;
+  user = await cleanUser(user);
+  const id = createId();
+  const provider = "email";
+  ctx.user = {
+    id,
+    strategy,
+    provider,
+    email: user.email
+  };
+  await session2.set(
+    id,
+    { id, strategy, provider, user: user.email },
+    { expires: "1w" }
+  );
+  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
+  if (strategy.includes("token")) {
+    return status(201).json({ ...user, token: id });
+  }
+  if (strategy.includes("cookie")) {
+    return status(302).cookies({ authentication: id }).redirect(redirect2);
+  }
+  if (strategy.includes("jwt")) {
+    throw new Error("JWT auth not supported yet");
+  }
+  if (strategy.includes("key")) {
+    throw new Error("Key auth not supported yet");
+  }
+  throw new Error("Unknown auth type");
+};
+async function emailLogin(ctx) {
+  const { email, password } = ctx.body;
+  if (!email) throw ServerError_default.LOGIN_NO_EMAIL();
+  if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
+  if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
+  if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
+  const store = ctx.options.auth.store;
+  if (!await store.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
+  const user = await store.get(email);
+  const isValid = await verify(password, user.password);
+  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
+  return createSession(user, ctx);
+}
+async function emailRegister(ctx) {
+  const { email, password, ...data } = ctx.body;
+  if (!email) throw ServerError_default.REGISTER_NO_EMAIL();
+  if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
+  if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
+  if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
+  const store = ctx.options.auth.store;
+  if (await store.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
+  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
+  const user = {
+    id: createId(email),
+    email,
+    password: await hash(password),
+    time,
+    ...data
+  };
+  await store.set(email, user);
+  return createSession(user, ctx);
+}
+async function emailResetPassword() {
+}
+async function emailUpdatePassword(ctx) {
+  const passwords = ctx.body;
+  const fullUser = await ctx.options.auth.store.get(ctx.user.email);
+  if (!fullUser) throw ServerError_default.AUTH_NO_USER();
+  const isValid = await verify(passwords.previous, fullUser.password);
+  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
+  fullUser.password = await hash(passwords.updated);
+  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
+  return 200;
+}
+var email_default = {
+  login: emailLogin,
+  register: emailRegister,
+  reset: emailResetPassword,
+  password: emailUpdatePassword
+};
 
 // src/reply.ts
 var Reply = class {
@@ -262,112 +308,6 @@ var file = (...args) => new Reply().file(...args);
 var redirect = (...args) => new Reply().redirect(...args);
 var view = (...args) => new Reply().view(...args);
 
-// src/auth/logout.ts
-async function logout(ctx) {
-  const { id, type: type2 } = ctx.auth;
-  await ctx.options.auth.session.del(id);
-  if (type2.includes("token")) {
-    return { token: null };
-  }
-  if (type2.includes("cookie")) {
-    return cookies({ authorization: null }).redirect("/");
-  }
-  if (type2.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (type2.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
-}
-
-// src/auth/updateUser.ts
-async function updateUser(user2, auth3, store) {
-  if (auth3.provider === "email") {
-    return await store.set(auth3.email, user2);
-  }
-}
-
-// src/auth/providers/email.ts
-var createSession = async (user2, ctx) => {
-  const { type: type2, session: session2, cleanUser, redirect: redirect2 = "/user" } = ctx.options.auth;
-  user2 = await cleanUser(user2);
-  const id = createId();
-  const provider = "email";
-  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
-  ctx.auth = {
-    id,
-    type: type2,
-    provider,
-    user: user2.email,
-    email: user2.email,
-    time
-  };
-  await session2.set(id, ctx.auth, { expires: "1w" });
-  if (type2.includes("token")) {
-    return status(201).json({ ...user2, token: id });
-  }
-  if (type2.includes("cookie")) {
-    return status(302).cookies({ authentication: id }).redirect(redirect2);
-  }
-  if (type2.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (type2.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
-};
-async function emailLogin(ctx) {
-  const { email, password } = ctx.body;
-  if (!email) throw ServerError_default.LOGIN_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
-  if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (!await store.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
-  const user2 = await store.get(email);
-  const isValid = await verify(password, user2.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  return createSession(user2, ctx);
-}
-async function emailRegister(ctx) {
-  const { email, password, ...data } = ctx.body;
-  if (!email) throw ServerError_default.REGISTER_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
-  if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (await store.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
-  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
-  const user2 = {
-    id: createId(email),
-    email,
-    password: await hash(password),
-    time,
-    ...data
-  };
-  await store.set(email, user2);
-  return createSession(user2, ctx);
-}
-async function emailResetPassword() {
-}
-async function emailUpdatePassword(ctx) {
-  const { previous, updated } = ctx.body;
-  const fullUser = await ctx.options.auth.store.get(ctx.auth.user);
-  const isValid = await verify(previous, fullUser.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  fullUser.password = await hash(updated);
-  await updateUser(fullUser, ctx.auth, ctx.options.auth.store);
-  return 200;
-}
-var email_default = {
-  login: emailLogin,
-  register: emailRegister,
-  reset: emailResetPassword,
-  password: emailUpdatePassword
-};
-
 // src/auth/providers/github.ts
 var oauth = async (code) => {
   const fch = async (url, { body, headers: headers2 = {}, ...rest } = {}) => {
@@ -406,17 +346,17 @@ var getUserProfile = async (code) => {
   return { ...profile, email };
 };
 var callback = async (ctx) => {
-  const { type: type2, cleanUser, store, session: session2, redirect: redirect2 } = ctx.options.auth;
+  const { strategy, cleanUser, store, session: session2, redirect: redirect2 } = ctx.options.auth;
   const profile = await getUserProfile(ctx.url.query.code);
-  const auth3 = {
+  const auth2 = {
     id: createId(),
-    type: type2,
+    strategy,
     provider: "github",
     user: createId(profile.email),
     email: profile.email,
     time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
   };
-  const user2 = cleanUser({
+  const user = cleanUser({
     id: profile.id,
     name: profile.name,
     email: profile.email,
@@ -424,18 +364,18 @@ var callback = async (ctx) => {
     location: profile.location,
     created: profile.created_at
   });
-  await store.set(auth3.user, user2);
-  await session2.set(auth3.id, auth3, { expires: "1w" });
-  if (auth3.type.includes("token")) {
-    return status(201).json({ ...user2, token: auth3.id });
+  await store.set(auth2.user, user);
+  await session2.set(auth2.id, auth2, { expires: "1w" });
+  if (auth2.strategy.includes("token")) {
+    return status(201).json({ ...user, token: auth2.id });
   }
-  if (auth3.type.includes("cookie")) {
-    return status(302).cookies({ authentication: auth3.id }).redirect(redirect2);
+  if (auth2.strategy.includes("cookie")) {
+    return status(302).cookies({ authentication: auth2.id }).redirect(redirect2);
   }
-  if (auth3.type.includes("jwt")) {
+  if (auth2.strategy.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
   }
-  if (auth3.type.includes("key")) {
+  if (auth2.strategy.includes("key")) {
     throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");
@@ -445,140 +385,48 @@ var github_default = { login, callback };
 // src/auth/providers/index.ts
 var providers_default = { email: email_default, github: github_default };
 
-// src/auth/NoSession.ts
-var NoSession = class {
-};
-function createNoSession() {
-  return new Proxy(new NoSession(), {
-    get(target, key) {
-      if (target[key]) return target[key];
-      if (key === "then") return target[key];
-      if (typeof key === "symbol") return target[key];
-      throw ServerError_default.NO_STORE_READ({ key: String(key) });
-    },
-    set(target, key, value) {
-      if (target[key] || key === "then" || typeof key === "symbol") {
-        target[key] = value;
-        return true;
-      }
-      throw ServerError_default.NO_STORE_WRITE({ key: String(key) });
-    }
-  });
-}
-
-// src/auth/session.ts
-async function session(ctx) {
-  const store = ctx.options.session?.store;
-  if (!store) return createNoSession();
-  if (ctx.cookies.session) {
-    const session2 = await store.get(ctx.cookies.session);
-    if (session2) return session2;
+// src/auth/parseAuthOptions.ts
+function parseAuthOptions(auth2, all) {
+  if (!auth2) return null;
+  if (typeof auth2 === "string") {
+    const [strategy, provider] = auth2.split(":");
+    auth2 = { strategy, provider };
   }
-  return {};
-}
-
-// src/auth/user.ts
-async function user(ctx) {
-  if (!ctx.auth) return;
-  const user2 = await ctx.options.auth.store.get(ctx.auth.user);
-  if (!user2) throw ServerError_default.AUTH_NO_USER();
-  return ctx.options.auth.cleanUser(user2);
-}
-
-// src/auth/index.ts
-var parseOptions = (auth3, all) => {
-  if (!auth3) return null;
-  if (typeof auth3 === "string") {
-    const [type2, provider] = auth3.split(":");
-    auth3 = { type: type2, provider };
+  if (typeof auth2.provider === "string") {
+    auth2.provider = auth2.provider.split("|").filter(Boolean);
   }
-  if (typeof auth3.type === "string") {
-    auth3.type = auth3.type.split("|").filter(Boolean);
+  if (!auth2.strategy) {
+    throw new Error("Auth options needs a strategy");
   }
-  if (typeof auth3.provider === "string") {
-    auth3.provider = auth3.provider.split("|").filter(Boolean);
+  if (!auth2.strategy.length) {
+    throw new Error("Auth options needs a strategy");
   }
-  if (!auth3.type) {
-    throw new Error("Auth options needs a type");
-  }
-  if (!auth3.type.length) {
-    throw new Error("Auth options needs a type");
-  }
-  if (!auth3.provider || !auth3.provider.length) {
+  if (!auth2.provider || !auth2.provider.length) {
     throw new Error("Auth options needs a provider");
   }
-  const providerNotFound = auth3.provider.find((p) => !providers_default[p]);
+  const providerNotFound = auth2.provider.find((p) => !providers_default[p]);
   if (providerNotFound) {
     throw new Error(
       `Provider "${providerNotFound}" not found, available ones are "${Object.keys(providers_default).join('", "')}"`
     );
   }
-  if (!auth3.session && all.store) {
-    auth3.session = all.store.prefix("auth:");
+  if (!auth2.session && all.store) {
+    auth2.session = all.store.prefix("auth:");
   }
-  if (!auth3.store && all.store) {
-    auth3.store = all.store.prefix("user:");
+  if (!auth2.store && all.store) {
+    auth2.store = all.store.prefix("user:");
   }
-  if (!auth3.cleanUser) {
-    auth3.cleanUser = (fullUser) => {
-      const { password: _password, ...user2 } = fullUser;
-      return user2;
+  if (!auth2.cleanUser) {
+    auth2.cleanUser = (fullUser) => {
+      const { password: _password, ...user } = fullUser;
+      return user;
     };
   }
-  if (!auth3.redirect) {
-    auth3.redirect = "/user";
+  if (!auth2.redirect) {
+    auth2.redirect = "/user";
   }
-  return auth3;
-};
-var load = async (ctx) => {
-  ctx.session = await session(ctx);
-  ctx.auth = await auth(ctx);
-  ctx.user = await user(ctx);
-  return ctx;
-};
-var middle = async (ctx) => {
-  if (ctx.options.auth) {
-    if (ctx.options.auth.provider.includes("github")) {
-      if (!env.GITHUB_ID) throw new Error("GITHUB_ID not defined");
-      if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
-      ctx.app.get(
-        "/auth/logout",
-        // { tags: "Auth", title: "Github logout" },
-        logout
-      );
-      ctx.app.get(
-        "/auth/login/github",
-        { tags: "Auth" },
-        providers_default.github.login
-      );
-      ctx.app.get(
-        "/auth/callback/github",
-        { tags: "Auth", title: "Github callback" },
-        providers_default.github.callback
-      );
-    }
-    if (ctx.options.auth.provider.includes("email")) {
-      ctx.app.post("/auth/logout", { tags: "Auth" }, logout);
-      ctx.app.post(
-        "/auth/register/email",
-        { tags: "Auth" },
-        providers_default.email.register
-      );
-      ctx.app.post(
-        "/auth/login/email",
-        { tags: "Auth" },
-        providers_default.email.login
-      );
-      ctx.app.put(
-        "/auth/password/email",
-        { tags: "Auth" },
-        providers_default.email.password
-      );
-      ctx.app.put("/auth/reset/email", { tags: "Auth" }, providers_default.email.reset);
-    }
-  }
-};
-var auth_default = { load, parseOptions, middle };
+  return auth2;
+}
 
 // src/helpers/bucket.ts
 import * as fs from "fs";
@@ -808,7 +656,9 @@ function config(options = {}) {
     (session2) => session2?.store?.name || "working",
     "\u{1F510}"
   );
-  settings.auth = auth_default.parseOptions(options.auth || env2.AUTH || null, options);
+  if (options.auth || env2.AUTH) {
+    settings.auth = parseAuthOptions(options.auth || env2.AUTH || null, options);
+  }
   if (options.openapi) {
     if (options.openapi === true) {
       settings.openapi = {};
@@ -986,6 +836,7 @@ async function parseResponse(out, ctx) {
 
 // src/pathPattern.ts
 function pathPattern(pattern, path2) {
+  if (pattern === "*" && path2 === "/") return {};
   pattern = `/${pattern.replace(/^\//, "")}`;
   pattern = pattern.replace(/\/$/, "") || "/";
   path2 = path2.replace(/\/$/, "") || "/";
@@ -1070,9 +921,7 @@ function validate(ctx, schema) {
 // src/helpers/handleRequest.ts
 async function handleRequest(handlers, ctx) {
   try {
-    if (ctx.error) {
-      throw ctx.error;
-    }
+    if (ctx.error) throw ctx.error;
     for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
       const match = pathPattern(matcher, ctx.url.pathname || "/");
       if (!match) continue;
@@ -1088,7 +937,7 @@ async function handleRequest(handlers, ctx) {
       }
       if (method !== "*") break;
     }
-    if (ctx.machine?.provider === "netlify") return;
+    if (ctx.platform.provider === "netlify") return;
     return new Response("Not Found", { status: 404 });
   } catch (error) {
     return new Response(error.message || "", { status: error.status || 500 });
@@ -1424,6 +1273,106 @@ async function verify(password, hash3) {
   });
 }
 
+// src/auth/findSessionId.ts
+var validateToken = (authorization) => {
+  const [type2, id] = authorization.trim().split(" ");
+  if (type2.toLowerCase() !== "bearer") {
+    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+  }
+  if (id.length !== 16) {
+    throw ServerError_default.AUTH_INVALID_TOKEN();
+  }
+  return id;
+};
+var validateCookie = (authorization) => {
+  if (authorization.length !== 16) {
+    throw ServerError_default.AUTH_INVALID_COOKIE();
+  }
+  return authorization;
+};
+function findSessionId(ctx) {
+  const strategy = ctx.options.auth.strategy;
+  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
+  if (strategy.includes("token")) {
+    if (!ctx.headers.authorization) return;
+    return validateToken(ctx.headers.authorization);
+  }
+  if (strategy.includes("cookie")) {
+    if (!ctx.cookies.authentication) return;
+    return validateCookie(ctx.cookies.authentication);
+  }
+  throw new Error(`Invalid auth type "${strategy}"`);
+}
+
+// src/auth/getUser.ts
+async function getUser(ctx) {
+  if (!ctx.options.auth) return;
+  const options = ctx.options.auth;
+  const sessionId = findSessionId(ctx);
+  if (!sessionId) return;
+  const auth2 = await options.session.get(sessionId);
+  if (!auth2) return;
+  if (options.strategy !== auth2.strategy) {
+    throw ServerError_default.AUTH_INVALID_STRATEGY({
+      strategy: auth2.strategy || "undefined",
+      valid: options.strategy
+    });
+  }
+  if (!options.provider.includes(auth2.provider)) {
+    throw ServerError_default.AUTH_INVALID_PROVIDER({
+      provider: auth2.provider,
+      valid: options.provider
+    });
+  }
+  const user = await ctx.options.auth.store.get(auth2.user);
+  if (!user) throw ServerError_default.AUTH_NO_USER();
+  user.strategy = auth2.strategy;
+  user.provider = auth2.provider;
+  return ctx.options.auth.cleanUser(user);
+}
+
+// src/auth/logout.ts
+async function logout(ctx) {
+  const session2 = findSessionId(ctx);
+  const { strategy } = ctx.user;
+  await ctx.options.auth.session.del(session2);
+  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
+  if (strategy.includes("token")) {
+    return { token: null };
+  }
+  if (strategy.includes("cookie")) {
+    return cookies({ authorization: null }).redirect("/");
+  }
+  if (strategy.includes("jwt")) {
+    throw new Error("JWT auth not supported yet");
+  }
+  if (strategy.includes("key")) {
+    throw new Error("Key auth not supported yet");
+  }
+  throw new Error("Unknown auth type");
+}
+
+// src/auth/index.ts
+function auth(app) {
+  app.use(async function middle(ctx) {
+    ctx.user = await getUser(ctx);
+  });
+  if (app.settings.auth.provider.includes("github")) {
+    if (!env.GITHUB_ID) throw new Error("GITHUB_ID not defined");
+    if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
+    app.get("/auth/logout", logout);
+    app.get("/auth/login/github", providers_default.github.login);
+    app.get("/auth/callback/github", providers_default.github.callback);
+  }
+  if (app.settings.auth.provider.includes("email")) {
+    app.post("/auth/logout", logout);
+    app.post("/auth/register/email", providers_default.email.register);
+    app.post("/auth/login/email", providers_default.email.login);
+    app.put("/auth/password/email", providers_default.email.password);
+    app.put("/auth/reset/email", providers_default.email.reset);
+  }
+}
+
 // src/middle/assets.ts
 async function assets(ctx) {
   if (!ctx.options.public) return;
@@ -1616,8 +1565,40 @@ function timer(ctx) {
   ctx.time = createTime();
 }
 
-// src/middle/index.ts
-var auth2 = auth_default.middle;
+// src/auth/NoSession.ts
+var NoSession = class {
+};
+function createNoSession() {
+  return new Proxy(new NoSession(), {
+    get(target, key) {
+      if (target[key]) return target[key];
+      if (key === "then") return target[key];
+      if (typeof key === "symbol") return target[key];
+      throw ServerError_default.NO_STORE_READ({ key: String(key) });
+    },
+    set(target, key, value) {
+      if (target[key] || key === "then" || typeof key === "symbol") {
+        target[key] = value;
+        return true;
+      }
+      throw ServerError_default.NO_STORE_WRITE({ key: String(key) });
+    }
+  });
+}
+
+// src/auth/session.ts
+async function session(ctx) {
+  const store = ctx.options.session?.store;
+  if (!store) {
+    ctx.session = createNoSession();
+    return;
+  }
+  if (ctx.cookies.session) {
+    const session2 = await store.get(ctx.cookies.session);
+    ctx.session = session2;
+    return;
+  }
+}
 
 // src/context/node.ts
 import { TLSSocket } from "tls";
@@ -1681,7 +1662,7 @@ async function createNode(req, app) {
   });
   const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
   const events = createEvents();
-  return await auth_default.load({
+  return {
     options: app.settings,
     platform: app.platform,
     url,
@@ -1692,7 +1673,7 @@ async function createNode(req, app) {
     init,
     events,
     app
-  });
+  };
 }
 
 // src/context/winter.ts
@@ -1714,7 +1695,7 @@ async function createWinter(req, app) {
   const rawBody = Buffer.from(await req.arrayBuffer());
   const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
   const events = createEvents();
-  return await auth_default.load({
+  return {
     options: app.settings,
     platform: app.platform,
     url,
@@ -1725,7 +1706,7 @@ async function createWinter(req, app) {
     init,
     events,
     app
-  });
+  };
 }
 
 // src/context/handlers.ts
@@ -1753,7 +1734,6 @@ var Node = async (app) => {
   }).listen(app.settings.port);
 };
 var Netlify = async (app, request, context) => {
-  console.log("Unknown context", context);
   if (typeof Netlify === "undefined") {
     throw new Error("Netlify doesn't exist");
   }
@@ -1794,26 +1774,75 @@ var Router = class _Router {
   socket(path2, ...middleware) {
     return this.handle("socket", path2, ...middleware);
   }
-  get(path2, ...middleware) {
-    return this.handle("get", path2, ...middleware);
+  get(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("get", path2, ...middleware);
+    }
+    return this.handle(
+      "get",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  head(path2, ...middleware) {
-    return this.handle("head", path2, ...middleware);
+  head(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("head", path2, ...middleware);
+    }
+    return this.handle(
+      "head",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  post(path2, ...middleware) {
-    return this.handle("post", path2, ...middleware);
+  post(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("post", path2, ...middleware);
+    }
+    return this.handle(
+      "post",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  put(path2, ...middleware) {
-    return this.handle("put", path2, ...middleware);
+  put(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("put", path2, ...middleware);
+    }
+    return this.handle(
+      "put",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  patch(path2, ...middleware) {
-    return this.handle("patch", path2, ...middleware);
+  patch(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("patch", path2, ...middleware);
+    }
+    return this.handle(
+      "patch",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  del(path2, ...middleware) {
-    return this.handle("delete", path2, ...middleware);
+  del(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("delete", path2, ...middleware);
+    }
+    return this.handle(
+      "delete",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
-  options(path2, ...middleware) {
-    return this.handle("options", path2, ...middleware);
+  options(path2, optionsOrMiddleware, ...middleware) {
+    if (optionsOrMiddleware && typeof optionsOrMiddleware === "object" && !("length" in optionsOrMiddleware)) {
+      return this.handle("options", path2, ...middleware);
+    }
+    return this.handle(
+      "options",
+      path2,
+      ...optionsOrMiddleware ? [optionsOrMiddleware, ...middleware] : middleware
+    );
   }
   use(...args) {
     const path2 = typeof args[0] === "string" ? args.shift() : "*";
@@ -1903,11 +1932,12 @@ var Server = class extends Router {
     }
     this.use(timer);
     this.use(assets);
+    this.use(session);
+    if (this.settings.auth) {
+      auth(this);
+    }
     if (this.settings.openapi) {
       this.get(this.settings.openapi.path || "/docs", openapi_default);
-    }
-    if (this.settings.auth) {
-      this.use(auth2);
     }
   }
   // We need to return a function; some environment expect the default export

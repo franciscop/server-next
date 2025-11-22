@@ -6,9 +6,12 @@ ServerError.extend({
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
   AUTH_ARGON_NEEDED:
     "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
-  AUTH_INVALID_TYPE: "Invalid Authorization type, '{type}'",
   AUTH_INVALID_TOKEN: "Invalid Authorization token",
   AUTH_INVALID_COOKIE: "Invalid Authorization cookie",
+  AUTH_INVALID_HEADER:
+    "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)",
+  AUTH_INVALID_STRATEGY:
+    "Invalid Authorization type '{strategy}', valid one is '{valid}'",
   AUTH_NO_PROVIDER: "No provider passed to the option 'auth.provider'",
   AUTH_INVALID_PROVIDER:
     "Invalid provider '{provider}', valid ones are: '{valid}'",

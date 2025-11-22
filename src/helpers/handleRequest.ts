@@ -9,11 +9,9 @@ export default async function handleRequest(
   ctx: Context,
 ): Promise<Response | undefined> {
   try {
-    if ((ctx as any).error) {
-      throw (ctx as any).error;
-    }
     for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
       const match = pathPattern(matcher, ctx.url.pathname || "/");
+
       // Skip this whole middleware if there was no match
       if (!match) continue;
 
@@ -35,7 +33,7 @@ export default async function handleRequest(
 
     // In Netlify, a non-response is perfectly valid, which would indicate
     // the edge function to just go ahead and consume the original resource
-    if ((ctx as any).machine?.provider === "netlify") return;
+    if (ctx.platform.provider === "netlify") return;
 
     // In other environments, a non-response is wrong and we should 404 then
     return new Response("Not Found", { status: 404 });
