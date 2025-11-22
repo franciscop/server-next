@@ -62,7 +62,7 @@ export class Router<O extends ServerConfig = object> {
     path: Path | Middleware<any, O>,
     ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
-    return this.handle("socket", path as any, ...middleware);
+    return this.handle("socket", path, ...middleware);
   }
 
   get<Path extends string>(
@@ -85,11 +85,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("get", path as any, ...middleware);
+      return this.handle("get", path, ...middleware);
     }
     return this.handle(
       "get",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -119,11 +119,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("head", path as any, ...middleware);
+      return this.handle("head", path, ...middleware);
     }
     return this.handle(
       "head",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -156,12 +156,12 @@ export class Router<O extends ServerConfig = object> {
       !("length" in optionsOrMiddleware)
     ) {
       // It's RouteOptions, just pass through the middleware
-      return this.handle("post", path as any, ...middleware);
+      return this.handle("post", path, ...middleware);
     }
     // Otherwise, it's middleware
     return this.handle(
       "post",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -191,11 +191,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("put", path as any, ...middleware);
+      return this.handle("put", path, ...middleware);
     }
     return this.handle(
       "put",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -225,11 +225,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("patch", path as any, ...middleware);
+      return this.handle("patch", path, ...middleware);
     }
     return this.handle(
       "patch",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -259,11 +259,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("delete", path as any, ...middleware);
+      return this.handle("delete", path, ...middleware);
     }
     return this.handle(
       "delete",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
@@ -293,11 +293,11 @@ export class Router<O extends ServerConfig = object> {
       typeof optionsOrMiddleware === "object" &&
       !("length" in optionsOrMiddleware)
     ) {
-      return this.handle("options", path as any, ...middleware);
+      return this.handle("options", path, ...middleware);
     }
     return this.handle(
       "options",
-      path as any,
+      path,
       ...(optionsOrMiddleware
         ? [
             optionsOrMiddleware as Middleware<PathToParams<Path>, O>,
