@@ -1,8 +1,8 @@
-import type { Context } from "..";
+import type { Body, Context } from "..";
 import { cookies } from "../reply";
 import findSessionId from "./findSessionId";
 
-export default async function logout(ctx: Context): Promise<any> {
+export default async function logout(ctx: Context): Promise<Body> {
   const session = findSessionId(ctx);
   const { strategy } = ctx.user;
   await ctx.options.auth.session.del(session);

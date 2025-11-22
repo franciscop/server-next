@@ -236,12 +236,12 @@ export type Context<
   app: Server;
 };
 
-export type Body = string;
-
 export type InlineReply =
   | Response
-  | { body: Body; headers?: Headers }
+  | { body: string; headers?: Headers }
   | SerializableValue;
+
+export type Body = InlineReply;
 
 export type Middleware<
   Params extends Record<string, string> = Record<string, string>,
