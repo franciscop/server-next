@@ -10,6 +10,10 @@ export type Method =
   | "options"
   | "socket";
 
+export type ServerConfig = {
+  User?: any;
+};
+
 export type RouterMethod = "*" | Method;
 
 export type Bucket = {
@@ -55,15 +59,25 @@ type KVStore = {
   keys: () => Promise<string[]>;
 };
 
+export type Provider = "email" | "github";
+export type Strategy = "cookies" | "jwt" | "token";
+
+export type AuthUser<T = {}> = T & {
+  id: string | number;
+  provider: Provider;
+  strategy: Strategy;
+  email: string;
+};
+
 export type AuthOption =
-  | string
+  | `${Strategy}:${Provider}`
   | {
-      type?: string | string[];
-      provider?: string | string[];
+      provider?: Provider | Provider[];
+      strategy?: Strategy | Strategy[];
       session?: KVStore;
       store?: KVStore;
       redirect?: string;
-      cleanUser?: <T = UserRecord>(user: T) => T | Promise<T>;
+      cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
     };
 
 export type Options = {
@@ -80,19 +94,13 @@ export type Options = {
   openapi?: any;
 };
 
-export type UserRecord = {
-  email: string;
-  password: string;
-};
-
 export type Auth = {
   id: string; // ID of the session
   store: KVStore;
-  type: string;
-  user?: string;
   provider: string;
+  strategy: string;
   session: KVStore;
-  cleanUser: <T = UserRecord>(user: T) => T | Promise<T>;
+  cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
   redirect: string;
 };
 
@@ -184,6 +192,7 @@ type Events = Record<string, EventCallback[]> & {
 
 export type Context<
   Params extends Record<string, string> = Record<string, string>,
+  O extends ServerConfig = {},
 > = {
   method: Method;
   headers: Record<string, string | string[]>;
@@ -197,8 +206,8 @@ export type Context<
   platform: Platform;
   time?: Time;
   session?: Record<string, BasicValue>;
-  auth?: Auth;
-  user?: UserRecord;
+  // The value of the authorized user
+  user?: O extends { User: infer U } ? U & AuthUser : AuthUser;
   init: number;
   events: Events;
   req?: Request;
@@ -211,10 +220,9 @@ export type Body = string;
 export type InlineReply =
   | Response
   | { body: Body; headers?: Headers }
-  | string
-  | number
-  | undefined;
+  | SerializableValue;
 
 export type Middleware<
   Params extends Record<string, string> = Record<string, string>,
-> = (ctx: Context<Params>) => InlineReply | void;
+  O extends ServerConfig = {},
+> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void;

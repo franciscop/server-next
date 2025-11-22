@@ -62,11 +62,7 @@ export default function toSucceed(
     message: () =>
       `${reset}Expected ${this.utils.printReceived(
         request.status,
-      )} to succeed, received body:\n${this.utils.printReceived(
-        request.body,
-        null,
-        2,
-      )}`,
+      )} to succeed, received body:\n${this.utils.printReceived(request.body)}`,
     pass: false,
   };
 }

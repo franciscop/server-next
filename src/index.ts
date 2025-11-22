@@ -7,9 +7,16 @@ import { assets, auth, openapi, timer } from "./middle/index";
 import * as handlers from "./context/handlers";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
-import type { BunEnv, Options, Platform, Settings } from "./types";
+import type {
+  AuthUser,
+  BunEnv,
+  Options,
+  Platform,
+  ServerConfig,
+  Settings,
+} from "./types";
 
-export class Server extends Router {
+export class Server<O extends ServerConfig = {}> extends Router<O> {
   settings: Settings;
   platform: Platform;
 
@@ -69,6 +76,10 @@ export class Server extends Router {
     return cb;
   }
 
+  withUser<User>(): Server<O & { User: AuthUser & User }> {
+    return this as any as Server<O & { User: AuthUser & User }>;
+  }
+
   // The different handlers for different platforms/runtimes
   node() {
     return handlers.Node(this);
@@ -86,8 +97,8 @@ export class Server extends Router {
   }
 }
 
-export default function server(options = {}) {
-  return new Server(options).self();
+export default function server<Options>(options = {}) {
+  return new Server<Options>(options).self();
 }
 
 export * from "./reply";

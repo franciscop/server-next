@@ -2,7 +2,7 @@ import "../tests/toSucceed";
 
 import kv from "polystore";
 
-import server from "..";
+import server, { AuthUser } from "..";
 
 const ID = "REqA2l022l8Q0tuI";
 
@@ -25,7 +25,7 @@ describe("auth", () => {
   it("provider must belong", async () => {
     const store = kv(new Map());
     const api = server({ store, auth: "token:email" })
-      .get("/", (ctx) => ctx.auth)
+      .get("/", (ctx) => ctx.user)
       .test();
 
     store.set(`auth:${ID}`, {
@@ -44,10 +44,21 @@ describe("auth", () => {
   });
 });
 
+describe("tyes", () => {
+  const store = kv(new Map());
+
+  type User = AuthUser<{ firstName: string; lastName: string; age: number }>;
+  type ServerTypes = { User: User };
+
+  server<ServerTypes>({ store, auth: "token:email" })
+    .get("/", (ctx) => ctx.user.lastName)
+    .test();
+});
+
 describe("token", () => {
   const store = kv(new Map());
   const api = server({ store, auth: "token:email" })
-    .get("/", (ctx) => ctx.auth)
+    .get("/", (ctx) => ctx.user)
     .test();
 
   afterEach(async () => {
@@ -109,7 +120,7 @@ describe("token", () => {
 describe("cookie", () => {
   const store = kv(new Map());
   const api = server({ store, auth: "cookie:email" })
-    .get("/", (ctx) => ctx.auth)
+    .get("/", (ctx) => ctx.user)
     .test();
 
   it("should have the proper token in email", async () => {

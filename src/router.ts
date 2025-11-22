@@ -1,10 +1,16 @@
-import type { Method, Middleware, PathToParams, RouterMethod } from "./types";
+import type {
+  Method,
+  Middleware,
+  PathToParams,
+  RouterMethod,
+  ServerConfig,
+} from "./types";
 
-type PathOrMiddle = string | Middleware;
+type PathOrMiddle<O extends ServerConfig = {}> = string | Middleware<any, O>;
 // This is "Method" and NOT "Method" on purpose
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 
-export class Router {
+export class Router<O extends ServerConfig = {}> {
   handlers: Record<Method, FullRoute> = {
     socket: [],
     get: [],
@@ -24,8 +30,8 @@ export class Router {
 
   handle(
     method: RouterMethod,
-    path: PathOrMiddle,
-    ...middleware: Middleware[]
+    path: PathOrMiddle<O>,
+    ...middleware: Middleware<any, O>[]
   ) {
     // If there's not path and it's just anothe middleware, add it and shift it
     if (typeof path !== "string") {
@@ -46,96 +52,96 @@ export class Router {
 
   socket<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  socket(...middleware: Middleware[]): this;
+  socket(...middleware: Middleware<any, O>[]): this;
   socket<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("socket", path as any, ...middleware);
   }
 
   get<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  get(...middleware: Middleware[]): this;
+  get(...middleware: Middleware<any, O>[]): this;
   get<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("get", path as any, ...middleware);
   }
 
   head<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  head(...middleware: Middleware[]): this;
+  head(...middleware: Middleware<any, O>[]): this;
   head<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("head", path as any, ...middleware);
   }
 
   post<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  post(...middleware: Middleware[]): this;
+  post(...middleware: Middleware<any, O>[]): this;
   post<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("post", path as any, ...middleware);
   }
 
   put<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  put(...middleware: Middleware[]): this;
+  put(...middleware: Middleware<any, O>[]): this;
   put<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("put", path as any, ...middleware);
   }
 
   patch<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  patch(...middleware: Middleware[]): this;
+  patch(...middleware: Middleware<any, O>[]): this;
   patch<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("patch", path as any, ...middleware);
   }
 
   del<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  del(...middleware: Middleware[]): this;
+  del(...middleware: Middleware<any, O>[]): this;
   del<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("delete", path as any, ...middleware);
   }
 
   options<Path extends string>(
     path: Path,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ): this;
-  options(...middleware: Middleware[]): this;
+  options(...middleware: Middleware<any, O>[]): this;
   options<Path extends string>(
-    path: Path | Middleware,
-    ...middleware: Middleware<PathToParams<Path>>[]
+    path: Path | Middleware<any, O>,
+    ...middleware: Middleware<PathToParams<Path>, O>[]
   ) {
     return this.handle("options", path as any, ...middleware);
   }

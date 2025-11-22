@@ -1,4 +1,4 @@
-import type { Context, Options } from "..";
+import type { Context, Options, Provider, Strategy } from "..";
 import auth from "./auth";
 import logout from "./logout";
 import providers from "./providers";
@@ -9,20 +9,20 @@ const parseOptions = (auth: Options["auth"], all: any): any => {
   if (!auth) return null;
 
   if (typeof auth === "string") {
-    const [type, provider] = auth.split(":");
-    auth = { type, provider };
+    const [strategy, provider] = auth.split(":") as [Strategy, Provider];
+    auth = { strategy, provider };
   }
-  if (typeof auth.type === "string") {
-    auth.type = auth.type.split("|").filter(Boolean);
+  if (typeof auth.strategy === "string") {
+    auth.strategy = auth.strategy.split("|").filter(Boolean) as Strategy[];
   }
   if (typeof auth.provider === "string") {
-    auth.provider = auth.provider.split("|").filter(Boolean);
+    auth.provider = auth.provider.split("|").filter(Boolean) as Provider[];
   }
-  if (!auth.type) {
-    throw new Error("Auth options needs a type");
+  if (!auth.strategy) {
+    throw new Error("Auth options needs a strategy");
   }
-  if (!auth.type.length) {
-    throw new Error("Auth options needs a type");
+  if (!auth.strategy.length) {
+    throw new Error("Auth options needs a strategy");
   }
   if (!auth.provider || !auth.provider.length) {
     throw new Error("Auth options needs a provider");
@@ -64,11 +64,7 @@ const middle = async (ctx: Context): Promise<void> => {
     if (ctx.options.auth.provider.includes("github")) {
       if (!env.GITHUB_ID) throw new Error("GITHUB_ID not defined");
       if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
-      ctx.app.get(
-        "/auth/logout",
-        // { tags: "Auth", title: "Github logout" },
-        logout,
-      );
+      ctx.app.get("/auth/logout", logout);
       ctx.app.get(
         "/auth/login/github",
         { tags: "Auth" },
