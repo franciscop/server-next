@@ -28,18 +28,18 @@ type SerializableValue = BasicValue | {
     [key: string]: SerializableValue;
 } | Array<SerializableValue>;
 type KVStore = {
-    name: string;
+    name?: string;
     prefix: (key: string) => KVStore;
     get: <T = SerializableValue>(key: string) => Promise<T>;
     set: <T = SerializableValue>(key: string, value: T, options?: {
         expires: string | number;
-    }) => Promise<void>;
+    }) => Promise<void | string>;
     has: (key: string) => Promise<boolean>;
-    del: (key: string) => Promise<void>;
+    del: (key: string) => Promise<void | string>;
     keys: () => Promise<string[]>;
 };
 type Provider = "email" | "github";
-type Strategy = "cookies" | "jwt" | "token";
+type Strategy = "cookie" | "jwt" | "token";
 type AuthSession = {
     id: string;
     provider: Provider;
@@ -52,16 +52,16 @@ type AuthUser<T = object> = T & {
     strategy: Strategy;
     email: string;
 };
-type AuthOption = `${Strategy}:${Provider}` | {
-    provider?: Provider | Provider[];
-    strategy?: Strategy;
+type ProviderString = Provider | `${Provider}|${Provider}`;
+type AuthOption = `${Strategy}:${Provider | ProviderString}` | {
+    provider: Provider | ProviderString | Provider[];
+    strategy: Strategy;
     session?: KVStore;
     store?: KVStore;
     redirect?: string;
     cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
 };
 type AuthSettings = {
-    id: string;
     provider: Provider[];
     strategy: Strategy;
     store: KVStore;

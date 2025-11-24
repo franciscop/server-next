@@ -1,15 +1,38 @@
-import type { Options, Provider, Strategy } from "../types";
+import type { Options, Provider, Settings, Strategy } from "../types";
 import providers from "./providers";
 
-export default function parseAuthOptions(auth: Options["auth"], all: any): any {
+const defaultRedirect = "/user";
+
+function defaultCleanUser(fullUser: any) {
+  const { password: _password, ...user } = fullUser;
+  return user;
+}
+
+const providersKeys = Object.keys(providers);
+function getProviders(provider: string | string[]): Provider[] {
+  if (typeof provider === "string") {
+    provider = provider.split("|");
+  }
+
+  const invalidProvider = provider.find((p) => !providersKeys.includes(p));
+  if (invalidProvider) {
+    throw new Error(
+      `Provider "${invalidProvider}" not found, available ones are "${providersKeys.join('", "')}"`,
+    );
+  }
+  return provider as Provider[];
+}
+
+export default function parseAuthOptions(
+  auth: Options["auth"],
+  all: Options,
+): Settings["auth"] {
   if (!auth) return null;
 
   if (typeof auth === "string") {
-    const [strategy, provider] = auth.split(":") as [Strategy, Provider];
+    const [strategy, providerRaw] = auth.split(":") as [Strategy, string];
+    const provider = providerRaw && (providerRaw.split("|") as Provider[]);
     auth = { strategy, provider };
-  }
-  if (typeof auth.provider === "string") {
-    auth.provider = auth.provider.split("|").filter(Boolean) as Provider[];
   }
   if (!auth.strategy) {
     throw new Error("Auth options needs a strategy");
@@ -17,30 +40,36 @@ export default function parseAuthOptions(auth: Options["auth"], all: any): any {
   if (!auth.strategy.length) {
     throw new Error("Auth options needs a strategy");
   }
+  const strategy = auth.strategy;
+
   if (!auth.provider || !auth.provider.length) {
     throw new Error("Auth options needs a provider");
   }
-  const providerNotFound = auth.provider.find((p: string) => !providers[p]);
-  if (providerNotFound) {
-    throw new Error(
-      `Provider "${providerNotFound}" not found, available ones are "${Object.keys(providers).join('", "')}"`,
-    );
-  }
+  const provider = getProviders(auth.provider);
 
-  if (!auth.session && all.store) {
-    auth.session = all.store.prefix("auth:");
+  const redirect = auth.redirect || defaultRedirect;
+  const cleanUser = auth.cleanUser || defaultCleanUser;
+
+  if (!auth.store && !all.store) {
+    throw new Error("Need a userStore store for Auth");
   }
-  if (!auth.store && all.store) {
-    auth.store = all.store.prefix("user:");
+  if (!auth.session && !all.store) {
+    throw new Error("Need a sessionStore store for Auth");
   }
-  if (!auth.cleanUser) {
-    auth.cleanUser = (fullUser: any) => {
-      const { password: _password, ...user } = fullUser;
-      return user;
-    };
-  }
-  if (!auth.redirect) {
-    auth.redirect = "/user";
-  }
-  return auth;
+  const store = auth.store || all.store.prefix("user:");
+  const session = auth.session || all.store.prefix("auth:");
+
+  return {
+    // Base main configuration
+    strategy,
+    provider,
+
+    // Extra configuration
+    redirect,
+    cleanUser,
+
+    // Stores for the auth session and users
+    store,
+    session,
+  };
 }

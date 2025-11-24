@@ -364,14 +364,30 @@ var github_default = { login, callback };
 var providers_default = { email: email_default, github: github_default };
 
 // src/auth/parseAuthOptions.ts
+var defaultRedirect = "/user";
+function defaultCleanUser(fullUser) {
+  const { password: _password, ...user } = fullUser;
+  return user;
+}
+var providersKeys = Object.keys(providers_default);
+function getProviders(provider) {
+  if (typeof provider === "string") {
+    provider = provider.split("|");
+  }
+  const invalidProvider = provider.find((p) => !providersKeys.includes(p));
+  if (invalidProvider) {
+    throw new Error(
+      `Provider "${invalidProvider}" not found, available ones are "${providersKeys.join('", "')}"`
+    );
+  }
+  return provider;
+}
 function parseAuthOptions(auth2, all) {
   if (!auth2) return null;
   if (typeof auth2 === "string") {
-    const [strategy, provider] = auth2.split(":");
-    auth2 = { strategy, provider };
-  }
-  if (typeof auth2.provider === "string") {
-    auth2.provider = auth2.provider.split("|").filter(Boolean);
+    const [strategy2, providerRaw] = auth2.split(":");
+    const provider2 = providerRaw && providerRaw.split("|");
+    auth2 = { strategy: strategy2, provider: provider2 };
   }
   if (!auth2.strategy) {
     throw new Error("Auth options needs a strategy");
@@ -379,31 +395,32 @@ function parseAuthOptions(auth2, all) {
   if (!auth2.strategy.length) {
     throw new Error("Auth options needs a strategy");
   }
+  const strategy = auth2.strategy;
   if (!auth2.provider || !auth2.provider.length) {
     throw new Error("Auth options needs a provider");
   }
-  const providerNotFound = auth2.provider.find((p) => !providers_default[p]);
-  if (providerNotFound) {
-    throw new Error(
-      `Provider "${providerNotFound}" not found, available ones are "${Object.keys(providers_default).join('", "')}"`
-    );
+  const provider = getProviders(auth2.provider);
+  const redirect2 = auth2.redirect || defaultRedirect;
+  const cleanUser = auth2.cleanUser || defaultCleanUser;
+  if (!auth2.store && !all.store) {
+    throw new Error("Need a userStore store for Auth");
   }
-  if (!auth2.session && all.store) {
-    auth2.session = all.store.prefix("auth:");
+  if (!auth2.session && !all.store) {
+    throw new Error("Need a sessionStore store for Auth");
   }
-  if (!auth2.store && all.store) {
-    auth2.store = all.store.prefix("user:");
-  }
-  if (!auth2.cleanUser) {
-    auth2.cleanUser = (fullUser) => {
-      const { password: _password, ...user } = fullUser;
-      return user;
-    };
-  }
-  if (!auth2.redirect) {
-    auth2.redirect = "/user";
-  }
-  return auth2;
+  const store = auth2.store || all.store.prefix("user:");
+  const session2 = auth2.session || all.store.prefix("auth:");
+  return {
+    // Base main configuration
+    strategy,
+    provider,
+    // Extra configuration
+    redirect: redirect2,
+    cleanUser,
+    // Stores for the auth session and users
+    store,
+    session: session2
+  };
 }
 
 // src/helpers/bucket.ts

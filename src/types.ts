@@ -55,21 +55,21 @@ export type SerializableValue =
   | Array<SerializableValue>;
 
 export type KVStore = {
-  name: string;
+  name?: string;
   prefix: (key: string) => KVStore;
   get: <T = SerializableValue>(key: string) => Promise<T>;
   set: <T = SerializableValue>(
     key: string,
     value: T,
     options?: { expires: string | number },
-  ) => Promise<void>;
+  ) => Promise<void | string>;
   has: (key: string) => Promise<boolean>;
-  del: (key: string) => Promise<void>;
+  del: (key: string) => Promise<void | string>;
   keys: () => Promise<string[]>;
 };
 
 export type Provider = "email" | "github";
-export type Strategy = "cookies" | "jwt" | "token";
+export type Strategy = "cookie" | "jwt" | "token";
 
 export type AuthSession = {
   id: string;
@@ -85,11 +85,19 @@ export type AuthUser<T = object> = T & {
   email: string;
 };
 
+// We only have 2 providers now, add more as we add more
+type ProviderString = Provider | `${Provider}|${Provider}`;
+// | `${Provider}|${Provider}|${Provider}`
+// | `${Provider}|${Provider}|${Provider}|${Provider}`
+// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`
+// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`
+// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`;
+
 export type AuthOption =
-  | `${Strategy}:${Provider}`
+  | `${Strategy}:${Provider | ProviderString}`
   | {
-      provider?: Provider | Provider[];
-      strategy?: Strategy;
+      provider: Provider | ProviderString | Provider[];
+      strategy: Strategy;
       session?: KVStore;
       store?: KVStore;
       redirect?: string;
@@ -97,7 +105,6 @@ export type AuthOption =
     };
 
 export type AuthSettings = {
-  id: string; // ID of the session
   provider: Provider[];
   strategy: Strategy;
 
