@@ -172,20 +172,13 @@ var email_default = {
 };
 
 // src/reply.ts
+var EXPIRED = (/* @__PURE__ */ new Date(0)).toUTCString();
 var Reply = class {
   res;
   constructor() {
     this.res = {
-      headers: {},
-      cookies: {}
+      headers: new Headers()
     };
-  }
-  generateHeaders() {
-    const headers2 = new Headers(this.res.headers);
-    for (const cookie of createCookies(this.res.cookies)) {
-      headers2.append("set-cookie", cookie);
-    }
-    return headers2;
   }
   status(status2) {
     this.res.status = status2;
@@ -194,39 +187,48 @@ var Reply = class {
   type(type2) {
     if (!type2) return this;
     type2 = types_default[type2.replace(/^\./, "")] || type2;
-    return this.headers({ "content-type": type2 });
+    this.res.headers.set("content-type", type2);
+    return this;
   }
   download(name) {
-    const ext = name.split(".").pop();
-    if (type && ext && !this.res.headers["content-type"]) this.type(ext);
+    const ext = name?.split(".").pop();
+    if (type && ext && !this.res.headers.get("content-type")) this.type(ext);
     const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
-    return this.headers({ "content-disposition": `attachment${filename}` });
+    return this.headers("content-disposition", `attachment${filename}`);
   }
-  headers(headers2) {
-    if (!headers2 || typeof headers2 !== "object") return this;
-    for (const key in headers2) {
-      this.res.headers[key.toLowerCase()] = headers2[key];
+  headers(key, value) {
+    if (typeof key !== "string") {
+      Object.entries(key).map(([key2, value2]) => this.headers(key2, value2));
+      return this;
     }
+    if (Array.isArray(value)) {
+      Object.values(value).map((val) => this.headers(key, val));
+      return this;
+    }
+    this.res.headers.append(key, value);
     return this;
   }
-  cookies(cookies2) {
-    if (!cookies2 || typeof cookies2 !== "object") return this;
-    for (const key in cookies2) {
-      if (typeof cookies2[key] === "string") {
-        this.res.cookies[key] = { value: cookies2[key] };
-      } else {
-        this.res.cookies[key] = cookies2[key];
-      }
+  cookies(key, value) {
+    if (typeof key === "object") {
+      Object.entries(key).map(([key2, value2]) => this.cookies(key2, value2));
+      return this;
     }
-    return this;
+    if (Array.isArray(value)) {
+      Object.values(value).map((val) => this.cookies(key, val));
+      return this;
+    }
+    console.log(key, value);
+    if (value === null) return this.cookies(key, { expires: EXPIRED });
+    if (typeof value !== "object") return this.cookies(key, { value });
+    return this.headers("set-cookie", createCookies(key, value));
   }
   json(body) {
-    return this.headers({
-      "content-type": "application/json"
-    }).send(JSON.stringify(body));
+    return this.headers("content-type", "application/json").send(
+      JSON.stringify(body)
+    );
   }
-  redirect(Location) {
-    return this.headers({ Location }).status(302).send();
+  redirect(path2) {
+    return this.headers("location", path2).status(302).send();
   }
   async file(path2) {
     try {
@@ -242,40 +244,38 @@ var Reply = class {
     }
   }
   send(body = "") {
-    const { status: status2 = 200 } = this.res;
+    const { status: status2 = 200, headers: headers2 } = this.res;
     if (typeof body === "string") {
-      if (!this.res.headers["content-type"]) {
-        const isHtml = body.startsWith("<");
-        this.res.headers["content-type"] = isHtml ? "text/html" : "text/plain";
+      if (!headers2.get("content-type")) {
+        const isHtml = body.trim().startsWith("<");
+        headers2.set("content-type", isHtml ? "text/html" : "text/plain");
       }
-      const headers2 = this.generateHeaders();
       return new Response(body, { status: status2, headers: headers2 });
     }
     const name = body?.constructor?.name;
     if (name === "Buffer") {
-      const headers2 = this.generateHeaders();
       return new Response(body, { status: status2, headers: headers2 });
     }
     if (typeof body?.getReader === "function") {
-      const headers2 = this.generateHeaders();
       return new Response(body, { status: status2, headers: headers2 });
     }
     if (name === "PassThrough" || name === "Readable") {
-      const headers2 = this.generateHeaders();
       return new Response(toWeb(body), { status: status2, headers: headers2 });
     }
-    return this.json(body);
+    headers2.set("content-type", "application/json");
+    return new Response(JSON.stringify(body), { status: status2, headers: headers2 });
   }
 };
-var status = (...args) => new Reply().status(...args);
-var headers = (...args) => new Reply().headers(...args);
-var type = (...args) => new Reply().type(...args);
-var download = (...args) => new Reply().download(...args);
-var cookies = (...args) => new Reply().cookies(...args);
-var send = (...args) => new Reply().send(...args);
-var json = (...args) => new Reply().json(...args);
-var file = (...args) => new Reply().file(...args);
-var redirect = (...args) => new Reply().redirect(...args);
+var r = () => new Reply();
+var status = (...args) => r().status(...args);
+var headers = (...args) => r().headers(...args);
+var type = (...args) => r().type(...args);
+var download = (...args) => r().download(...args);
+var cookies = (...args) => r().cookies(...args);
+var send = (...args) => r().send(...args);
+var json = (...args) => r().json(...args);
+var file = (...args) => r().file(...args);
+var redirect = (...args) => r().redirect(...args);
 
 // src/auth/providers/github.ts
 var oauth = async (code) => {
@@ -668,20 +668,52 @@ function cors(config2, origin = "") {
 }
 
 // src/helpers/createCookies.ts
-function createCookies(cookies2) {
-  if (!cookies2 || !Object.keys(cookies2).length) return [];
-  return Object.entries(cookies2).map(([key, val]) => {
-    if (!val) {
-      val = { value: "", expires: (/* @__PURE__ */ new Date(0)).toUTCString() };
+var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
+var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
+parse.millisecond = parse.ms = 1e-3;
+parse.second = parse.sec = parse.s = parse[""] = 1;
+parse.minute = parse.min = parse.m = parse.s * 60;
+parse.hour = parse.hr = parse.h = parse.m * 60;
+parse.day = parse.d = parse.h * 24;
+parse.week = parse.wk = parse.w = parse.d * 7;
+parse.year = parse.yr = parse.y = parse.d * 365.25;
+parse.month = parse.b = parse.y / 12;
+function parse(str) {
+  if (str === null || str === void 0) return null;
+  if (typeof str === "number") return str;
+  str = str.toLowerCase().replace(/[,_]/g, "");
+  const [_, value, units] = times.exec(str) || [];
+  if (!units) return null;
+  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
+  if (!unitValue) return null;
+  const result = unitValue * parseFloat(value);
+  return Math.abs(Math.round(result * 1e3));
+}
+function normalizeExpires(expires) {
+  if (expires === null || expires === void 0) return void 0;
+  if (expires === 0) return EXPIRED2;
+  if (typeof expires === "string") {
+    if (/^[\d._]+\w+$/.test(expires)) {
+      return new Date(Date.now() + parse(expires)).toUTCString();
+    } else {
+      return expires;
     }
-    if (typeof val === "string") {
-      val = { value: val };
-    }
-    const { value, path: path2, expires } = val;
-    const pathPart = `;Path=${path2 || "/"}`;
-    const expiresPart = expires ? `;Expires=${expires}` : "";
-    return `${key}=${value || ""}${pathPart}${expiresPart}`;
-  });
+  }
+  if (typeof expires === "number") {
+    return new Date(Date.now() + expires).toUTCString();
+  }
+  if (expires instanceof Date) {
+    return expires.toUTCString();
+  }
+  return void 0;
+}
+function createCookies(key, val) {
+  if (val.value === null) val.expires = EXPIRED2;
+  const { value, path: path2, expires } = val;
+  const pathPart = `;Path=${path2 || "/"}`;
+  const expiresStr = normalizeExpires(expires);
+  const expiresPart = typeof expires !== "undefined" ? `;Expires=${expiresStr}` : "";
+  return `${key}=${value || ""}${pathPart}${expiresPart}`;
 }
 
 // src/helpers/createWebsocket.ts
@@ -1386,7 +1418,7 @@ var encode = (str = "") => {
 };
 var getConfig = (routes) => {
   const config2 = routes.find(
-    (r) => typeof r !== "string" && typeof r !== "function" && typeof r === "object"
+    (r2) => typeof r2 !== "string" && typeof r2 !== "function" && typeof r2 === "object"
   );
   if (!config2) return {};
   if (config2.tags) {
@@ -1535,13 +1567,13 @@ var openapi_default = async (ctx) => {
 
 // src/middle/timer.ts
 var createTime = () => {
-  const times = [["init", performance.now()]];
-  const time = (name) => times.push([name, performance.now()]);
-  time.times = times;
+  const times2 = [["init", performance.now()]];
+  const time = (name) => times2.push([name, performance.now()]);
+  time.times = times2;
   time.headers = () => {
-    const r = (t) => Math.round(t);
-    const times2 = time.times;
-    const timing = times2.slice(1).map(([name, time2], i) => `${name};dur=${r(time2 - times2[i][1])}`).join(", ");
+    const r2 = (t) => Math.round(t);
+    const times3 = time.times;
+    const timing = times3.slice(1).map(([name, time2], i) => `${name};dur=${r2(time2 - times3[i][1])}`).join(", ");
     return timing;
   };
   return time;
@@ -1841,7 +1873,7 @@ function isSerializable(body) {
 }
 function ServerTest(app) {
   const port = app.settings.port;
-  const fetch2 = async (path2, method, options = {}) => {
+  const fetch2 = async (method, path2, options = {}) => {
     if (!options.headers) options.headers = {};
     if (isSerializable(options.body)) {
       options.headers["content-type"] = "application/json";
@@ -1855,13 +1887,13 @@ function ServerTest(app) {
     );
   };
   return {
-    get: (path2, options) => fetch2(path2, "get", options),
-    head: (path2, options) => fetch2(path2, "head", options),
-    post: (path2, body, options) => fetch2(path2, "post", { body, ...options }),
-    put: (path2, body, options) => fetch2(path2, "put", { body, ...options }),
-    patch: (path2, body, options) => fetch2(path2, "patch", { body, ...options }),
-    delete: (path2, options) => fetch2(path2, "delete", options),
-    options: (path2, options) => fetch2(path2, "options", options)
+    get: (path2, options) => fetch2("get", path2, options),
+    head: (path2, options) => fetch2("head", path2, options),
+    post: (path2, body, options) => fetch2("post", path2, { body, ...options }),
+    put: (path2, body, options) => fetch2("put", path2, { body, ...options }),
+    patch: (path2, body, options) => fetch2("patch", path2, { body, ...options }),
+    delete: (path2, options) => fetch2("delete", path2, options),
+    options: (path2, options) => fetch2("options", path2, options)
   };
 }
 
@@ -1930,7 +1962,6 @@ function server(options = {}) {
   return new Server(options).self();
 }
 export {
-  Reply,
   Server,
   ServerError_default as ServerError,
   cookies,

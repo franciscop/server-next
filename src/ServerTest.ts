@@ -16,15 +16,17 @@ function isSerializable(
   return true;
 }
 
+type NoBodyRequest = Omit<RequestInit, "body">;
+
 // A function that can be triggered for testing
 export default function ServerTest(app: Server) {
   const port = app.settings.port;
 
   // let cookie = "";
   const fetch = async (
-    path: string,
     method: Method,
-    options: Omit<RequestInit, "body"> & { body?: BodyValue } = {},
+    path: string,
+    options: NoBodyRequest & { body?: BodyValue } = {},
   ) => {
     if (!options.headers) options.headers = {};
     if (isSerializable(options.body)) {
@@ -39,28 +41,18 @@ export default function ServerTest(app: Server) {
     );
   };
   return {
-    get: (path: string, options?: Omit<RequestInit, "body">) =>
-      fetch(path, "get", options),
-    head: (path: string, options?: Omit<RequestInit, "body">) =>
-      fetch(path, "head", options),
-    post: (
-      path: string,
-      body?: BodyValue,
-      options?: Omit<RequestInit, "body">,
-    ) => fetch(path, "post", { body, ...options }),
-    put: (
-      path: string,
-      body?: BodyValue,
-      options?: Omit<RequestInit, "body">,
-    ) => fetch(path, "put", { body, ...options }),
-    patch: (
-      path: string,
-      body?: BodyValue,
-      options?: Omit<RequestInit, "body">,
-    ) => fetch(path, "patch", { body, ...options }),
-    delete: (path: string, options?: Omit<RequestInit, "body">) =>
-      fetch(path, "delete", options),
-    options: (path: string, options?: Omit<RequestInit, "body">) =>
-      fetch(path, "options", options),
+    get: (path: string, options?: NoBodyRequest) => fetch("get", path, options),
+    head: (path: string, options?: NoBodyRequest) =>
+      fetch("head", path, options),
+    post: (path: string, body?: BodyValue, options?: NoBodyRequest) =>
+      fetch("post", path, { body, ...options }),
+    put: (path: string, body?: BodyValue, options?: NoBodyRequest) =>
+      fetch("put", path, { body, ...options }),
+    patch: (path: string, body?: BodyValue, options?: NoBodyRequest) =>
+      fetch("patch", path, { body, ...options }),
+    delete: (path: string, options?: NoBodyRequest) =>
+      fetch("delete", path, options),
+    options: (path: string, options?: NoBodyRequest) =>
+      fetch("options", path, options),
   };
 }

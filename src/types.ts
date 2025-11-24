@@ -23,6 +23,12 @@ export type RouteOptions = {
   // [key: string]: any;
 };
 
+export type Cookie = {
+  value?: string;
+  path?: string;
+  expires?: number | string | Date;
+};
+
 export type RouterMethod = "*" | Method;
 
 export type Bucket = {

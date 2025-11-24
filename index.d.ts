@@ -7,6 +7,11 @@ type RouteOptions = {
     title?: string;
     description?: string;
 };
+type Cookie = {
+    value?: string;
+    path?: string;
+    expires?: number | string | Date;
+};
 type RouterMethod = "*" | Method;
 type Bucket = {
     read: (path: string) => Promise<ReadableStream | null>;
@@ -228,41 +233,34 @@ declare class Router<O extends ServerConfig = object> {
 }
 declare function router(): Router;
 
+type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 interface ResponseData {
-    headers: Record<string, string>;
-    cookies: Record<string, {
-        value: string;
-    } | string>;
+    headers: Headers;
     status?: number;
 }
 declare class Reply {
     res: ResponseData;
     constructor();
-    private generateHeaders;
     status(status: number): this;
     type(type?: string): this;
-    download(name: string): this;
-    headers(headers: Record<string, string>): this;
-    cookies(cookies: Record<string, {
-        value: string;
-    } | string>): this;
+    download(name?: string): this;
+    headers(key: string | Record<string, string>, value?: string): this;
+    cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
     json(body: unknown): Response;
-    redirect(Location: string): Response;
+    redirect(path: string): Response;
     file(path: string): Promise<Response>;
     send(body?: string | Buffer | ReadableStream | any): Response;
 }
-
-declare const status: (...args: [number]) => Reply;
-declare const headers: (...args: [Record<string, string>]) => Reply;
-declare const type: (...args: [string?]) => Reply;
-declare const download: (...args: [string]) => Reply;
-declare const cookies: (...args: [Record<string, {
-    value: string;
-} | string>]) => Reply;
-declare const send: (...args: [(string | Buffer | ReadableStream)?]) => Response;
-declare const json: (...args: [unknown]) => Response;
-declare const file: (...args: [string]) => Promise<Response>;
-declare const redirect: (...args: [string]) => Response;
+type Params<K extends keyof Reply> = Reply[K] extends (...args: infer A) => any ? A : never;
+declare const status: (...args: Params<"status">) => Reply;
+declare const headers: (...args: Params<"headers">) => Reply;
+declare const type: (...args: Params<"type">) => Reply;
+declare const download: (...args: Params<"download">) => Reply;
+declare const cookies: (...args: Params<"cookies">) => Reply;
+declare const send: (...args: Params<"send">) => Response;
+declare const json: (...args: Params<"json">) => Response;
+declare const file: (...args: Params<"file">) => Promise<Response>;
+declare const redirect: (...args: Params<"redirect">) => Response;
 
 declare class Server<O extends ServerConfig = object> extends Router<O> {
     settings: Settings;
@@ -276,21 +274,119 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
     fetch(request: Request, env?: BunEnv): Promise<Response>;
     callback(request: Request, context: unknown): Promise<Response>;
     test(): {
-        get: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
-        head: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        get: (path: string, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
+        head: (path: string, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
         post: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
         put: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
         patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
-        delete: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
-        options: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
+        delete: (path: string, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
+        options: (path: string, options?: {
+            cache?: RequestCache;
+            credentials?: RequestCredentials;
+            headers?: HeadersInit;
+            integrity?: string;
+            keepalive?: boolean;
+            method?: string;
+            mode?: RequestMode;
+            priority?: RequestPriority;
+            redirect?: RequestRedirect;
+            referrer?: string;
+            referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
+            window?: null;
+        }) => Promise<Response>;
     };
 }
 declare function server<Options>(options?: {}): Server<Options> & ((request: any, context?: any) => any);
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
