@@ -50,27 +50,27 @@ describe("can route properly", () => {
 
   it("can get fallback when nothing matches", async () => {
     const res = await api.get("/");
-    expect(res.body).toBe("Fallback");
+    expect(await res.text()).toBe("Fallback");
   });
 
   it("can get the base get", async () => {
     const res = await api.get("/hello");
-    expect(res.body).toBe("Hello /hello");
+    expect(await res.text()).toBe("Hello /hello");
   });
 
   it("can get the nested get", async () => {
     const res = await api.get("/api/hello");
-    expect(res.body).toBe("Hello /api/hello");
+    expect(await res.text()).toBe("Hello /api/hello");
   });
 
   it("can post to the base get", async () => {
     const res = await api.post("/hello");
-    expect(res.body).toBe("Hello /hello");
+    expect(await res.text()).toBe("Hello /hello");
   });
 
   it("can post to the nested get", async () => {
     const res = await api.post("/api/hello");
-    expect(res.body).toBe("Hello /api/hello");
+    expect(await res.text()).toBe("Hello /api/hello");
   });
 
   it("no status reuse", async () => {

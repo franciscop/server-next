@@ -241,7 +241,7 @@ export type Context<
   init: number;
   events: Events;
   req?: Request;
-  res?: Response;
+  res?: Response & { cookies?: Record<string, string> };
   app: Server;
 };
 

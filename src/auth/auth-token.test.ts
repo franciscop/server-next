@@ -1,5 +1,3 @@
-import "../tests/toSucceed";
-
 import kv from "polystore";
 
 import server from "..";
@@ -25,19 +23,21 @@ describe("user creation flow", () => {
     // REGISTER A NEW USER
     token = await (async () => {
       const register = await api.post("/auth/register/email", CREDENTIALS);
-      expect(register).toSucceed();
+      expect(register.status).toBe(201);
 
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([register.body.token]);
-      return register.body.token;
+      const { token } = await register.json();
+      expect(await sessions()).toEqual([token]);
+      return token;
     })();
 
     // CAN GET MY OWN INFO
     await (async () => {
       const headers = { authorization: `Bearer ${token}` };
       const me = await api.get("/me", { headers });
-      expect(me).toSucceed();
-      expect(me.body.email).toEqual(EMAIL);
+      const { email } = await me.json();
+      expect(me.status).toBe(200);
+      expect(email).toEqual(EMAIL);
 
       expect(await users()).toEqual(["abc@test.com"]);
       expect(await sessions()).toEqual([token]);
@@ -47,7 +47,7 @@ describe("user creation flow", () => {
     await (async () => {
       const headers = { authorization: `Bearer ${token}` };
       const logout = await api.post("/auth/logout", {}, { headers });
-      expect(logout).toSucceed();
+      expect(logout.status).toBe(200);
       expect(await users()).toEqual(["abc@test.com"]);
       expect(await sessions()).toEqual([]);
     })();
@@ -55,18 +55,20 @@ describe("user creation flow", () => {
     // LOGIN FOR THE FIRST TIME
     token = await (async () => {
       const login = await api.post("/auth/login/email", CREDENTIALS);
-      expect(login).toSucceed();
+      const { token } = await login.json();
+      expect(login.status).toBe(201);
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([login.body.token]);
-      return login.body.token;
+      expect(await sessions()).toEqual([token]);
+      return token;
     })();
 
     // CAN GET MY OWN INFO
     await (async () => {
       const headers = { authorization: `Bearer ${token}` };
       const me = await api.get("/me", { headers });
-      expect(me).toSucceed();
-      expect(me.body.email).toEqual(EMAIL);
+      const { email } = await me.json();
+      expect(me.status).toBe(200);
+      expect(email).toEqual(EMAIL);
     })();
 
     // UPDATE PASSWORD
@@ -74,7 +76,7 @@ describe("user creation flow", () => {
       const headers = { authorization: `Bearer ${token}` };
       const body = { previous: PASS, updated: "22222222" };
       const update = await api.put("/auth/password/email", body, { headers });
-      expect(update).toSucceed();
+      expect(update.status).toBe(200);
       expect(await users()).toEqual(["abc@test.com"]);
       expect(await sessions()).toEqual([token]);
     })();
@@ -83,7 +85,7 @@ describe("user creation flow", () => {
     await (async () => {
       const headers = { authorization: `Bearer ${token}` };
       const logout = await api.post("/auth/logout", {}, { headers });
-      expect(logout).toSucceed();
+      expect(logout.status).toBe(200);
       expect(await users()).toEqual(["abc@test.com"]);
       expect(await sessions()).toEqual([]);
     })();
@@ -91,7 +93,7 @@ describe("user creation flow", () => {
     // LOGIN WITH OLD PASSWORD
     await (async () => {
       const login = await api.post("/auth/login/email", CREDENTIALS);
-      expect(login).not.toSucceed();
+      expect(login.status).toBe(500);
       expect(await users()).toEqual(["abc@test.com"]);
     })();
 
@@ -101,10 +103,11 @@ describe("user creation flow", () => {
         ...CREDENTIALS,
         password: "22222222",
       });
-      expect(login).toSucceed();
+      const { token } = await login.json();
+      expect(login.status).toBe(201);
       expect(await users()).toEqual(["abc@test.com"]);
-      expect(await sessions()).toEqual([login.body.token]);
-      return login.body.token;
+      expect(await sessions()).toEqual([token]);
+      return token;
     })();
   });
 });

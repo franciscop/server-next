@@ -1,5 +1,4 @@
 import type { Method, SerializableValue, Server } from ".";
-import { parseHeaders } from "./helpers";
 
 type BodyValue = SerializableValue | BodyInit;
 
@@ -27,37 +26,17 @@ export default function ServerTest(app: Server) {
     method: Method,
     options: Omit<RequestInit, "body"> & { body?: BodyValue } = {},
   ) => {
-    try {
-      if (!options.headers) options.headers = {};
-      if (isSerializable(options.body)) {
-        options.headers["content-type"] = "application/json";
-        options.body = JSON.stringify(options.body);
-      }
-      // if (cookie && !options.headers.cookie) {
-      //   options.headers.cookie = cookie;
-      // }
-      const res = await app.fetch(
-        new Request(`http://localhost:${port}${path}`, {
-          method,
-          ...(options as RequestInit),
-        }),
-      );
-
-      const headers = parseHeaders(res.headers);
-      let body: SerializableValue;
-      // if (headers["set-cookie"]) {
-      //   // TODO: app should really be a smart merge of the 2
-      //   cookie = headers["set-cookie"];
-      // }
-      if (headers["content-type"]?.includes("application/json")) {
-        body = await res.json();
-      } else {
-        body = await res.text();
-      }
-      return { status: res.status, headers, body };
-    } catch (error) {
-      return { status: 500, headers: {}, body: error.message };
+    if (!options.headers) options.headers = {};
+    if (isSerializable(options.body)) {
+      options.headers["content-type"] = "application/json";
+      options.body = JSON.stringify(options.body);
     }
+    return await app.fetch(
+      new Request(`http://localhost:${port}${path}`, {
+        method,
+        ...(options as RequestInit),
+      }),
+    );
   };
   return {
     get: (path: string, options?: Omit<RequestInit, "body">) =>

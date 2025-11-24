@@ -35,17 +35,17 @@ class Reply {
     return this.headers({ "content-type": type });
   }
 
-  download(name: string, type?: string): this {
-    if (name && !type) type = name.split(".").pop();
-    if (type) this.type(type);
-    const filename = name ? `; filename="${name}"` : "";
+  download(name: string): this {
+    const ext = name.split(".").pop();
+    if (type && ext && !this.res.headers["content-type"]) this.type(ext);
+    const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
     return this.headers({ "content-disposition": `attachment${filename}` });
   }
 
   headers(headers: Record<string, string>): this {
     if (!headers || typeof headers !== "object") return this;
     for (const key in headers) {
-      this.res.headers[key] = headers[key];
+      this.res.headers[key.toLowerCase()] = headers[key];
     }
     return this;
   }
@@ -72,36 +72,18 @@ class Reply {
     return this.headers({ Location }).status(302).send();
   }
 
-  async file(
-    path: string,
-    renderer: (data: Buffer) => Promise<Buffer | string> = async (data) => data,
-  ): Promise<Response> {
+  async file(path: string): Promise<Response> {
     try {
-      const fs = await import("node:fs/promises");
-      const data = await fs.readFile(path);
+      const fs = await import("node:fs");
       const ext = path.split(".").pop();
-      return this.type(ext).send(await renderer(data));
+      const stream = fs.createReadStream(path);
+      return this.type(ext).send(stream);
     } catch (error: any) {
       if (error.code === "ENOENT") {
         return this.status(404).send();
       }
       throw error;
     }
-  }
-
-  async view(
-    path: string,
-    renderer: (data: Buffer) => Promise<Buffer | string> = async (data) => data,
-    ctx?: {
-      options: { views?: { read: (path: string) => Promise<Buffer | null> } };
-    },
-  ): Promise<Response> {
-    if (!ctx?.options.views) {
-      throw new Error("Views not enabled");
-    }
-    const data = await ctx.options.views.read(path);
-    if (!data) return this.status(404).send();
-    return this.type(path.split(".").pop()).send(await renderer(data));
   }
 
   send(body: string | Buffer | ReadableStream | any = ""): Response {
@@ -123,7 +105,7 @@ class Reply {
       return new Response(body, { status, headers });
     }
 
-    if (name === "ReadableStream") {
+    if (typeof body?.getReader === "function") {
       const headers = this.generateHeaders();
       return new Response(body, { status, headers });
     }
@@ -143,24 +125,12 @@ export const status = (...args: [number]) => new Reply().status(...args);
 export const headers = (...args: [Record<string, string>]) =>
   new Reply().headers(...args);
 export const type = (...args: [string?]) => new Reply().type(...args);
-export const download = (...args: [string, string?]) =>
-  new Reply().download(...args);
+export const download = (...args: [string]) => new Reply().download(...args);
 export const cookies = (
   ...args: [Record<string, { value: string } | string>]
 ) => new Reply().cookies(...args);
-export const send = (...args: [string | Buffer | ReadableStream]) =>
+export const send = (...args: [(string | Buffer | ReadableStream)?]) =>
   new Reply().send(...args);
 export const json = (...args: [unknown]) => new Reply().json(...args);
-export const file = (
-  ...args: [string, ((data: Buffer) => Promise<Buffer | string>)?]
-) => new Reply().file(...args);
+export const file = (...args: [string]) => new Reply().file(...args);
 export const redirect = (...args: [string]) => new Reply().redirect(...args);
-export const view = (
-  ...args: [
-    string,
-    ((data: Buffer) => Promise<Buffer | string>)?,
-    {
-      options: { views?: { read: (path: string) => Promise<Buffer | null> } };
-    }?,
-  ]
-) => new Reply().view(...args);

@@ -7,9 +7,9 @@ describe("can match the url", () => {
       .get("/*", (ctx) => ctx.url.params)
       .test();
 
-    const { body, headers } = await api.get("/hello");
-    expect(body).toEqual({ id: "hello" });
-    expect(headers["content-type"]).toEqual("application/json");
+    const res = await api.get("/hello");
+    expect(res.headers.get("content-type")).toEqual("application/json");
+    expect(await res.json()).toEqual({ id: "hello" });
   });
 
   it("but it doesn't if it's a use", async () => {
@@ -19,8 +19,8 @@ describe("can match the url", () => {
       .get("/*", (ctx) => ctx.url.params)
       .test();
 
-    const { body, headers } = await api.get("/hello");
-    expect(body).toEqual({ id: "hello" });
-    expect(headers["content-type"]).toEqual("application/json");
+    const res = await api.get("/hello");
+    expect(res.headers.get("content-type")).toEqual("application/json");
+    expect(await res.json()).toEqual({ id: "hello" });
   });
 });

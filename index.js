@@ -196,16 +196,16 @@ var Reply = class {
     type2 = types_default[type2.replace(/^\./, "")] || type2;
     return this.headers({ "content-type": type2 });
   }
-  download(name, type2) {
-    if (name && !type2) type2 = name.split(".").pop();
-    if (type2) this.type(type2);
-    const filename = name ? `; filename="${name}"` : "";
+  download(name) {
+    const ext = name.split(".").pop();
+    if (type && ext && !this.res.headers["content-type"]) this.type(ext);
+    const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
     return this.headers({ "content-disposition": `attachment${filename}` });
   }
   headers(headers2) {
     if (!headers2 || typeof headers2 !== "object") return this;
     for (const key in headers2) {
-      this.res.headers[key] = headers2[key];
+      this.res.headers[key.toLowerCase()] = headers2[key];
     }
     return this;
   }
@@ -228,26 +228,18 @@ var Reply = class {
   redirect(Location) {
     return this.headers({ Location }).status(302).send();
   }
-  async file(path2, renderer = async (data) => data) {
+  async file(path2) {
     try {
-      const fs2 = await import("fs/promises");
-      const data = await fs2.readFile(path2);
+      const fs2 = await import("fs");
       const ext = path2.split(".").pop();
-      return this.type(ext).send(await renderer(data));
+      const stream = fs2.createReadStream(path2);
+      return this.type(ext).send(stream);
     } catch (error) {
       if (error.code === "ENOENT") {
         return this.status(404).send();
       }
       throw error;
     }
-  }
-  async view(path2, renderer = async (data) => data, ctx) {
-    if (!ctx?.options.views) {
-      throw new Error("Views not enabled");
-    }
-    const data = await ctx.options.views.read(path2);
-    if (!data) return this.status(404).send();
-    return this.type(path2.split(".").pop()).send(await renderer(data));
   }
   send(body = "") {
     const { status: status2 = 200 } = this.res;
@@ -264,7 +256,7 @@ var Reply = class {
       const headers2 = this.generateHeaders();
       return new Response(body, { status: status2, headers: headers2 });
     }
-    if (name === "ReadableStream") {
+    if (typeof body?.getReader === "function") {
       const headers2 = this.generateHeaders();
       return new Response(body, { status: status2, headers: headers2 });
     }
@@ -284,7 +276,6 @@ var send = (...args) => new Reply().send(...args);
 var json = (...args) => new Reply().json(...args);
 var file = (...args) => new Reply().file(...args);
 var redirect = (...args) => new Reply().redirect(...args);
-var view = (...args) => new Reply().view(...args);
 
 // src/auth/providers/github.ts
 var oauth = async (code) => {
@@ -806,7 +797,7 @@ async function parseResponse(out, ctx) {
   }
   if (Object.keys(ctx.session || {}).length) {
     if (!ctx.options.session?.store) {
-      throw ServerError_default.NO_STORE({});
+      throw ServerError_default.NO_STORE();
     }
     if (!ctx.cookies.session) {
       ctx.res.cookies.session = createId();
@@ -1851,29 +1842,17 @@ function isSerializable(body) {
 function ServerTest(app) {
   const port = app.settings.port;
   const fetch2 = async (path2, method, options = {}) => {
-    try {
-      if (!options.headers) options.headers = {};
-      if (isSerializable(options.body)) {
-        options.headers["content-type"] = "application/json";
-        options.body = JSON.stringify(options.body);
-      }
-      const res = await app.fetch(
-        new Request(`http://localhost:${port}${path2}`, {
-          method,
-          ...options
-        })
-      );
-      const headers2 = parseHeaders_default(res.headers);
-      let body;
-      if (headers2["content-type"]?.includes("application/json")) {
-        body = await res.json();
-      } else {
-        body = await res.text();
-      }
-      return { status: res.status, headers: headers2, body };
-    } catch (error) {
-      return { status: 500, headers: {}, body: error.message };
+    if (!options.headers) options.headers = {};
+    if (isSerializable(options.body)) {
+      options.headers["content-type"] = "application/json";
+      options.body = JSON.stringify(options.body);
     }
+    return await app.fetch(
+      new Request(`http://localhost:${port}${path2}`, {
+        method,
+        ...options
+      })
+    );
   };
   return {
     get: (path2, options) => fetch2(path2, "get", options),
@@ -1964,6 +1943,5 @@ export {
   router,
   send,
   status,
-  type,
-  view
+  type
 };

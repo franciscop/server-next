@@ -89,31 +89,31 @@ export default async function parseResponse(
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
   if (ctx.time?.times?.length > 1) {
-    out.headers.set("Server-Timing", ctx.time.headers() as any);
+    out.headers.set("Server-Timing", ctx.time.headers());
   }
 
   // If we have a session, we need to persist it into a cookie
   if (Object.keys(ctx.session || {}).length) {
     if (!ctx.options.session?.store) {
-      throw (ServerError as any).NO_STORE({});
+      throw ServerError.NO_STORE();
     }
 
     // Persistence is based on the Token
     // Persistence is based on the Cookies
     // No session cookies, generate a _persistent_ cookie
     if (!ctx.cookies.session) {
-      (ctx.res as any).cookies.session = createId();
+      ctx.res.cookies.session = createId();
     }
 
     const id = ctx.cookies.session;
     // Saves the session in the session store
     // Note that this is async but we are totally fine deferring it
-    (ctx.options.session.store as any).set(id, ctx.session);
+    ctx.options.session.store.set(id, ctx.session);
   }
 
   // Cookies to headers
   if (ctx.options.cookies) {
-    if (Object.keys((ctx.res as any).cookies).length) {
+    if (Object.keys(ctx.res.cookies).length) {
       for (const cookie of (ctx.res as any).cookies) {
         (ctx.res as any).headers.append("set-cookie", cookie);
       }
@@ -122,8 +122,8 @@ export default async function parseResponse(
 
   // Add the headers that are needed
   if ((ctx as any)?.res?.headers) {
-    for (const key in (ctx.res as any).headers) {
-      out.headers[key] = (ctx.res as any).headers[key];
+    for (const key in ctx.res.headers) {
+      out.headers[key] = ctx.res.headers[key];
     }
   }
 

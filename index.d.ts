@@ -149,7 +149,9 @@ type Context<Params extends Record<string, string> = Record<string, string>, O e
     init: number;
     events: Events;
     req?: Request;
-    res?: Response;
+    res?: Response & {
+        cookies?: Record<string, string>;
+    };
     app: Server;
 };
 type InlineReply = Response | {
@@ -239,42 +241,28 @@ declare class Reply {
     private generateHeaders;
     status(status: number): this;
     type(type?: string): this;
-    download(name: string, type?: string): this;
+    download(name: string): this;
     headers(headers: Record<string, string>): this;
     cookies(cookies: Record<string, {
         value: string;
     } | string>): this;
     json(body: unknown): Response;
     redirect(Location: string): Response;
-    file(path: string, renderer?: (data: Buffer) => Promise<Buffer | string>): Promise<Response>;
-    view(path: string, renderer?: (data: Buffer) => Promise<Buffer | string>, ctx?: {
-        options: {
-            views?: {
-                read: (path: string) => Promise<Buffer | null>;
-            };
-        };
-    }): Promise<Response>;
+    file(path: string): Promise<Response>;
     send(body?: string | Buffer | ReadableStream | any): Response;
 }
 
 declare const status: (...args: [number]) => Reply;
 declare const headers: (...args: [Record<string, string>]) => Reply;
 declare const type: (...args: [string?]) => Reply;
-declare const download: (...args: [string, string?]) => Reply;
+declare const download: (...args: [string]) => Reply;
 declare const cookies: (...args: [Record<string, {
     value: string;
 } | string>]) => Reply;
-declare const send: (...args: [string | Buffer | ReadableStream]) => Response;
+declare const send: (...args: [(string | Buffer | ReadableStream)?]) => Response;
 declare const json: (...args: [unknown]) => Response;
-declare const file: (...args: [string, ((data: Buffer) => Promise<Buffer | string>)?]) => Promise<Response>;
+declare const file: (...args: [string]) => Promise<Response>;
 declare const redirect: (...args: [string]) => Response;
-declare const view: (...args: [string, ((data: Buffer) => Promise<Buffer | string>)?, {
-    options: {
-        views?: {
-            read: (path: string) => Promise<Buffer | null>;
-        };
-    };
-}?]) => Promise<Response>;
 
 declare class Server<O extends ServerConfig = object> extends Router<O> {
     settings: Settings;
@@ -288,77 +276,21 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
     fetch(request: Request, env?: BunEnv): Promise<Response>;
     callback(request: Request, context: unknown): Promise<Response>;
     test(): {
-        get: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
-        head: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
+        get: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        head: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
         post: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
         put: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
         patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
-        delete: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
-        options: (path: string, options?: Omit<RequestInit, "body">) => Promise<{
-            status: number;
-            headers: Record<string, string | string[]>;
-            body: SerializableValue;
-        } | {
-            status: number;
-            headers: {};
-            body: any;
-        }>;
+        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        delete: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
+        options: (path: string, options?: Omit<RequestInit, "body">) => Promise<Response>;
     };
 }
 declare function server<Options>(options?: {}): Server<Options> & ((request: any, context?: any) => any);
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, view };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, Reply, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

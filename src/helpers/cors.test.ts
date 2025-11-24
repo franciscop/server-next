@@ -10,11 +10,11 @@ describe("cors", () => {
       .test()
       .get("/", { headers: { origin } });
 
-    expect(headers).toEqual({
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "*",
-      "access-control-allow-methods": "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
-    });
+    expect(headers.get("access-control-allow-origin")).toBe("*");
+    expect(headers.get("access-control-allow-headers")).toBe("*");
+    expect(headers.get("access-control-allow-methods")).toBe(
+      "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
+    );
   });
 
   it("can disable the cors", async () => {
@@ -23,7 +23,7 @@ describe("cors", () => {
       .get("/", () => 200)
       .test()
       .get("/", { headers: { origin } });
-    expect(headers["access-control-allow-origin"]).toBe(undefined);
+    expect(headers.get("access-control-allow-origin")).toBe(null);
   });
 
   it("gets the wildcard without the origin", async () => {
@@ -32,7 +32,7 @@ describe("cors", () => {
       .get("/", () => 200)
       .test()
       .get("/");
-    expect(headers["access-control-allow-origin"]).toBe("*");
+    expect(headers.get("access-control-allow-origin")).toBe("*");
   });
 
   it("gets the origin with true", async () => {
@@ -41,7 +41,7 @@ describe("cors", () => {
       .get("/", () => 200)
       .test()
       .get("/", { headers: { origin } });
-    expect(headers["access-control-allow-origin"]).toBe(origin);
+    expect(headers.get("access-control-allow-origin")).toBe(origin);
   });
 
   it("gets the correct origin with multiple as string", async () => {
@@ -50,7 +50,7 @@ describe("cors", () => {
       .get("/", () => 200)
       .test()
       .get("/", { headers: { origin: "https://b.com/" } });
-    expect(headers["access-control-allow-origin"]).toBe("https://b.com/");
+    expect(headers.get("access-control-allow-origin")).toBe("https://b.com/");
   });
 
   it("gets the correct origin with multiple as array", async () => {
@@ -59,6 +59,6 @@ describe("cors", () => {
       .get("/", () => 200)
       .test()
       .get("/", { headers: { origin: "https://b.com/" } });
-    expect(headers["access-control-allow-origin"]).toBe("https://b.com/");
+    expect(headers.get("access-control-allow-origin")).toBe("https://b.com/");
   });
 });

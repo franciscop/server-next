@@ -1,5 +1,3 @@
-import "./tests/toSucceed";
-
 import server, { status } from ".";
 
 describe("exports", () => {
@@ -43,24 +41,24 @@ describe("return different types", () => {
     .test();
 
   it("can get the plain text", async () => {
-    const { body } = await api.get("/text");
-    expect(body).toBe("Hello world");
+    const res = await api.get("/text");
+    expect(await res.text()).toBe("Hello world");
   });
 
   it("can get the array", async () => {
-    const { body } = await api.get("/array");
-    expect(body).toEqual(["Hello world"]);
+    const res = await api.get("/array");
+    expect(await res.json()).toEqual(["Hello world"]);
   });
 
   it("can get the object", async () => {
-    const req = await api.get("/object");
-    expect(req).toSucceed({ hello: "world" });
+    const res = await api.get("/object");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ hello: "world" });
   });
 
   it("can get the status", async () => {
-    const req = await api.get("/status");
-    expect(req).toSucceed();
-    expect(req.status).toBe(201);
+    const res = await api.get("/status");
+    expect(res.status).toBe(201);
   });
 });
 
@@ -70,16 +68,16 @@ describe("simple post works", () => {
     .test();
 
   it("can post new data", async () => {
-    const { body, status, headers } = await api.post("/", "New Data");
-    expect(status).toBe(201);
-    expect(body).toBe("New Data");
-    expect(headers["content-type"]).toBe("text/plain");
+    const res = await api.post("/", "New Data");
+    expect(res.status).toBe(201);
+    expect(res.headers.get("content-type")).toBe("text/plain");
+    expect(await res.text()).toBe("New Data");
   });
 
   it("will return JSON", async () => {
-    const { body, status, headers } = await api.post("/", { hello: "world" });
-    expect(status).toBe(201);
-    expect(body).toEqual({ hello: "world" });
-    expect(headers["content-type"]).toBe("application/json");
+    const res = await api.post("/", { hello: "world" });
+    expect(res.status).toBe(201);
+    expect(res.headers.get("content-type")).toBe("application/json");
+    expect(await res.json()).toEqual({ hello: "world" });
   });
 });
