@@ -2,6 +2,15 @@ type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" |
 type ServerConfig = {
     User?: Record<string, string | number | boolean | Date | null | undefined>;
 };
+declare namespace JSX {
+    interface Element {
+        type: any;
+        props: any;
+    }
+    interface IntrinsicElements {
+        [elem: string]: any;
+    }
+}
 type RouteOptions = {
     tags?: string | string[];
     title?: string;
@@ -162,7 +171,7 @@ type Context<Params extends Record<string, string> = Record<string, string>, O e
 type InlineReply = Response | {
     body: string;
     headers?: Headers;
-} | SerializableValue;
+} | SerializableValue | JSX.Element;
 type Body = InlineReply;
 type Middleware<O extends ServerConfig = object, Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 

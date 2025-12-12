@@ -16,6 +16,20 @@ export type ServerConfig = {
   User?: Record<string, string | number | boolean | Date | null | undefined>;
 };
 
+declare namespace JSX {
+  // The shape of what JSX emits in your system.
+  // It does NOT pull in React at all.
+  interface Element {
+    type: any;
+    props: any;
+  }
+
+  // Allow any intrinsic tags (<div>, <p>, etc.)
+  interface IntrinsicElements {
+    [elem: string]: any;
+  }
+}
+
 export type RouteOptions = {
   tags?: string | string[];
   title?: string;
@@ -254,7 +268,8 @@ export type Context<
 export type InlineReply =
   | Response
   | { body: string; headers?: Headers }
-  | SerializableValue;
+  | SerializableValue
+  | JSX.Element;
 
 export type Body = InlineReply;
 
