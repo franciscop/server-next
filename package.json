@@ -1,6 +1,6 @@
 {
   "name": "@server/next",
-  "version": "0.27.5",
+  "version": "0.27.6",
   "description": "A fully-fledged web server with routing, file uploads, sessions, static files, schema validation, websockets, testing, etc.",
   "homepage": "https://server-js.com/",
   "repository": "https://github.com/franciscop/server-next.git",
