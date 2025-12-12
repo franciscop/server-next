@@ -269,7 +269,7 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
     websocket: any;
     port?: number;
     constructor(options?: Options);
-    self(): this & ((request: any, context?: any) => any);
+    self(): this;
     node(): Promise<void>;
     fetch(request: Request, env?: BunEnv): Promise<Response>;
     callback(request: Request, context: unknown): Promise<Response>;
@@ -387,6 +387,6 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
         }) => Promise<Response>;
     };
 }
-declare function server<Options>(options?: {}): Server<Options> & ((request: any, context?: any) => any);
+declare function server<Options>(options?: {}): Server<Options>;
 
 export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
