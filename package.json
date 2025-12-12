@@ -38,7 +38,7 @@
   ],
   "exports": {
     ".": "./index.js",
-    "./jsx-runtime": "./src/jsx/jsx-dev-runtime.js",
+    "./jsx-runtime": "./src/jsx/jsx-runtime.js",
     "./jsx-dev-runtime": "./src/jsx/jsx-dev-runtime.js"
   },
   "devDependencies": {
