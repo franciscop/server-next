@@ -860,7 +860,7 @@ function pathPattern(pattern, path2) {
   path2 = path2.replace(/\/$/, "") || "/";
   if (pattern === path2) return {};
   const params = {};
-  const pathParts = path2.split("/").slice(1);
+  const pathParts = path2.split("/").slice(1).map((u) => decodeURIComponent(u));
   const pattParts = pattern.split("/").slice(1);
   let allSame = true;
   for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {

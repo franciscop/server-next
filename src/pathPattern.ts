@@ -11,7 +11,10 @@ export default function pathPattern(
   if (pattern === path) return {};
 
   const params: Record<string, any> = {};
-  const pathParts = path.split("/").slice(1);
+  const pathParts = path
+    .split("/")
+    .slice(1)
+    .map((u) => decodeURIComponent(u));
   const pattParts = pattern.split("/").slice(1);
 
   let allSame = true;
