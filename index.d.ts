@@ -46,9 +46,7 @@ type KVStore = {
     name?: string;
     prefix: (key: string) => KVStore;
     get: <T = SerializableValue>(key: string) => Promise<T>;
-    set: <T = SerializableValue>(key: string, value: T, options?: {
-        expires: string | number;
-    }) => Promise<void | string>;
+    set: <T = SerializableValue>(key: string, value: T, expires?: string | number) => Promise<void | string>;
     has: (key: string) => Promise<boolean>;
     del: (key: string) => Promise<void | string>;
     keys: () => Promise<string[]>;

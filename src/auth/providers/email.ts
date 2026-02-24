@@ -17,7 +17,7 @@ const createSession = async (user: AuthUser, ctx: Context) => {
   await session.set<AuthSession>(
     id,
     { id, strategy, provider, user: user.email },
-    { expires: "1w" },
+    "1w",
   );
 
   if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);

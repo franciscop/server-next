@@ -101,7 +101,7 @@ var createSession = async (user, ctx) => {
   await session2.set(
     id,
     { id, strategy, provider, user: user.email },
-    { expires: "1w" }
+    "1w"
   );
   if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
   if (strategy.includes("token")) {
@@ -343,7 +343,7 @@ var callback = async (ctx) => {
     created: profile.created_at
   });
   await store.set(auth2.user, user);
-  await session2.set(auth2.id, auth2, { expires: "1w" });
+  await session2.set(auth2.id, auth2, "1w");
   if (auth2.strategy.includes("token")) {
     return status(201).json({ ...user, token: auth2.id });
   }

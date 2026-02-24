@@ -68,7 +68,7 @@ const callback = async (ctx: Context) => {
   });
 
   await store.set(auth.user, user);
-  await session.set(auth.id, auth, { expires: "1w" });
+  await session.set(auth.id, auth, "1w");
 
   if (auth.strategy.includes("token")) {
     return status(201).json({ ...user, token: auth.id });

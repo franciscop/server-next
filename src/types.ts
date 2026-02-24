@@ -82,7 +82,7 @@ export type KVStore = {
   set: <T = SerializableValue>(
     key: string,
     value: T,
-    options?: { expires: string | number },
+    expires?: string | number,
   ) => Promise<void | string>;
   has: (key: string) => Promise<boolean>;
   del: (key: string) => Promise<void | string>;
