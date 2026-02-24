@@ -1,4 +1,5 @@
 import { createCookies, toWeb, types } from "./helpers";
+import isReadableStream from "./helpers/isReadableStream";
 import type { Cookie } from "./types";
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
@@ -69,7 +70,6 @@ class Reply {
     }
 
     // cookies("hello", null)
-    console.log(key, value);
     if (value === null) return this.cookies(key, { expires: EXPIRED });
 
     // cookies("hello", "world")
@@ -127,7 +127,14 @@ class Reply {
       return new Response(toWeb(body), { status, headers });
     }
 
-    headers.set("content-type", "application/json");
+    if (isReadableStream(body)) {
+      return new Response(toWeb(body), { status, headers });
+    }
+
+    // Default sends it as json
+    if (!headers.get("content-type")) {
+      headers.set("content-type", "application/json");
+    }
     return new Response(JSON.stringify(body), { status, headers });
   }
 }

@@ -1,4 +1,4 @@
-import server from "../../src/index.js";
+import server from "../..";
 
 const sleep = (time) => new Promise((done) => setTimeout(done, time));
 

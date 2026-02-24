@@ -17,12 +17,12 @@ const Button = styled.button`
 `;
 
 const DynButton = styled.button`
-  background: ${(p) => (p.$active ? "#faa" : "#fcc")};
   color: white;
   padding: 6px 8px;
   border: none;
   border-radius: 3px;
   cursor: pointer;
+  background: ${(p) => (p.$active ? "#faa" : "#fcc")};
 `;
 
 export default server()

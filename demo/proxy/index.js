@@ -1,4 +1,4 @@
-import server from "../../src/index.js";
+import server from "../..";
 
 const BASE_URL = "https://jsonplaceholder.typicode.com";
 export default server().get("/*", (ctx) => {

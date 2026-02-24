@@ -1,4 +1,4 @@
-import server from "../../src/index.js";
+import server from "../..";
 const URL = "https://jsonplaceholder.typicode.com";
 
 const home = `<div>

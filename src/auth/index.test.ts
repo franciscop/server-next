@@ -7,15 +7,18 @@ const ID = "REqA2l022l8Q0tuI";
 
 describe("auth", () => {
   it("requires a provider", async () => {
+    // @ts-expect-error
     expect(() => server({ auth: "token" })).toThrow(
       "Auth options needs a provider",
     );
+    // @ts-expect-error
     expect(() => server({ auth: "token:" })).toThrow(
       "Auth options needs a provider",
     );
   });
 
   it("requires a valid provider", async () => {
+    // @ts-expect-error
     expect(() => server({ auth: "token:nonexisting" })).toThrow(
       /Provider "nonexisting" not found, available ones are/,
     );

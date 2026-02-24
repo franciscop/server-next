@@ -69,3 +69,5 @@ typings/
 
 src/tests/uploads/*
 !src/tests/uploads/.gitkeep
+
+demo/session/store/*.json

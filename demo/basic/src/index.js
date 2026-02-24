@@ -1,7 +1,7 @@
 import kv from "polystore";
 import z from "zod";
 
-import server, { cookies, file, json, status } from "../../../src/index.js";
+import server, { cookies, file, json, status } from "../../..";
 import db from "./db.js";
 
 const store = kv(`file://${process.cwd()}/src/data/store.json`);

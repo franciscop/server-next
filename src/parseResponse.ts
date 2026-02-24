@@ -1,5 +1,6 @@
 import {
   cors,
+  createCookies,
   createId,
   iteratorAsyncToReadable,
   iteratorToReadable,
@@ -94,6 +95,7 @@ export default async function parseResponse(
 
   // If we have a session, we need to persist it into a cookie
   if (Object.keys(ctx.session || {}).length) {
+    // TODO: remove, not the right layer
     if (!ctx.options.session?.store) {
       throw ServerError.NO_STORE();
     }
@@ -102,7 +104,10 @@ export default async function parseResponse(
     // Persistence is based on the Cookies
     // No session cookies, generate a _persistent_ cookie
     if (!ctx.cookies.session) {
-      ctx.res.cookies.session = createId();
+      out.headers.append(
+        "set-cookie",
+        createCookies("session", { value: createId() }),
+      );
     }
 
     const id = ctx.cookies.session;
@@ -113,9 +118,9 @@ export default async function parseResponse(
 
   // Cookies to headers
   if (ctx.options.cookies) {
-    if (Object.keys(ctx.res.cookies).length) {
-      for (const cookie of (ctx.res as any).cookies) {
-        (ctx.res as any).headers.append("set-cookie", cookie);
+    if (Object.keys(ctx.res?.cookies || {}).length) {
+      for (const cookie of Object.values(ctx.res.cookies)) {
+        ctx.res.headers.append("set-cookie", cookie);
       }
     }
   }

@@ -1,4 +1,4 @@
-import server from "../../src/index.js";
+import server from "../..";
 import z from "zod";
 
 const UserSchema = z.object({ name: z.string(), email: z.string() });

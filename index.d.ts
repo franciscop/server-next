@@ -1,6 +1,7 @@
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
-type ServerConfig = {
-    User?: Record<string, string | number | boolean | Date | null | undefined>;
+type ServerConfig<Session = {}, User = {}> = {
+    Session?: Session;
+    User?: User;
 };
 declare namespace JSX {
     interface Element {
@@ -60,7 +61,7 @@ type AuthSession = {
     strategy: Strategy;
     user: string;
 };
-type AuthUser<T = object> = T & {
+type AuthUser<T = Record<string, any>> = T & {
     id: string | number;
     provider: Provider;
     strategy: Strategy;
@@ -156,10 +157,12 @@ type Context<Params extends Record<string, string> = Record<string, string>, O e
     time?: Time;
     socket?: WebSocket;
     sockets?: WebSocket[];
-    session?: Record<string, BasicValue>;
+    session: O extends {
+        Session?: infer S;
+    } ? S extends Record<"Session", infer Inner> ? Inner : Record<string, any> : Record<string, any>;
     user?: O extends {
-        User: infer U;
-    } ? U & AuthUser : AuthUser;
+        User?: infer U;
+    } ? U extends Record<"User", infer Inner> ? Inner : AuthUser : AuthUser;
     init: number;
     events: Events;
     req?: Request;
@@ -271,7 +274,7 @@ declare const json: (...args: Params<"json">) => Response;
 declare const file: (...args: Params<"file">) => Promise<Response>;
 declare const redirect: (...args: Params<"redirect">) => Response;
 
-declare class Server<O extends ServerConfig = object> extends Router<O> {
+declare class Server<O extends ServerConfig = {}> extends Router<O> {
     settings: Settings;
     platform: Platform;
     sockets: any[];
@@ -396,6 +399,6 @@ declare class Server<O extends ServerConfig = object> extends Router<O> {
         }) => Promise<Response>;
     };
 }
-declare function server<Options>(options?: {}): Server<Options>;
+declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
 export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

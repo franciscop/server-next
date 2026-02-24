@@ -1,5 +1,5 @@
 import server, { status } from ".";
-import session from "./auth/session";
+import session from "./middle/session";
 import router from "./router";
 
 function expandHandlers(handlers) {

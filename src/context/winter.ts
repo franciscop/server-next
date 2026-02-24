@@ -38,6 +38,7 @@ export default async function createWinter(
     body,
     headers,
     cookies,
+    session: {},
     init,
     events,
     app,

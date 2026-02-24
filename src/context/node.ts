@@ -57,6 +57,7 @@ export default async function createNode(
     body,
     headers,
     cookies,
+    session: {},
     init,
     events,
     app,

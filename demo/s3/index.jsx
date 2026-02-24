@@ -1,4 +1,4 @@
-import server, { redirect } from "../../";
+import server, { redirect } from "../..";
 import { s3 } from "bun";
 
 // Automatically upload and serve assets from S3

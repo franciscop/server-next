@@ -16,8 +16,6 @@ export default async function session(ctx: Context): Promise<void> {
   // There's a session cookie; use it as the key to get the data
   // from the store
   if (ctx.cookies.session) {
-    const session = await store.get<StoreReturn>(ctx.cookies.session);
-    ctx.session = session;
-    return;
+    ctx.session = (await store.get<StoreReturn>(ctx.cookies.session)) || {};
   }
 }

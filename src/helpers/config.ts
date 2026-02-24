@@ -74,6 +74,10 @@ export default function config(options: Options = {}): Settings {
   debugInfo(options, "store", (store) => store?.name || "working", "📦");
   settings.cookies = options.cookies ?? null;
   debugInfo(options, "cookies", (cookies) => cookies?.name || "working", "🍪");
+  if (options.session) {
+    settings.session =
+      "store" in options.session ? options.session : { store: options.session };
+  }
   if (options.store && !options.session) {
     settings.session = { store: options.store.prefix("session:") };
   }

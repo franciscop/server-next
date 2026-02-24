@@ -1,0 +1,16 @@
+{
+  "name": "session",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "polystore": "^0.17.0"
+  }
+}

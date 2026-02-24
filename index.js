@@ -171,6 +171,11 @@ var email_default = {
   password: emailUpdatePassword
 };
 
+// src/helpers/isReadableStream.ts
+function isReadableStream(obj) {
+  return obj !== null && typeof obj === "object" && typeof obj.pipe === "function" && typeof obj.read === "function" && typeof obj.on === "function";
+}
+
 // src/reply.ts
 var EXPIRED = (/* @__PURE__ */ new Date(0)).toUTCString();
 var Reply = class {
@@ -217,7 +222,6 @@ var Reply = class {
       Object.values(value).map((val) => this.cookies(key, val));
       return this;
     }
-    console.log(key, value);
     if (value === null) return this.cookies(key, { expires: EXPIRED });
     if (typeof value !== "object") return this.cookies(key, { value });
     return this.headers("set-cookie", createCookies(key, value));
@@ -262,7 +266,12 @@ var Reply = class {
     if (name === "PassThrough" || name === "Readable") {
       return new Response(toWeb(body), { status: status2, headers: headers2 });
     }
-    headers2.set("content-type", "application/json");
+    if (isReadableStream(body)) {
+      return new Response(toWeb(body), { status: status2, headers: headers2 });
+    }
+    if (!headers2.get("content-type")) {
+      headers2.set("content-type", "application/json");
+    }
     return new Response(JSON.stringify(body), { status: status2, headers: headers2 });
   }
 };
@@ -633,6 +642,9 @@ function config(options = {}) {
   debugInfo(options, "store", (store) => store?.name || "working", "\u{1F4E6}");
   settings.cookies = options.cookies ?? null;
   debugInfo(options, "cookies", (cookies2) => cookies2?.name || "working", "\u{1F36A}");
+  if (options.session) {
+    settings.session = "store" in options.session ? options.session : { store: options.session };
+  }
   if (options.store && !options.session) {
     settings.session = { store: options.store.prefix("session:") };
   }
@@ -832,14 +844,17 @@ async function parseResponse(out, ctx) {
       throw ServerError_default.NO_STORE();
     }
     if (!ctx.cookies.session) {
-      ctx.res.cookies.session = createId();
+      out.headers.append(
+        "set-cookie",
+        createCookies("session", { value: createId() })
+      );
     }
     const id = ctx.cookies.session;
     ctx.options.session.store.set(id, ctx.session);
   }
   if (ctx.options.cookies) {
-    if (Object.keys(ctx.res.cookies).length) {
-      for (const cookie of ctx.res.cookies) {
+    if (Object.keys(ctx.res?.cookies || {}).length) {
+      for (const cookie of Object.values(ctx.res.cookies)) {
         ctx.res.headers.append("set-cookie", cookie);
       }
     }
@@ -1293,6 +1308,9 @@ async function verify(password, hash3) {
 // src/auth/findSessionId.ts
 var validateToken = (authorization) => {
   const [type2, id] = authorization.trim().split(" ");
+  if (!type2 || !id) {
+    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+  }
   if (type2.toLowerCase() !== "bearer") {
     throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   }
@@ -1565,24 +1583,7 @@ var openapi_default = async (ctx) => {
 </html> `;
 };
 
-// src/middle/timer.ts
-var createTime = () => {
-  const times2 = [["init", performance.now()]];
-  const time = (name) => times2.push([name, performance.now()]);
-  time.times = times2;
-  time.headers = () => {
-    const r2 = (t) => Math.round(t);
-    const times3 = time.times;
-    const timing = times3.slice(1).map(([name, time2], i) => `${name};dur=${r2(time2 - times3[i][1])}`).join(", ");
-    return timing;
-  };
-  return time;
-};
-function timer(ctx) {
-  ctx.time = createTime();
-}
-
-// src/auth/NoSession.ts
+// src/middle/NoSession.ts
 var NoSession = class {
 };
 function createNoSession() {
@@ -1603,7 +1604,7 @@ function createNoSession() {
   });
 }
 
-// src/auth/session.ts
+// src/middle/session.ts
 async function session(ctx) {
   const store = ctx.options.session?.store;
   if (!store) {
@@ -1611,10 +1612,25 @@ async function session(ctx) {
     return;
   }
   if (ctx.cookies.session) {
-    const session2 = await store.get(ctx.cookies.session);
-    ctx.session = session2;
-    return;
+    ctx.session = await store.get(ctx.cookies.session) || {};
   }
+}
+
+// src/middle/timer.ts
+var createTime = () => {
+  const times2 = [["init", performance.now()]];
+  const time = (name) => times2.push([name, performance.now()]);
+  time.times = times2;
+  time.headers = () => {
+    const r2 = (t) => Math.round(t);
+    const times3 = time.times;
+    const timing = times3.slice(1).map(([name, time2], i) => `${name};dur=${r2(time2 - times3[i][1])}`).join(", ");
+    return timing;
+  };
+  return time;
+};
+function timer(ctx) {
+  ctx.time = createTime();
 }
 
 // src/context/node.ts
@@ -1686,6 +1702,7 @@ async function createNode(req, app) {
     body,
     headers: headers2,
     cookies: cookies2,
+    session: {},
     init,
     events,
     app
@@ -1719,6 +1736,7 @@ async function createWinter(req, app) {
     body,
     headers: headers2,
     cookies: cookies2,
+    session: {},
     init,
     events,
     app
@@ -1903,7 +1921,6 @@ var Server = class extends Router {
   platform;
   sockets;
   websocket;
-  // Needed to be explicit for Bun/WinterCG
   port;
   constructor(options = {}) {
     super();
@@ -1927,9 +1944,6 @@ var Server = class extends Router {
       this.get(this.settings.openapi.path || "/docs", openapi_default);
     }
   }
-  // We need to return a function; some environment expect the default export
-  // to be a function that is called with the request, but we also want to
-  // allow chaining, so we return a function that "extends" the instance
   self() {
     const cb = this.callback.bind(this);
     const proto = Object.getPrototypeOf(this);
@@ -1943,7 +1957,6 @@ var Server = class extends Router {
     }
     return cb;
   }
-  // The different handlers for different platforms/runtimes
   node() {
     return Node(this);
   }
@@ -1953,12 +1966,11 @@ var Server = class extends Router {
   callback(request, context) {
     return Netlify(this, request, context);
   }
-  // Helper purely for testing
   test() {
     return ServerTest(this);
   }
 };
-function server(options = {}) {
+function server(options) {
   return new Server(options).self();
 }
 export {

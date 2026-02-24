@@ -12,8 +12,9 @@ export type Method =
   | "options"
   | "socket";
 
-export type ServerConfig = {
-  User?: Record<string, string | number | boolean | Date | null | undefined>;
+export type ServerConfig<Session = {}, User = {}> = {
+  Session?: Session; // drives ctx.session typing
+  User?: User; // drives ctx.user typing
 };
 
 declare namespace JSX {
@@ -98,7 +99,7 @@ export type AuthSession = {
   user: string;
 };
 
-export type AuthUser<T = object> = T & {
+export type AuthUser<T = Record<string, any>> = T & {
   id: string | number;
   provider: Provider;
   strategy: Strategy;
@@ -255,9 +256,18 @@ export type Context<
   time?: Time;
   socket?: WebSocket;
   sockets?: WebSocket[];
-  session?: Record<string, BasicValue>;
-  // The value of the authorized user
-  user?: O extends { User: infer U } ? U & AuthUser : AuthUser;
+  session: O extends { Session?: infer S }
+    ? S extends Record<"Session", infer Inner>
+      ? Inner
+      : Record<string, any>
+    : Record<string, any>;
+
+  user?: O extends { User?: infer U }
+    ? U extends Record<"User", infer Inner>
+      ? Inner
+      : AuthUser
+    : AuthUser;
+  // user?: O extends { User: infer U } ? U & AuthUser : AuthUser;
   init: number;
   events: Events;
   req?: Request;

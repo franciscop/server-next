@@ -5,5 +5,5 @@ export default server()
   .socket("message", (ctx) => {
     // console.log("Server. FE says:", ctx, ctx.data, ctx.body);
     console.log(ctx);
-    ctx.socket.send("hello world");
+    ctx.socket?.send("hello world");
   });
