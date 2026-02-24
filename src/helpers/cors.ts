@@ -5,7 +5,7 @@ export default function cors(
   config: boolean | string | string[],
   origin: string = "",
 ): string | null {
-  origin = origin.toLowerCase();
+  origin = origin?.toLowerCase();
 
   // When it's true, reflect the origin
   if (config === true) return origin || null;

@@ -16,6 +16,9 @@ parse.month = parse.b = parse.y / 12;
 export function parse(str: string) {
   if (str === null || str === undefined) return null;
   if (typeof str === "number") return str;
+  if (typeof str !== "string") {
+    throw new Error(`Not a string: ${str} (${typeof str})`);
+  }
   // ignore commas/placeholders
   str = str.toLowerCase().replace(/[,_]/g, "");
   const [_, value, units] = times.exec(str) || [];

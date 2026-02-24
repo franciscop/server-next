@@ -668,7 +668,7 @@ function config(options = {}) {
 // src/helpers/cors.ts
 var localhost = /^https?:\/\/localhost(:\d+)?$/;
 function cors(config2, origin = "") {
-  origin = origin.toLowerCase();
+  origin = origin?.toLowerCase();
   if (config2 === true) return origin || null;
   if (config2 === "*") return "*";
   if (!origin) return null;
@@ -693,6 +693,9 @@ parse.month = parse.b = parse.y / 12;
 function parse(str) {
   if (str === null || str === void 0) return null;
   if (typeof str === "number") return str;
+  if (typeof str !== "string") {
+    throw new Error(`Not a string: ${str} (${typeof str})`);
+  }
   str = str.toLowerCase().replace(/[,_]/g, "");
   const [_, value, units] = times.exec(str) || [];
   if (!units) return null;
@@ -1308,13 +1311,10 @@ async function verify(password, hash3) {
 // src/auth/findSessionId.ts
 var validateToken = (authorization) => {
   const [type2, id] = authorization.trim().split(" ");
-  if (!type2 || !id) {
+  if (!type2 || type2.toLowerCase() !== "bearer") {
     throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   }
-  if (type2.toLowerCase() !== "bearer") {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
-  if (id.length !== 16) {
+  if (!id || id.length !== 16) {
     throw ServerError_default.AUTH_INVALID_TOKEN();
   }
   return id;
