@@ -100,5 +100,13 @@ export default function config(options: Options = {}): Settings {
     // TODO
   }
 
+  settings.onError =
+    options.onError ||
+    ((error: Error & { status: number }) => {
+      return new Response(error.message || "Server Error", {
+        status: error.status || 500,
+      });
+    });
+
   return settings;
 }

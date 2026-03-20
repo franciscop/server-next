@@ -1,4 +1,4 @@
-import type { Context } from "..";
+import { ServerError, type Context } from "..";
 import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
 import define from "./define";
@@ -36,8 +36,8 @@ export default async function handleRequest(
     if (ctx.platform.provider === "netlify") return;
 
     // In other environments, a non-response is wrong and we should 404 then
-    return new Response("Not Found", { status: 404 });
+    throw new ServerError("NOT_FOUND", 404, "Not Found");
   } catch (error: any) {
-    return new Response(error.message || "", { status: error.status || 500 });
+    return ctx.options.onError(error, ctx);
   }
 }

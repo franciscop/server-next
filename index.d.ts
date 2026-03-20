@@ -82,6 +82,7 @@ type AuthSettings = {
     cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
     redirect: string;
 };
+type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 type Options = {
     port?: number;
     secret?: string;
@@ -96,6 +97,7 @@ type Options = {
     cors?: CorsOptions;
     auth?: AuthOption;
     openapi?: any;
+    onError?: OnError;
 };
 type Settings = {
     port: number;
@@ -111,6 +113,7 @@ type Settings = {
     cors?: CorsSettings;
     auth?: AuthSettings;
     openapi?: any;
+    onError?: OnError;
 };
 type Time = {
     (name: string): void;

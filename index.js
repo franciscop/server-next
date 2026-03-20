@@ -662,6 +662,11 @@ function config(options = {}) {
       settings.openapi = {};
     }
   }
+  settings.onError = options.onError || ((error) => {
+    return new Response(error.message || "Server Error", {
+      status: error.status || 500
+    });
+  });
   return settings;
 }
 
@@ -973,9 +978,9 @@ async function handleRequest(handlers, ctx) {
       if (method !== "*") break;
     }
     if (ctx.platform.provider === "netlify") return;
-    return new Response("Not Found", { status: 404 });
+    throw new ServerError_default("NOT_FOUND", 404, "Not Found");
   } catch (error) {
-    return new Response(error.message || "", { status: error.status || 500 });
+    return ctx.options.onError(error, ctx);
   }
 }
 

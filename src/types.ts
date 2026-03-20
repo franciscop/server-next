@@ -139,6 +139,8 @@ export type AuthSettings = {
   redirect: string;
 };
 
+type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
+
 export type Options = {
   port?: number;
   secret?: string;
@@ -151,6 +153,7 @@ export type Options = {
   cors?: CorsOptions;
   auth?: AuthOption;
   openapi?: any;
+  onError?: OnError;
 };
 
 export type Settings = {
@@ -165,6 +168,7 @@ export type Settings = {
   cors?: CorsSettings;
   auth?: AuthSettings;
   openapi?: any;
+  onError?: OnError;
 };
 
 export type Time = {
