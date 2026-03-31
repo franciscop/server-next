@@ -176,15 +176,15 @@ export class Router<O extends ServerConfig = object> {
     return this.handle("patch", pathOrMid, ...middleware);
   }
 
-  del<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
-  del<Path extends string>(
+  delete<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+  delete<Path extends string>(
     path: Path,
     options: Options,
     ...middleware: Mids<O, Path>
   ): this;
-  del(...middleware: Middleware<O>[]): this;
-  del(options: Options, ...middleware: Middleware<O>[]): this;
-  del<Path extends string>(
+  delete(...middleware: Middleware<O>[]): this;
+  delete(options: Options, ...middleware: Middleware<O>[]): this;
+  delete<Path extends string>(
     pathOrMid: Path | Middleware<O>,
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]

@@ -1850,7 +1850,7 @@ var Router = class _Router {
     }
     return this.handle("patch", pathOrMid, ...middleware);
   }
-  del(pathOrMid, optionsOrMid, ...middleware) {
+  delete(pathOrMid, optionsOrMid, ...middleware) {
     if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
       return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
     }

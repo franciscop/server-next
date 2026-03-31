@@ -73,6 +73,24 @@ describe("can route properly", () => {
     expect(await res.text()).toBe("Hello /api/hello");
   });
 
+  it("can delete to the base route", async () => {
+    const api = server()
+      .delete("/hello", (ctx) => `Deleted ${ctx.url.pathname}`)
+      .test();
+    const res = await api.delete("/hello");
+    expect(await res.text()).toBe("Deleted /hello");
+  });
+
+  it("can delete to a nested route", async () => {
+    const deleteRouter = router().delete(
+      "/hello",
+      (ctx) => `Deleted ${ctx.url.pathname}`,
+    );
+    const api = server().use("/api/", deleteRouter).test();
+    const res = await api.delete("/api/hello");
+    expect(await res.text()).toBe("Deleted /api/hello");
+  });
+
   it("no status reuse", async () => {
     const api = server()
       .get("/a", () => status(201).send("hello"))

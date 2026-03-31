@@ -231,10 +231,10 @@ declare class Router<O extends ServerConfig = object> {
     patch<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
     patch(...middleware: Middleware<O>[]): this;
     patch(options: RouteOptions, ...middleware: Middleware<O>[]): this;
-    del<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
-    del<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
-    del(...middleware: Middleware<O>[]): this;
-    del(options: RouteOptions, ...middleware: Middleware<O>[]): this;
+    delete<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
+    delete<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
+    delete(...middleware: Middleware<O>[]): this;
+    delete(options: RouteOptions, ...middleware: Middleware<O>[]): this;
     options<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
     options<Path extends string>(path: Path, options: RouteOptions, ...mid: Mids<O, Path>): this;
     options(...middleware: Middleware<O>[]): this;
