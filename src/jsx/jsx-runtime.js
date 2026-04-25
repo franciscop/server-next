@@ -3,6 +3,7 @@ const entities = {
   "<": "&lt;",
   ">": "&gt;",
   '"': "&quot;",
+  "'": "&#39;",
 };
 
 const encode = (str = "") => {
@@ -40,34 +41,54 @@ const minifyCss = (str) =>
     .replace(/(\{) (\w)/g, "$1$2")
     .trim();
 
+const REACT_ELEMENT_TYPE = Symbol.for("react.element");
+
 const isReactElement = (val) =>
-  val !== null && typeof val === "object" && "type" in val && "props" in val;
+  val !== null &&
+  typeof val === "object" &&
+  (val.$$typeof === REACT_ELEMENT_TYPE || // real React
+    ("type" in val && "props" in val)); // your test objects
+
+const resolve = (val) => {
+  while (typeof val === "function") val = val();
+  if (isReactElement(val)) {
+    val = jsx(val.type, val.props || {});
+  }
+  return val ?? "";
+};
 
 const renderChild = (child) => {
-  if (!isValidChild(child)) return "";
-  if (typeof child === "function") return child();
-  if (typeof child === "number") return String(child);
-  if (typeof child === "string") return encode(child);
-  if (Array.isArray(child)) return child.flat().map(renderChild).join("");
-  if (isReactElement(child)) {
-    const result = jsx(child.type, child.props || {});
-    return typeof result === "function" ? result() : result ?? "";
+  while (typeof child === "function") child = child();
+
+  if (Array.isArray(child)) {
+    return child.map(renderChild).join("");
   }
+
+  if (isReactElement(child)) {
+    return resolve(jsx(child.type, child.props || {}));
+  }
+
+  if (typeof child === "string") return encode(child);
+  if (typeof child === "number") return String(child);
+
+  if (!isValidChild(child)) return "";
+
+  console.warn("Unknown child:", child);
   return "";
 };
 
 const jsx = (tag, { children, ...props }) => {
   if (typeof tag === "function") {
-    const result = tag({ children, ...props });
-    if (isReactElement(result)) return jsx(result.type, result.props || {});
-    return result ?? (() => "");
+    return () => renderChild(tag({ children, ...props }));
   }
 
   // Handle React forwardRef objects: { render: fn }
-  if (typeof tag === "object" && tag !== null && typeof tag.render === "function") {
-    const result = tag.render({ children, ...props }, null);
-    if (isReactElement(result)) return jsx(result.type, result.props || {});
-    return result ?? (() => "");
+  if (
+    typeof tag === "object" &&
+    tag !== null &&
+    typeof tag.render === "function"
+  ) {
+    return () => renderChild(tag.render({ children, ...props }, null));
   }
 
   if (tag === "script" && children) {
@@ -88,6 +109,7 @@ const jsx = (tag, { children, ...props }) => {
 
   children = (Array.isArray(children) ? children.flat() : [children])
     .map(renderChild)
+    .map((c) => (typeof c === "string" ? c : ""))
     .join("");
 
   if (!tag) return () => children;
