@@ -17,7 +17,6 @@ const SELFCLOSE = new Set(
 );
 
 const REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
-const REACT_ELEMENT_TYPE = Symbol.for("react.element");
 
 const altAttrs = {
   classname: "class",

@@ -44,6 +44,25 @@ describe("jsx", () => {
       `<!DOCTYPE html><html lang="en">Hello</html>`,
     );
   });
+
+  it("can render a pre with text", () => {
+    expect(<pre>hello</pre>).toRender("<pre>hello</pre>");
+  });
+
+  it("can render a pre with newlines", () => {
+    expect(<pre>line1{"\n"}line2</pre>).toRender("<pre>line1\nline2</pre>");
+  });
+
+  it("can render a pre with indented text", () => {
+    expect(<pre>{`  indented`}</pre>).toRender("<pre>  indented</pre>");
+  });
+  it("can render a pre inside a div", () => {
+    expect(
+      <div>
+        <pre>line1{"\n"}line2</pre>
+      </div>,
+    ).toRender("<div><pre>line1\nline2</pre></div>");
+  });
 });
 
 describe("fragments", () => {
