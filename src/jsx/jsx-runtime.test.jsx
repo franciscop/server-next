@@ -45,3 +45,53 @@ describe("jsx", () => {
     );
   });
 });
+
+describe("React element interop", () => {
+  // Simulate a component built with React's jsx runtime, which returns plain
+  // objects { type, props } instead of @server/next functions
+  const reactEl = (type, props = {}) => ({ type, props });
+
+  it("renders a React element returned from a function component", () => {
+    const Greeting = () => reactEl("h1", { children: "Hello" });
+    expect(<Greeting />).toRender("<h1>Hello</h1>");
+  });
+
+  it("renders nested React elements", () => {
+    const Card = () =>
+      reactEl("div", {
+        children: [
+          reactEl("h2", { children: "Title" }),
+          reactEl("p", { children: "Body" }),
+        ],
+      });
+    expect(<Card />).toRender("<div><h2>Title</h2><p>Body</p></div>");
+  });
+
+  it("renders React elements as children of a native element", () => {
+    const child = reactEl("strong", { children: "bold" });
+    expect(<p>{child}</p>).toRender("<p><strong>bold</strong></p>");
+  });
+
+  it("renders a mix of React elements and plain strings as children", () => {
+    const em = reactEl("em", { children: "world" });
+    expect(<p>Hello {em}!</p>).toRender("<p>Hello <em>world</em>!</p>");
+  });
+
+  it("renders a React element with attributes", () => {
+    const Link = () => reactEl("a", { href: "https://example.com", children: "click" });
+    expect(<Link />).toRender(`<a href="https://example.com">click</a>`);
+  });
+
+  it("renders deeply nested React elements", () => {
+    const Deep = () =>
+      reactEl("div", {
+        children: reactEl("ul", {
+          children: [
+            reactEl("li", { children: "one" }),
+            reactEl("li", { children: "two" }),
+          ],
+        }),
+      });
+    expect(<Deep />).toRender("<div><ul><li>one</li><li>two</li></ul></div>");
+  });
+});

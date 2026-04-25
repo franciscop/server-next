@@ -40,8 +40,35 @@ const minifyCss = (str) =>
     .replace(/(\{) (\w)/g, "$1$2")
     .trim();
 
+const isReactElement = (val) =>
+  val !== null && typeof val === "object" && "type" in val && "props" in val;
+
+const renderChild = (child) => {
+  if (!isValidChild(child)) return "";
+  if (typeof child === "function") return child();
+  if (typeof child === "number") return String(child);
+  if (typeof child === "string") return encode(child);
+  if (Array.isArray(child)) return child.flat().map(renderChild).join("");
+  if (isReactElement(child)) {
+    const result = jsx(child.type, child.props || {});
+    return typeof result === "function" ? result() : result ?? "";
+  }
+  return "";
+};
+
 const jsx = (tag, { children, ...props }) => {
-  if (typeof tag === "function") return tag({ children, ...props });
+  if (typeof tag === "function") {
+    const result = tag({ children, ...props });
+    if (isReactElement(result)) return jsx(result.type, result.props || {});
+    return result ?? (() => "");
+  }
+
+  // Handle React forwardRef objects: { render: fn }
+  if (typeof tag === "object" && tag !== null && typeof tag.render === "function") {
+    const result = tag.render({ children, ...props }, null);
+    if (isReactElement(result)) return jsx(result.type, result.props || {});
+    return result ?? (() => "");
+  }
 
   if (tag === "script" && children) {
     const src = children;
@@ -58,11 +85,9 @@ const jsx = (tag, { children, ...props }) => {
   }
 
   if (!isValidChild(children)) children = [];
-  if (typeof children === "string") children = [children];
 
-  children = (Array.isArray(children) ? children : [children])
-    .flat()
-    .map((c) => (typeof c === "function" ? c() : encode(c)))
+  children = (Array.isArray(children) ? children.flat() : [children])
+    .map(renderChild)
     .join("");
 
   if (!tag) return () => children;

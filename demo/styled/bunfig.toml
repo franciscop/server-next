@@ -1,0 +1,2 @@
+jsx = "react-jsx"
+jsxImportSource = "@server/next"

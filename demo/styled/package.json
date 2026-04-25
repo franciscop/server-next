@@ -1,0 +1,12 @@
+{
+  "name": "styled",
+  "version": "0.0.1",
+  "main": "index.jsx",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Demo using styled-components with server-side rendering",
+  "dependencies": {
+    "@server/next": "file:../../",
+    "styled-components": "^6"
+  }
+}
