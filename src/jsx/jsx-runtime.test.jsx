@@ -46,6 +46,31 @@ describe("jsx", () => {
   });
 });
 
+describe("fragments", () => {
+  it("does not crash on symbol-based element types (React internals)", () => {
+    expect(
+      <>
+        <span>Hello</span> world
+      </>,
+    ).toRender("<span>Hello</span> world");
+  });
+
+  it("renders nested fragments", () => {
+    expect(
+      <>
+        <>
+          <span>A</span>
+        </>
+        B
+      </>,
+    ).toRender("<span>A</span>B");
+  });
+
+  it("handles empty fragments", () => {
+    expect(<></>).toRender("");
+  });
+});
+
 describe("React element interop", () => {
   // Simulate a component built with React's jsx runtime, which returns plain
   // objects { type, props } instead of @server/next functions
@@ -78,7 +103,8 @@ describe("React element interop", () => {
   });
 
   it("renders a React element with attributes", () => {
-    const Link = () => reactEl("a", { href: "https://example.com", children: "click" });
+    const Link = () =>
+      reactEl("a", { href: "https://example.com", children: "click" });
     expect(<Link />).toRender(`<a href="https://example.com">click</a>`);
   });
 

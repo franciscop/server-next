@@ -16,73 +16,64 @@ const SELFCLOSE = new Set(
   "area,base,br,col,embed,hr,img,input,link,meta,source,track,wbr".split(","),
 );
 
+const REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
+const REACT_ELEMENT_TYPE = Symbol.for("react.element");
+
 const altAttrs = {
   classname: "class",
 };
 
-// "" and 0 are valid children, false and null and undefined are not
-const isValidChild = (child) => child || child === "" || child === 0;
+// valid primitives only
+const isValidChild = (child) => child === 0 || child === "" || !!child;
 
+// CSS helpers
 const escapeCSS = (value) => String(value).replace(/[<>&"'`]/g, "\\$&");
 
 const minifyCss = (str) =>
   str
     .replace(/\s+/g, " ")
-    .replace(/(?!<")\/\*[^*]+\*\/(?!")/g, "")
-    .replace(/(\w|\*) (\{)/g, "$1$2")
-    .replace(/(\}) (\w|\*)/g, "$1$2")
-    .replace(/(\{) (\w)/g, "$1$2")
-    .replace(/(\w)(:) /g, "$1$2")
-    .replace(/(;) (\})/g, "$1$2")
-    .replace(/(;) (\w)/g, "$1$2")
-    .replace(/;(\})/g, "$1")
-    .replace(/(\w), (\w)/g, "$1,$2")
-    .replace(/(\w), (\w)/g, "$1,$2")
-    .replace(/(\{) (\w)/g, "$1$2")
+    .replace(/\/\*[^*]*\*\//g, "")
     .trim();
 
-const REACT_ELEMENT_TYPE = Symbol.for("react.element");
-
+// React element detection (safe for your custom objects too)
 const isReactElement = (val) =>
-  val !== null &&
-  typeof val === "object" &&
-  (val.$$typeof === REACT_ELEMENT_TYPE || // real React
-    ("type" in val && "props" in val)); // your test objects
+  val !== null && typeof val === "object" && "type" in val && "props" in val;
 
-const resolve = (val) => {
-  while (typeof val === "function") val = val();
-  if (isReactElement(val)) {
-    val = jsx(val.type, val.props || {});
-  }
-  return val ?? "";
-};
-
+// 🔥 CRITICAL: single-pass renderer (NO recursion cycles)
 const renderChild = (child) => {
-  while (typeof child === "function") child = child();
+  if (child == null || child === false) return "";
 
   if (Array.isArray(child)) {
     return child.map(renderChild).join("");
   }
 
-  if (isReactElement(child)) {
-    return resolve(jsx(child.type, child.props || {}));
+  if (typeof child === "function") {
+    return renderChild(child());
   }
 
-  if (typeof child === "string") return encode(child);
+  if (typeof child === "string") return child;
   if (typeof child === "number") return String(child);
 
-  if (!isValidChild(child)) return "";
+  if (isReactElement(child)) {
+    return jsx(child.type, child.props || {})();
+  }
 
   console.warn("Unknown child:", child);
   return "";
 };
 
-const jsx = (tag, { children, ...props }) => {
+const jsx = (tag, { children, ...props } = {}) => {
+  // 🔥 Fragment (Symbol-safe)
+  if (tag === REACT_FRAGMENT_TYPE || tag === Fragment) {
+    return () => renderChild(children);
+  }
+
+  // function component
   if (typeof tag === "function") {
     return () => renderChild(tag({ children, ...props }));
   }
 
-  // Handle React forwardRef objects: { render: fn }
+  // forwardRef-like objects
   if (
     typeof tag === "object" &&
     tag !== null &&
@@ -91,48 +82,60 @@ const jsx = (tag, { children, ...props }) => {
     return () => renderChild(tag.render({ children, ...props }, null));
   }
 
+  // script special-case
   if (tag === "script" && children) {
     const src = children;
     children = () => src;
   }
 
-  if (tag === "style" && children && typeof children === "string") {
+  // style special-case
+  if (tag === "style" && typeof children === "string") {
     const src = minifyCss(escapeCSS(children));
     children = () => src;
   }
 
+  // dangerouslySetInnerHTML
   if (props?.dangerouslySetInnerHTML) {
     children = () => props.dangerouslySetInnerHTML.__html;
   }
 
-  if (!isValidChild(children)) children = [];
-
-  children = (Array.isArray(children) ? children.flat() : [children])
+  // normalize children
+  const flatChildren = (Array.isArray(children) ? children.flat() : [children])
+    .filter(isValidChild)
     .map(renderChild)
-    .map((c) => (typeof c === "string" ? c : ""))
     .join("");
 
-  if (!tag) return () => children;
+  // 🔥 CRITICAL SAFETY GATE (prevents Symbol/string crash)
+  if (!tag || typeof tag !== "string") {
+    return () => flatChildren;
+  }
 
+  // attributes
   let attrStr = Object.entries(props || {})
     .filter(([k]) => k !== "dangerouslySetInnerHTML")
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
     .filter(([, v]) => v !== false)
     .map(([k, v]) => {
       const key = altAttrs[k.toLowerCase()] || encode(k);
+
       if (v === true) return key;
+
       const value =
         typeof v === "string" || typeof v === "number" ? encode(v) : "";
+
       return `${key}="${value}"`;
     })
     .join(" ");
 
   if (attrStr) attrStr = ` ${attrStr}`;
 
-  if (SELFCLOSE.has(tag)) return () => `<${tag}${attrStr} />`;
+  if (SELFCLOSE.has(tag)) {
+    return () => `<${tag}${attrStr} />`;
+  }
 
   const doctype = tag === "html" ? "<!DOCTYPE html>" : "";
-  return () => `${doctype}<${tag}${attrStr}>${children}</${tag}>`;
+
+  return () => `${doctype}<${tag}${attrStr}>${flatChildren}</${tag}>`;
 };
 
 const Fragment = "";
