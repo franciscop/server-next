@@ -118,11 +118,13 @@ const jsx = (tag, { children, ...props }) => {
     .filter(([k]) => k !== "dangerouslySetInnerHTML")
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
     .filter(([, v]) => v !== false)
-    .map(([k, v]) =>
-      v === true
-        ? altAttrs[k.toLowerCase()] || encode(k)
-        : `${altAttrs[k.toLowerCase()] || encode(k)}="${encode(String(v))}"`,
-    )
+    .map(([k, v]) => {
+      const key = altAttrs[k.toLowerCase()] || encode(k);
+      if (v === true) return key;
+      const value =
+        typeof v === "string" || typeof v === "number" ? encode(v) : "";
+      return `${key}="${value}"`;
+    })
     .join(" ");
 
   if (attrStr) attrStr = ` ${attrStr}`;
