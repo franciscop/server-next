@@ -27,13 +27,13 @@ const altAttrs = {
 const isValidChild = (child) =>
   child != null && child !== false && child !== true;
 
-// CSS helpers
-const escapeCSS = (value) => String(value).replace(/[<>&"'`]/g, "\\$&");
-
 const minifyCss = (str) =>
   str
-    .replace(/\s+/g, " ")
     .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([{}:;,>~+])\s*/g, "$1")
+    .replace(/;}/g, "}")
+    .replace(/<\/style>/gi, "<\\/style>")
     .trim();
 
 // React element detection (safe for custom objects too)
@@ -104,9 +104,9 @@ const jsx = (tag, { children, ...props } = {}) => {
     children = raw(content);
   }
 
-  // style: minified + escaped raw content
+  // style: minified raw content
   if (tag === "style" && typeof children === "string") {
-    children = raw(minifyCss(escapeCSS(children)));
+    children = raw(minifyCss(children));
   }
 
   // dangerouslySetInnerHTML

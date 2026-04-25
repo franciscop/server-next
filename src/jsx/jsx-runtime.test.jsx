@@ -299,20 +299,50 @@ describe("script tag", () => {
 describe("style tag", () => {
   it("renders style content", () => {
     expect(<style>{"body { color: red; }"}</style>).toRender(
-      "<style>body { color: red; }</style>",
+      "<style>body{color:red}</style>",
     );
   });
 
   it("minifies whitespace in style content", () => {
     expect(
       <style>{"body {\n  color:   red;\n  margin: 0;\n}"}</style>,
-    ).toRender("<style>body { color: red; margin: 0; }</style>");
+    ).toRender("<style>body{color:red;margin:0}</style>");
   });
 
   it("strips CSS comments", () => {
     expect(
       <style>{"/* reset */ body { margin: 0; } /* end */"}</style>,
-    ).toRender("<style>body { margin: 0; }</style>");
+    ).toRender("<style>body{margin:0}</style>");
+  });
+
+  it("preserves child combinator in selectors", () => {
+    expect(
+      <style>{":not(pre) > code { background: none; }"}</style>,
+    ).toRender("<style>:not(pre)>code{background:none}</style>");
+  });
+
+  it("preserves sibling combinators in selectors", () => {
+    expect(
+      <style>{"h2 + p { margin: 0; } h2 ~ p { color: red; }"}</style>,
+    ).toRender("<style>h2+p{margin:0}h2~p{color:red}</style>");
+  });
+
+  it("removes spaces around braces, colons, and semicolons", () => {
+    expect(
+      <style>{"a { color : red ; font-size : 1em ; }"}</style>,
+    ).toRender("<style>a{color:red;font-size:1em}</style>");
+  });
+
+  it("removes trailing semicolon before closing brace", () => {
+    expect(
+      <style>{"p { margin: 0; padding: 0; }"}</style>,
+    ).toRender("<style>p{margin:0;padding:0}</style>");
+  });
+
+  it("does not break </style> injection", () => {
+    expect(
+      <style>{"a { content: '</style>'; }"}</style>,
+    ).toRender("<style>a{content:'<\\/style>'}</style>");
   });
 });
 
