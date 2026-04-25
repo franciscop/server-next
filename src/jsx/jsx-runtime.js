@@ -9,7 +9,7 @@ const entities = {
 const encode = (str = "") => {
   if (typeof str === "number") str = String(str);
   if (typeof str !== "string") return "";
-  return str.replace(/[&<>"]/g, (tag) => entities[tag]);
+  return str.replace(/[&<>"']/g, (tag) => entities[tag]);
 };
 
 const SELFCLOSE = new Set(
@@ -20,10 +20,12 @@ const REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
 
 const altAttrs = {
   classname: "class",
+  htmlfor: "for",
 };
 
-// valid primitives only
-const isValidChild = (child) => child === 0 || child === "" || !!child;
+// valid primitives only — null, undefined, false, true are all skipped
+const isValidChild = (child) =>
+  child != null && child !== false && child !== true;
 
 // CSS helpers
 const escapeCSS = (value) => String(value).replace(/[<>&"'`]/g, "\\$&");
@@ -31,27 +33,38 @@ const escapeCSS = (value) => String(value).replace(/[<>&"'`]/g, "\\$&");
 const minifyCss = (str) =>
   str
     .replace(/\s+/g, " ")
-    .replace(/\/\*[^*]*\*\//g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
     .trim();
 
-// React element detection (safe for your custom objects too)
+// React element detection (safe for custom objects too)
 const isReactElement = (val) =>
   val !== null && typeof val === "object" && "type" in val && "props" in val;
 
-// 🔥 CRITICAL: single-pass renderer (NO recursion cycles)
+// Marker for raw (pre-escaped) content that bypasses HTML encoding
+const RAW = Symbol("raw");
+const raw = (str) => ({ [RAW]: String(str) });
+
 const renderChild = (child) => {
-  if (child == null || child === false) return "";
+  if (child == null || child === false || child === true) return "";
 
   if (Array.isArray(child)) {
     return child.map(renderChild).join("");
   }
 
   if (typeof child === "function") {
-    return renderChild(child());
+    const result = child();
+    // Strings returned by functions are pre-rendered HTML — don't re-encode them
+    if (result == null || result === false || result === true) return "";
+    if (typeof result === "string") return result;
+    if (typeof result === "number") return String(result);
+    return renderChild(result);
   }
 
-  if (typeof child === "string") return child;
+  if (typeof child === "string") return encode(child);
   if (typeof child === "number") return String(child);
+
+  // Raw marker bypasses encoding (used by script, style, dangerouslySetInnerHTML)
+  if (typeof child === "object" && RAW in child) return child[RAW];
 
   if (isReactElement(child)) {
     return jsx(child.type, child.props || {})();
@@ -62,7 +75,7 @@ const renderChild = (child) => {
 };
 
 const jsx = (tag, { children, ...props } = {}) => {
-  // 🔥 Fragment (Symbol-safe)
+  // Fragment (Symbol-safe)
   if (tag === REACT_FRAGMENT_TYPE || tag === Fragment) {
     return () => renderChild(children);
   }
@@ -81,21 +94,24 @@ const jsx = (tag, { children, ...props } = {}) => {
     return () => renderChild(tag.render({ children, ...props }, null));
   }
 
-  // script special-case
-  if (tag === "script" && children) {
-    const src = children;
-    children = () => src;
+  // script: raw content (JS must not be HTML-encoded)
+  if (tag === "script" && children != null) {
+    const parts = Array.isArray(children) ? children : [children];
+    const content = parts
+      .filter(isValidChild)
+      .map((c) => (typeof c === "string" ? c : typeof c === "number" ? String(c) : ""))
+      .join("");
+    children = raw(content);
   }
 
-  // style special-case
+  // style: minified + escaped raw content
   if (tag === "style" && typeof children === "string") {
-    const src = minifyCss(escapeCSS(children));
-    children = () => src;
+    children = raw(minifyCss(escapeCSS(children)));
   }
 
   // dangerouslySetInnerHTML
   if (props?.dangerouslySetInnerHTML) {
-    children = () => props.dangerouslySetInnerHTML.__html;
+    children = raw(props.dangerouslySetInnerHTML.__html ?? "");
   }
 
   // normalize children
@@ -104,7 +120,7 @@ const jsx = (tag, { children, ...props } = {}) => {
     .map(renderChild)
     .join("");
 
-  // 🔥 CRITICAL SAFETY GATE (prevents Symbol/string crash)
+  // safety gate (prevents Symbol/unknown-type crash)
   if (!tag || typeof tag !== "string") {
     return () => flatChildren;
   }
@@ -120,7 +136,7 @@ const jsx = (tag, { children, ...props } = {}) => {
       if (v === true) return key;
 
       const value =
-        typeof v === "string" || typeof v === "number" ? encode(v) : "";
+        typeof v === "string" || typeof v === "number" ? encode(String(v)) : "";
 
       return `${key}="${value}"`;
     })
@@ -137,6 +153,6 @@ const jsx = (tag, { children, ...props } = {}) => {
   return () => `${doctype}<${tag}${attrStr}>${flatChildren}</${tag}>`;
 };
 
-const Fragment = "";
+const Fragment = Symbol.for("react.fragment");
 
 export { jsx, jsx as jsxs, jsx as jsxDEV, Fragment };
