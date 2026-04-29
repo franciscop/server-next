@@ -39,7 +39,12 @@ describe("request body formats", () => {
     const res = await api.post("/", reqBody);
     const body = await res.json();
     expect(body.hello).toBe("world");
-    expect(body.file.split(".").pop()).toBe("jpg");
+    // Rich file object
+    expect(body.file.name).toBe("nero.jpg");
+    expect(body.file.id).toMatch(/^\w{16}\.\w+$/);
+    expect(body.file.path).toMatch(/uploads.*\.jpg$/);
+    expect(body.file.type).toBe("image/jpeg");
+    expect(body.file.size).toBeGreaterThan(0);
   });
 
   it("accepts a ReadableStream from text", async () => {
@@ -52,5 +57,42 @@ describe("request body formats", () => {
   it("accepts a ReadableStream from binary", async () => {
     const reqBody = toWeb(createReadStream("./src/tests/nero.jpg"));
     await api.post("/", reqBody);
+  });
+});
+
+describe("uploads: not configured", () => {
+  const api = server()
+    .post("/", (ctx: Context) => ctx.body)
+    .test();
+
+  it("still parses text fields from FormData", async () => {
+    const form = new FormData();
+    form.append("name", "alice");
+    form.append("message", "hello");
+    const res = await api.post("/", form);
+    const body = await res.json();
+    expect(body.name).toBe("alice");
+    expect(body.message).toBe("hello");
+  });
+
+  it("silently skips file fields", async () => {
+    const form = new FormData();
+    form.append("name", "alice");
+    const fileBuffer = await fsp.readFile("./src/tests/nero.jpg");
+    const blob = new Blob([fileBuffer], { type: "image/jpeg" });
+    form.append("avatar", blob, "nero.jpg");
+    const res = await api.post("/", form);
+    const body = await res.json();
+    expect(body.name).toBe("alice");
+    expect(body.avatar).toBeUndefined();
+  });
+
+  it("returns nothing for an all-files FormData", async () => {
+    const form = new FormData();
+    const blob = new Blob(["data"], { type: "image/png" });
+    form.append("img", blob, "img.png");
+    const res = await api.post("/", form);
+    const body = await res.json();
+    expect(body.img).toBeUndefined();
   });
 });

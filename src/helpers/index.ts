@@ -16,3 +16,5 @@ export { default as parseHeaders } from "./parseHeaders";
 export { default as toWeb } from "./toWeb";
 export { default as types } from "./types";
 export { default as verify } from "./verify";
+export { default as upload } from "./upload";
+export type { LimitOptions, UploadPipeline } from "./upload";

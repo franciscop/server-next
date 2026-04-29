@@ -1,5 +1,5 @@
 import type { Bucket } from "..";
-import { createId } from "../helpers";
+import { saveFileToBucket, UploadPipeline } from "./upload";
 
 function getBoundary(header?: string): string | null {
   if (!header) return null;
@@ -23,17 +23,6 @@ function getMatching(string: string, regex: RegExp): string {
   return matches?.[1] ?? "";
 }
 
-const saveFile = async (
-  name: string,
-  value: Buffer,
-  bucket: Bucket,
-): Promise<string> => {
-  const ext = name.split(".").pop();
-  const id = `${createId()}.${ext}`;
-  await bucket.write(id, value);
-  return id;
-};
-
 // Utility function to split a buffer
 function splitBuffer(buffer: Buffer, delimiter: Buffer): Buffer[] {
   const result: Buffer[] = [];
@@ -51,6 +40,7 @@ function splitBuffer(buffer: Buffer, delimiter: Buffer): Buffer[] {
 }
 
 const BREAK_BUFFER = Buffer.from("\r\n\r\n");
+const END_BUFFER = Buffer.from("--\r\n");
 
 // Simple heuristic to guess if a buffer is text
 function isProbablyText(buffer: Buffer): boolean {
@@ -62,16 +52,17 @@ function isProbablyText(buffer: Buffer): boolean {
   return true;
 }
 
+
 export default async function parseBody(
   raw: Buffer,
   contentType?: string | string[],
-  bucket?: Bucket,
+  bucket?: Bucket | UploadPipeline,
 ): Promise<any> {
   const contentTypeStr = Array.isArray(contentType)
     ? contentType[0]
     : contentType;
 
-  if (!raw) return {};
+  if (!raw || raw.length === 0) return {};
 
   // Handle plain text or JSON first
   if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
@@ -90,7 +81,7 @@ export default async function parseBody(
   const parts = splitBuffer(raw, boundaryBuffer);
 
   for (const part of parts) {
-    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
+    if (part.length === 0 || part.equals(END_BUFFER)) continue;
 
     const idx = part.indexOf(BREAK_BUFFER);
     if (idx === -1) continue;
@@ -106,8 +97,28 @@ export default async function parseBody(
     const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
 
     if (filename) {
-      if (!bucket) throw new Error("Bucket is required to save files");
-      body[name] = await saveFile(filename, contentBuf, bucket);
+      const partContentType =
+        getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() ||
+        "application/octet-stream";
+
+      if (!bucket) {
+        continue;
+      }
+
+      if (bucket instanceof UploadPipeline) {
+        body[name] = await bucket.processFile(
+          filename,
+          contentBuf,
+          partContentType,
+        );
+      } else {
+        body[name] = await saveFileToBucket(
+          filename,
+          contentBuf,
+          bucket,
+          partContentType,
+        );
+      }
     } else {
       const value = isProbablyText(contentBuf)
         ? contentBuf.toString("utf-8").trim()

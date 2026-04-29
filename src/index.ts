@@ -93,4 +93,6 @@ export default function server<
 export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./ServerError";
+export { default as upload } from "./helpers/upload";
+export type { LimitOptions, UploadPipeline } from "./helpers/upload";
 export type * from "./types";

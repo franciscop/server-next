@@ -1,6 +1,7 @@
 // Through this file, "options" refers to the ones that are accepted
 // by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
+import type { UploadPipeline } from "./helpers/upload";
 
 export type Method =
   | "get"
@@ -50,6 +51,14 @@ export type Bucket = {
   read: (path: string) => Promise<ReadableStream | null>;
   write: (path: string, data: string | Buffer) => Promise<void | string>;
   delete: (path: string) => Promise<boolean>;
+};
+
+export type UploadedFile = {
+  name: string;
+  id: string;
+  path: string;
+  type: string;
+  size: number;
 };
 
 export type CorsSettings = {
@@ -146,7 +155,7 @@ export type Options = {
   secret?: string;
   views?: string | Bucket;
   public?: string | Bucket;
-  uploads?: string | Bucket;
+  uploads?: string | Bucket | UploadPipeline;
   store?: KVStore;
   cookies?: KVStore;
   session?: KVStore | { store: KVStore };
@@ -161,7 +170,7 @@ export type Settings = {
   secret: string;
   views?: Bucket;
   public?: Bucket;
-  uploads?: Bucket;
+  uploads?: Bucket | UploadPipeline;
   store?: KVStore;
   cookies?: KVStore;
   session?: { store: KVStore };

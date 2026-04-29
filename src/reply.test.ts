@@ -169,5 +169,21 @@ describe("Reply", () => {
         'attachment; filename="hello.unknown"',
       );
     });
+
+    it("infers content-type from extension without any prior type() call", () => {
+      // If the ext-inference guard is broken, content-type would be absent or wrong
+      const res = download("report.pdf").send("data");
+      expect(res.headers.get("content-type")).toBe("application/pdf");
+    });
+
+    it("does not set content-type when called without a filename", () => {
+      // download() with no name should never inject a content-type
+      const res = download().send();
+      expect(res.headers.get("content-disposition")).toBe("attachment");
+      // content-type comes from send(), not from download()
+      expect(res.headers.get("content-type")).not.toBeNull();
+      // but it is NOT set to a file-derived type
+      expect(res.headers.get("content-type")).toBe("text/plain");
+    });
   });
 });

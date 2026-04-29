@@ -1,3 +1,18 @@
+type LimitOptions = {
+    maxSize?: number | string;
+    minSize?: number | string;
+    fileType?: string[];
+};
+declare class UploadPipeline {
+    private _bucket;
+    private _limits;
+    constructor(bucket?: Bucket | null);
+    limit(options: LimitOptions): this;
+    store(bucket: Bucket): this;
+    processFile(originalName: string, data: Buffer, contentType: string): Promise<UploadedFile>;
+}
+declare function upload(bucket?: Bucket | null): UploadPipeline;
+
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 type ServerConfig<Session = {}, User = {}> = {
     Session?: Session;
@@ -27,6 +42,13 @@ type Bucket = {
     read: (path: string) => Promise<ReadableStream | null>;
     write: (path: string, data: string | Buffer) => Promise<void | string>;
     delete: (path: string) => Promise<boolean>;
+};
+type UploadedFile = {
+    name: string;
+    id: string;
+    path: string;
+    type: string;
+    size: number;
 };
 type CorsSettings = {
     origin: string | boolean;
@@ -88,7 +110,7 @@ type Options = {
     secret?: string;
     views?: string | Bucket;
     public?: string | Bucket;
-    uploads?: string | Bucket;
+    uploads?: string | Bucket | UploadPipeline;
     store?: KVStore;
     cookies?: KVStore;
     session?: KVStore | {
@@ -104,7 +126,7 @@ type Settings = {
     secret: string;
     views?: Bucket;
     public?: Bucket;
-    uploads?: Bucket;
+    uploads?: Bucket | UploadPipeline;
     store?: KVStore;
     cookies?: KVStore;
     session?: {
@@ -402,4 +424,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

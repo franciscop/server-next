@@ -14,7 +14,7 @@ export default async function parseResponse(
   out: any,
   ctx: Context,
 ): Promise<Response | null> {
-  if (!out && typeof out !== "string") return;
+  if (!out && typeof out !== "string") return null;
 
   if (typeof out === "function") {
     out = await out(ctx);

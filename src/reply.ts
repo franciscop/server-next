@@ -33,7 +33,7 @@ class Reply {
 
   download(name?: string): this {
     const ext = name?.split(".").pop();
-    if (type && ext && !this.res.headers.get("content-type")) this.type(ext);
+    if (ext && !this.res.headers.get("content-type")) this.type(ext);
     const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
     return this.headers("content-disposition", `attachment${filename}`);
   }

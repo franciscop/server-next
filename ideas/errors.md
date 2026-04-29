@@ -37,12 +37,13 @@ export default server()
 Then, developers using the library also write bugs, and it's the library's goal to be as resilient to those as possible. For this, we should try to avoid halting the app if possible, and thus if the dev writes this:
 
 ```js
-export default server().get("/users/:id", async (ctx) => {
-  // ...
-  // ...
-
-  throw new Error("Ha?");
-});
+export default server()
+  .get("/users/:id", async (ctx) => {
+    // ...
+    // ...
+  
+    throw new Error("Ha?");
+  });
 ```
 
 It makes more sense that we return a `500` + `"Server error"` instead of halting the server altogether. There's very rare ocassions in modern dev that we want to stop the server altogether.
@@ -100,6 +101,7 @@ export default server({ onError })
 
     if (!(await canReadUser(ctx.auth, user))) {
       throw ClientError(..., { status: 401 });
+      return status(401).send(...);
     }
 
     // Success

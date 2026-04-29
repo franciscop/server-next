@@ -197,7 +197,7 @@ var Reply = class {
   }
   download(name) {
     const ext = name?.split(".").pop();
-    if (type && ext && !this.res.headers.get("content-type")) this.type(ext);
+    if (ext && !this.res.headers.get("content-type")) this.type(ext);
     const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
     return this.headers("content-disposition", `attachment${filename}`);
   }
@@ -542,59 +542,83 @@ function createId(source, size = 16) {
   return randomId(size);
 }
 
-// src/helpers/color.ts
-var map = {
-  reset: 0,
-  bright: 1,
-  dim: 2,
-  under: 4,
-  blink: 5,
-  reverse: 7,
-  black: 30,
-  red: 31,
-  green: 32,
-  yellow: 33,
-  blue: 34,
-  magenta: 35,
-  cyan: 36,
-  white: 37,
-  bgblack: 40,
-  bgred: 41,
-  bggreen: 42,
-  bgyellow: 43,
-  bgblue: 44,
-  bgmagenta: 45,
-  bgcyan: 46,
-  bgwhite: 47
-};
-var replace = (k) => {
-  if (process.env.NO_COLOR) return "";
-  if (!(k in map)) throw new Error(`"{${k}}" is not a valid color`);
-  return `\x1B[${map[k]}m`;
-};
-function color(str, ...vals) {
-  if (typeof str === "string") {
-    return str.replace(/\{(\w+)\}/g, (_m, k) => replace(k)).replace(/\{\/\w*\}/g, () => replace("reset"));
-  }
-  return color(str[0] + vals.map((v, i) => v + str[i + 1]).join(""));
+// src/helpers/upload.ts
+function parseBytes(value) {
+  if (typeof value === "number") return value;
+  const units = {
+    b: 1,
+    kb: 1024,
+    mb: 1024 ** 2,
+    gb: 1024 ** 3
+  };
+  const match = value.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)$/);
+  if (!match) throw new Error(`Invalid size: "${value}"`);
+  return parseFloat(match[1]) * (units[match[2]] ?? 1);
 }
-
-// src/helpers/debugInfo.ts
-var isDebug = process.argv.includes("--debug");
-function debugInfo(options, name, cb, icon = "") {
-  if (!isDebug) return;
-  if (!options[name]) {
-    console.log(color`options:${String(name)}\t→ {dim}[not set]{/}`);
-    return;
+function getExt(filename) {
+  const i = filename.lastIndexOf(".");
+  if (i <= 0) return ".bin";
+  return filename.slice(i).toLowerCase();
+}
+async function saveFileToBucket(originalName, data, bucket, contentType) {
+  const ext = getExt(originalName);
+  const id = `${createId()}${ext}`;
+  const path2 = await bucket.write(id, data);
+  return { name: originalName, id, path: path2, type: contentType, size: data.length };
+}
+var UploadPipeline = class {
+  _bucket;
+  _limits = {};
+  constructor(bucket) {
+    this._bucket = bucket ?? null;
   }
-  console.log(
-    color`options:${String(name)}\t→ ${icon ? `${icon} ` : ""}${cb(options[name])}`
-  );
+  limit(options) {
+    this._limits = { ...this._limits, ...options };
+    return this;
+  }
+  store(bucket) {
+    this._bucket = bucket;
+    return this;
+  }
+  async processFile(originalName, data, contentType) {
+    const { maxSize, minSize, fileType } = this._limits;
+    if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
+      throw new Error(
+        `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
+      );
+    }
+    if (minSize !== void 0 && data.length < parseBytes(minSize)) {
+      throw new Error(
+        `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
+      );
+    }
+    if (fileType && fileType.length > 0) {
+      const ext = getExt(originalName);
+      const mime = contentType.toLowerCase();
+      const allowed = fileType.some(
+        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
+      );
+      if (!allowed) {
+        throw new Error(
+          `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
+        );
+      }
+    }
+    if (!this._bucket) {
+      throw new Error(
+        `No destination configured \u2014 pass a bucket to upload() or call .store()`
+      );
+    }
+    return saveFileToBucket(originalName, data, this._bucket, contentType);
+  }
+};
+function upload(bucket) {
+  return new UploadPipeline(bucket);
 }
 
 // src/helpers/config.ts
-var env2 = globalThis.env;
 function config(options = {}) {
+  const env2 = globalThis.env;
   const settings = {
     port: options.port || env2.PORT || 3e3,
     secret: options.secret || env2.SECRET || `unsafe-${createId()}`
@@ -633,27 +657,16 @@ function config(options = {}) {
     settings.cors = cors2;
   }
   settings.views = options.views ? bucket_default(options.views) : null;
-  debugInfo(options, "views", (views) => views?.location || "true", "\u{1F4C2}");
   settings.public = options.public ? bucket_default(options.public) : null;
-  debugInfo(options, "public", (pub) => pub?.location || "true", "\u{1F4C2}");
-  settings.uploads = options.uploads ? bucket_default(options.uploads) : null;
-  debugInfo(options, "uploads", (ups) => ups?.location || "true", "\u{1F4C2}");
+  settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket_default(options.uploads) : null;
   settings.store = options.store ?? null;
-  debugInfo(options, "store", (store) => store?.name || "working", "\u{1F4E6}");
   settings.cookies = options.cookies ?? null;
-  debugInfo(options, "cookies", (cookies2) => cookies2?.name || "working", "\u{1F36A}");
   if (options.session) {
     settings.session = "store" in options.session ? options.session : { store: options.session };
   }
   if (options.store && !options.session) {
     settings.session = { store: options.store.prefix("session:") };
   }
-  debugInfo(
-    options,
-    "session",
-    (session2) => session2?.store?.name || "working",
-    "\u{1F510}"
-  );
   if (options.auth || env2.AUTH) {
     settings.auth = parseAuthOptions(options.auth || env2.AUTH || null, options);
   }
@@ -795,7 +808,7 @@ function getMachine() {
 
 // src/parseResponse.ts
 async function parseResponse(out, ctx) {
-  if (!out && typeof out !== "string") return;
+  if (!out && typeof out !== "string") return null;
   if (typeof out === "function") {
     out = await out(ctx);
   }
@@ -1071,12 +1084,6 @@ function getMatching(string, regex) {
   const matches = string.match(regex);
   return matches?.[1] ?? "";
 }
-var saveFile = async (name, value, bucket) => {
-  const ext = name.split(".").pop();
-  const id = `${createId()}.${ext}`;
-  await bucket.write(id, value);
-  return id;
-};
 function splitBuffer(buffer, delimiter) {
   const result = [];
   let start = 0;
@@ -1090,6 +1097,7 @@ function splitBuffer(buffer, delimiter) {
   return result;
 }
 var BREAK_BUFFER = Buffer.from("\r\n\r\n");
+var END_BUFFER = Buffer.from("--\r\n");
 function isProbablyText(buffer) {
   for (let i = 0; i < Math.min(buffer.length, 512); i++) {
     const byte = buffer[i];
@@ -1100,7 +1108,7 @@ function isProbablyText(buffer) {
 }
 async function parseBody(raw, contentType, bucket) {
   const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-  if (!raw) return {};
+  if (!raw || raw.length === 0) return {};
   if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
     return raw.toString("utf-8");
   }
@@ -1113,7 +1121,7 @@ async function parseBody(raw, contentType, bucket) {
   const boundaryBuffer = Buffer.from(`--${boundary}`);
   const parts = splitBuffer(raw, boundaryBuffer);
   for (const part of parts) {
-    if (part.length === 0 || part.equals(Buffer.from("--\r\n"))) continue;
+    if (part.length === 0 || part.equals(END_BUFFER)) continue;
     const idx = part.indexOf(BREAK_BUFFER);
     if (idx === -1) continue;
     const headerStr = part.slice(0, idx).toString("utf-8");
@@ -1122,8 +1130,24 @@ async function parseBody(raw, contentType, bucket) {
     if (!name) continue;
     const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
     if (filename) {
-      if (!bucket) throw new Error("Bucket is required to save files");
-      body[name] = await saveFile(filename, contentBuf, bucket);
+      const partContentType = getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() || "application/octet-stream";
+      if (!bucket) {
+        continue;
+      }
+      if (bucket instanceof UploadPipeline) {
+        body[name] = await bucket.processFile(
+          filename,
+          contentBuf,
+          partContentType
+        );
+      } else {
+        body[name] = await saveFileToBucket(
+          filename,
+          contentBuf,
+          bucket,
+          partContentType
+        );
+      }
     } else {
       const value = isProbablyText(contentBuf) ? contentBuf.toString("utf-8").trim() : contentBuf;
       if (body[name]) {
@@ -1749,9 +1773,9 @@ async function createWinter(req, app) {
 }
 
 // src/context/handlers.ts
-var Winter = async (app, request, env3) => {
-  if (env3?.upgrade(request)) return;
-  Object.assign(globalThis.env, env3);
+var Winter = async (app, request, env2) => {
+  if (env2?.upgrade(request)) return;
+  Object.assign(globalThis.env, env2);
   const ctx = await createWinter(request, app);
   const res = await handleRequest(app.handlers, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
@@ -1965,8 +1989,8 @@ var Server = class extends Router {
   node() {
     return Node(this);
   }
-  fetch(request, env3) {
-    return Winter(this, request, env3);
+  fetch(request, env2) {
+    return Winter(this, request, env2);
   }
   callback(request, context) {
     return Netlify(this, request, context);
@@ -1991,5 +2015,6 @@ export {
   router,
   send,
   status,
-  type
+  type,
+  upload
 };

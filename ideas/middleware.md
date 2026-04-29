@@ -1,6 +1,6 @@
 # Plugins vs Middleware
 
-There are two available ways to add options, one is through plugins and another is through middleware. You can think as plugins as more advanced middleware and with a better integration with Server, BUT they are also limited to what Server supports natively. Middleware are very similar toExpress and other generic frameworks:
+There are two available ways to add options, one is through plugins and another is through middleware. You can think as plugins as more advanced middleware and with a better integration with Server, BUT they are also limited to what Server supports natively. Middleware are very similar to Express and other generic frameworks:
 
 ```js
 // Middlware examples

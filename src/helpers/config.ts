@@ -1,15 +1,12 @@
 import parseAuthOptions from "../auth/parseAuthOptions";
 import Bucket from "./bucket";
 import createId from "./createId";
-import debugInfo from "./debugInfo";
+import { UploadPipeline } from "./upload";
 
 import type { CorsSettings, Options, Settings } from "..";
 
-const env = globalThis.env;
-
-// Big mess; parse all of the options for server, which can be at launch time
-// or dynamically per-request for the functions (so have to read ENV inside)
 export default function config(options: Options = {}): Settings {
+  const env = globalThis.env;
   const settings: Settings = {
     port: options.port || env.PORT || 3000,
     secret: options.secret || env.SECRET || `unsafe-${createId()}`,
@@ -63,17 +60,17 @@ export default function config(options: Options = {}): Settings {
 
   // Bucket
   settings.views = options.views ? Bucket(options.views) : null;
-  debugInfo(options, "views", (views) => views?.location || "true", "📂");
   settings.public = options.public ? Bucket(options.public) : null;
-  debugInfo(options, "public", (pub) => pub?.location || "true", "📂");
-  settings.uploads = options.uploads ? Bucket(options.uploads) : null;
-  debugInfo(options, "uploads", (ups) => ups?.location || "true", "📂");
+  settings.uploads =
+    options.uploads instanceof UploadPipeline
+      ? options.uploads
+      : options.uploads
+        ? Bucket(options.uploads)
+        : null;
 
   // Stores
   settings.store = options.store ?? null;
-  debugInfo(options, "store", (store) => store?.name || "working", "📦");
   settings.cookies = options.cookies ?? null;
-  debugInfo(options, "cookies", (cookies) => cookies?.name || "working", "🍪");
   if (options.session) {
     settings.session =
       "store" in options.session ? options.session : { store: options.session };
@@ -81,12 +78,6 @@ export default function config(options: Options = {}): Settings {
   if (options.store && !options.session) {
     settings.session = { store: options.store.prefix("session:") };
   }
-  debugInfo(
-    options,
-    "session",
-    (session) => session?.store?.name || "working",
-    "🔐",
-  );
 
   if (options.auth || env.AUTH) {
     settings.auth = parseAuthOptions(options.auth || env.AUTH || null, options);
