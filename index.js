@@ -330,7 +330,7 @@ var callback = async (ctx) => {
     id: createId(),
     strategy,
     provider: "github",
-    user: createId(profile.email),
+    user: String(profile.id),
     email: profile.email,
     time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
   };

@@ -54,7 +54,7 @@ const callback = async (ctx: Context) => {
     id: createId(),
     strategy,
     provider: "github",
-    user: createId(profile.email),
+    user: String(profile.id),
     email: profile.email,
     time: new Date().toISOString().replace(/\.[0-9]*/, ""),
   };
