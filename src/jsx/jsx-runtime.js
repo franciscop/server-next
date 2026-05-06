@@ -1,4 +1,4 @@
-const entities = {
+const ENTITIES = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
@@ -6,21 +6,32 @@ const entities = {
   "'": "&#39;",
 };
 
-const encode = (str = "") => {
-  if (typeof str === "number") str = String(str);
-  if (typeof str !== "string") return "";
-  return str.replace(/[&<>"']/g, (tag) => entities[tag]);
-};
-
 const SELFCLOSE = new Set(
   "area,base,br,col,embed,hr,img,input,link,meta,source,track,wbr".split(","),
 );
 
+const SVG_TAGS = new Set([
+  "svg",
+  "circle",
+  "rect",
+  "path",
+  "line",
+  "g",
+  "text",
+  "defs",
+]);
+
 const REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
 
-const altAttrs = {
+const ALT_NAMES = {
   classname: "class",
   htmlfor: "for",
+};
+
+const encode = (str = "") => {
+  if (typeof str === "number") str = String(str);
+  if (typeof str !== "string") return "";
+  return str.replace(/[&<>"']/g, (tag) => ENTITIES[tag]);
 };
 
 // valid primitives only — null, undefined, false, true are all skipped
@@ -53,7 +64,6 @@ const renderChild = (child) => {
 
   if (typeof child === "function") {
     const result = child();
-    // Strings returned by functions are pre-rendered HTML — don't re-encode them
     if (result == null || result === false || result === true) return "";
     if (typeof result === "string") return result;
     if (typeof result === "number") return String(result);
@@ -63,7 +73,6 @@ const renderChild = (child) => {
   if (typeof child === "string") return encode(child);
   if (typeof child === "number") return String(child);
 
-  // Raw marker bypasses encoding (used by script, style, dangerouslySetInnerHTML)
   if (typeof child === "object" && RAW in child) return child[RAW];
 
   if (isReactElement(child)) {
@@ -133,7 +142,15 @@ const jsx = (tag, { children, ...props } = {}) => {
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
     .filter(([, v]) => v !== false)
     .map(([k, v]) => {
-      const key = altAttrs[k.toLowerCase()] || encode(k);
+      const preserveSvg = k === "viewBox" || k === "preserveAspectRatio";
+
+      const key =
+        ALT_NAMES[k.toLowerCase()] ||
+        (SVG_TAGS.has(tag)
+          ? preserveSvg
+            ? k
+            : k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)
+          : encode(k));
 
       if (v === true) return key;
 

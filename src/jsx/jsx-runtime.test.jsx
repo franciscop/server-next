@@ -537,3 +537,95 @@ describe("styles", () => {
     ).toRender('<div style="color:red"></div>');
   });
 });
+
+describe("svg attributes", () => {
+  it("converts strokeWidth to stroke-width", () => {
+    expect(
+      <svg>
+        <circle strokeWidth="2" />
+      </svg>,
+    ).toRender('<svg><circle stroke-width="2"></circle></svg>');
+  });
+
+  it("converts fillOpacity to fill-opacity", () => {
+    expect(
+      <svg>
+        <rect fillOpacity="0.5" />
+      </svg>,
+    ).toRender('<svg><rect fill-opacity="0.5"></rect></svg>');
+  });
+
+  it("converts strokeLinecap to stroke-linecap", () => {
+    expect(
+      <svg>
+        <line strokeLinecap="round" />
+      </svg>,
+    ).toRender('<svg><line stroke-linecap="round"></line></svg>');
+  });
+
+  it("does NOT break viewBox casing", () => {
+    expect(
+      <svg viewBox="0 0 100 100">
+        <rect />
+      </svg>,
+    ).toRender('<svg viewBox="0 0 100 100"><rect></rect></svg>');
+  });
+
+  it("handles mixed SVG attributes correctly", () => {
+    expect(
+      <svg viewBox="0 0 10 10">
+        <circle strokeWidth="1" fillOpacity="0.2" />
+      </svg>,
+    ).toRender(
+      '<svg viewBox="0 0 10 10"><circle stroke-width="1" fill-opacity="0.2"></circle></svg>',
+    );
+  });
+
+  it("keeps viewBox unchanged", () => {
+    expect(
+      <svg viewBox="0 0 100 100">
+        <rect />
+      </svg>,
+    ).toRender('<svg viewBox="0 0 100 100"><rect></rect></svg>');
+  });
+
+  it("does NOT convert viewBox to view-box", () => {
+    expect(<svg viewBox="0 0 10 10"></svg>).toRender(
+      '<svg viewBox="0 0 10 10"></svg>',
+    );
+  });
+
+  it("converts strokeWidth to stroke-width", () => {
+    expect(
+      <svg>
+        <circle strokeWidth="2" />
+      </svg>,
+    ).toRender('<svg><circle stroke-width="2"></circle></svg>');
+  });
+
+  it("converts fillOpacity to fill-opacity", () => {
+    expect(
+      <svg>
+        <rect fillOpacity="0.5" />
+      </svg>,
+    ).toRender('<svg><rect fill-opacity="0.5"></rect></svg>');
+  });
+
+  it("converts strokeLinecap to stroke-linecap", () => {
+    expect(
+      <svg>
+        <line strokeLinecap="round" />
+      </svg>,
+    ).toRender('<svg><line stroke-linecap="round"></line></svg>');
+  });
+
+  it("handles mixed SVG attributes correctly", () => {
+    expect(
+      <svg viewBox="0 0 10 10">
+        <circle strokeWidth="1" fillOpacity="0.2" />
+      </svg>,
+    ).toRender(
+      '<svg viewBox="0 0 10 10"><circle stroke-width="1" fill-opacity="0.2"></circle></svg>',
+    );
+  });
+});
