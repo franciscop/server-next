@@ -142,9 +142,13 @@ describe("text encoding", () => {
 
   it("renders array children", () => {
     const items = ["x", "y", "z"];
-    expect(<span>{items.map((i) => <b key={i}>{i}</b>)}</span>).toRender(
-      "<span><b>x</b><b>y</b><b>z</b></span>",
-    );
+    expect(
+      <span>
+        {items.map((i) => (
+          <b key={i}>{i}</b>
+        ))}
+      </span>,
+    ).toRender("<span><b>x</b><b>y</b><b>z</b></span>");
   });
 
   it("treats string returned from a function child as raw HTML", () => {
@@ -171,9 +175,7 @@ describe("attribute encoding", () => {
   });
 
   it("encodes ' in attribute values", () => {
-    expect(<div title={"it's"}></div>).toRender(
-      '<div title="it&#39;s"></div>',
-    );
+    expect(<div title={"it's"}></div>).toRender('<div title="it&#39;s"></div>');
   });
 
   it("maps className to class", () => {
@@ -316,9 +318,9 @@ describe("style tag", () => {
   });
 
   it("preserves child combinator in selectors", () => {
-    expect(
-      <style>{":not(pre) > code { background: none; }"}</style>,
-    ).toRender("<style>:not(pre)>code{background:none}</style>");
+    expect(<style>{":not(pre) > code { background: none; }"}</style>).toRender(
+      "<style>:not(pre)>code{background:none}</style>",
+    );
   });
 
   it("preserves sibling combinators in selectors", () => {
@@ -328,21 +330,21 @@ describe("style tag", () => {
   });
 
   it("removes spaces around braces, colons, and semicolons", () => {
-    expect(
-      <style>{"a { color : red ; font-size : 1em ; }"}</style>,
-    ).toRender("<style>a{color:red;font-size:1em}</style>");
+    expect(<style>{"a { color : red ; font-size : 1em ; }"}</style>).toRender(
+      "<style>a{color:red;font-size:1em}</style>",
+    );
   });
 
   it("removes trailing semicolon before closing brace", () => {
-    expect(
-      <style>{"p { margin: 0; padding: 0; }"}</style>,
-    ).toRender("<style>p{margin:0;padding:0}</style>");
+    expect(<style>{"p { margin: 0; padding: 0; }"}</style>).toRender(
+      "<style>p{margin:0;padding:0}</style>",
+    );
   });
 
   it("does not break </style> injection", () => {
-    expect(
-      <style>{"a { content: '</style>'; }"}</style>,
-    ).toRender("<style>a{content:'<\\/style>'}</style>");
+    expect(<style>{"a { content: '</style>'; }"}</style>).toRender(
+      "<style>a{content:'<\\/style>'}</style>",
+    );
   });
 });
 
@@ -368,9 +370,9 @@ describe("dangerouslySetInnerHTML", () => {
   });
 
   it("does not render dangerouslySetInnerHTML as an attribute", () => {
-    expect(
-      <div dangerouslySetInnerHTML={{ __html: "hi" }}></div>,
-    ).toRender("<div>hi</div>");
+    expect(<div dangerouslySetInnerHTML={{ __html: "hi" }}></div>).toRender(
+      "<div>hi</div>",
+    );
   });
 });
 
@@ -411,18 +413,14 @@ describe("function components", () => {
 
   it("encodes text returned by a component", () => {
     const Unsafe = () => "<script>alert(1)</script>";
-    expect(<Unsafe />).toRender(
-      "&lt;script&gt;alert(1)&lt;/script&gt;",
-    );
+    expect(<Unsafe />).toRender("&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 });
 
 describe("forwardRef-like components", () => {
   it("renders an object with a render function", () => {
     const Button = { render: ({ children }) => <button>{children}</button> };
-    expect(<Button>click me</Button>).toRender(
-      "<button>click me</button>",
-    );
+    expect(<Button>click me</Button>).toRender("<button>click me</button>");
   });
 
   it("passes props to render function", () => {
@@ -485,5 +483,57 @@ describe("React element interop", () => {
         }),
       });
     expect(<Deep />).toRender("<div><ul><li>one</li><li>two</li></ul></div>");
+  });
+});
+describe("styles", () => {
+  it("stringifies style object into CSS", () => {
+    expect(
+      <div
+        style={{
+          display: "inline-block",
+          padding: "2px 8px",
+          borderRadius: "4px",
+        }}
+      />,
+    ).toRender(
+      '<div style="display:inline-block;padding:2px 8px;border-radius:4px"></div>',
+    );
+  });
+
+  it("handles numbers and mixed style values", () => {
+    expect(
+      <div
+        style={{
+          fontSize: 12,
+          lineHeight: 1.5,
+          fontWeight: "600",
+        }}
+      />,
+    ).toRender(
+      '<div style="font-size:12;line-height:1.5;font-weight:600"></div>',
+    );
+  });
+
+  it("converts camelCase CSS properties", () => {
+    expect(
+      <div
+        style={{
+          backgroundColor: "#fff",
+          marginTop: "10px",
+        }}
+      />,
+    ).toRender('<div style="background-color:#fff;margin-top:10px"></div>');
+  });
+
+  it("ignores null and undefined style values", () => {
+    expect(
+      <div
+        style={{
+          color: "red",
+          padding: null,
+          margin: undefined,
+        }}
+      />,
+    ).toRender('<div style="color:red"></div>');
   });
 });

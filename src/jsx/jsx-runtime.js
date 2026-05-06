@@ -99,7 +99,9 @@ const jsx = (tag, { children, ...props } = {}) => {
     const parts = Array.isArray(children) ? children : [children];
     const content = parts
       .filter(isValidChild)
-      .map((c) => (typeof c === "string" ? c : typeof c === "number" ? String(c) : ""))
+      .map((c) =>
+        typeof c === "string" ? c : typeof c === "number" ? String(c) : "",
+      )
       .join("");
     children = raw(content);
   }
@@ -134,6 +136,16 @@ const jsx = (tag, { children, ...props } = {}) => {
       const key = altAttrs[k.toLowerCase()] || encode(k);
 
       if (v === true) return key;
+
+      if (k === "style" && v && typeof v === "object") {
+        v = Object.entries(v)
+          .filter(([, val]) => val != null)
+          .map(([prop, val]) => {
+            const cssKey = prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+            return `${cssKey}:${val}`;
+          })
+          .join(";");
+      }
 
       const value =
         typeof v === "string" || typeof v === "number" ? encode(String(v)) : "";
