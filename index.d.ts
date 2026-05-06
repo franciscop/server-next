@@ -66,9 +66,11 @@ type SerializableValue = BasicValue | {
 } | Array<SerializableValue>;
 type KVStore = {
     name?: string;
-    prefix: (key: string) => KVStore;
-    get: <T = SerializableValue>(key: string) => Promise<T>;
-    set: <T = SerializableValue>(key: string, value: T, expires?: string | number) => Promise<void | string>;
+    prefix: (prefix?: string) => KVStore;
+    get: <T = SerializableValue>(key: string) => Promise<T | null>;
+    set: <T = SerializableValue>(key: string, value: T, options?: {
+        expires?: string | number | null;
+    }) => Promise<void | string>;
     has: (key: string) => Promise<boolean>;
     del: (key: string) => Promise<void | string>;
     keys: () => Promise<string[]>;

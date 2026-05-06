@@ -86,12 +86,12 @@ export type SerializableValue =
 
 export type KVStore = {
   name?: string;
-  prefix: (key: string) => KVStore;
-  get: <T = SerializableValue>(key: string) => Promise<T>;
+  prefix: (prefix?: string) => KVStore;
+  get: <T = SerializableValue>(key: string) => Promise<T | null>;
   set: <T = SerializableValue>(
     key: string,
     value: T,
-    expires?: string | number,
+    options?: { expires?: string | number | null },
   ) => Promise<void | string>;
   has: (key: string) => Promise<boolean>;
   del: (key: string) => Promise<void | string>;
