@@ -58,7 +58,9 @@ const callback = async (ctx: Context) => {
     email: profile.email,
     time: new Date().toISOString().replace(/\.[0-9]*/, ""),
   };
+  const existing = await store.get(String(profile.id));
   const user = cleanUser({
+    ...((existing as Object) ?? {}),
     id: profile.id,
     name: profile.name,
     email: profile.email,

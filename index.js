@@ -334,7 +334,9 @@ var callback = async (ctx) => {
     email: profile.email,
     time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
   };
+  const existing = await store.get(String(profile.id));
   const user = cleanUser({
+    ...existing ?? {},
     id: profile.id,
     name: profile.name,
     email: profile.email,
