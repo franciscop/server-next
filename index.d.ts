@@ -168,7 +168,7 @@ type Events = Record<string, EventCallback[]> & {
     on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
     trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
 };
-type Context<Params extends Record<string, string> = Record<string, string>, O extends ServerConfig = object> = {
+type Context<Params extends Record<string, string | undefined> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
@@ -201,7 +201,7 @@ type InlineReply = Response | {
     headers?: Headers;
 } | SerializableValue | JSX.Element;
 type Body = InlineReply;
-type Middleware<O extends ServerConfig = object, Params extends Record<string, string> = Record<string, string>> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
+type Middleware<O extends ServerConfig = object, Params extends Record<string, string | undefined> = Record<string, string>> = (ctx: Context<Params, O>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 
 type Variables = Record<string, string | string[]>;
 type ExtendError = string | {
@@ -224,7 +224,7 @@ declare global {
     var env: Record<string, any>;
 }
 
-type Mids<O, Path extends string> = Middleware<O, PathToParams<Path>>[];
+type Mids<O extends ServerConfig, Path extends string> = Middleware<O, PathToParams<Path>>[];
 type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
 type FullRoute = [RouterMethod, string, ...Middleware[]][];
 declare class Router<O extends ServerConfig = object> {

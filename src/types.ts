@@ -253,7 +253,7 @@ type Events = Record<string, EventCallback[]> & {
 };
 
 export type Context<
-  Params extends Record<string, string> = Record<string, string>,
+  Params extends Record<string, string | undefined> = Record<string, string>,
   O extends ServerConfig = object,
 > = {
   method: Method;
@@ -298,7 +298,7 @@ export type Body = InlineReply;
 
 export type Middleware<
   O extends ServerConfig = object,
-  Params extends Record<string, string> = Record<string, string>,
+  Params extends Record<string, string | undefined> = Record<string, string>,
 > = (
   ctx: Context<Params, O>,
 ) => InlineReply | Promise<InlineReply> | void | Promise<void>;

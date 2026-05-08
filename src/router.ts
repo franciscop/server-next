@@ -7,7 +7,7 @@ import type {
   ServerConfig,
 } from "./types";
 
-type Mids<O, Path extends string> = Middleware<O, PathToParams<Path>>[];
+type Mids<O extends ServerConfig, Path extends string> = Middleware<O, PathToParams<Path>>[];
 
 type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
 // This is "Method" and NOT "Method" on purpose

@@ -12,3 +12,15 @@ export declare namespace JSX {
     [elem: string]: any;
   }
 }
+
+declare global {
+  namespace JSX {
+    interface Element {
+      type: any;
+      props: any;
+    }
+    interface IntrinsicElements {
+      [elem: string]: any;
+    }
+  }
+}
