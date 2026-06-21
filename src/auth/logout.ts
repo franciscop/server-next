@@ -12,7 +12,7 @@ export default async function logout(ctx: Context): Promise<Body> {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
-    return cookies({ authorization: null }).redirect("/");
+    return cookies({ authentication: null }).redirect("/");
   }
   if (strategy.includes("jwt")) {
     throw new Error("JWT auth not supported yet");

@@ -63,10 +63,13 @@ function normalizeExpires(
 // Takes an object and returns a string with the proper cookie values
 export default function createCookies(key: string, val: Cookie): string {
   if (val.value === null) val.expires = EXPIRED;
-  const { value, path, expires } = val;
-  const pathPart = `;Path=${path || "/"}`;
-  const expiresStr = normalizeExpires(expires);
-  const expiresPart =
-    typeof expires !== "undefined" ? `;Expires=${expiresStr}` : "";
-  return `${key}=${value || ""}${pathPart}${expiresPart}`;
+  const { value, path, expires, maxAge, httpOnly, secure, sameSite } = val;
+
+  let str = `${key}=${value || ""};Path=${path || "/"}`;
+  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
+  if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
+  if (httpOnly) str += ";HttpOnly";
+  if (secure) str += ";Secure";
+  if (sameSite) str += `;SameSite=${sameSite}`;
+  return str;
 }

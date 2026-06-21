@@ -43,12 +43,22 @@ ServerError_default.extend({
   NO_STORE_WRITE: "You need a 'store' to write 'ctx.session.{key}'",
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
   AUTH_ARGON_NEEDED: "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
-  AUTH_INVALID_TOKEN: "Invalid Authorization token",
-  AUTH_INVALID_COOKIE: "Invalid Authorization cookie",
-  AUTH_INVALID_HEADER: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)",
-  AUTH_INVALID_STRATEGY: "Invalid Authorization type '{strategy}', valid one is '{valid}'",
+  AUTH_INVALID_TOKEN: { status: 401, message: "Invalid Authorization token" },
+  AUTH_INVALID_COOKIE: { status: 401, message: "Invalid Authorization cookie" },
+  AUTH_INVALID_HEADER: {
+    status: 401,
+    message: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)"
+  },
+  AUTH_INVALID_STRATEGY: {
+    status: 401,
+    message: "Invalid Authorization type '{strategy}', valid one is '{valid}'"
+  },
+  AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" },
   AUTH_NO_PROVIDER: "No provider passed to the option 'auth.provider'",
-  AUTH_INVALID_PROVIDER: "Invalid provider '{provider}', valid ones are: '{valid}'",
+  AUTH_INVALID_PROVIDER: {
+    status: 401,
+    message: "Invalid provider '{provider}', valid ones are: '{valid}'"
+  },
   AUTH_NO_SESSION: { status: 401, message: "Invalid session" },
   AUTH_NO_USER: {
     status: 401,
@@ -96,98 +106,6 @@ function clientIp(headers2, opts = {}) {
   }
   return normalize(remoteAddress);
 }
-
-// src/auth/updateUser.ts
-async function updateUser(user, auth2, store) {
-  if (auth2.provider === "email") {
-    return await store.set(auth2.email, user);
-  }
-}
-
-// src/auth/providers/email.ts
-var createSession = async (user, ctx) => {
-  const { strategy, session: session2, cleanUser, redirect: redirect2 = "/user" } = ctx.options.auth;
-  user = await cleanUser(user);
-  const id = createId();
-  const provider = "email";
-  ctx.user = {
-    id,
-    strategy,
-    provider,
-    email: user.email
-  };
-  await session2.set(
-    id,
-    { id, strategy, provider, user: user.email },
-    { expires: "1w" }
-  );
-  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
-    return status(201).json({ ...user, token: id });
-  }
-  if (strategy.includes("cookie")) {
-    return status(302).cookies({ authentication: id }).redirect(redirect2);
-  }
-  if (strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
-};
-async function emailLogin(ctx) {
-  const { email, password } = ctx.body;
-  if (!email) throw ServerError_default.LOGIN_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
-  if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (!await store.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
-  const user = await store.get(email);
-  const isValid = await verify(password, user.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  return createSession(user, ctx);
-}
-async function emailRegister(ctx) {
-  const { email, password, ...data } = ctx.body;
-  if (!email) throw ServerError_default.REGISTER_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
-  if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (await store.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
-  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
-  const user = {
-    id: createId(email),
-    strategy: ctx.options.auth.strategy,
-    provider: "email",
-    email,
-    password: await hash(password),
-    time,
-    ...data
-  };
-  await store.set(email, user);
-  return createSession(user, ctx);
-}
-async function emailResetPassword() {
-}
-async function emailUpdatePassword(ctx) {
-  const passwords = ctx.body;
-  const fullUser = await ctx.options.auth.store.get(ctx.user.email);
-  if (!fullUser) throw ServerError_default.AUTH_NO_USER();
-  const isValid = await verify(passwords.previous, fullUser.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  fullUser.password = await hash(passwords.updated);
-  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
-  return 200;
-}
-var email_default = {
-  login: emailLogin,
-  register: emailRegister,
-  reset: emailResetPassword,
-  password: emailUpdatePassword
-};
 
 // src/helpers/isReadableStream.ts
 function isReadableStream(obj) {
@@ -314,6 +232,379 @@ var json = (...args) => r().json(...args);
 var file = (...args) => r().file(...args);
 var redirect = (...args) => r().redirect(...args);
 
+// src/auth/finishLogin.ts
+async function finishLogin(ctx, input) {
+  const settings = ctx.options.auth;
+  const { strategy, cleanUser } = settings;
+  const key = String(input.key);
+  const auth2 = {
+    id: createId(),
+    strategy,
+    provider: input.provider,
+    user: key,
+    email: input.email,
+    time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
+  };
+  let user = input.user;
+  if (input.store !== false) {
+    const existing = await settings.store.get(key);
+    user = { ...existing ?? {}, ...input.user };
+  }
+  user = await cleanUser(user);
+  if (input.store !== false) await settings.store.set(key, user);
+  await settings.session.set(auth2.id, auth2, { expires: "1w" });
+  if (strategy.includes("token")) {
+    return status(201).json({ ...user, token: auth2.id });
+  }
+  if (strategy.includes("cookie")) {
+    return cookies("authentication", {
+      value: auth2.id,
+      path: "/",
+      httpOnly: true,
+      secure: ctx.platform.production,
+      sameSite: "Lax"
+    }).redirect(settings.redirect);
+  }
+  if (strategy.includes("jwt")) throw new Error("JWT auth not supported yet");
+  if (strategy.includes("key")) throw new Error("Key auth not supported yet");
+  throw new Error("Unknown auth type");
+}
+
+// src/helpers/createCookies.ts
+var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
+var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
+parse.millisecond = parse.ms = 1e-3;
+parse.second = parse.sec = parse.s = parse[""] = 1;
+parse.minute = parse.min = parse.m = parse.s * 60;
+parse.hour = parse.hr = parse.h = parse.m * 60;
+parse.day = parse.d = parse.h * 24;
+parse.week = parse.wk = parse.w = parse.d * 7;
+parse.year = parse.yr = parse.y = parse.d * 365.25;
+parse.month = parse.b = parse.y / 12;
+function parse(str) {
+  if (str === null || str === void 0) return null;
+  if (typeof str === "number") return str;
+  if (typeof str !== "string") {
+    throw new Error(`Not a string: ${str} (${typeof str})`);
+  }
+  str = str.toLowerCase().replace(/[,_]/g, "");
+  const [_, value, units] = times.exec(str) || [];
+  if (!units) return null;
+  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
+  if (!unitValue) return null;
+  const result = unitValue * parseFloat(value);
+  return Math.abs(Math.round(result * 1e3));
+}
+function normalizeExpires(expires) {
+  if (expires === null || expires === void 0) return void 0;
+  if (expires === 0) return EXPIRED2;
+  if (typeof expires === "string") {
+    if (/^[\d._]+\w+$/.test(expires)) {
+      return new Date(Date.now() + parse(expires)).toUTCString();
+    } else {
+      return expires;
+    }
+  }
+  if (typeof expires === "number") {
+    return new Date(Date.now() + expires).toUTCString();
+  }
+  if (expires instanceof Date) {
+    return expires.toUTCString();
+  }
+  return void 0;
+}
+function createCookies(key, val) {
+  if (val.value === null) val.expires = EXPIRED2;
+  const { value, path: path2, expires, maxAge, httpOnly, secure, sameSite } = val;
+  let str = `${key}=${value || ""};Path=${path2 || "/"}`;
+  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
+  if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
+  if (httpOnly) str += ";HttpOnly";
+  if (secure) str += ";Secure";
+  if (sameSite) str += `;SameSite=${sameSite}`;
+  return str;
+}
+
+// src/auth/state.ts
+var NAME = "oauth_state";
+function startState(ctx, crossSite = false) {
+  const state = createId();
+  return {
+    state,
+    cookie: {
+      value: state,
+      path: "/",
+      expires: "10m",
+      httpOnly: true,
+      secure: crossSite || ctx.platform.production,
+      sameSite: crossSite ? "None" : "Lax"
+    }
+  };
+}
+function checkState(ctx, received) {
+  const expected = ctx.cookies[NAME];
+  if (!expected || !received || expected !== received) {
+    throw ServerError_default.AUTH_INVALID_STATE();
+  }
+}
+function clearState() {
+  return createCookies(NAME, { value: null });
+}
+
+// src/auth/providers/apple.ts
+var AUTHORIZE = "https://appleid.apple.com/auth/authorize";
+var TOKEN = "https://appleid.apple.com/auth/token";
+var b64url = (data) => {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  let bin = "";
+  for (const byte of bytes) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var b64urlJson = (segment) => {
+  let b64 = segment.replace(/-/g, "+").replace(/_/g, "/");
+  b64 += "=".repeat((4 - b64.length % 4) % 4);
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+};
+var clientSecret = async () => {
+  const now = Math.floor(Date.now() / 1e3);
+  const header = { alg: "ES256", kid: env.APPLE_KEY_ID, typ: "JWT" };
+  const payload = {
+    iss: env.APPLE_TEAM_ID,
+    iat: now,
+    exp: now + 3600,
+    aud: "https://appleid.apple.com",
+    sub: env.APPLE_ID
+  };
+  const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+  const pem = String(env.APPLE_PRIVATE_KEY).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    der,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    new TextEncoder().encode(data)
+  );
+  return `${data}.${b64url(new Uint8Array(sig))}`;
+};
+var login = (ctx) => {
+  const { state, cookie } = startState(ctx, true);
+  const params = new URLSearchParams({
+    client_id: env.APPLE_ID,
+    redirect_uri: `${ctx.url.origin}/auth/callback/apple`,
+    response_type: "code",
+    scope: "name email",
+    // Requesting scopes forces Apple to POST the result back (form_post)
+    response_mode: "form_post",
+    state
+  });
+  return cookies("oauth_state", cookie).redirect(`${AUTHORIZE}?${params}`);
+};
+var callback = async (ctx) => {
+  const body = ctx.body || {};
+  checkState(ctx, body.state);
+  const tokenRes = await fetch(TOKEN, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      client_id: env.APPLE_ID,
+      client_secret: await clientSecret(),
+      code: body.code,
+      grant_type: "authorization_code",
+      redirect_uri: `${ctx.url.origin}/auth/callback/apple`
+    })
+  });
+  if (!tokenRes.ok) throw new Error("apple: token exchange failed");
+  const token = await tokenRes.json();
+  const claims = b64urlJson(token.id_token.split(".")[1]);
+  let name;
+  if (body.user) {
+    const parsed = JSON.parse(body.user).name;
+    if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
+  }
+  const res = await finishLogin(ctx, {
+    provider: "apple",
+    key: claims.sub,
+    email: claims.email,
+    user: { id: claims.sub, name, email: claims.email }
+  });
+  res.headers.append("set-cookie", clearState());
+  return res;
+};
+var apple_default = { login, callback };
+
+// src/auth/providers/oauth.ts
+function oauthProvider(config2) {
+  const KEY = config2.name.toUpperCase();
+  const callbackUrl = (ctx) => `${ctx.url.origin}/auth/callback/${config2.name}`;
+  const login3 = (ctx) => {
+    const { state, cookie } = startState(ctx);
+    const params = new URLSearchParams({
+      client_id: env[`${KEY}_ID`],
+      redirect_uri: callbackUrl(ctx),
+      response_type: "code",
+      scope: config2.scope,
+      state
+    });
+    return cookies("oauth_state", cookie).redirect(
+      `${config2.authorizeUrl}?${params}`
+    );
+  };
+  const callback3 = async (ctx) => {
+    checkState(ctx, ctx.url.query.state);
+    const tokenRes = await fetch(config2.tokenUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        client_id: env[`${KEY}_ID`],
+        client_secret: env[`${KEY}_SECRET`],
+        code: ctx.url.query.code,
+        grant_type: "authorization_code",
+        redirect_uri: callbackUrl(ctx)
+      })
+    });
+    if (!tokenRes.ok) throw new Error(`${config2.name}: token exchange failed`);
+    const token = await tokenRes.json();
+    const profileRes = await fetch(config2.profileUrl, {
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${token.access_token}`
+      }
+    });
+    if (!profileRes.ok) throw new Error(`${config2.name}: profile fetch failed`);
+    const profile = config2.profile(await profileRes.json());
+    const res = await finishLogin(ctx, {
+      provider: config2.name,
+      key: profile.id,
+      email: profile.email,
+      user: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        picture: profile.picture
+      }
+    });
+    res.headers.append("set-cookie", clearState());
+    return res;
+  };
+  return { login: login3, callback: callback3 };
+}
+
+// src/auth/providers/discord.ts
+var discord_default = oauthProvider({
+  name: "discord",
+  authorizeUrl: "https://discord.com/oauth2/authorize",
+  tokenUrl: "https://discord.com/api/oauth2/token",
+  profileUrl: "https://discord.com/api/users/@me",
+  scope: "identify email",
+  profile: (p) => ({
+    id: p.id,
+    email: p.email,
+    name: p.global_name || p.username,
+    picture: p.avatar ? `https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png` : void 0
+  })
+});
+
+// src/auth/updateUser.ts
+async function updateUser(user, auth2, store) {
+  if (auth2.provider === "email") {
+    return await store.set(auth2.email, user);
+  }
+}
+
+// src/auth/providers/email.ts
+async function emailLogin(ctx) {
+  const { email, password } = ctx.body;
+  if (!email) throw ServerError_default.LOGIN_NO_EMAIL();
+  if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
+  if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
+  if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
+  const store = ctx.options.auth.store;
+  if (!await store.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
+  const user = await store.get(email);
+  const isValid = await verify(password, user.password);
+  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
+  return finishLogin(ctx, {
+    provider: "email",
+    key: user.email,
+    email: user.email,
+    user,
+    store: false
+  });
+}
+async function emailRegister(ctx) {
+  const { email, password, ...data } = ctx.body;
+  if (!email) throw ServerError_default.REGISTER_NO_EMAIL();
+  if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
+  if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
+  if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
+  const store = ctx.options.auth.store;
+  if (await store.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
+  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
+  const user = {
+    id: createId(email),
+    strategy: ctx.options.auth.strategy,
+    provider: "email",
+    email,
+    password: await hash(password),
+    time,
+    ...data
+  };
+  await store.set(email, user);
+  return finishLogin(ctx, {
+    provider: "email",
+    key: email,
+    email,
+    user,
+    store: false
+  });
+}
+async function emailResetPassword() {
+}
+async function emailUpdatePassword(ctx) {
+  const passwords = ctx.body;
+  const fullUser = await ctx.options.auth.store.get(ctx.user.email);
+  if (!fullUser) throw ServerError_default.AUTH_NO_USER();
+  const isValid = await verify(passwords.previous, fullUser.password);
+  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
+  fullUser.password = await hash(passwords.updated);
+  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
+  return 200;
+}
+var email_default = {
+  login: emailLogin,
+  register: emailRegister,
+  reset: emailResetPassword,
+  password: emailUpdatePassword
+};
+
+// src/auth/providers/facebook.ts
+var facebook_default = oauthProvider({
+  name: "facebook",
+  authorizeUrl: "https://www.facebook.com/v18.0/dialog/oauth",
+  tokenUrl: "https://graph.facebook.com/v18.0/oauth/access_token",
+  profileUrl: "https://graph.facebook.com/me?fields=id,name,email,picture",
+  scope: "email public_profile",
+  profile: (p) => ({
+    id: p.id,
+    email: p.email,
+    name: p.name,
+    picture: p.picture?.data?.url
+  })
+});
+
 // src/auth/providers/github.ts
 var oauth = async (code) => {
   const fch = async (url, { body, headers: headers2 = {}, ...rest } = {}) => {
@@ -337,9 +628,15 @@ var oauth = async (code) => {
     });
   };
 };
-var login = function githubLogin() {
-  return redirect(
-    `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_ID}&scope=user:email`
+var login2 = (ctx) => {
+  const { state, cookie } = startState(ctx);
+  const params = new URLSearchParams({
+    client_id: env.GITHUB_ID,
+    scope: "user:email",
+    state
+  });
+  return cookies("oauth_state", cookie).redirect(
+    `https://github.com/login/oauth/authorize?${params}`
   );
 };
 var getUserProfile = async (code) => {
@@ -351,47 +648,67 @@ var getUserProfile = async (code) => {
   const email = emails.sort((a) => a.primary ? -1 : 1)[0]?.email;
   return { ...profile, email };
 };
-var callback = async (ctx) => {
-  const { strategy, cleanUser, store, session: session2, redirect: redirect2 } = ctx.options.auth;
+var callback2 = async (ctx) => {
+  checkState(ctx, ctx.url.query.state);
   const profile = await getUserProfile(ctx.url.query.code);
-  const auth2 = {
-    id: createId(),
-    strategy,
+  const res = await finishLogin(ctx, {
     provider: "github",
-    user: String(profile.id),
+    key: profile.id,
     email: profile.email,
-    time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
-  };
-  const existing = await store.get(String(profile.id));
-  const user = cleanUser({
-    ...existing ?? {},
-    id: profile.id,
-    name: profile.name,
-    email: profile.email,
-    picture: profile.avatar_url,
-    location: profile.location,
-    created: profile.created_at
+    user: {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      picture: profile.avatar_url,
+      location: profile.location,
+      created: profile.created_at
+    }
   });
-  await store.set(auth2.user, user);
-  await session2.set(auth2.id, auth2, { expires: "1w" });
-  if (auth2.strategy.includes("token")) {
-    return status(201).json({ ...user, token: auth2.id });
-  }
-  if (auth2.strategy.includes("cookie")) {
-    return status(302).cookies({ authentication: auth2.id }).redirect(redirect2);
-  }
-  if (auth2.strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (auth2.strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
+  res.headers.append("set-cookie", clearState());
+  return res;
 };
-var github_default = { login, callback };
+var github_default = { login: login2, callback: callback2 };
+
+// src/auth/providers/google.ts
+var google_default = oauthProvider({
+  name: "google",
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  profileUrl: "https://openidconnect.googleapis.com/v1/userinfo",
+  scope: "openid email profile",
+  profile: (p) => ({
+    id: p.sub,
+    email: p.email,
+    name: p.name,
+    picture: p.picture
+  })
+});
+
+// src/auth/providers/microsoft.ts
+var microsoft_default = oauthProvider({
+  name: "microsoft",
+  authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+  tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+  profileUrl: "https://graph.microsoft.com/v1.0/me",
+  scope: "openid email profile User.Read",
+  profile: (p) => ({
+    // Personal accounts expose `userPrincipalName` rather than `mail`
+    id: p.id,
+    email: p.mail || p.userPrincipalName,
+    name: p.displayName
+  })
+});
 
 // src/auth/providers/index.ts
-var providers_default = { email: email_default, github: github_default };
+var providers_default = {
+  apple: apple_default,
+  discord: discord_default,
+  email: email_default,
+  facebook: facebook_default,
+  github: github_default,
+  google: google_default,
+  microsoft: microsoft_default
+};
 
 // src/auth/parseAuthOptions.ts
 var defaultRedirect = "/user";
@@ -882,58 +1199,6 @@ function applyCors(res, ctx) {
   if (ctx.method === "options") {
     res.headers.set("Access-Control-Max-Age", "86400");
   }
-}
-
-// src/helpers/createCookies.ts
-var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
-var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
-parse.millisecond = parse.ms = 1e-3;
-parse.second = parse.sec = parse.s = parse[""] = 1;
-parse.minute = parse.min = parse.m = parse.s * 60;
-parse.hour = parse.hr = parse.h = parse.m * 60;
-parse.day = parse.d = parse.h * 24;
-parse.week = parse.wk = parse.w = parse.d * 7;
-parse.year = parse.yr = parse.y = parse.d * 365.25;
-parse.month = parse.b = parse.y / 12;
-function parse(str) {
-  if (str === null || str === void 0) return null;
-  if (typeof str === "number") return str;
-  if (typeof str !== "string") {
-    throw new Error(`Not a string: ${str} (${typeof str})`);
-  }
-  str = str.toLowerCase().replace(/[,_]/g, "");
-  const [_, value, units] = times.exec(str) || [];
-  if (!units) return null;
-  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
-  if (!unitValue) return null;
-  const result = unitValue * parseFloat(value);
-  return Math.abs(Math.round(result * 1e3));
-}
-function normalizeExpires(expires) {
-  if (expires === null || expires === void 0) return void 0;
-  if (expires === 0) return EXPIRED2;
-  if (typeof expires === "string") {
-    if (/^[\d._]+\w+$/.test(expires)) {
-      return new Date(Date.now() + parse(expires)).toUTCString();
-    } else {
-      return expires;
-    }
-  }
-  if (typeof expires === "number") {
-    return new Date(Date.now() + expires).toUTCString();
-  }
-  if (expires instanceof Date) {
-    return expires.toUTCString();
-  }
-  return void 0;
-}
-function createCookies(key, val) {
-  if (val.value === null) val.expires = EXPIRED2;
-  const { value, path: path2, expires } = val;
-  const pathPart = `;Path=${path2 || "/"}`;
-  const expiresStr = normalizeExpires(expires);
-  const expiresPart = typeof expires !== "undefined" ? `;Expires=${expiresStr}` : "";
-  return `${key}=${value || ""}${pathPart}${expiresPart}`;
 }
 
 // src/helpers/createWebsocket.ts
@@ -1594,7 +1859,7 @@ async function logout(ctx) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
-    return cookies({ authorization: null }).redirect("/");
+    return cookies({ authentication: null }).redirect("/");
   }
   if (strategy.includes("jwt")) {
     throw new Error("JWT auth not supported yet");
@@ -1606,18 +1871,37 @@ async function logout(ctx) {
 }
 
 // src/auth/index.ts
+var oauth2 = [
+  "github",
+  "google",
+  "microsoft",
+  "discord",
+  "facebook"
+];
 function auth(app) {
   app.use(async function middle(ctx) {
     ctx.user = await getUser(ctx);
   });
-  if (app.settings.auth.provider.includes("github")) {
-    if (!env.GITHUB_ID) throw new Error("GITHUB_ID not defined");
-    if (!env.GITHUB_SECRET) throw new Error("GITHUB_SECRET not defined");
+  const enabled = app.settings.auth.provider;
+  for (const name of oauth2) {
+    if (!enabled.includes(name)) continue;
+    const key = name.toUpperCase();
+    if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
+    if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
     app.get("/auth/logout", logout);
-    app.get("/auth/login/github", providers_default.github.login);
-    app.get("/auth/callback/github", providers_default.github.callback);
+    app.get(`/auth/login/${name}`, providers_default[name].login);
+    app.get(`/auth/callback/${name}`, providers_default[name].callback);
   }
-  if (app.settings.auth.provider.includes("email")) {
+  if (enabled.includes("apple")) {
+    const keys = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"];
+    for (const key of keys) {
+      if (!env[key]) throw new Error(`${key} not defined`);
+    }
+    app.get("/auth/logout", logout);
+    app.get("/auth/login/apple", providers_default.apple.login);
+    app.post("/auth/callback/apple", providers_default.apple.callback);
+  }
+  if (enabled.includes("email")) {
     app.post("/auth/logout", logout);
     app.post("/auth/register/email", providers_default.email.register);
     app.post("/auth/login/email", providers_default.email.login);
@@ -1885,9 +2169,9 @@ import { TLSSocket } from "tls";
 // src/context/createEvents.ts
 function createEvents() {
   const events = {};
-  events.on = (name, callback2) => {
+  events.on = (name, callback3) => {
     events[name] = events[name] || [];
-    events[name].push(callback2);
+    events[name].push(callback3);
   };
   events.trigger = (name, data) => {
     if (!events[name]) return;

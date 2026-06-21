@@ -40,9 +40,13 @@ export type RouteOptions = {
 };
 
 export type Cookie = {
-  value?: string;
+  value?: string | null;
   path?: string;
   expires?: number | string | Date;
+  maxAge?: number;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
 };
 
 export type RouterMethod = "*" | Method;
@@ -100,7 +104,14 @@ export type KVStore = {
   keys: () => Promise<string[]>;
 };
 
-export type Provider = "email" | "github";
+export type Provider =
+  | "email"
+  | "github"
+  | "google"
+  | "microsoft"
+  | "discord"
+  | "facebook"
+  | "apple";
 export type Strategy = "cookie" | "jwt" | "token";
 
 export type AuthSession = {

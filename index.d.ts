@@ -33,9 +33,13 @@ type RouteOptions = {
     description?: string;
 };
 type Cookie = {
-    value?: string;
+    value?: string | null;
     path?: string;
     expires?: number | string | Date;
+    maxAge?: number;
+    httpOnly?: boolean;
+    secure?: boolean;
+    sameSite?: "Strict" | "Lax" | "None";
 };
 type RouterMethod = "*" | Method;
 type Bucket = {
@@ -77,7 +81,7 @@ type KVStore = {
     del: (key: string) => Promise<void | string>;
     keys: () => Promise<string[]>;
 };
-type Provider = "email" | "github";
+type Provider = "email" | "github" | "google" | "microsoft" | "discord" | "facebook" | "apple";
 type Strategy = "cookie" | "jwt" | "token";
 type AuthSession = {
     id: string;

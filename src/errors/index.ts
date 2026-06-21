@@ -6,15 +6,23 @@ ServerError.extend({
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
   AUTH_ARGON_NEEDED:
     "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
-  AUTH_INVALID_TOKEN: "Invalid Authorization token",
-  AUTH_INVALID_COOKIE: "Invalid Authorization cookie",
-  AUTH_INVALID_HEADER:
-    "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)",
-  AUTH_INVALID_STRATEGY:
-    "Invalid Authorization type '{strategy}', valid one is '{valid}'",
+  AUTH_INVALID_TOKEN: { status: 401, message: "Invalid Authorization token" },
+  AUTH_INVALID_COOKIE: { status: 401, message: "Invalid Authorization cookie" },
+  AUTH_INVALID_HEADER: {
+    status: 401,
+    message:
+      "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)",
+  },
+  AUTH_INVALID_STRATEGY: {
+    status: 401,
+    message: "Invalid Authorization type '{strategy}', valid one is '{valid}'",
+  },
+  AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" },
   AUTH_NO_PROVIDER: "No provider passed to the option 'auth.provider'",
-  AUTH_INVALID_PROVIDER:
-    "Invalid provider '{provider}', valid ones are: '{valid}'",
+  AUTH_INVALID_PROVIDER: {
+    status: 401,
+    message: "Invalid provider '{provider}', valid ones are: '{valid}'",
+  },
   AUTH_NO_SESSION: { status: 401, message: "Invalid session" },
   AUTH_NO_USER: {
     status: 401,

@@ -1,40 +1,8 @@
-import type { AuthSession, AuthUser, Context } from "../..";
-import { ServerError, status } from "../..";
+import type { AuthUser, Context } from "../..";
+import { ServerError } from "../..";
 import { createId, hash, verify } from "../../helpers";
+import finishLogin from "../finishLogin";
 import updateUser from "../updateUser";
-
-const createSession = async (user: AuthUser, ctx: Context) => {
-  const { strategy, session, cleanUser, redirect = "/user" } = ctx.options.auth;
-  user = await cleanUser(user);
-  const id = createId();
-  const provider = "email";
-  ctx.user = {
-    id,
-    strategy,
-    provider,
-    email: user.email,
-  };
-  await session.set<AuthSession>(
-    id,
-    { id, strategy, provider, user: user.email },
-    { expires: "1w" },
-  );
-
-  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
-    return status(201).json({ ...user, token: id });
-  }
-  if (strategy.includes("cookie")) {
-    return status(302).cookies({ authentication: id }).redirect(redirect);
-  }
-  if (strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
-};
 
 async function emailLogin(ctx: Context) {
   const { email, password } = ctx.body as { email: string; password: string };
@@ -50,7 +18,14 @@ async function emailLogin(ctx: Context) {
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
-  return createSession(user, ctx);
+  // The user is already stored; store:false avoids re-saving without a password
+  return finishLogin(ctx, {
+    provider: "email",
+    key: user.email,
+    email: user.email,
+    user,
+    store: false,
+  });
 }
 
 async function emailRegister(ctx: Context) {
@@ -78,7 +53,13 @@ async function emailRegister(ctx: Context) {
   };
   await store.set(email, user);
 
-  return createSession(user, ctx);
+  return finishLogin(ctx, {
+    provider: "email",
+    key: email,
+    email,
+    user,
+    store: false,
+  });
 }
 
 async function emailResetPassword() {

@@ -1,6 +1,7 @@
 import type { Context } from "../..";
-import { createId } from "../../helpers";
-import { redirect, status } from "../../reply";
+import { cookies } from "../../reply";
+import finishLogin from "../finishLogin";
+import { checkState, clearState, startState } from "../state";
 
 const oauth = async (code: string) => {
   const fch = async (
@@ -29,9 +30,15 @@ const oauth = async (code: string) => {
   };
 };
 
-const login = function githubLogin() {
-  return redirect(
-    `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_ID}&scope=user:email`,
+const login = (ctx: Context) => {
+  const { state, cookie } = startState(ctx);
+  const params = new URLSearchParams({
+    client_id: env.GITHUB_ID,
+    scope: "user:email",
+    state,
+  });
+  return cookies("oauth_state", cookie).redirect(
+    `https://github.com/login/oauth/authorize?${params}`,
   );
 };
 
@@ -46,45 +53,25 @@ const getUserProfile = async (code: string) => {
 };
 
 const callback = async (ctx: Context) => {
-  const { strategy, cleanUser, store, session, redirect } = ctx.options.auth;
+  checkState(ctx, ctx.url.query.state);
 
   const profile = await getUserProfile(ctx.url.query.code);
 
-  const auth = {
-    id: createId(),
-    strategy,
+  const res = await finishLogin(ctx, {
     provider: "github",
-    user: String(profile.id),
+    key: profile.id,
     email: profile.email,
-    time: new Date().toISOString().replace(/\.[0-9]*/, ""),
-  };
-  const existing = await store.get(String(profile.id));
-  const user = cleanUser({
-    ...((existing as Object) ?? {}),
-    id: profile.id,
-    name: profile.name,
-    email: profile.email,
-    picture: profile.avatar_url,
-    location: profile.location,
-    created: profile.created_at,
+    user: {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      picture: profile.avatar_url,
+      location: profile.location,
+      created: profile.created_at,
+    },
   });
-
-  await store.set(auth.user, user);
-  await session.set(auth.id, auth, { expires: "1w" });
-
-  if (auth.strategy.includes("token")) {
-    return status(201).json({ ...user, token: auth.id });
-  }
-  if (auth.strategy.includes("cookie")) {
-    return status(302).cookies({ authentication: auth.id }).redirect(redirect);
-  }
-  if (auth.strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
-  }
-  if (auth.strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
-  }
-  throw new Error("Unknown auth type");
+  res.headers.append("set-cookie", clearState());
+  return res;
 };
 
 export default { login, callback };

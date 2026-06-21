@@ -41,7 +41,7 @@ describe("auth", () => {
 
     const authorization = `Bearer ${ID}`;
     const res = await api.get("/", { headers: { authorization } });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.text()).toBe(
       "Invalid provider 'wrong', valid ones are: 'email'",
     );
@@ -73,7 +73,7 @@ describe("token", () => {
   it("should be Bearer", async () => {
     const authorization = `Basic ${ID}`;
     const res = await api.get("/", { headers: { authorization } });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.text()).toBe(
       "Invalid authorization header Basic, must send 'Bearer {TOKEN}' (with space)",
     );
@@ -82,7 +82,7 @@ describe("token", () => {
   it("should have the proper token", async () => {
     const authorization = "Bearer hola";
     const res = await api.get("/", { headers: { authorization } });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.text()).toBe("Invalid Authorization token");
   });
 
@@ -134,7 +134,7 @@ describe("cookie", () => {
   it("should have the proper token in email", async () => {
     const cookie = "authentication=hello";
     const res = await api.get("/", { headers: { cookie } });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(await res.text()).toBe("Invalid Authorization cookie");
   });
 
