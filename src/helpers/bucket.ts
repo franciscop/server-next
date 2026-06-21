@@ -14,7 +14,7 @@ function thinLocalBucket(root: string): Bucket {
     read: async (name: string): Promise<ReadableStream | null> => {
       const fullPath = absolute(name);
       const stats = await fsp.stat(fullPath).catch(() => null);
-      if (!stats || !stats.isFile()) return null;
+      if (!stats?.isFile()) return null;
 
       const nodeStream = fs.createReadStream(fullPath);
       return new ReadableStream({

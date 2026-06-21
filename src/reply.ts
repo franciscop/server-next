@@ -111,11 +111,17 @@ class Reply {
         const isHtml = body.trim().startsWith("<");
         headers.set("content-type", isHtml ? "text/html" : "text/plain");
       }
+      if (!headers.has("content-length")) {
+        headers.set("content-length", String(Buffer.byteLength(body)));
+      }
       return new Response(body, { status, headers });
     }
 
     const name = body?.constructor?.name;
     if (name === "Buffer") {
+      if (!headers.has("content-length")) {
+        headers.set("content-length", String(body.length));
+      }
       return new Response(body, { status, headers });
     }
 
@@ -135,7 +141,11 @@ class Reply {
     if (!headers.get("content-type")) {
       headers.set("content-type", "application/json");
     }
-    return new Response(JSON.stringify(body), { status, headers });
+    const payload = JSON.stringify(body);
+    if (!headers.has("content-length")) {
+      headers.set("content-length", String(Buffer.byteLength(payload)));
+    }
+    return new Response(payload, { status, headers });
   }
 }
 

@@ -1,10 +1,21 @@
 import { ServerError, type Context } from "..";
 import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
+import { applyCors } from "./cors";
 import define from "./define";
 import validate from "./validate";
 
 export default async function handleRequest(
+  handlers: Record<string, any[]>,
+  ctx: Context,
+): Promise<Response | undefined> {
+  const res = await getResponse(handlers, ctx);
+  // Log the request once the final response is known (no-op unless `log` is on)
+  if (res) ctx.options.log.request(ctx, res);
+  return res;
+}
+
+async function getResponse(
   handlers: Record<string, any[]>,
   ctx: Context,
 ): Promise<Response | undefined> {
@@ -38,6 +49,10 @@ export default async function handleRequest(
     // In other environments, a non-response is wrong and we should 404 then
     throw new ServerError("NOT_FOUND", 404, "Not Found");
   } catch (error: any) {
-    return ctx.options.onError(error, ctx);
+    // Errors bypass parseResponse, so re-apply CORS here; otherwise a browser
+    // can't even read the error status of a cross-origin request.
+    const res = await ctx.options.onError(error, ctx);
+    applyCors(res, ctx);
+    return res;
   }
 }

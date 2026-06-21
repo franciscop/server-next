@@ -1,5 +1,6 @@
+export { default as clientIp } from "./clientIp";
 export { default as config } from "./config";
-export { default as cors } from "./cors";
+export { default as cors, applyCors } from "./cors";
 export { default as createCookies } from "./createCookies";
 export { default as createId } from "./createId";
 export { default as createWebsocket } from "./createWebsocket";

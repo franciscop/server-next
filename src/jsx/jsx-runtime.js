@@ -34,7 +34,7 @@ const encode = (str = "") => {
   return str.replace(/[&<>"']/g, (tag) => ENTITIES[tag]);
 };
 
-// valid primitives only — null, undefined, false, true are all skipped
+// valid primitives only: null, undefined, false, true are all skipped
 const isValidChild = (child) =>
   child != null && child !== false && child !== true;
 

@@ -1,4 +1,5 @@
 import server, { status } from ".";
+import favicon from "./middle/favicon";
 import session from "./middle/session";
 import router from "./router";
 
@@ -39,6 +40,7 @@ describe("can route properly", () => {
   it("has the correct structure", () => {
     const registeredPaths = app.handlers.get.map((h) => h[1]);
     expect(registeredPaths).toEqual([
+      "*",
       "*",
       "*",
       "*",
@@ -165,6 +167,7 @@ describe("complex routing", () => {
       "/path1",
       timer,
       assets,
+      favicon,
       session,
       mid1,
       mid2,
@@ -175,6 +178,7 @@ describe("complex routing", () => {
       "/sub1/path2",
       timer,
       assets,
+      favicon,
       session,
       mid1,
       mid2,
@@ -216,11 +220,21 @@ describe("nested routing", () => {
     const timer = home[1];
     const assets = home[2];
 
-    expect(home).toEqual(["/", timer, assets, session, mid1, mid2, mid3]);
+    expect(home).toEqual([
+      "/",
+      timer,
+      assets,
+      favicon,
+      session,
+      mid1,
+      mid2,
+      mid3,
+    ]);
     expect(userMe).toEqual([
       "/users/me",
       timer,
       assets,
+      favicon,
       session,
       mid1,
       mid2,
@@ -232,6 +246,7 @@ describe("nested routing", () => {
       "/a/b/c/d",
       timer,
       assets,
+      favicon,
       session,
       mid1,
       mid2,

@@ -92,7 +92,7 @@ export class UploadPipeline {
 
     if (!this._bucket) {
       throw new Error(
-        `No destination configured — pass a bucket to upload() or call .store()`,
+        `No destination configured. Pass a bucket to upload() or call .store()`,
       );
     }
 

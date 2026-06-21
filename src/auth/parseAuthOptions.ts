@@ -42,7 +42,7 @@ export default function parseAuthOptions(
   }
   const strategy = auth.strategy;
 
-  if (!auth.provider || !auth.provider.length) {
+  if (!auth.provider?.length) {
     throw new Error("Auth options needs a provider");
   }
   const provider = getProviders(auth.provider);

@@ -1,7 +1,13 @@
 import type { IncomingMessage } from "node:http";
 import { TLSSocket } from "node:tls";
 import type { Context, Server } from "..";
-import { define, parseBody, parseCookies, parseHeaders } from "../helpers";
+import {
+  clientIp,
+  define,
+  parseBody,
+  parseCookies,
+  parseHeaders,
+} from "../helpers";
 import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
 
@@ -43,6 +49,13 @@ export default async function createNode(
       .on("end", () => resolve(Buffer.concat(body)))
       .on("error", reject);
   });
+
+  // Reflect the real received size when the client didn't send Content-Length
+  // (e.g. chunked uploads), so ctx.headers and the request log are accurate.
+  if (rawBody.length && !headers["content-length"]) {
+    headers["content-length"] = String(rawBody.length);
+  }
+
   const body = rawBody
     ? await parseBody(rawBody, headers["content-type"], app.settings.uploads)
     : undefined;
@@ -61,5 +74,9 @@ export default async function createNode(
     init,
     events,
     app,
+    ip: clientIp(headers, {
+      remoteAddress: req.socket.remoteAddress || "",
+      trustProxy: app.settings.security.trustProxy,
+    }),
   };
 }

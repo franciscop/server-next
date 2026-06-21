@@ -1,5 +1,5 @@
 import {
-  cors,
+  applyCors,
   createCookies,
   createId,
   iteratorAsyncToReadable,
@@ -36,7 +36,12 @@ export default async function parseResponse(
   // A plain string will be converted to either html or plain
   if (typeof out === "string") {
     const type = /^\s*</.test(out) ? "text/html" : "text/plain";
-    out = new Response(out, { headers: { "content-type": type } });
+    out = new Response(out, {
+      headers: {
+        "content-type": type,
+        "content-length": String(Buffer.byteLength(out)),
+      },
+    });
   }
 
   // https://stackoverflow.com/a/69745650/938236
@@ -73,19 +78,8 @@ export default async function parseResponse(
 
   // Here it should be a Response
 
-  // If we have CORS, set it up
-  if (ctx.options.cors) {
-    // Set the proper CORS headers
-    const origin = cors(ctx.options.cors.origin, ctx.headers.origin as string);
-    if (origin) {
-      out.headers.set("Access-Control-Allow-Origin", origin);
-      out.headers.set("Access-Control-Allow-Methods", ctx.options.cors.methods);
-      out.headers.set("Access-Control-Allow-Headers", ctx.options.cors.headers);
-      if ((ctx.options.cors as any).credentials) {
-        out.headers.set("Access-Control-Allow-Credentials", "true");
-      }
-    }
-  }
+  // If we have CORS, set the proper headers up
+  applyCors(out, ctx);
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count

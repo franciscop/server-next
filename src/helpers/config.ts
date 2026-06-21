@@ -1,15 +1,30 @@
 import parseAuthOptions from "../auth/parseAuthOptions";
 import Bucket from "./bucket";
 import createId from "./createId";
+import createLogger from "./logger";
 import { UploadPipeline } from "./upload";
 
-import type { CorsSettings, Options, Settings } from "..";
+import type { CorsSettings, LogLevel, Options, Settings } from "..";
 
 export default function config(options: Options = {}): Settings {
   const env = globalThis.env;
+
+  // Logging: off by default (undefined); `info` (or the LOG_LEVEL env var) turns
+  // on the startup + request logs.
+  const raw = options.log ?? env.LOG_LEVEL;
+  const level: LogLevel | undefined =
+    raw === true ? "info" : raw === false ? undefined : (raw as LogLevel | undefined);
+  const log = createLogger(level);
+
   const settings: Settings = {
     port: options.port || env.PORT || 3000,
     secret: options.secret || env.SECRET || `unsafe-${createId()}`,
+    log,
+    // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
+    // when clients connect directly so a client can't spoof its IP).
+    security: {
+      trustProxy: options.security?.trustProxy ?? true,
+    },
   };
 
   // CORS
@@ -49,6 +64,10 @@ export default function config(options: Options = {}): Settings {
           ? options.cors.headers.join(",")
           : options.cors.headers;
       }
+
+      if (options.cors.credentials) {
+        cors.credentials = true;
+      }
     }
 
     if (typeof cors.origin === "string") {
@@ -67,6 +86,9 @@ export default function config(options: Options = {}): Settings {
       : options.uploads
         ? Bucket(options.uploads)
         : null;
+
+  // Favicon served at /favicon.ico (path or Bucket)
+  if (options.favicon) settings.favicon = options.favicon;
 
   // Stores
   settings.store = options.store ?? null;
@@ -98,6 +120,23 @@ export default function config(options: Options = {}): Settings {
         status: error.status || 500,
       });
     });
+
+  // Startup summary: one concise line per configured module (only with `log`)
+  const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
+  if (settings.auth) {
+    log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
+  }
+  if (settings.public) log.message("public", loc(options.public));
+  if (settings.views) log.message("views", loc(options.views));
+  if (settings.uploads) log.message("uploads", loc(options.uploads));
+  if (settings.session) log.message("session", "enabled");
+  if (settings.cors) {
+    const origin =
+      settings.cors.origin === true ? "*" : String(settings.cors.origin);
+    log.message("cors", origin);
+  }
+  if (settings.favicon) log.message("favicon", loc(settings.favicon));
+  if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
 
   return settings;
 }

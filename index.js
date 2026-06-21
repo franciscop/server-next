@@ -79,6 +79,24 @@ if (typeof process !== "undefined") {
   Object.assign(globalThis.env, process.env);
 }
 
+// src/helpers/clientIp.ts
+var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
+var normalize = (ip) => ip.replace(/^::ffff:/, "");
+function clientIp(headers2, opts = {}) {
+  const { remoteAddress = "", trustProxy = false } = opts;
+  const cf = first(headers2["cf-connecting-ip"]);
+  if (cf) return normalize(cf);
+  const nf = first(headers2["x-nf-client-connection-ip"]);
+  if (nf) return normalize(nf);
+  if (trustProxy) {
+    const xff = first(headers2["x-forwarded-for"]);
+    if (xff) return normalize(xff.split(",")[0].trim());
+    const real = first(headers2["x-real-ip"]);
+    if (real) return normalize(real);
+  }
+  return normalize(remoteAddress);
+}
+
 // src/auth/updateUser.ts
 async function updateUser(user, auth2, store) {
   if (auth2.provider === "email") {
@@ -254,10 +272,16 @@ var Reply = class {
         const isHtml = body.trim().startsWith("<");
         headers2.set("content-type", isHtml ? "text/html" : "text/plain");
       }
+      if (!headers2.has("content-length")) {
+        headers2.set("content-length", String(Buffer.byteLength(body)));
+      }
       return new Response(body, { status: status2, headers: headers2 });
     }
     const name = body?.constructor?.name;
     if (name === "Buffer") {
+      if (!headers2.has("content-length")) {
+        headers2.set("content-length", String(body.length));
+      }
       return new Response(body, { status: status2, headers: headers2 });
     }
     if (typeof body?.getReader === "function") {
@@ -272,7 +296,11 @@ var Reply = class {
     if (!headers2.get("content-type")) {
       headers2.set("content-type", "application/json");
     }
-    return new Response(JSON.stringify(body), { status: status2, headers: headers2 });
+    const payload = JSON.stringify(body);
+    if (!headers2.has("content-length")) {
+      headers2.set("content-length", String(Buffer.byteLength(payload)));
+    }
+    return new Response(payload, { status: status2, headers: headers2 });
   }
 };
 var r = () => new Reply();
@@ -398,7 +426,7 @@ function parseAuthOptions(auth2, all) {
     throw new Error("Auth options needs a strategy");
   }
   const strategy = auth2.strategy;
-  if (!auth2.provider || !auth2.provider.length) {
+  if (!auth2.provider?.length) {
     throw new Error("Auth options needs a provider");
   }
   const provider = getProviders(auth2.provider);
@@ -439,7 +467,7 @@ function thinLocalBucket(root) {
     read: async (name) => {
       const fullPath = absolute(name);
       const stats = await fsp.stat(fullPath).catch(() => null);
-      if (!stats || !stats.isFile()) return null;
+      if (!stats?.isFile()) return null;
       const nodeStream = fs.createReadStream(fullPath);
       return new ReadableStream({
         start(controller) {
@@ -544,6 +572,115 @@ function createId(source, size = 16) {
   return randomId(size);
 }
 
+// src/helpers/color.ts
+var map = {
+  reset: 0,
+  bright: 1,
+  dim: 2,
+  under: 4,
+  blink: 5,
+  reverse: 7,
+  black: 30,
+  red: 31,
+  green: 32,
+  yellow: 33,
+  blue: 34,
+  magenta: 35,
+  cyan: 36,
+  white: 37,
+  bgblack: 40,
+  bgred: 41,
+  bggreen: 42,
+  bgyellow: 43,
+  bgblue: 44,
+  bgmagenta: 45,
+  bgcyan: 46,
+  bgwhite: 47
+};
+var replace = (k) => {
+  if (process.env.NO_COLOR) return "";
+  if (!(k in map)) throw new Error(`"{${k}}" is not a valid color`);
+  return `\x1B[${map[k]}m`;
+};
+function color(str, ...vals) {
+  if (typeof str === "string") {
+    return str.replace(/\{(\w+)\}/g, (_m, k) => replace(k)).replace(/\{\/\w*\}/g, () => replace("reset"));
+  }
+  return color(str[0] + vals.map((v, i) => v + str[i + 1]).join(""));
+}
+
+// src/helpers/logger.ts
+var STATUS_TEXT = {
+  200: "OK",
+  201: "Created",
+  202: "Accepted",
+  204: "No Content",
+  301: "Moved Permanently",
+  302: "Found",
+  303: "See Other",
+  304: "Not Modified",
+  307: "Temporary Redirect",
+  308: "Permanent Redirect",
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  409: "Conflict",
+  413: "Payload Too Large",
+  422: "Unprocessable Entity",
+  429: "Too Many Requests",
+  500: "Internal Server Error",
+  502: "Bad Gateway",
+  503: "Service Unavailable"
+};
+var UNITS = ["b", "kb", "mb", "gb", "tb"];
+function formatBytes(bytes) {
+  if (!bytes || bytes < 0) return "0b";
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    UNITS.length - 1
+  );
+  const value = bytes / 1024 ** i;
+  const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded}${UNITS[i]}`;
+}
+var SCOPE_COLORS = {
+  start: "green",
+  api: "cyan"
+};
+var MODULE_COLOR = "magenta";
+var paint = (name, text) => `${color(`{${name}}`)}${text}${color("{/}")}`;
+function createLogger(level) {
+  const enabled = !!level;
+  const message = (scope, msg) => {
+    if (!enabled) return;
+    const c = SCOPE_COLORS[scope] || MODULE_COLOR;
+    console.log(paint(c, `[server:${scope}] ${msg}`));
+  };
+  const request = (ctx, res) => {
+    if (!enabled) return;
+    const method = ctx.method.toUpperCase();
+    const path2 = ctx.url.pathname;
+    const reqLen = Number(ctx.headers["content-length"]) || 0;
+    const resLen = Number(res.headers.get("content-length")) || 0;
+    const status2 = res.status;
+    const text = STATUS_TEXT[status2] || "";
+    const reqSize = reqLen ? ` ${formatBytes(reqLen)}` : "";
+    const resSize = resLen ? ` ${formatBytes(resLen)}` : "";
+    let line = `${method} ${path2}${reqSize} \u2192 ${status2}${text ? ` ${text}` : ""}${resSize}`;
+    const location = res.headers.get("location");
+    if (location) line += ` \u2192 ${location}`;
+    message("api", line);
+  };
+  return {
+    level,
+    message,
+    start: (url) => message("start", url),
+    request
+  };
+}
+
 // src/helpers/upload.ts
 function parseBytes(value) {
   if (typeof value === "number") return value;
@@ -608,7 +745,7 @@ var UploadPipeline = class {
     }
     if (!this._bucket) {
       throw new Error(
-        `No destination configured \u2014 pass a bucket to upload() or call .store()`
+        `No destination configured. Pass a bucket to upload() or call .store()`
       );
     }
     return saveFileToBucket(originalName, data, this._bucket, contentType);
@@ -621,9 +758,18 @@ function upload(bucket) {
 // src/helpers/config.ts
 function config(options = {}) {
   const env2 = globalThis.env;
+  const raw = options.log ?? env2.LOG_LEVEL;
+  const level = raw === true ? "info" : raw === false ? void 0 : raw;
+  const log = createLogger(level);
   const settings = {
     port: options.port || env2.PORT || 3e3,
-    secret: options.secret || env2.SECRET || `unsafe-${createId()}`
+    secret: options.secret || env2.SECRET || `unsafe-${createId()}`,
+    log,
+    // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
+    // when clients connect directly so a client can't spoof its IP).
+    security: {
+      trustProxy: options.security?.trustProxy ?? true
+    }
   };
   options.cors = options.cors || env2.CORS || null;
   if (options.cors) {
@@ -652,6 +798,9 @@ function config(options = {}) {
       if ("headers" in options.cors) {
         cors2.headers = Array.isArray(options.cors.headers) ? options.cors.headers.join(",") : options.cors.headers;
       }
+      if (options.cors.credentials) {
+        cors2.credentials = true;
+      }
     }
     if (typeof cors2.origin === "string") {
       cors2.origin = cors2.origin.toLowerCase();
@@ -661,6 +810,7 @@ function config(options = {}) {
   settings.views = options.views ? bucket_default(options.views) : null;
   settings.public = options.public ? bucket_default(options.public) : null;
   settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket_default(options.uploads) : null;
+  if (options.favicon) settings.favicon = options.favicon;
   settings.store = options.store ?? null;
   settings.cookies = options.cookies ?? null;
   if (options.session) {
@@ -682,6 +832,20 @@ function config(options = {}) {
       status: error.status || 500
     });
   });
+  const loc = (v) => typeof v === "string" ? v : "enabled";
+  if (settings.auth) {
+    log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
+  }
+  if (settings.public) log.message("public", loc(options.public));
+  if (settings.views) log.message("views", loc(options.views));
+  if (settings.uploads) log.message("uploads", loc(options.uploads));
+  if (settings.session) log.message("session", "enabled");
+  if (settings.cors) {
+    const origin = settings.cors.origin === true ? "*" : String(settings.cors.origin);
+    log.message("cors", origin);
+  }
+  if (settings.favicon) log.message("favicon", loc(settings.favicon));
+  if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
   return settings;
 }
 
@@ -697,6 +861,27 @@ function cors(config2, origin = "") {
   if (arr.includes(origin)) return origin;
   console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
   return null;
+}
+function applyCors(res, ctx) {
+  const settings = ctx.options.cors;
+  if (!settings) return;
+  const requestOrigin = ctx.headers.origin || "";
+  let origin = cors(settings.origin, requestOrigin);
+  if (!origin) return;
+  if (settings.credentials && origin === "*") {
+    if (!requestOrigin) return;
+    origin = requestOrigin.toLowerCase();
+  }
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Access-Control-Allow-Methods", settings.methods);
+  res.headers.set("Access-Control-Allow-Headers", settings.headers);
+  if (settings.credentials) {
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  if (origin !== "*") res.headers.append("Vary", "Origin");
+  if (ctx.method === "options") {
+    res.headers.set("Access-Control-Max-Age", "86400");
+  }
 }
 
 // src/helpers/createCookies.ts
@@ -825,7 +1010,12 @@ async function parseResponse(out, ctx) {
   }
   if (typeof out === "string") {
     const type2 = /^\s*</.test(out) ? "text/html" : "text/plain";
-    out = new Response(out, { headers: { "content-type": type2 } });
+    out = new Response(out, {
+      headers: {
+        "content-type": type2,
+        "content-length": String(Buffer.byteLength(out))
+      }
+    });
   }
   if (out?.constructor === Object || Array.isArray(out)) {
     out = json(out);
@@ -848,17 +1038,7 @@ async function parseResponse(out, ctx) {
   if (!(out instanceof Response)) {
     throw new Error(`Invalid response type ${out}`);
   }
-  if (ctx.options.cors) {
-    const origin = cors(ctx.options.cors.origin, ctx.headers.origin);
-    if (origin) {
-      out.headers.set("Access-Control-Allow-Origin", origin);
-      out.headers.set("Access-Control-Allow-Methods", ctx.options.cors.methods);
-      out.headers.set("Access-Control-Allow-Headers", ctx.options.cors.headers);
-      if (ctx.options.cors.credentials) {
-        out.headers.set("Access-Control-Allow-Credentials", "true");
-      }
-    }
-  }
+  applyCors(out, ctx);
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
@@ -976,6 +1156,11 @@ function validate(ctx, schema) {
 
 // src/helpers/handleRequest.ts
 async function handleRequest(handlers, ctx) {
+  const res = await getResponse(handlers, ctx);
+  if (res) ctx.options.log.request(ctx, res);
+  return res;
+}
+async function getResponse(handlers, ctx) {
   try {
     for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
       const match = pathPattern(matcher, ctx.url.pathname || "/");
@@ -995,7 +1180,9 @@ async function handleRequest(handlers, ctx) {
     if (ctx.platform.provider === "netlify") return;
     throw new ServerError_default("NOT_FOUND", 404, "Not Found");
   } catch (error) {
-    return ctx.options.onError(error, ctx);
+    const res = await ctx.options.onError(error, ctx);
+    applyCors(res, ctx);
+    return res;
   }
 }
 
@@ -1342,10 +1529,10 @@ async function verify(password, hash3) {
 // src/auth/findSessionId.ts
 var validateToken = (authorization) => {
   const [type2, id] = authorization.trim().split(" ");
-  if (!type2 || type2.toLowerCase() !== "bearer") {
+  if (type2?.toLowerCase() !== "bearer") {
     throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   }
-  if (!id || id.length !== 16) {
+  if (id?.length !== 16) {
     throw ServerError_default.AUTH_INVALID_TOKEN();
   }
   return id;
@@ -1450,6 +1637,23 @@ async function assets(ctx) {
     return type(ctx.url.pathname.split(".").pop()).send(asset);
   } catch {
   }
+}
+
+// src/middle/favicon.ts
+async function favicon(ctx) {
+  if (ctx.method !== "get") return;
+  if (ctx.url.pathname !== "/favicon.ico") return;
+  const fav = ctx.options.favicon;
+  if (fav) {
+    if (typeof fav === "string") return file(fav);
+    const icon = await fav.read("favicon.ico");
+    return icon ? type("ico").send(icon) : 204;
+  }
+  const handled = ctx.app.handlers.get.some(
+    ([method, matcher]) => method !== "*" && pathPattern(matcher, "/favicon.ico")
+  );
+  if (handled) return;
+  return 204;
 }
 
 // src/middle/openapi.ts
@@ -1614,6 +1818,17 @@ var openapi_default = async (ctx) => {
 </html> `;
 };
 
+// src/middle/preflight.ts
+function preflight(ctx) {
+  if (ctx.method !== "options") return;
+  if (!ctx.headers["access-control-request-method"]) return;
+  const handled = ctx.app.handlers.options.some(
+    ([method, matcher]) => method !== "*" && pathPattern(matcher, ctx.url.pathname)
+  );
+  if (handled) return;
+  return 204;
+}
+
 // src/middle/NoSession.ts
 var NoSession = class {
 };
@@ -1723,6 +1938,9 @@ async function createNode(req, app) {
     const body2 = [];
     req.on("data", (chunk) => body2.push(chunk)).on("end", () => resolve2(Buffer.concat(body2))).on("error", reject);
   });
+  if (rawBody.length && !headers2["content-length"]) {
+    headers2["content-length"] = String(rawBody.length);
+  }
   const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
   const events = createEvents();
   return {
@@ -1736,12 +1954,16 @@ async function createNode(req, app) {
     session: {},
     init,
     events,
-    app
+    app,
+    ip: clientIp(headers2, {
+      remoteAddress: req.socket.remoteAddress || "",
+      trustProxy: app.settings.security.trustProxy
+    })
   };
 }
 
 // src/context/winter.ts
-async function createWinter(req, app) {
+async function createWinter(req, app, server2) {
   const init = performance.now();
   const method = req.method.toLowerCase();
   if (!isValidMethod(method)) {
@@ -1757,6 +1979,9 @@ async function createWinter(req, app) {
     (url2) => Object.fromEntries(url2.searchParams.entries())
   );
   const rawBody = Buffer.from(await req.arrayBuffer());
+  if (rawBody.length && !headers2["content-length"]) {
+    headers2["content-length"] = String(rawBody.length);
+  }
   const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
   const events = createEvents();
   return {
@@ -1770,7 +1995,11 @@ async function createWinter(req, app) {
     session: {},
     init,
     events,
-    app
+    app,
+    ip: clientIp(headers2, {
+      remoteAddress: server2?.requestIP?.(req)?.address || "",
+      trustProxy: app.settings.security.trustProxy
+    })
   };
 }
 
@@ -1778,7 +2007,7 @@ async function createWinter(req, app) {
 var Winter = async (app, request, env2) => {
   if (env2?.upgrade(request)) return;
   Object.assign(globalThis.env, env2);
-  const ctx = await createWinter(request, app);
+  const ctx = await createWinter(request, app, env2);
   const res = await handleRequest(app.handlers, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
@@ -1796,7 +2025,9 @@ var Node = async (app) => {
       response.write(out.body || "");
     }
     response.end();
-  }).listen(app.settings.port);
+  }).listen(app.settings.port, () => {
+    app.settings.log.start(`http://localhost:${app.settings.port}/`);
+  });
 };
 var Netlify = async (app, request, context) => {
   request.context = context;
@@ -1964,9 +2195,13 @@ var Server = class extends Router {
     this.websocket = createWebsocket(this.sockets, this.handlers);
     if (this.platform.runtime === "node") {
       this.node();
+    } else if (this.platform.runtime === "bun") {
+      this.settings.log.start(`http://localhost:${this.settings.port}/`);
     }
     this.use(timer);
+    if (this.settings.cors) this.use(preflight);
     this.use(assets);
+    this.use(favicon);
     this.use(session);
     if (this.settings.auth) {
       auth(this);

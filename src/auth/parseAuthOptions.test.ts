@@ -1,11 +1,10 @@
-import "../tests/toSucceed";
-
 import kv from "polystore";
 
 import parseAuthOptions from "./parseAuthOptions";
 
 describe("parseAuthOptions", () => {
-  const store = kv(new Map());
+  const map = new Map();
+  const store = kv(map);
 
   it("returns null when auth is not provided", () => {
     const result = parseAuthOptions(undefined, { store });
@@ -81,7 +80,7 @@ describe("parseAuthOptions", () => {
     expect(() => {
       // @ts-expect-error
       parseAuthOptions("cookie:invalid", { store });
-    }).toThrow("Invalid providers");
+    }).toThrow('Provider "invalid" not found');
   });
 
   it("throws error when no store is available", () => {
@@ -99,9 +98,10 @@ describe("parseAuthOptions", () => {
     expect(result?.session).toBe(sessionStore);
   });
 
-  it("creates session store from all.store with 'auth:' prefix", () => {
+  it("creates session store from all.store with 'auth:' prefix", async () => {
     const result = parseAuthOptions("cookie:email", { store });
-    expect(result?.session.name).toContain("auth:");
+    await result?.session.set("token", "x");
+    expect([...map.keys()]).toContain("auth:token");
   });
 
   it("uses auth.store when provided", () => {
@@ -113,9 +113,10 @@ describe("parseAuthOptions", () => {
     expect(result?.store).toBe(userStore);
   });
 
-  it("creates user store from all.store with 'user:' prefix", () => {
+  it("creates user store from all.store with 'user:' prefix", async () => {
     const result = parseAuthOptions("cookie:email", { store });
-    expect(result?.store.name).toContain("user:");
+    await result?.store.set("alice", { id: 1 });
+    expect([...map.keys()]).toContain("user:alice");
   });
 
   it("uses custom redirect when provided", () => {

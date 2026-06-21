@@ -65,6 +65,7 @@ export type CorsSettings = {
   origin: string | boolean;
   methods: string;
   headers: string;
+  credentials?: boolean;
 };
 
 type CorsOptions =
@@ -75,6 +76,7 @@ type CorsOptions =
       origin?: string | string[];
       methods?: string | Method[];
       headers?: string | string[];
+      credentials?: boolean;
     };
 
 export type BasicValue = string | number | boolean | null;
@@ -148,6 +150,27 @@ export type AuthSettings = {
   redirect: string;
 };
 
+export type LogLevel = "info";
+
+export type Logger = {
+  level?: LogLevel;
+  // Low-level helper, prints `[server:<scope>] <message>` when enabled
+  message: (scope: string, message: string) => void;
+  // `[server:start] http://localhost:3000/`
+  start: (url: string) => void;
+  // `[server:api] POST /hello/world 1kb → 200 OK 10kb`
+  request: (ctx: Context, res: Response) => void;
+};
+
+export type SecurityOptions = {
+  // Trust X-Forwarded-* headers for ctx.ip (on by default)
+  trustProxy?: boolean;
+};
+
+export type SecuritySettings = {
+  trustProxy: boolean;
+};
+
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 
 export type Options = {
@@ -163,6 +186,9 @@ export type Options = {
   auth?: AuthOption;
   openapi?: any;
   onError?: OnError;
+  log?: LogLevel | boolean;
+  favicon?: string | Bucket;
+  security?: SecurityOptions;
 };
 
 export type Settings = {
@@ -178,6 +204,9 @@ export type Settings = {
   auth?: AuthSettings;
   openapi?: any;
   onError?: OnError;
+  log: Logger;
+  favicon?: string | Bucket;
+  security: SecuritySettings;
 };
 
 export type Time = {
@@ -257,6 +286,7 @@ export type Context<
   O extends ServerConfig = object,
 > = {
   method: Method;
+  ip: string;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
   body?: SerializableValue;

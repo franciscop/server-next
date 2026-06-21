@@ -3,10 +3,10 @@ import type { Context } from "../types";
 
 const validateToken = (authorization: string): string => {
   const [type, id] = authorization.trim().split(" ");
-  if (!type || type.toLowerCase() !== "bearer") {
+  if (type?.toLowerCase() !== "bearer") {
     throw ServerError.AUTH_INVALID_HEADER({ type });
   }
-  if (!id || id.length !== 16) {
+  if (id?.length !== 16) {
     throw ServerError.AUTH_INVALID_TOKEN();
   }
   return id;

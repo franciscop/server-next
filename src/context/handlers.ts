@@ -9,7 +9,8 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
   if (env?.upgrade(request)) return;
   Object.assign(globalThis.env, env); // Extend env with the passed vars
 
-  const ctx = await createWinter(request, app);
+  // In Bun, the 2nd fetch arg is the server object (with .requestIP/.upgrade)
+  const ctx = await createWinter(request, app, env);
   const res = await handleRequest(app.handlers, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
@@ -32,7 +33,9 @@ export const Node = async (app: Server) => {
       }
       response.end();
     })
-    .listen(app.settings.port);
+    .listen(app.settings.port, () => {
+      app.settings.log.start(`http://localhost:${app.settings.port}/`);
+    });
 };
 
 export const Netlify = async (

@@ -2,7 +2,7 @@ import "./errors/index";
 import "./polyfill";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import { assets, auth, openapi, session, timer } from "./middle";
+import { assets, auth, favicon, openapi, preflight, session, timer } from "./middle";
 
 import * as handlers from "./context/handlers";
 import { Router } from "./router";
@@ -39,10 +39,16 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
 
     if (this.platform.runtime === "node") {
       this.node();
+    } else if (this.platform.runtime === "bun") {
+      // Bun serves the `export default` itself, so there's no listen callback to
+      // hook, so log the startup banner here, since the port is already known.
+      this.settings.log.start(`http://localhost:${this.settings.port}/`);
     }
 
     this.use(timer);
+    if (this.settings.cors) this.use(preflight);
     this.use(assets);
+    this.use(favicon);
     this.use(session);
 
     if (this.settings.auth) {

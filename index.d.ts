@@ -54,11 +54,13 @@ type CorsSettings = {
     origin: string | boolean;
     methods: string;
     headers: string;
+    credentials?: boolean;
 };
 type CorsOptions = boolean | string | string[] | {
     origin?: string | string[];
     methods?: string | Method[];
     headers?: string | string[];
+    credentials?: boolean;
 };
 type BasicValue = string | number | boolean | null;
 type SerializableValue = BasicValue | {
@@ -106,6 +108,19 @@ type AuthSettings = {
     cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
     redirect: string;
 };
+type LogLevel = "info";
+type Logger = {
+    level?: LogLevel;
+    message: (scope: string, message: string) => void;
+    start: (url: string) => void;
+    request: (ctx: Context, res: Response) => void;
+};
+type SecurityOptions = {
+    trustProxy?: boolean;
+};
+type SecuritySettings = {
+    trustProxy: boolean;
+};
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 type Options = {
     port?: number;
@@ -122,6 +137,9 @@ type Options = {
     auth?: AuthOption;
     openapi?: any;
     onError?: OnError;
+    log?: LogLevel | boolean;
+    favicon?: string | Bucket;
+    security?: SecurityOptions;
 };
 type Settings = {
     port: number;
@@ -138,6 +156,9 @@ type Settings = {
     auth?: AuthSettings;
     openapi?: any;
     onError?: OnError;
+    log: Logger;
+    favicon?: string | Bucket;
+    security: SecuritySettings;
 };
 type Time = {
     (name: string): void;
@@ -170,6 +191,7 @@ type Events = Record<string, EventCallback[]> & {
 };
 type Context<Params extends Record<string, string | undefined> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
+    ip: string;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
     body?: SerializableValue;
@@ -426,4 +448,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
