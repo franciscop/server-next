@@ -13,12 +13,8 @@ const encode = (str: string | number = ""): string => {
   return str.replace(/[&<>"]/g, (tag) => entities[tag]);
 };
 
-const getConfig = (routes: any[]): any => {
-  const config = routes.find(
-    (r) =>
-      typeof r !== "string" && typeof r !== "function" && typeof r === "object",
-  );
-  if (!config) return {};
+const getConfig = (options: any = {}): any => {
+  const config = { ...options };
   if (config.tags) {
     if (typeof config.tags === "string") {
       config.tags = config.tags.split(/\s*,\s*/g);
@@ -87,14 +83,11 @@ const generateOpenApiPaths = (
 
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
-      const [_, path, fn, meta] = [
-        route[0],
-        route[1],
-        route.find((p: any) => typeof p === "function"),
-        route.find((p: any) => typeof p === "object"),
-      ];
+      const path = route.path;
+      const fn = route.fns.find((p: any) => typeof p === "function");
+      const meta = route.fns.find((p: any) => typeof p === "object");
 
-      const config = getConfig(route);
+      const config = getConfig(route.options);
 
       if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
         continue;

@@ -11,7 +11,7 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
 
   // In Bun, the 2nd fetch arg is the server object (with .requestIP/.upgrade)
   const ctx = await createWinter(request, app, env);
-  const res = await handleRequest(app.handlers, ctx);
+  const res = await handleRequest(app, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
@@ -23,7 +23,7 @@ export const Node = async (app: Server) => {
       const ctx = await createNode(request, app);
       if ("error" in ctx) throw ctx.error;
 
-      const out = await handleRequest(app.handlers, ctx);
+      const out = await handleRequest(app, ctx);
 
       response.writeHead(out.status || 200, parseHeaders(out.headers));
       if (out.body instanceof ReadableStream) {
@@ -50,7 +50,7 @@ export const Netlify = async (
     throw new Error("Netlify doesn't exist");
   }
   const ctx = await createWinter(request, app);
-  const res = await handleRequest(app.handlers, ctx);
+  const res = await handleRequest(app, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };

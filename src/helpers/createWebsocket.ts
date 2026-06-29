@@ -1,35 +1,33 @@
-import type { Middleware, RouterMethod } from "../types";
-
-type FullRoute = [RouterMethod, string, ...Middleware[]][];
+import type { Route } from "../types";
 
 type WebSocketHandlers = {
-  socket?: FullRoute;
+  socket?: Route[];
 };
 
 export default function createWebsocket(
   sockets: WebSocket[],
   handlers: WebSocketHandlers,
 ) {
+  const run = (event: string, socket: WebSocket, body?: string | Buffer) => {
+    const routes = handlers.socket?.filter((r) => r.path === event) ?? [];
+    for (const route of routes) {
+      for (const fn of route.fns) {
+        // @ts-expect-error socket callbacks receive a socket context, not a Context
+        fn({ socket, sockets, body });
+      }
+    }
+  };
+
   return {
-    message: async (socket: WebSocket, body: string | Buffer) => {
-      handlers.socket
-        ?.filter((s) => s[1] === "message")
-        // @ts-expect-error
-        ?.map((s) => s[2]({ socket, sockets, body }));
-    },
+    message: (socket: WebSocket, body: string | Buffer) =>
+      run("message", socket, body),
     open: (socket: WebSocket) => {
       sockets.push(socket);
-      handlers.socket
-        ?.filter((s) => s[1] === "open")
-        // @ts-expect-error
-        ?.map((s) => s[2]({ socket, sockets, body: undefined }));
+      run("open", socket);
     },
     close: (socket: WebSocket) => {
       sockets.splice(sockets.indexOf(socket), 1);
-      handlers.socket
-        ?.filter((s) => s[1] === "close")
-        // @ts-expect-error
-        ?.map((s) => s[2]({ socket, sockets, body: undefined }));
+      run("close", socket);
     },
   };
 }

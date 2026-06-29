@@ -1,257 +1,157 @@
 import server, { status } from ".";
-import favicon from "./middle/favicon";
-import session from "./middle/session";
 import router from "./router";
 
-function expandHandlers(handlers) {
-  const expandedHandlers = [];
-  const middlewareStack = [];
-
-  handlers.forEach((handler) => {
-    const verb = handler[0];
-    const path = handler[1];
-    const fns = handler.slice(2);
-
-    if (verb === "*") {
-      // accumulate middleware
-      middlewareStack.push(...fns);
-    } else {
-      // leaf route
-      expandedHandlers.push([path, ...middlewareStack, ...fns]);
-    }
-  });
-
-  return expandedHandlers;
-}
-
-describe("can route properly", () => {
-  const apiRouter = router()
+describe("basic routing", () => {
+  const api = server()
+    .get("/", () => "Home")
     .get("/hello", (ctx) => `Hello ${ctx.url.pathname}`)
-    .put("/hello", (ctx) => `Hello ${ctx.url.pathname}`)
-    .post("/hello", (ctx) => `Hello ${ctx.url.pathname}`);
+    .post("/hello", (ctx) => `Posted ${ctx.url.pathname}`)
+    .delete("/hello", () => "Deleted")
+    .test();
 
-  const app = server()
-    .use("/", apiRouter)
-    .use("/api/", apiRouter)
-    .get("/", () => "Fallback");
-  const api = app.test();
-
-  // INTERNAL - so this might change in the future
-  it("has the correct structure", () => {
-    const registeredPaths = app.handlers.get.map((h) => h[1]);
-    expect(registeredPaths).toEqual([
-      "*",
-      "*",
-      "*",
-      "*",
-      "/hello",
-      "/api/hello",
-      "/",
-    ]);
+  it("matches a GET route", async () => {
+    expect(await (await api.get("/hello")).text()).toBe("Hello /hello");
   });
-
-  it("can get fallback when nothing matches", async () => {
-    const res = await api.get("/");
-    expect(await res.text()).toBe("Fallback");
+  it("matches a POST route", async () => {
+    expect(await (await api.post("/hello")).text()).toBe("Posted /hello");
   });
-
-  it("can get the base get", async () => {
-    const res = await api.get("/hello");
-    expect(await res.text()).toBe("Hello /hello");
+  it("matches a DELETE route", async () => {
+    expect(await (await api.delete("/hello")).text()).toBe("Deleted");
   });
-
-  it("can get the nested get", async () => {
-    const res = await api.get("/api/hello");
-    expect(await res.text()).toBe("Hello /api/hello");
+  it("matches the home route", async () => {
+    expect(await (await api.get("/")).text()).toBe("Home");
   });
-
-  it("can post to the base get", async () => {
-    const res = await api.post("/hello");
-    expect(await res.text()).toBe("Hello /hello");
-  });
-
-  it("can post to the nested get", async () => {
-    const res = await api.post("/api/hello");
-    expect(await res.text()).toBe("Hello /api/hello");
-  });
-
-  it("can delete to the base route", async () => {
-    const api = server()
-      .delete("/hello", (ctx) => `Deleted ${ctx.url.pathname}`)
-      .test();
-    const res = await api.delete("/hello");
-    expect(await res.text()).toBe("Deleted /hello");
-  });
-
-  it("can delete to a nested route", async () => {
-    const deleteRouter = router().delete(
-      "/hello",
-      (ctx) => `Deleted ${ctx.url.pathname}`,
-    );
-    const api = server().use("/api/", deleteRouter).test();
-    const res = await api.delete("/api/hello");
-    expect(await res.text()).toBe("Deleted /api/hello");
-  });
-
-  it("no status reuse", async () => {
-    const api = server()
-      .get("/a", () => status(201).send("hello"))
-      .get("/b", () => ({ hello: "bye" }))
-      .get("/", () => "Fallback")
-      .test();
-    const { status: statusA } = await api.get("/a");
-    expect(statusA).toBe(201);
-    const { status: statusB } = await api.get("/b");
-    expect(statusB).toBe(200);
+  it("404s an unknown route", async () => {
+    expect((await api.get("/nope")).status).toBe(404);
   });
 });
 
-describe("complex routing", () => {
-  const mid1 = () => null;
-  const mid2 = () => null;
-  const mid3 = () => null;
-  const mid4 = () => null;
-  const mid5 = () => null;
-  const mid6 = () => null;
-  const mid7 = () => null;
-  const mid8 = () => null;
-  const mid9 = () => null;
-  const mid10 = () => null;
-  const mid11 = () => null;
-  const mid12 = () => null;
-  const mid13 = () => null;
-  const mid14 = () => null;
-  const mid15 = () => null;
-
-  const router1 = router()
-    .use(mid6)
-    .get("/path2", mid7, mid8)
-    .get("/path3", mid9)
-    .get(mid10);
-
-  const router2 = router()
-    .use(mid12)
-    .get("/path2", mid13, mid14)
-    .get("/path3", mid15);
-
+describe("status is not reused between routes", () => {
   const api = server()
-    .use(mid1)
-    .use(mid2, mid3)
-    .get("/path1", mid4)
-    .use(mid5)
-    .use("/sub1/*", router1)
-    .use(mid11)
-    .use("/sub2/*", router2);
+    .get("/a", () => status(201).send("hello"))
+    .get("/b", () => ({ hello: "bye" }))
+    .test();
 
-  it("extracts the right paths", () => {
-    const handlers = expandHandlers(api.handlers.get);
-    expect(handlers.map((h) => h[0])).toEqual([
-      "/path1",
-      "/sub1/path2",
-      "/sub1/path3",
-      "/sub1/*",
-      "/sub2/path2",
-      "/sub2/path3",
-    ]);
-  });
-
-  it("has the right callbacks", () => {
-    const handlers = expandHandlers(api.handlers.get);
-    const part1 = handlers.find((h) => h[0] === "/path1");
-    const part2 = handlers.find((h) => h[0] === "/sub1/path2");
-
-    const timer = part1[1];
-    const assets = part1[2];
-
-    expect(part1).toEqual([
-      "/path1",
-      timer,
-      assets,
-      favicon,
-      session,
-      mid1,
-      mid2,
-      mid3,
-      mid4,
-    ]);
-    expect(part2).toEqual([
-      "/sub1/path2",
-      timer,
-      assets,
-      favicon,
-      session,
-      mid1,
-      mid2,
-      mid3,
-      mid5,
-      mid6,
-      mid7,
-      mid8,
-    ]);
+  it("keeps a per-route status", async () => {
+    expect((await api.get("/a")).status).toBe(201);
+    expect((await api.get("/b")).status).toBe(200);
   });
 });
 
-describe("nested routing", () => {
-  const mid1 = () => null;
-  const mid2 = () => null;
-  const mid3 = () => null;
-  const mid4 = () => null;
-  const mid5 = () => null;
-  const mid6 = () => null;
-  const mid7 = () => null;
+describe("merging a router at the root", () => {
+  const usersRouter = router()
+    .get("/users", () => "list")
+    .get("/users/:id", (ctx) => `user ${ctx.url.params.id}`);
 
   const api = server()
-    .use(mid1)
-    .use(router().use(mid2))
-    .use(router().get("/", mid3))
-    .use("/users/*", router().use(mid4).get("/me", mid5, mid6))
-    .use(
-      "/a/*",
-      router().use("/b/*", router().use("/c/*", router().get("/d", mid7))),
-    );
+    .use(usersRouter)
+    .get("/", () => "Home")
+    .test();
 
-  it("has the right paths", () => {
-    const paths = expandHandlers(api.handlers.get).map((p) => p[0]);
-    expect(paths).toEqual(["/", "/users/me", "/a/b/c/d"]);
+  it("serves the merged routes (full paths)", async () => {
+    expect(await (await api.get("/users")).text()).toBe("list");
+    expect(await (await api.get("/users/42")).text()).toBe("user 42");
+  });
+  it("still serves the host's own routes", async () => {
+    expect(await (await api.get("/")).text()).toBe("Home");
+  });
+});
+
+describe("middleware order and flattening", () => {
+  it("runs global then route middleware, in registration order", async () => {
+    const calls: string[] = [];
+    const m = (name: string) => () => {
+      calls.push(name);
+    };
+    const api = server()
+      .use(m("g1"))
+      .use(m("g2"), m("g3"))
+      .get("/a", m("r1"), () => {
+        calls.push("handler");
+        return "ok";
+      })
+      .test();
+
+    await api.get("/a");
+    expect(calls).toEqual(["g1", "g2", "g3", "r1", "handler"]);
   });
 
-  it("has the right callbacks", () => {
-    const [home, userMe, nested] = expandHandlers(api.handlers.get);
-    const timer = home[1];
-    const assets = home[2];
+  it("only applies middleware to routes registered after them", async () => {
+    const calls: string[] = [];
+    const api = server()
+      .get("/before", () => "before")
+      .use(() => {
+        calls.push("mid");
+      })
+      .get("/after", () => "after")
+      .test();
 
-    expect(home).toEqual([
-      "/",
-      timer,
-      assets,
-      favicon,
-      session,
-      mid1,
-      mid2,
-      mid3,
-    ]);
-    expect(userMe).toEqual([
-      "/users/me",
-      timer,
-      assets,
-      favicon,
-      session,
-      mid1,
-      mid2,
-      mid4,
-      mid5,
-      mid6,
-    ]);
-    expect(nested).toEqual([
-      "/a/b/c/d",
-      timer,
-      assets,
-      favicon,
-      session,
-      mid1,
-      mid2,
-      mid4,
-      mid7,
-    ]);
+    await api.get("/before");
+    expect(calls).toEqual([]); // the .use() came later, so it doesn't apply here
+    await api.get("/after");
+    expect(calls).toEqual(["mid"]);
+  });
+
+  it("stores routes as { path, options, fns } objects", () => {
+    const app = server().get("/a", () => "A");
+    const [route] = app.handlers.get;
+    expect(route.path).toBe("/a");
+    expect(Array.isArray(route.fns)).toBe(true);
+    expect(route.fns.at(-1)).toBeInstanceOf(Function); // the handler is last
+  });
+});
+
+describe("router-scoped middleware", () => {
+  it("applies a router's own .use() to that router's routes only", async () => {
+    const calls: string[] = [];
+    const guarded = router()
+      .use(() => {
+        calls.push("guard");
+      })
+      .get("/private", () => "private");
+
+    const api = server()
+      .use(guarded)
+      .get("/public", () => "public")
+      .test();
+
+    await api.get("/public");
+    expect(calls).toEqual([]); // guard not in the host route
+    await api.get("/private");
+    expect(calls).toEqual(["guard"]);
+  });
+});
+
+describe("global middleware as a fallthrough", () => {
+  it("can answer a request that matches no route", async () => {
+    const api = server()
+      .use((ctx) => {
+        if (ctx.url.pathname === "/static") return "served";
+      })
+      .get("/", () => "home")
+      .test();
+
+    expect(await (await api.get("/static")).text()).toBe("served");
+    expect((await api.get("/nope")).status).toBe(404);
+  });
+});
+
+describe("per-route options", () => {
+  it("merges route options over the global settings (local wins)", async () => {
+    const api = server({ secret: "g" })
+      .get("/a", { tags: "x", title: "T" }, (ctx) => ({
+        tags: (ctx.options as any).tags,
+        title: (ctx.options as any).title,
+        secret: ctx.options.secret,
+      }))
+      .get("/b", (ctx) => ({ tags: (ctx.options as any).tags ?? null }))
+      .test();
+
+    expect(await (await api.get("/a")).json()).toEqual({
+      tags: "x",
+      title: "T",
+      secret: "g",
+    });
+    expect(await (await api.get("/b")).json()).toEqual({ tags: null });
   });
 });

@@ -3,22 +3,21 @@ import type {
   Middleware,
   RouteOptions as Options,
   PathToParams,
-  RouterMethod,
+  Route,
   ServerConfig,
 } from "./types";
 
-type Mids<O extends ServerConfig, Path extends string> = Middleware<O, PathToParams<Path>>[];
-
-type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
-// This is "Method" and NOT "Method" on purpose
-type FullRoute = [RouterMethod, string, ...Middleware[]][];
-
-function isMiddleware<O>(x: unknown): x is Middleware<O> {
-  return typeof x === "function";
-}
+type Mids<O extends ServerConfig, Path extends string> = Middleware<
+  O,
+  PathToParams<Path>
+>[];
 
 export class Router<O extends ServerConfig = object> {
-  handlers: Record<Method, FullRoute> = {
+  // Cross-cutting middleware added with .use(); they run on every request
+  middleware: Middleware[] = [];
+
+  // Routes per method, each carrying its own (already-flattened) chain of fns
+  handlers: Record<Method, Route[]> = {
     socket: [],
     get: [],
     head: [],
@@ -35,25 +34,27 @@ export class Router<O extends ServerConfig = object> {
     return this;
   }
 
-  handle(
-    method: RouterMethod,
-    path: PathOrMiddle<O>,
-    ...middleware: Middleware<O>[]
-  ) {
-    // If there's not path and it's just anothe middleware, add it and shift it
-    if (typeof path !== "string") {
-      middleware.unshift(path);
-      path = "*";
+  // Registers one route: bakes the current middleware + the route's own
+  // functions into a single flat `fns` list. A plain options object may sit
+  // between the path and the handlers, and it's pulled out here.
+  handle(method: Method, pathOrFn?: any, ...rest: any[]) {
+    let path = "*";
+    if (typeof pathOrFn === "string") {
+      path = pathOrFn;
+    } else if (pathOrFn != null) {
+      rest.unshift(pathOrFn);
     }
 
-    // Do not try to optimize, we NEED the method to remain '*' here so that
-    // it doesn't auto-close the request
-    const methods =
-      method === "*" ? (Object.keys(this.handlers) as Method[]) : [method];
-    for (const m of methods) {
-      this.handlers[m].push([method, path, ...middleware]);
+    let options: Options = {};
+    if (rest[0] != null && typeof rest[0] !== "function") {
+      options = rest.shift();
     }
 
+    // Sockets are dispatched on their own and don't run the HTTP middleware
+    const base = method === "socket" ? [] : this.middleware;
+    const fns = [...base, ...rest].filter((fn) => fn != null);
+
+    this.handlers[method].push({ path, options, fns });
     return this.self();
   }
 
@@ -70,10 +71,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("socket", pathOrMid, ...middleware);
+    return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
   }
 
   get<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -89,11 +87,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("get", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("get", pathOrMid, ...middleware);
+    return this.handle("get", pathOrMid, optionsOrMid, ...middleware);
   }
 
   head<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -109,11 +103,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("head", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("head", pathOrMid, ...middleware);
+    return this.handle("head", pathOrMid, optionsOrMid, ...middleware);
   }
 
   post<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -129,11 +119,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("post", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("post", pathOrMid, ...middleware);
+    return this.handle("post", pathOrMid, optionsOrMid, ...middleware);
   }
 
   put<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -149,11 +135,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("put", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("put", pathOrMid, ...middleware);
+    return this.handle("put", pathOrMid, optionsOrMid, ...middleware);
   }
 
   patch<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -169,11 +151,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("patch", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("patch", pathOrMid, ...middleware);
+    return this.handle("patch", pathOrMid, optionsOrMid, ...middleware);
   }
 
   delete<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -189,11 +167,7 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("delete", pathOrMid, ...middleware);
+    return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
   }
 
   options<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
@@ -209,39 +183,33 @@ export class Router<O extends ServerConfig = object> {
     optionsOrMid?: Options | Middleware<O>,
     ...middleware: Middleware<O>[]
   ) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("options", pathOrMid, optionsOrMid, ...middleware);
-    }
-
-    return this.handle("options", pathOrMid, ...middleware);
+    return this.handle("options", pathOrMid, optionsOrMid, ...middleware);
   }
 
+  // .use() takes cross-cutting middleware or a whole router to merge in. It does
+  // NOT take a path: to scope a middleware to some paths, check ctx.url.pathname
+  // inside it, put it on its own router, or repeat it on the routes.
   use(...middleware: Middleware[]): this;
-  use(path: string, ...middleware: Middleware[]): this;
   use(router: Router): this;
-  use(path: string, router: Router): this;
-  use(...args: [string | Router | Middleware, ...(Router | Middleware)[]]) {
-    // .use('/', router) or .use('/', mid1, mid2)
-    const path = (typeof args[0] === "string" ? args.shift() : "*") as string;
-
-    // .use(router), need to bring the methods in
-    if (args[0] instanceof Router) {
-      // Create a base path like `/users/` so that we can concatenate later on
-      const basePath = `/${path.replace(/\*$/, "")}/`
-        .replace(/^\/+/, "/")
-        .replace(/\/+$/, "/");
-      const handlers = args[0].handlers;
-      for (const m in handlers) {
-        for (const [method, path, ...middleware] of handlers[m as Method]) {
-          const fullPath = basePath + path.replace(/^\//, "");
-          this.handlers[m as Method].push([method, fullPath, ...middleware]);
+  use(...args: (Middleware | Router)[]) {
+    for (const arg of args) {
+      if (arg instanceof Router) {
+        // Merge the router's routes at the root, prepending our middleware
+        for (const m of Object.keys(arg.handlers) as Method[]) {
+          for (const route of arg.handlers[m]) {
+            const base = m === "socket" ? [] : this.middleware;
+            this.handlers[m].push({
+              path: route.path,
+              options: route.options,
+              fns: [...base, ...route.fns],
+            });
+          }
         }
+      } else {
+        this.middleware.push(arg);
       }
-      return this.self();
     }
-
-    // .use(mid1, mid2)
-    return this.handle("*", path, ...(args as Middleware[]));
+    return this.self();
   }
 }
 

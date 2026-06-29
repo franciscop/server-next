@@ -1203,17 +1203,23 @@ function applyCors(res, ctx) {
 
 // src/helpers/createWebsocket.ts
 function createWebsocket(sockets, handlers) {
+  const run = (event, socket, body) => {
+    const routes = handlers.socket?.filter((r2) => r2.path === event) ?? [];
+    for (const route of routes) {
+      for (const fn of route.fns) {
+        fn({ socket, sockets, body });
+      }
+    }
+  };
   return {
-    message: async (socket, body) => {
-      handlers.socket?.filter((s) => s[1] === "message")?.map((s) => s[2]({ socket, sockets, body }));
-    },
+    message: (socket, body) => run("message", socket, body),
     open: (socket) => {
       sockets.push(socket);
-      handlers.socket?.filter((s) => s[1] === "open")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
+      run("open", socket);
     },
     close: (socket) => {
       sockets.splice(sockets.indexOf(socket), 1);
-      handlers.socket?.filter((s) => s[1] === "close")?.map((s) => s[2]({ socket, sockets, body: void 0 }));
+      run("close", socket);
     }
   };
 }
@@ -1420,18 +1426,23 @@ function validate(ctx, schema) {
 }
 
 // src/helpers/handleRequest.ts
-async function handleRequest(handlers, ctx) {
-  const res = await getResponse(handlers, ctx);
+async function handleRequest(app, ctx) {
+  const res = await getResponse(app, ctx);
   if (res) ctx.options.log.request(ctx, res);
   return res;
 }
-async function getResponse(handlers, ctx) {
+async function getResponse(app, ctx) {
   try {
-    for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
-      const match = pathPattern(matcher, ctx.url.pathname || "/");
-      if (!match) continue;
-      define(ctx.url, "params", () => match);
-      for (const cb of cbs) {
+    let matched = false;
+    for (const route of app.handlers[ctx.method]) {
+      const params = pathPattern(route.path, ctx.url.pathname || "/");
+      if (!params) continue;
+      matched = true;
+      define(ctx.url, "params", () => params);
+      if (Object.keys(route.options).length) {
+        ctx.options = { ...app.settings, ...route.options };
+      }
+      for (const cb of route.fns) {
         if (typeof cb === "function") {
           const res = await cb(ctx);
           const out = await parseResponse(res, ctx);
@@ -1440,7 +1451,13 @@ async function getResponse(handlers, ctx) {
           validate(ctx, cb);
         }
       }
-      if (method !== "*") break;
+      break;
+    }
+    if (!matched) {
+      for (const mw of app.middleware) {
+        const out = await parseResponse(await mw(ctx), ctx);
+        if (out) return out;
+      }
     }
     if (ctx.platform.provider === "netlify") return;
     throw new ServerError_default("NOT_FOUND", 404, "Not Found");
@@ -1934,7 +1951,7 @@ async function favicon(ctx) {
     return icon ? type("ico").send(icon) : 204;
   }
   const handled = ctx.app.handlers.get.some(
-    ([method, matcher]) => method !== "*" && pathPattern(matcher, "/favicon.ico")
+    (route) => pathPattern(route.path, "/favicon.ico")
   );
   if (handled) return;
   return 204;
@@ -1953,11 +1970,8 @@ var encode = (str = "") => {
   if (typeof str !== "string") return "";
   return str.replace(/[&<>"]/g, (tag) => entities[tag]);
 };
-var getConfig = (routes) => {
-  const config2 = routes.find(
-    (r2) => typeof r2 !== "string" && typeof r2 !== "function" && typeof r2 === "object"
-  );
-  if (!config2) return {};
+var getConfig = (options = {}) => {
+  const config2 = { ...options };
   if (config2.tags) {
     if (typeof config2.tags === "string") {
       config2.tags = config2.tags.split(/\s*,\s*/g);
@@ -2002,13 +2016,10 @@ var generateOpenApiPaths = (handlers) => {
   const paths = {};
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
-      const [_, path2, fn, meta] = [
-        route[0],
-        route[1],
-        route.find((p) => typeof p === "function"),
-        route.find((p) => typeof p === "object")
-      ];
-      const config2 = getConfig(route);
+      const path2 = route.path;
+      const fn = route.fns.find((p) => typeof p === "function");
+      const meta = route.fns.find((p) => typeof p === "object");
+      const config2 = getConfig(route.options);
       if (typeof path2 !== "string" || path2 === "*" || path2 === "/docs" || !fn) {
         continue;
       }
@@ -2107,7 +2118,7 @@ function preflight(ctx) {
   if (ctx.method !== "options") return;
   if (!ctx.headers["access-control-request-method"]) return;
   const handled = ctx.app.handlers.options.some(
-    ([method, matcher]) => method !== "*" && pathPattern(matcher, ctx.url.pathname)
+    (route) => pathPattern(route.path, ctx.url.pathname)
   );
   if (handled) return;
   return 204;
@@ -2292,7 +2303,7 @@ var Winter = async (app, request, env2) => {
   if (env2?.upgrade(request)) return;
   Object.assign(globalThis.env, env2);
   const ctx = await createWinter(request, app, env2);
-  const res = await handleRequest(app.handlers, ctx);
+  const res = await handleRequest(app, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
@@ -2301,7 +2312,7 @@ var Node = async (app) => {
   http.createServer(async (request, response) => {
     const ctx = await createNode(request, app);
     if ("error" in ctx) throw ctx.error;
-    const out = await handleRequest(app.handlers, ctx);
+    const out = await handleRequest(app, ctx);
     response.writeHead(out.status || 200, parseHeaders_default(out.headers));
     if (out.body instanceof ReadableStream) {
       await iterate(out.body, (chunk) => response.write(chunk));
@@ -2319,16 +2330,16 @@ var Netlify = async (app, request, context) => {
     throw new Error("Netlify doesn't exist");
   }
   const ctx = await createWinter(request, app);
-  const res = await handleRequest(app.handlers, ctx);
+  const res = await handleRequest(app, ctx);
   ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 
 // src/router.ts
-function isMiddleware(x) {
-  return typeof x === "function";
-}
 var Router = class _Router {
+  // Cross-cutting middleware added with .use(); they run on every request
+  middleware = [];
+  // Routes per method, each carrying its own (already-flattened) chain of fns
   handlers = {
     socket: [],
     get: [],
@@ -2344,79 +2355,67 @@ var Router = class _Router {
   self() {
     return this;
   }
-  handle(method, path2, ...middleware) {
-    if (typeof path2 !== "string") {
-      middleware.unshift(path2);
-      path2 = "*";
+  // Registers one route: bakes the current middleware + the route's own
+  // functions into a single flat `fns` list. A plain options object may sit
+  // between the path and the handlers, and it's pulled out here.
+  handle(method, pathOrFn, ...rest) {
+    let path2 = "*";
+    if (typeof pathOrFn === "string") {
+      path2 = pathOrFn;
+    } else if (pathOrFn != null) {
+      rest.unshift(pathOrFn);
     }
-    const methods2 = method === "*" ? Object.keys(this.handlers) : [method];
-    for (const m of methods2) {
-      this.handlers[m].push([method, path2, ...middleware]);
+    let options = {};
+    if (rest[0] != null && typeof rest[0] !== "function") {
+      options = rest.shift();
     }
+    const base = method === "socket" ? [] : this.middleware;
+    const fns = [...base, ...rest].filter((fn) => fn != null);
+    this.handlers[method].push({ path: path2, options, fns });
     return this.self();
   }
   socket(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("socket", pathOrMid, ...middleware);
+    return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
   }
   get(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("get", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("get", pathOrMid, ...middleware);
+    return this.handle("get", pathOrMid, optionsOrMid, ...middleware);
   }
   head(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("head", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("head", pathOrMid, ...middleware);
+    return this.handle("head", pathOrMid, optionsOrMid, ...middleware);
   }
   post(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("post", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("post", pathOrMid, ...middleware);
+    return this.handle("post", pathOrMid, optionsOrMid, ...middleware);
   }
   put(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("put", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("put", pathOrMid, ...middleware);
+    return this.handle("put", pathOrMid, optionsOrMid, ...middleware);
   }
   patch(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("patch", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("patch", pathOrMid, ...middleware);
+    return this.handle("patch", pathOrMid, optionsOrMid, ...middleware);
   }
   delete(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("delete", pathOrMid, ...middleware);
+    return this.handle("delete", pathOrMid, optionsOrMid, ...middleware);
   }
   options(pathOrMid, optionsOrMid, ...middleware) {
-    if (typeof pathOrMid === "string" && isMiddleware(optionsOrMid)) {
-      return this.handle("options", pathOrMid, optionsOrMid, ...middleware);
-    }
-    return this.handle("options", pathOrMid, ...middleware);
+    return this.handle("options", pathOrMid, optionsOrMid, ...middleware);
   }
   use(...args) {
-    const path2 = typeof args[0] === "string" ? args.shift() : "*";
-    if (args[0] instanceof _Router) {
-      const basePath = `/${path2.replace(/\*$/, "")}/`.replace(/^\/+/, "/").replace(/\/+$/, "/");
-      const handlers = args[0].handlers;
-      for (const m in handlers) {
-        for (const [method, path3, ...middleware] of handlers[m]) {
-          const fullPath = basePath + path3.replace(/^\//, "");
-          this.handlers[m].push([method, fullPath, ...middleware]);
+    for (const arg of args) {
+      if (arg instanceof _Router) {
+        for (const m of Object.keys(arg.handlers)) {
+          for (const route of arg.handlers[m]) {
+            const base = m === "socket" ? [] : this.middleware;
+            this.handlers[m].push({
+              path: route.path,
+              options: route.options,
+              fns: [...base, ...route.fns]
+            });
+          }
         }
+      } else {
+        this.middleware.push(arg);
       }
-      return this.self();
     }
-    return this.handle("*", path2, ...args);
+    return this.self();
   }
 };
 function router() {

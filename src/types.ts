@@ -39,6 +39,13 @@ export type RouteOptions = {
   // [key: string]: any;
 };
 
+// A single registered route with its middleware chain already flattened in
+export type Route = {
+  path: string;
+  options: RouteOptions;
+  fns: Middleware[];
+};
+
 export type Cookie = {
   value?: string | null;
   path?: string;

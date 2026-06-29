@@ -32,6 +32,11 @@ type RouteOptions = {
     title?: string;
     description?: string;
 };
+type Route = {
+    path: string;
+    options: RouteOptions;
+    fns: Middleware[];
+};
 type Cookie = {
     value?: string | null;
     path?: string;
@@ -251,12 +256,11 @@ declare global {
 }
 
 type Mids<O extends ServerConfig, Path extends string> = Middleware<O, PathToParams<Path>>[];
-type PathOrMiddle<O extends ServerConfig = object> = string | Middleware<O>;
-type FullRoute = [RouterMethod, string, ...Middleware[]][];
 declare class Router<O extends ServerConfig = object> {
-    handlers: Record<Method, FullRoute>;
+    middleware: Middleware[];
+    handlers: Record<Method, Route[]>;
     self(): this;
-    handle(method: RouterMethod, path: PathOrMiddle<O>, ...middleware: Middleware<O>[]): this;
+    handle(method: Method, pathOrFn?: any, ...rest: any[]): this;
     socket<Path extends string>(path: Path, ...middleware: Mids<O, Path>): this;
     socket<Path extends string>(path: Path, options: RouteOptions, ...middleware: Mids<O, Path>): this;
     socket(...middleware: Middleware<O>[]): this;
@@ -290,9 +294,7 @@ declare class Router<O extends ServerConfig = object> {
     options(...middleware: Middleware<O>[]): this;
     options(options: RouteOptions, ...middleware: Middleware<O>[]): this;
     use(...middleware: Middleware[]): this;
-    use(path: string, ...middleware: Middleware[]): this;
     use(router: Router): this;
-    use(path: string, router: Router): this;
 }
 declare function router(): Router;
 
@@ -452,4 +454,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

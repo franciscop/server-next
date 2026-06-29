@@ -1,4 +1,4 @@
-import { ServerError, type Context } from "..";
+import { ServerError, type Context, type Server } from "..";
 import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
 import { applyCors } from "./cors";
@@ -6,29 +6,36 @@ import define from "./define";
 import validate from "./validate";
 
 export default async function handleRequest(
-  handlers: Record<string, any[]>,
+  app: Server,
   ctx: Context,
 ): Promise<Response | undefined> {
-  const res = await getResponse(handlers, ctx);
+  const res = await getResponse(app, ctx);
   // Log the request once the final response is known (no-op unless `log` is on)
   if (res) ctx.options.log.request(ctx, res);
   return res;
 }
 
 async function getResponse(
-  handlers: Record<string, any[]>,
+  app: Server,
   ctx: Context,
 ): Promise<Response | undefined> {
   try {
-    for (const [method, matcher, ...cbs] of handlers[ctx.method]) {
-      const match = pathPattern(matcher, ctx.url.pathname || "/");
+    let matched = false;
 
-      // Skip this whole middleware if there was no match
-      if (!match) continue;
+    // 1. Find the matching route. Its `fns` already include the middleware that
+    //    were registered before it, so we just run the list in order.
+    for (const route of app.handlers[ctx.method]) {
+      const params = pathPattern(route.path, ctx.url.pathname || "/");
+      if (!params) continue;
+      matched = true;
+      define(ctx.url, "params", () => params);
 
-      define(ctx.url, "params", () => match);
+      // Per-route options, merged over the global settings (local wins)
+      if (Object.keys(route.options).length) {
+        ctx.options = { ...app.settings, ...route.options };
+      }
 
-      for (const cb of cbs) {
+      for (const cb of route.fns) {
         if (typeof cb === "function") {
           const res = await cb(ctx);
           const out = await parseResponse(res, ctx);
@@ -38,12 +45,20 @@ async function getResponse(
         }
       }
 
-      // When it's an HTTP method, break free after it's done (which will 404)
-      if (method !== "*") break;
+      // A method matched; do not fall through to other routes
+      break;
     }
 
-    // In Netlify, a non-response is perfectly valid, which would indicate
-    // the edge function to just go ahead and consume the original resource
+    // 2. No route matched: run the global middleware (this is how static files
+    //    via `assets`, `favicon`, etc. answer requests that aren't routes).
+    if (!matched) {
+      for (const mw of app.middleware) {
+        const out = await parseResponse(await mw(ctx), ctx);
+        if (out) return out;
+      }
+    }
+
+    // In Netlify, a non-response passes through to the original resource
     if (ctx.platform.provider === "netlify") return;
 
     // In other environments, a non-response is wrong and we should 404 then
