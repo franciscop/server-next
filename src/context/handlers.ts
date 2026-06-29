@@ -35,6 +35,11 @@ export const Node = async (app: Server) => {
     })
     .listen(app.settings.port, () => {
       app.settings.log.start(`http://localhost:${app.settings.port}/`);
+      if (app.handlers.socket.length) {
+        console.warn(
+          "[server] WebSockets (.socket()) are only supported on Bun, not Node",
+        );
+      }
     });
 };
 

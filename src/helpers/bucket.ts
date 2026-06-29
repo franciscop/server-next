@@ -28,12 +28,29 @@ function thinLocalBucket(root: string): Bucket {
         },
       });
     },
-    write: (name: string, value?: any, type?: BufferEncoding): any => {
+    write: async (
+      name: string,
+      value?: any,
+      type?: BufferEncoding,
+    ): Promise<any> => {
       const fullPath = absolute(name);
-      if (value) {
-        return fsp.writeFile(fullPath, value, type).then(() => fullPath);
+      if (!value) return fs.createWriteStream(fullPath);
+      // folder() may point at a nested path that doesn't exist yet
+      await fsp.mkdir(path.dirname(fullPath), { recursive: true });
+      // A web ReadableStream is written chunk by chunk, never fully buffered
+      if (value instanceof ReadableStream) {
+        const writable = fs.createWriteStream(fullPath);
+        for await (const chunk of value as AsyncIterable<Uint8Array>) {
+          writable.write(chunk);
+        }
+        await new Promise<void>((resolve, reject) => {
+          writable.on("error", reject);
+          writable.end(resolve);
+        });
+        return fullPath;
       }
-      return fs.createWriteStream(fullPath);
+      await fsp.writeFile(fullPath, value, type);
+      return fullPath;
     },
     delete: async (name: string): Promise<boolean> => {
       const fullPath = absolute(name);
@@ -44,29 +61,35 @@ function thinLocalBucket(root: string): Bucket {
         return false;
       }
     },
+    folder: (prefix: string): Bucket => thinLocalBucket(path.join(root, prefix)),
   } as Bucket;
 }
 
-function thinBunBucket(s3: any): Bucket {
+function thinBunBucket(s3: any, prefix = ""): Bucket {
+  const key = (name: string) => (prefix ? `${prefix}/${name}` : name);
   return {
     read: async (name: string) => {
-      const file = s3.file(name);
+      const file = s3.file(key(name));
       if (!(await file.exists())) return null;
       return await file.stream();
     },
     write: async (name: string, value?: any) => {
-      const file = s3.file(name);
+      const file = s3.file(key(name));
       if (value) {
         await file.write(value);
-        return name;
+        return key(name);
       }
-      return s3.presign(name, { expiresIn: 3600, acl: "public-read-write" });
+      return s3.presign(key(name), {
+        expiresIn: 3600,
+        acl: "public-read-write",
+      });
     },
     delete: async (name: string) => {
-      const file = s3.file(name);
+      const file = s3.file(key(name));
       if (!(await file.exists())) return null;
       return await file.delete();
     },
+    folder: (sub: string) => thinBunBucket(s3, key(sub)),
   } as Bucket;
 }
 

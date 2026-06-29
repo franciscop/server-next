@@ -28,6 +28,12 @@ export default async function parseResponse(
     out = new Response(out);
   }
 
+  // A Buffer / typed array is sent as-is (raw bytes), e.g. a `raw` body echoed
+  // back. Caught here so it doesn't fall through to the byte-iterator branch.
+  if (out instanceof Uint8Array) {
+    out = new Response(out as BodyInit);
+  }
+
   // A plain number is a status code
   if (typeof out === "number") {
     out = new Response(undefined, { status: out });

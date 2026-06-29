@@ -2,9 +2,9 @@ import type { Context, Server } from "..";
 import {
   clientIp,
   define,
-  parseBody,
   parseCookies,
   parseHeaders,
+  setBodySource,
 } from "../helpers";
 import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
@@ -31,27 +31,22 @@ export default async function createWinter(
     Object.fromEntries(url.searchParams.entries()),
   );
 
-  const rawBody = Buffer.from(await req.arrayBuffer());
-
-  // Clients don't always send Content-Length (e.g. chunked uploads, or the
-  // in-process test client); reflect the real received size so ctx.headers and
-  // the request log are accurate.
-  if (rawBody.length && !headers["content-length"]) {
-    headers["content-length"] = String(rawBody.length);
-  }
-
-  const body = req.body
-    ? await parseBody(rawBody, headers["content-type"], app.settings.uploads)
-    : undefined;
+  // Don't read the body yet: handleRequest resolves it once the route (and its
+  // `body` mode) is known, so a `stream` route never buffers. req.body is
+  // already a web ReadableStream, so no conversion is needed here.
+  const source = {
+    getBuffer: async () => Buffer.from(await req.arrayBuffer()),
+    getStream: () => req.body ?? undefined,
+  };
 
   const events = createEvents();
 
-  return {
+  const ctx: Context = {
     options: app.settings,
     platform: app.platform,
     url,
     method,
-    body,
+    body: undefined,
     headers,
     cookies,
     session: {},
@@ -63,4 +58,6 @@ export default async function createWinter(
       trustProxy: app.settings.security.trustProxy,
     }),
   };
+  setBodySource(ctx, source);
+  return ctx;
 }

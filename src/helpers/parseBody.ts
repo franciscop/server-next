@@ -1,5 +1,9 @@
 import type { Bucket } from "..";
-import { saveFileToBucket, UploadPipeline } from "./upload";
+import createId from "./createId";
+import { getExt, UploadPipeline } from "./upload";
+
+type Dest = Bucket | UploadPipeline | null | undefined;
+type Input = Buffer | ReadableStream;
 
 function getBoundary(header?: string): string | null {
   if (!header) return null;
@@ -23,25 +27,6 @@ function getMatching(string: string, regex: RegExp): string {
   return matches?.[1] ?? "";
 }
 
-// Utility function to split a buffer
-function splitBuffer(buffer: Buffer, delimiter: Buffer): Buffer[] {
-  const result: Buffer[] = [];
-  let start = 0;
-  let index = buffer.indexOf(delimiter);
-
-  while (index !== -1) {
-    result.push(buffer.slice(start, index));
-    start = index + delimiter.length;
-    index = buffer.indexOf(delimiter, start);
-  }
-
-  result.push(buffer.slice(start));
-  return result;
-}
-
-const BREAK_BUFFER = Buffer.from("\r\n\r\n");
-const END_BUFFER = Buffer.from("--\r\n");
-
 // Simple heuristic to guess if a buffer is text
 function isProbablyText(buffer: Buffer): boolean {
   for (let i = 0; i < Math.min(buffer.length, 512); i++) {
@@ -52,85 +37,313 @@ function isProbablyText(buffer: Buffer): boolean {
   return true;
 }
 
+// Common content-type → extension, used to name a raw single-file body that has
+// no filename of its own. Falls back to the subtype, then ".bin".
+const MIME_EXT: Record<string, string> = {
+  "application/json": ".json",
+  "application/pdf": ".pdf",
+  "application/zip": ".zip",
+  "text/plain": ".txt",
+  "text/html": ".html",
+  "text/csv": ".csv",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "video/mp4": ".mp4",
+  "audio/mpeg": ".mp3",
+};
+function extFromType(type: string): string {
+  const base = (type || "").split(";")[0].trim().toLowerCase();
+  if (MIME_EXT[base]) return MIME_EXT[base];
+  const sub = base.split("/")[1];
+  return sub && /^[a-z0-9]+$/.test(sub) ? `.${sub}` : ".bin";
+}
 
-export default async function parseBody(
-  raw: Buffer,
-  contentType?: string | string[],
-  bucket?: Bucket | UploadPipeline,
-): Promise<any> {
-  const contentTypeStr = Array.isArray(contentType)
-    ? contentType[0]
-    : contentType;
+const asIterable = (s: ReadableStream) => s as AsyncIterable<Uint8Array>;
 
-  if (!raw || raw.length === 0) return {};
+function toStream(input: Input): ReadableStream {
+  if (input instanceof ReadableStream) return input;
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(input);
+      controller.close();
+    },
+  });
+}
 
-  // Handle plain text or JSON first
-  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
-    return raw.toString("utf-8");
+async function toBuffer(input: Input): Promise<Buffer> {
+  if (!(input instanceof ReadableStream)) return input;
+  const chunks: Buffer[] = [];
+  for await (const chunk of asIterable(input)) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+// application/x-www-form-urlencoded → object, arraying repeated keys like multipart
+function parseUrlEncoded(text: string): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [key, value] of new URLSearchParams(text)) {
+    const existing = out[key];
+    if (existing === undefined) out[key] = value;
+    else if (Array.isArray(existing)) existing.push(value);
+    else out[key] = [existing, value];
   }
-  if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(raw.toString("utf-8"));
+  return out;
+}
+
+// A repeated field name collects its values into an array, whether they are text
+// fields (e.g. checkboxes) or files (e.g. a gallery). The first value is kept as
+// a scalar; a second occurrence turns it into an array.
+function addField(body: Record<string, any>, name: string, value: any): void {
+  if (body[name] === undefined) {
+    body[name] = value;
+    return;
+  }
+  if (!Array.isArray(body[name])) body[name] = [body[name]];
+  body[name].push(value);
+}
+
+// One part of a multipart body. A text field and a pipeline-bound file buffer
+// their bytes (a pipeline must see the whole file to validate it); a file bound
+// to a plain Bucket streams straight through, so its bytes are never all in
+// memory at once. A file with no destination, or a nameless part, is drained.
+type Part =
+  | { kind: "skip" }
+  | { kind: "text"; name: string; chunks: Buffer[] }
+  | { kind: "drop" }
+  | {
+      kind: "pipefile";
+      name: string;
+      filename: string;
+      type: string;
+      pipeline: UploadPipeline;
+      chunks: Buffer[];
+    }
+  | {
+      kind: "file";
+      name: string;
+      filename: string;
+      type: string;
+      id: string;
+      controller: ReadableStreamDefaultController;
+      write: Promise<void | string>;
+      size: number;
+    };
+
+function startPart(headerStr: string, dest: Dest): Part {
+  const name = getMatching(headerStr, /name="(.+?)"/)
+    .trim()
+    .replace(/\[\]$/, "");
+  if (!name) return { kind: "skip" };
+
+  const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
+  if (!filename) return { kind: "text", name, chunks: [] };
+
+  const type =
+    getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() ||
+    "application/octet-stream";
+
+  if (!dest) return { kind: "drop" };
+  if (dest instanceof UploadPipeline) {
+    return { kind: "pipefile", name, filename, type, pipeline: dest, chunks: [] };
   }
 
-  // Multipart
-  const boundary = getBoundary(contentTypeStr);
-  if (!boundary) return null;
+  // Plain Bucket: open a stream now and pipe the part's bytes into it as they
+  // arrive, so a large file is never fully buffered.
+  const id = `${createId()}${getExt(filename)}`;
+  let controller!: ReadableStreamDefaultController;
+  const readable = new ReadableStream({
+    start(c) {
+      controller = c;
+    },
+  });
+  return {
+    kind: "file",
+    name,
+    filename,
+    type,
+    id,
+    controller,
+    write: dest.write(id, readable),
+    size: 0,
+  };
+}
 
+function feedPart(part: Part, data: Buffer): void {
+  if (data.length === 0) return;
+  if (part.kind === "text" || part.kind === "pipefile") part.chunks.push(data);
+  else if (part.kind === "file") {
+    part.controller.enqueue(data);
+    part.size += data.length;
+  }
+}
+
+async function endPart(part: Part, body: Record<string, any>): Promise<void> {
+  if (part.kind === "text") {
+    const buf = Buffer.concat(part.chunks);
+    const value = isProbablyText(buf) ? buf.toString("utf-8").trim() : buf;
+    addField(body, part.name, value);
+  } else if (part.kind === "pipefile") {
+    const buf = Buffer.concat(part.chunks);
+    const ref = await part.pipeline.processFile(part.filename, buf, part.type);
+    addField(body, part.name, ref);
+  } else if (part.kind === "file") {
+    part.controller.close();
+    const path = (await part.write) as string;
+    addField(body, part.name, {
+      name: part.filename,
+      id: part.id,
+      path,
+      type: part.type,
+      size: part.size,
+    });
+  }
+}
+
+const BREAK = Buffer.from("\r\n\r\n");
+
+// A streaming multipart/form-data parser. It scans for the boundary delimiter
+// across chunk borders, keeping only a small tail when one might be split, so
+// file parts flow to their destination instead of being collected in memory.
+async function parseMultipart(
+  stream: ReadableStream,
+  boundary: string,
+  dest: Dest,
+): Promise<Record<string, any>> {
+  // Every part is preceded by `\r\n--boundary`. Prepend a CRLF so the very first
+  // boundary (which has none) matches the same delimiter as the rest.
+  const delim = Buffer.from(`\r\n--${boundary}`);
   const body: Record<string, any> = {};
-  const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(raw, boundaryBuffer);
+  let buf = Buffer.from("\r\n");
+  let state: "boundary" | "headers" | "body" = "boundary";
+  let part: Part | null = null;
 
-  for (const part of parts) {
-    if (part.length === 0 || part.equals(END_BUFFER)) continue;
+  for await (const chunk of asIterable(stream)) {
+    buf = Buffer.concat([buf, Buffer.from(chunk)]);
 
-    const idx = part.indexOf(BREAK_BUFFER);
-    if (idx === -1) continue;
+    let advanced = true;
+    while (advanced) {
+      advanced = false;
 
-    const headerStr = part.slice(0, idx).toString("utf-8");
-    const contentBuf = part.slice(idx + BREAK_BUFFER.length, part.length - 2);
-
-    const name = getMatching(headerStr, /name="(.+?)"/)
-      .trim()
-      .replace(/\[\]$/, "");
-    if (!name) continue;
-
-    const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
-
-    if (filename) {
-      const partContentType =
-        getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() ||
-        "application/octet-stream";
-
-      if (!bucket) {
-        continue;
-      }
-
-      if (bucket instanceof UploadPipeline) {
-        body[name] = await bucket.processFile(
-          filename,
-          contentBuf,
-          partContentType,
-        );
+      if (state === "boundary") {
+        const i = buf.indexOf(delim);
+        if (i === -1) {
+          // Drop preamble/epilogue, but keep a possible partial delimiter tail
+          if (buf.length >= delim.length) {
+            buf = buf.subarray(buf.length - delim.length + 1);
+          }
+          break;
+        }
+        // Need the two bytes after the delimiter: "--" ends the body, "\r\n"
+        // starts the next part's headers.
+        if (buf.length < i + delim.length + 2) break;
+        const after = i + delim.length;
+        if (buf[after] === 0x2d && buf[after + 1] === 0x2d) return body; // "--"
+        buf = buf.subarray(after + 2);
+        state = "headers";
+        advanced = true;
+      } else if (state === "headers") {
+        const i = buf.indexOf(BREAK);
+        if (i === -1) break;
+        part = startPart(buf.subarray(0, i).toString("utf-8"), dest);
+        buf = buf.subarray(i + BREAK.length);
+        state = "body";
+        advanced = true;
       } else {
-        body[name] = await saveFileToBucket(
-          filename,
-          contentBuf,
-          bucket,
-          partContentType,
-        );
-      }
-    } else {
-      const value = isProbablyText(contentBuf)
-        ? contentBuf.toString("utf-8").trim()
-        : contentBuf; // keep as Buffer if unknown
-      if (body[name]) {
-        if (!Array.isArray(body[name])) body[name] = [body[name]];
-        body[name].push(value);
-      } else {
-        body[name] = value;
+        const i = buf.indexOf(delim);
+        if (i === -1) {
+          // No delimiter yet: flush all but the tail that might be a split one
+          const safe = buf.length - (delim.length - 1);
+          if (safe > 0 && part) {
+            feedPart(part, buf.subarray(0, safe));
+            buf = buf.subarray(safe);
+          }
+          break;
+        }
+        if (part) {
+          feedPart(part, buf.subarray(0, i));
+          await endPart(part, body);
+          part = null;
+        }
+        buf = buf.subarray(i); // leave the delimiter for the boundary state
+        state = "boundary";
+        advanced = true;
       }
     }
   }
 
+  // Tolerate a body that ends without a closing boundary
+  if (part) await endPart(part, body);
   return body;
+}
+
+// Stream a single raw-body file (e.g. a posted video/mp4) straight to a Bucket,
+// counting its size as it flows, so the bytes are never all in memory.
+async function streamToBucket(
+  stream: ReadableStream,
+  type: string,
+  bucket: Bucket,
+): Promise<any> {
+  const id = `${createId()}${extFromType(type)}`;
+  let size = 0;
+  let controller!: ReadableStreamDefaultController;
+  const readable = new ReadableStream({
+    start(c) {
+      controller = c;
+    },
+  });
+  const write = bucket.write(id, readable);
+  for await (const chunk of asIterable(stream)) {
+    controller.enqueue(chunk);
+    size += chunk.byteLength;
+  }
+  controller.close();
+  const path = (await write) as string;
+  if (!size) return undefined;
+  return { name: id, id, path, type, size };
+}
+
+// Turns a request body into `ctx.body`. Accepts a Buffer or a web ReadableStream
+// (the streaming modes pass the stream so files are never fully buffered; the
+// buffered call sites and tests pass a Buffer, which is wrapped as a one-chunk
+// stream so both go through the exact same parser).
+export default async function parseBody(
+  input: Input,
+  contentType?: string | string[],
+  dest?: Dest,
+): Promise<any> {
+  const type = Array.isArray(contentType) ? contentType[0] : contentType;
+
+  // Multipart (Case A): stream-parse, files go to `dest` as they arrive
+  const boundary =
+    type && /multipart\/form-data/i.test(type) ? getBoundary(type) : null;
+  if (boundary) return parseMultipart(toStream(input), boundary, dest);
+
+  // Types that need the whole body in hand to make sense of it
+  if (!type || /^text\//i.test(type)) {
+    const buf = await toBuffer(input);
+    return buf.length ? buf.toString("utf-8") : undefined;
+  }
+  if (/application\/json/i.test(type)) {
+    const buf = await toBuffer(input);
+    return buf.length ? JSON.parse(buf.toString("utf-8")) : undefined;
+  }
+  if (/application\/x-www-form-urlencoded/i.test(type)) {
+    const buf = await toBuffer(input);
+    return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : undefined;
+  }
+
+  // Case B: a single raw file as the whole body (image/*, video/*, octet-stream)
+  if (!dest) {
+    const buf = await toBuffer(input);
+    return buf.length ? buf : undefined;
+  }
+  if (dest instanceof UploadPipeline) {
+    const buf = await toBuffer(input);
+    return buf.length
+      ? dest.processFile(`upload${extFromType(type)}`, buf, type)
+      : undefined;
+  }
+  return streamToBucket(toStream(input), type, dest);
 }

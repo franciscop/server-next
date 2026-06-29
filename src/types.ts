@@ -32,10 +32,15 @@ declare namespace JSX {
   }
 }
 
+// How the request body is read into ctx.body: parsed (the default), the raw
+// bytes as a Buffer, or the unread stream itself (a web ReadableStream).
+export type BodyMode = "parse" | "raw" | "stream";
+
 export type RouteOptions = {
   tags?: string | string[];
   title?: string;
   description?: string;
+  body?: BodyMode;
   // [key: string]: any;
 };
 
@@ -59,9 +64,14 @@ export type Cookie = {
 export type RouterMethod = "*" | Method;
 
 export type Bucket = {
+  location?: string;
   read: (path: string) => Promise<ReadableStream | null>;
-  write: (path: string, data: string | Buffer) => Promise<void | string>;
+  write: (
+    path: string,
+    data: string | Buffer | ReadableStream,
+  ) => Promise<void | string>;
   delete: (path: string) => Promise<boolean>;
+  folder?: (prefix: string) => Bucket;
 };
 
 export type UploadedFile = {
@@ -194,7 +204,6 @@ type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 export type Options = {
   port?: number;
   secret?: string;
-  views?: string | Bucket;
   public?: string | Bucket;
   uploads?: string | Bucket | UploadPipeline;
   store?: KVStore;
@@ -207,12 +216,12 @@ export type Options = {
   log?: LogLevel | boolean;
   favicon?: string | Bucket;
   security?: SecurityOptions;
+  body?: BodyMode;
 };
 
 export type Settings = {
   port: number;
   secret: string;
-  views?: Bucket;
   public?: Bucket;
   uploads?: Bucket | UploadPipeline;
   store?: KVStore;
@@ -225,6 +234,7 @@ export type Settings = {
   log: Logger;
   favicon?: string | Bucket;
   security: SecuritySettings;
+  body: BodyMode;
 };
 
 export type Time = {
@@ -307,7 +317,7 @@ export type Context<
   ip: string;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: SerializableValue;
+  body?: SerializableValue | Buffer | ReadableStream;
   url: URL & {
     params: Params;
     query: Record<string, string>;
@@ -340,7 +350,9 @@ export type InlineReply =
   | Response
   | { body: string; headers?: Headers }
   | SerializableValue
-  | JSX.Element;
+  | JSX.Element
+  | Buffer
+  | ReadableStream;
 
 export type Body = InlineReply;
 

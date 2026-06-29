@@ -74,13 +74,16 @@ describe("parseBody", () => {
       size: expect.any(Number),
     });
 
-    expect(body.gallery).toMatchObject({
-      name: expect.stringMatching(/\.(txt)$/),
+    // gallery[] has two files, so it collects into an array
+    expect(body.gallery).toHaveLength(2);
+    expect(body.gallery[0]).toMatchObject({
+      name: "A.txt",
       id: expect.stringMatching(/^\w{16}\.txt$/),
       path: expect.stringMatching(/^\/mock\/\w{16}\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
     });
+    expect(body.gallery[1]).toMatchObject({ name: "C.txt" });
   });
 
   it("skips file parts when no bucket is provided", async () => {

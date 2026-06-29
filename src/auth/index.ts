@@ -19,6 +19,10 @@ export default function auth(app: Server) {
     ctx.user = await getUser(ctx);
   });
 
+  // One logout route for every provider and strategy. POST, since it changes
+  // state (clearing the session) and so shouldn't be triggered by a prefetch.
+  app.post("/auth/logout", logout);
+
   const enabled = app.settings.auth.provider;
 
   for (const name of oauth) {
@@ -26,7 +30,6 @@ export default function auth(app: Server) {
     const key = name.toUpperCase();
     if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
     if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
-    app.get("/auth/logout", logout);
     app.get(`/auth/login/${name}`, providers[name].login);
     app.get(`/auth/callback/${name}`, providers[name].callback);
   }
@@ -37,13 +40,11 @@ export default function auth(app: Server) {
     for (const key of keys) {
       if (!env[key]) throw new Error(`${key} not defined`);
     }
-    app.get("/auth/logout", logout);
     app.get("/auth/login/apple", providers.apple.login);
     app.post("/auth/callback/apple", providers.apple.callback);
   }
 
   if (enabled.includes("email")) {
-    app.post("/auth/logout", logout);
     app.post("/auth/register/email", providers.email.register);
     app.post("/auth/login/email", providers.email.login);
     app.put("/auth/password/email", providers.email.password);

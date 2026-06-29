@@ -4,9 +4,10 @@ import type { Context, Server } from "..";
 import {
   clientIp,
   define,
-  parseBody,
   parseCookies,
   parseHeaders,
+  setBodySource,
+  toWeb,
 } from "../helpers";
 import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
@@ -42,32 +43,29 @@ export default async function createNode(
     Object.fromEntries(url.searchParams.entries()),
   );
 
-  const rawBody = await new Promise<Buffer<ArrayBuffer>>((resolve, reject) => {
-    const body: Uint8Array[] = [];
-    req
-      .on("data", (chunk: Uint8Array) => body.push(chunk))
-      .on("end", () => resolve(Buffer.concat(body)))
-      .on("error", reject);
-  });
-
-  // Reflect the real received size when the client didn't send Content-Length
-  // (e.g. chunked uploads), so ctx.headers and the request log are accurate.
-  if (rawBody.length && !headers["content-length"]) {
-    headers["content-length"] = String(rawBody.length);
-  }
-
-  const body = rawBody
-    ? await parseBody(rawBody, headers["content-type"], app.settings.uploads)
-    : undefined;
+  // Don't read the body yet: handleRequest resolves it once the route (and its
+  // `body` mode) is known, so a `stream` route never buffers. We just expose the
+  // two ways to read req, normalizing the stream to a web ReadableStream (toWeb).
+  const source = {
+    getBuffer: () =>
+      new Promise<Buffer>((resolve, reject) => {
+        const chunks: Uint8Array[] = [];
+        req
+          .on("data", (chunk: Uint8Array) => chunks.push(chunk))
+          .on("end", () => resolve(Buffer.concat(chunks)))
+          .on("error", reject);
+      }),
+    getStream: () => toWeb(req),
+  };
 
   const events = createEvents();
 
-  return {
+  const ctx: Context = {
     options: app.settings,
     platform: app.platform,
     url,
     method,
-    body,
+    body: undefined,
     headers,
     cookies,
     session: {},
@@ -79,4 +77,6 @@ export default async function createNode(
       trustProxy: app.settings.security.trustProxy,
     }),
   };
+  setBodySource(ctx, source);
+  return ctx;
 }

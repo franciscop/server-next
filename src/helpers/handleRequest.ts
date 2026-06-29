@@ -1,6 +1,7 @@
 import { ServerError, type Context, type Server } from "..";
 import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
+import { resolveBody } from "./body";
 import { applyCors } from "./cors";
 import define from "./define";
 import validate from "./validate";
@@ -35,6 +36,11 @@ async function getResponse(
         ctx.options = { ...app.settings, ...route.options };
       }
 
+      // Now that the route (and its `body` mode) is known, read the body once.
+      // A `stream` route gets the unread stream; the middleware in `fns` (auth,
+      // etc.) still run first because they sit before the handler in the chain.
+      ctx.body = await resolveBody(ctx, ctx.options.body);
+
       for (const cb of route.fns) {
         if (typeof cb === "function") {
           const res = await cb(ctx);
@@ -52,6 +58,7 @@ async function getResponse(
     // 2. No route matched: run the global middleware (this is how static files
     //    via `assets`, `favicon`, etc. answer requests that aren't routes).
     if (!matched) {
+      ctx.body = await resolveBody(ctx, ctx.options.body);
       for (const mw of app.middleware) {
         const out = await parseResponse(await mw(ctx), ctx);
         if (out) return out;

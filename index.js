@@ -89,6 +89,403 @@ if (typeof process !== "undefined") {
   Object.assign(globalThis.env, process.env);
 }
 
+// src/helpers/createId.ts
+var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
+var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
+var cyrb53 = (str, seed = 0) => {
+  if (typeof str !== "string") str = String(str);
+  let h1 = 3735928559 ^ seed;
+  let h2 = 1103547991 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
+  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
+  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+};
+var hash = (str, size) => {
+  let chars = "";
+  let num = cyrb53(str);
+  for (let i = 0; i < size; i++) {
+    if (num < alphabet.length) num = cyrb53(str, i);
+    chars += alphabet[num % alphabet.length];
+    num = Math.floor(num / alphabet.length);
+  }
+  return chars;
+};
+var randomId = (size = 16) => {
+  let id = "";
+  const bytes = random(size);
+  while (size--) {
+    id += alphabet[bytes[size] & 61];
+  }
+  return id;
+};
+function createId(source, size = 16) {
+  if (source) return hash(source, size);
+  return randomId(size);
+}
+
+// src/helpers/upload.ts
+function parseBytes(value) {
+  if (typeof value === "number") return value;
+  const units = {
+    b: 1,
+    kb: 1024,
+    mb: 1024 ** 2,
+    gb: 1024 ** 3
+  };
+  const match = value.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)$/);
+  if (!match) throw new Error(`Invalid size: "${value}"`);
+  return parseFloat(match[1]) * (units[match[2]] ?? 1);
+}
+function getExt(filename) {
+  const i = filename.lastIndexOf(".");
+  if (i <= 0) return ".bin";
+  return filename.slice(i).toLowerCase();
+}
+async function saveFileToBucket(originalName, data, bucket, contentType) {
+  const ext = getExt(originalName);
+  const id = `${createId()}${ext}`;
+  const path2 = await bucket.write(id, data);
+  return { name: originalName, id, path: path2, type: contentType, size: data.length };
+}
+var UploadPipeline = class {
+  _bucket;
+  _limits = {};
+  constructor(bucket) {
+    this._bucket = bucket ?? null;
+  }
+  limit(options) {
+    this._limits = { ...this._limits, ...options };
+    return this;
+  }
+  store(bucket) {
+    this._bucket = bucket;
+    return this;
+  }
+  async processFile(originalName, data, contentType) {
+    const { maxSize, minSize, fileType } = this._limits;
+    if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
+      throw new Error(
+        `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
+      );
+    }
+    if (minSize !== void 0 && data.length < parseBytes(minSize)) {
+      throw new Error(
+        `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
+      );
+    }
+    if (fileType && fileType.length > 0) {
+      const ext = getExt(originalName);
+      const mime = contentType.toLowerCase();
+      const allowed = fileType.some(
+        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
+      );
+      if (!allowed) {
+        throw new Error(
+          `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
+        );
+      }
+    }
+    if (!this._bucket) {
+      throw new Error(
+        `No destination configured. Pass a bucket to upload() or call .store()`
+      );
+    }
+    return saveFileToBucket(originalName, data, this._bucket, contentType);
+  }
+};
+function upload(bucket) {
+  return new UploadPipeline(bucket);
+}
+
+// src/helpers/parseBody.ts
+function getBoundary(header) {
+  if (!header) return null;
+  if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
+    console.error("Do not set the `Content-Type` manually for FormData");
+  }
+  const items = header.split(";");
+  for (const item of items) {
+    const trimmedItem = item.trim();
+    if (trimmedItem.startsWith("boundary=")) {
+      return trimmedItem.split("=")[1].trim();
+    }
+  }
+  return null;
+}
+function getMatching(string, regex) {
+  const matches = string.match(regex);
+  return matches?.[1] ?? "";
+}
+function isProbablyText(buffer) {
+  for (let i = 0; i < Math.min(buffer.length, 512); i++) {
+    const byte = buffer[i];
+    if (byte === 0) return false;
+    if (byte < 7 || byte > 13 && byte < 32) return false;
+  }
+  return true;
+}
+var MIME_EXT = {
+  "application/json": ".json",
+  "application/pdf": ".pdf",
+  "application/zip": ".zip",
+  "text/plain": ".txt",
+  "text/html": ".html",
+  "text/csv": ".csv",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "video/mp4": ".mp4",
+  "audio/mpeg": ".mp3"
+};
+function extFromType(type2) {
+  const base = (type2 || "").split(";")[0].trim().toLowerCase();
+  if (MIME_EXT[base]) return MIME_EXT[base];
+  const sub = base.split("/")[1];
+  return sub && /^[a-z0-9]+$/.test(sub) ? `.${sub}` : ".bin";
+}
+var asIterable = (s) => s;
+function toStream(input) {
+  if (input instanceof ReadableStream) return input;
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(input);
+      controller.close();
+    }
+  });
+}
+async function toBuffer(input) {
+  if (!(input instanceof ReadableStream)) return input;
+  const chunks = [];
+  for await (const chunk of asIterable(input)) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+function parseUrlEncoded(text) {
+  const out = {};
+  for (const [key, value] of new URLSearchParams(text)) {
+    const existing = out[key];
+    if (existing === void 0) out[key] = value;
+    else if (Array.isArray(existing)) existing.push(value);
+    else out[key] = [existing, value];
+  }
+  return out;
+}
+function addField(body, name, value) {
+  if (body[name] === void 0) {
+    body[name] = value;
+    return;
+  }
+  if (!Array.isArray(body[name])) body[name] = [body[name]];
+  body[name].push(value);
+}
+function startPart(headerStr, dest) {
+  const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
+  if (!name) return { kind: "skip" };
+  const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
+  if (!filename) return { kind: "text", name, chunks: [] };
+  const type2 = getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() || "application/octet-stream";
+  if (!dest) return { kind: "drop" };
+  if (dest instanceof UploadPipeline) {
+    return { kind: "pipefile", name, filename, type: type2, pipeline: dest, chunks: [] };
+  }
+  const id = `${createId()}${getExt(filename)}`;
+  let controller;
+  const readable = new ReadableStream({
+    start(c) {
+      controller = c;
+    }
+  });
+  return {
+    kind: "file",
+    name,
+    filename,
+    type: type2,
+    id,
+    controller,
+    write: dest.write(id, readable),
+    size: 0
+  };
+}
+function feedPart(part, data) {
+  if (data.length === 0) return;
+  if (part.kind === "text" || part.kind === "pipefile") part.chunks.push(data);
+  else if (part.kind === "file") {
+    part.controller.enqueue(data);
+    part.size += data.length;
+  }
+}
+async function endPart(part, body) {
+  if (part.kind === "text") {
+    const buf = Buffer.concat(part.chunks);
+    const value = isProbablyText(buf) ? buf.toString("utf-8").trim() : buf;
+    addField(body, part.name, value);
+  } else if (part.kind === "pipefile") {
+    const buf = Buffer.concat(part.chunks);
+    const ref = await part.pipeline.processFile(part.filename, buf, part.type);
+    addField(body, part.name, ref);
+  } else if (part.kind === "file") {
+    part.controller.close();
+    const path2 = await part.write;
+    addField(body, part.name, {
+      name: part.filename,
+      id: part.id,
+      path: path2,
+      type: part.type,
+      size: part.size
+    });
+  }
+}
+var BREAK = Buffer.from("\r\n\r\n");
+async function parseMultipart(stream, boundary, dest) {
+  const delim = Buffer.from(`\r
+--${boundary}`);
+  const body = {};
+  let buf = Buffer.from("\r\n");
+  let state = "boundary";
+  let part = null;
+  for await (const chunk of asIterable(stream)) {
+    buf = Buffer.concat([buf, Buffer.from(chunk)]);
+    let advanced = true;
+    while (advanced) {
+      advanced = false;
+      if (state === "boundary") {
+        const i = buf.indexOf(delim);
+        if (i === -1) {
+          if (buf.length >= delim.length) {
+            buf = buf.subarray(buf.length - delim.length + 1);
+          }
+          break;
+        }
+        if (buf.length < i + delim.length + 2) break;
+        const after = i + delim.length;
+        if (buf[after] === 45 && buf[after + 1] === 45) return body;
+        buf = buf.subarray(after + 2);
+        state = "headers";
+        advanced = true;
+      } else if (state === "headers") {
+        const i = buf.indexOf(BREAK);
+        if (i === -1) break;
+        part = startPart(buf.subarray(0, i).toString("utf-8"), dest);
+        buf = buf.subarray(i + BREAK.length);
+        state = "body";
+        advanced = true;
+      } else {
+        const i = buf.indexOf(delim);
+        if (i === -1) {
+          const safe = buf.length - (delim.length - 1);
+          if (safe > 0 && part) {
+            feedPart(part, buf.subarray(0, safe));
+            buf = buf.subarray(safe);
+          }
+          break;
+        }
+        if (part) {
+          feedPart(part, buf.subarray(0, i));
+          await endPart(part, body);
+          part = null;
+        }
+        buf = buf.subarray(i);
+        state = "boundary";
+        advanced = true;
+      }
+    }
+  }
+  if (part) await endPart(part, body);
+  return body;
+}
+async function streamToBucket(stream, type2, bucket) {
+  const id = `${createId()}${extFromType(type2)}`;
+  let size = 0;
+  let controller;
+  const readable = new ReadableStream({
+    start(c) {
+      controller = c;
+    }
+  });
+  const write = bucket.write(id, readable);
+  for await (const chunk of asIterable(stream)) {
+    controller.enqueue(chunk);
+    size += chunk.byteLength;
+  }
+  controller.close();
+  const path2 = await write;
+  if (!size) return void 0;
+  return { name: id, id, path: path2, type: type2, size };
+}
+async function parseBody(input, contentType, dest) {
+  const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
+  const boundary = type2 && /multipart\/form-data/i.test(type2) ? getBoundary(type2) : null;
+  if (boundary) return parseMultipart(toStream(input), boundary, dest);
+  if (!type2 || /^text\//i.test(type2)) {
+    const buf = await toBuffer(input);
+    return buf.length ? buf.toString("utf-8") : void 0;
+  }
+  if (/application\/json/i.test(type2)) {
+    const buf = await toBuffer(input);
+    return buf.length ? JSON.parse(buf.toString("utf-8")) : void 0;
+  }
+  if (/application\/x-www-form-urlencoded/i.test(type2)) {
+    const buf = await toBuffer(input);
+    return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : void 0;
+  }
+  if (!dest) {
+    const buf = await toBuffer(input);
+    return buf.length ? buf : void 0;
+  }
+  if (dest instanceof UploadPipeline) {
+    const buf = await toBuffer(input);
+    return buf.length ? dest.processFile(`upload${extFromType(type2)}`, buf, type2) : void 0;
+  }
+  return streamToBucket(toStream(input), type2, dest);
+}
+
+// src/helpers/body.ts
+var sources = /* @__PURE__ */ new WeakMap();
+function setBodySource(ctx, source) {
+  sources.set(ctx, source);
+}
+async function resolveBody(ctx, mode) {
+  const source = sources.get(ctx);
+  if (!source) return void 0;
+  if (mode === "stream") return source.getStream();
+  if (mode === "raw") {
+    const raw = await source.getBuffer();
+    if (!raw.length) return void 0;
+    if (!ctx.headers["content-length"]) {
+      ctx.headers["content-length"] = String(raw.length);
+    }
+    return raw;
+  }
+  const stream = source.getStream();
+  if (!stream) return void 0;
+  let size = 0;
+  const counted = stream.pipeThrough(
+    new TransformStream({
+      transform(chunk, controller) {
+        size += chunk.byteLength;
+        controller.enqueue(chunk);
+      }
+    })
+  );
+  const body = await parseBody(
+    counted,
+    ctx.headers["content-type"],
+    ctx.options.uploads
+  );
+  if (size && !ctx.headers["content-length"]) {
+    ctx.headers["content-length"] = String(size);
+  }
+  return body;
+}
+
 // src/helpers/clientIp.ts
 var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
 var normalize = (ip) => ip.replace(/^::ffff:/, "");
@@ -558,7 +955,7 @@ async function emailRegister(ctx) {
     strategy: ctx.options.auth.strategy,
     provider: "email",
     email,
-    password: await hash(password),
+    password: await hash2(password),
     time,
     ...data
   };
@@ -579,7 +976,7 @@ async function emailUpdatePassword(ctx) {
   if (!fullUser) throw ServerError_default.AUTH_NO_USER();
   const isValid = await verify(passwords.previous, fullUser.password);
   if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  fullUser.password = await hash(passwords.updated);
+  fullUser.password = await hash2(passwords.updated);
   await updateUser(fullUser, ctx.user, ctx.options.auth.store);
   return 200;
 }
@@ -797,12 +1194,23 @@ function thinLocalBucket(root) {
         }
       });
     },
-    write: (name, value, type2) => {
+    write: async (name, value, type2) => {
       const fullPath = absolute(name);
-      if (value) {
-        return fsp.writeFile(fullPath, value, type2).then(() => fullPath);
+      if (!value) return fs.createWriteStream(fullPath);
+      await fsp.mkdir(path.dirname(fullPath), { recursive: true });
+      if (value instanceof ReadableStream) {
+        const writable = fs.createWriteStream(fullPath);
+        for await (const chunk of value) {
+          writable.write(chunk);
+        }
+        await new Promise((resolve2, reject) => {
+          writable.on("error", reject);
+          writable.end(resolve2);
+        });
+        return fullPath;
       }
-      return fs.createWriteStream(fullPath);
+      await fsp.writeFile(fullPath, value, type2);
+      return fullPath;
     },
     delete: async (name) => {
       const fullPath = absolute(name);
@@ -812,29 +1220,35 @@ function thinLocalBucket(root) {
       } catch {
         return false;
       }
-    }
+    },
+    folder: (prefix) => thinLocalBucket(path.join(root, prefix))
   };
 }
-function thinBunBucket(s3) {
+function thinBunBucket(s3, prefix = "") {
+  const key = (name) => prefix ? `${prefix}/${name}` : name;
   return {
     read: async (name) => {
-      const file2 = s3.file(name);
+      const file2 = s3.file(key(name));
       if (!await file2.exists()) return null;
       return await file2.stream();
     },
     write: async (name, value) => {
-      const file2 = s3.file(name);
+      const file2 = s3.file(key(name));
       if (value) {
         await file2.write(value);
-        return name;
+        return key(name);
       }
-      return s3.presign(name, { expiresIn: 3600, acl: "public-read-write" });
+      return s3.presign(key(name), {
+        expiresIn: 3600,
+        acl: "public-read-write"
+      });
     },
     delete: async (name) => {
-      const file2 = s3.file(name);
+      const file2 = s3.file(key(name));
       if (!await file2.exists()) return null;
       return await file2.delete();
-    }
+    },
+    folder: (sub) => thinBunBucket(s3, key(sub))
   };
 }
 function bucket_default(root) {
@@ -846,47 +1260,6 @@ function bucket_default(root) {
     return thinBunBucket(root);
   }
   return root;
-}
-
-// src/helpers/createId.ts
-var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
-var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
-var cyrb53 = (str, seed = 0) => {
-  if (typeof str !== "string") str = String(str);
-  let h1 = 3735928559 ^ seed;
-  let h2 = 1103547991 ^ seed;
-  for (let i = 0, ch; i < str.length; i++) {
-    ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
-  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
-  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
-  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
-  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-};
-var hash2 = (str, size) => {
-  let chars = "";
-  let num = cyrb53(str);
-  for (let i = 0; i < size; i++) {
-    if (num < alphabet.length) num = cyrb53(str, i);
-    chars += alphabet[num % alphabet.length];
-    num = Math.floor(num / alphabet.length);
-  }
-  return chars;
-};
-var randomId = (size = 16) => {
-  let id = "";
-  const bytes = random(size);
-  while (size--) {
-    id += alphabet[bytes[size] & 61];
-  }
-  return id;
-};
-function createId(source, size = 16) {
-  if (source) return hash2(source, size);
-  return randomId(size);
 }
 
 // src/helpers/color.ts
@@ -998,80 +1371,6 @@ function createLogger(level) {
   };
 }
 
-// src/helpers/upload.ts
-function parseBytes(value) {
-  if (typeof value === "number") return value;
-  const units = {
-    b: 1,
-    kb: 1024,
-    mb: 1024 ** 2,
-    gb: 1024 ** 3
-  };
-  const match = value.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)$/);
-  if (!match) throw new Error(`Invalid size: "${value}"`);
-  return parseFloat(match[1]) * (units[match[2]] ?? 1);
-}
-function getExt(filename) {
-  const i = filename.lastIndexOf(".");
-  if (i <= 0) return ".bin";
-  return filename.slice(i).toLowerCase();
-}
-async function saveFileToBucket(originalName, data, bucket, contentType) {
-  const ext = getExt(originalName);
-  const id = `${createId()}${ext}`;
-  const path2 = await bucket.write(id, data);
-  return { name: originalName, id, path: path2, type: contentType, size: data.length };
-}
-var UploadPipeline = class {
-  _bucket;
-  _limits = {};
-  constructor(bucket) {
-    this._bucket = bucket ?? null;
-  }
-  limit(options) {
-    this._limits = { ...this._limits, ...options };
-    return this;
-  }
-  store(bucket) {
-    this._bucket = bucket;
-    return this;
-  }
-  async processFile(originalName, data, contentType) {
-    const { maxSize, minSize, fileType } = this._limits;
-    if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
-      throw new Error(
-        `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
-      );
-    }
-    if (minSize !== void 0 && data.length < parseBytes(minSize)) {
-      throw new Error(
-        `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
-      );
-    }
-    if (fileType && fileType.length > 0) {
-      const ext = getExt(originalName);
-      const mime = contentType.toLowerCase();
-      const allowed = fileType.some(
-        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
-      );
-      if (!allowed) {
-        throw new Error(
-          `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
-        );
-      }
-    }
-    if (!this._bucket) {
-      throw new Error(
-        `No destination configured. Pass a bucket to upload() or call .store()`
-      );
-    }
-    return saveFileToBucket(originalName, data, this._bucket, contentType);
-  }
-};
-function upload(bucket) {
-  return new UploadPipeline(bucket);
-}
-
 // src/helpers/config.ts
 function config(options = {}) {
   const env2 = globalThis.env;
@@ -1082,6 +1381,9 @@ function config(options = {}) {
     port: options.port || env2.PORT || 3e3,
     secret: options.secret || env2.SECRET || `unsafe-${createId()}`,
     log,
+    // How request bodies are read: parsed into ctx.body by default; `raw` keeps
+    // the Buffer, `stream` hands the handler the unread web ReadableStream.
+    body: options.body ?? "parse",
     // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
     // when clients connect directly so a client can't spoof its IP).
     security: {
@@ -1124,7 +1426,6 @@ function config(options = {}) {
     }
     settings.cors = cors2;
   }
-  settings.views = options.views ? bucket_default(options.views) : null;
   settings.public = options.public ? bucket_default(options.public) : null;
   settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket_default(options.uploads) : null;
   if (options.favicon) settings.favicon = options.favicon;
@@ -1154,7 +1455,6 @@ function config(options = {}) {
     log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
-  if (settings.views) log.message("views", loc(options.views));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.session) log.message("session", "enabled");
   if (settings.cors) {
@@ -1274,6 +1574,9 @@ async function parseResponse(out, ctx) {
     out = new Response(out, { headers: { "Content-Type": out.type } });
   }
   if (out instanceof ReadableStream) {
+    out = new Response(out);
+  }
+  if (out instanceof Uint8Array) {
     out = new Response(out);
   }
   if (typeof out === "number") {
@@ -1442,6 +1745,7 @@ async function getResponse(app, ctx) {
       if (Object.keys(route.options).length) {
         ctx.options = { ...app.settings, ...route.options };
       }
+      ctx.body = await resolveBody(ctx, ctx.options.body);
       for (const cb of route.fns) {
         if (typeof cb === "function") {
           const res = await cb(ctx);
@@ -1454,6 +1758,7 @@ async function getResponse(app, ctx) {
       break;
     }
     if (!matched) {
+      ctx.body = await resolveBody(ctx, ctx.options.body);
       for (const mw of app.middleware) {
         const out = await parseResponse(await mw(ctx), ctx);
         if (out) return out;
@@ -1472,7 +1777,7 @@ async function getResponse(app, ctx) {
 import * as crypto2 from "crypto";
 import { getRandomValues } from "crypto";
 import { promisify } from "util";
-async function hash(password) {
+async function hash2(password) {
   if ("argon2" in crypto2) {
     const argon23 = promisify(crypto2.argon2);
     const buf = await argon23("argon2id", {
@@ -1534,102 +1839,6 @@ function iteratorToReadable(generator) {
       controller.close();
     }
   });
-}
-
-// src/helpers/parseBody.ts
-function getBoundary(header) {
-  if (!header) return null;
-  if (header.includes("multipart/form-data") && !header.includes("boundary=")) {
-    console.error("Do not set the `Content-Type` manually for FormData");
-  }
-  const items = header.split(";");
-  for (const item of items) {
-    const trimmedItem = item.trim();
-    if (trimmedItem.startsWith("boundary=")) {
-      return trimmedItem.split("=")[1].trim();
-    }
-  }
-  return null;
-}
-function getMatching(string, regex) {
-  const matches = string.match(regex);
-  return matches?.[1] ?? "";
-}
-function splitBuffer(buffer, delimiter) {
-  const result = [];
-  let start = 0;
-  let index = buffer.indexOf(delimiter);
-  while (index !== -1) {
-    result.push(buffer.slice(start, index));
-    start = index + delimiter.length;
-    index = buffer.indexOf(delimiter, start);
-  }
-  result.push(buffer.slice(start));
-  return result;
-}
-var BREAK_BUFFER = Buffer.from("\r\n\r\n");
-var END_BUFFER = Buffer.from("--\r\n");
-function isProbablyText(buffer) {
-  for (let i = 0; i < Math.min(buffer.length, 512); i++) {
-    const byte = buffer[i];
-    if (byte === 0) return false;
-    if (byte < 7 || byte > 13 && byte < 32) return false;
-  }
-  return true;
-}
-async function parseBody(raw, contentType, bucket) {
-  const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-  if (!raw || raw.length === 0) return {};
-  if (!contentTypeStr || /^text\//.test(contentTypeStr)) {
-    return raw.toString("utf-8");
-  }
-  if (/application\/json/.test(contentTypeStr)) {
-    return JSON.parse(raw.toString("utf-8"));
-  }
-  const boundary = getBoundary(contentTypeStr);
-  if (!boundary) return null;
-  const body = {};
-  const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(raw, boundaryBuffer);
-  for (const part of parts) {
-    if (part.length === 0 || part.equals(END_BUFFER)) continue;
-    const idx = part.indexOf(BREAK_BUFFER);
-    if (idx === -1) continue;
-    const headerStr = part.slice(0, idx).toString("utf-8");
-    const contentBuf = part.slice(idx + BREAK_BUFFER.length, part.length - 2);
-    const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
-    if (!name) continue;
-    const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
-    if (filename) {
-      const partContentType = getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() || "application/octet-stream";
-      if (!bucket) {
-        continue;
-      }
-      if (bucket instanceof UploadPipeline) {
-        body[name] = await bucket.processFile(
-          filename,
-          contentBuf,
-          partContentType
-        );
-      } else {
-        body[name] = await saveFileToBucket(
-          filename,
-          contentBuf,
-          bucket,
-          partContentType
-        );
-      }
-    } else {
-      const value = isProbablyText(contentBuf) ? contentBuf.toString("utf-8").trim() : contentBuf;
-      if (body[name]) {
-        if (!Array.isArray(body[name])) body[name] = [body[name]];
-        body[name].push(value);
-      } else {
-        body[name] = value;
-      }
-    }
-  }
-  return body;
 }
 
 // src/helpers/parseCookies.ts
@@ -1899,13 +2108,13 @@ function auth(app) {
   app.use(async function middle(ctx) {
     ctx.user = await getUser(ctx);
   });
+  app.post("/auth/logout", logout);
   const enabled = app.settings.auth.provider;
   for (const name of oauth2) {
     if (!enabled.includes(name)) continue;
     const key = name.toUpperCase();
     if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
     if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
-    app.get("/auth/logout", logout);
     app.get(`/auth/login/${name}`, providers_default[name].login);
     app.get(`/auth/callback/${name}`, providers_default[name].callback);
   }
@@ -1914,12 +2123,10 @@ function auth(app) {
     for (const key of keys) {
       if (!env[key]) throw new Error(`${key} not defined`);
     }
-    app.get("/auth/logout", logout);
     app.get("/auth/login/apple", providers_default.apple.login);
     app.post("/auth/callback/apple", providers_default.apple.callback);
   }
   if (enabled.includes("email")) {
-    app.post("/auth/logout", logout);
     app.post("/auth/register/email", providers_default.email.register);
     app.post("/auth/login/email", providers_default.email.login);
     app.put("/auth/password/email", providers_default.email.password);
@@ -2229,21 +2436,20 @@ async function createNode(req, app) {
     "query",
     (url2) => Object.fromEntries(url2.searchParams.entries())
   );
-  const rawBody = await new Promise((resolve2, reject) => {
-    const body2 = [];
-    req.on("data", (chunk) => body2.push(chunk)).on("end", () => resolve2(Buffer.concat(body2))).on("error", reject);
-  });
-  if (rawBody.length && !headers2["content-length"]) {
-    headers2["content-length"] = String(rawBody.length);
-  }
-  const body = rawBody ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const source = {
+    getBuffer: () => new Promise((resolve2, reject) => {
+      const chunks2 = [];
+      req.on("data", (chunk) => chunks2.push(chunk)).on("end", () => resolve2(Buffer.concat(chunks2))).on("error", reject);
+    }),
+    getStream: () => toWeb(req)
+  };
   const events = createEvents();
-  return {
+  const ctx = {
     options: app.settings,
     platform: app.platform,
     url,
     method,
-    body,
+    body: void 0,
     headers: headers2,
     cookies: cookies2,
     session: {},
@@ -2255,6 +2461,8 @@ async function createNode(req, app) {
       trustProxy: app.settings.security.trustProxy
     })
   };
+  setBodySource(ctx, source);
+  return ctx;
 }
 
 // src/context/winter.ts
@@ -2273,18 +2481,17 @@ async function createWinter(req, app, server2) {
     "query",
     (url2) => Object.fromEntries(url2.searchParams.entries())
   );
-  const rawBody = Buffer.from(await req.arrayBuffer());
-  if (rawBody.length && !headers2["content-length"]) {
-    headers2["content-length"] = String(rawBody.length);
-  }
-  const body = req.body ? await parseBody(rawBody, headers2["content-type"], app.settings.uploads) : void 0;
+  const source = {
+    getBuffer: async () => Buffer.from(await req.arrayBuffer()),
+    getStream: () => req.body ?? void 0
+  };
   const events = createEvents();
-  return {
+  const ctx = {
     options: app.settings,
     platform: app.platform,
     url,
     method,
-    body,
+    body: void 0,
     headers: headers2,
     cookies: cookies2,
     session: {},
@@ -2296,6 +2503,8 @@ async function createWinter(req, app, server2) {
       trustProxy: app.settings.security.trustProxy
     })
   };
+  setBodySource(ctx, source);
+  return ctx;
 }
 
 // src/context/handlers.ts
@@ -2322,6 +2531,11 @@ var Node = async (app) => {
     response.end();
   }).listen(app.settings.port, () => {
     app.settings.log.start(`http://localhost:${app.settings.port}/`);
+    if (app.handlers.socket.length) {
+      console.warn(
+        "[server] WebSockets (.socket()) are only supported on Bun, not Node"
+      );
+    }
   });
 };
 var Netlify = async (app, request, context) => {

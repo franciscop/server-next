@@ -20,6 +20,9 @@ export default function config(options: Options = {}): Settings {
     port: options.port || env.PORT || 3000,
     secret: options.secret || env.SECRET || `unsafe-${createId()}`,
     log,
+    // How request bodies are read: parsed into ctx.body by default; `raw` keeps
+    // the Buffer, `stream` hands the handler the unread web ReadableStream.
+    body: options.body ?? "parse",
     // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
     // when clients connect directly so a client can't spoof its IP).
     security: {
@@ -78,7 +81,6 @@ export default function config(options: Options = {}): Settings {
   }
 
   // Bucket
-  settings.views = options.views ? Bucket(options.views) : null;
   settings.public = options.public ? Bucket(options.public) : null;
   settings.uploads =
     options.uploads instanceof UploadPipeline
@@ -127,7 +129,6 @@ export default function config(options: Options = {}): Settings {
     log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
-  if (settings.views) log.message("views", loc(options.views));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.session) log.message("session", "enabled");
   if (settings.cors) {
