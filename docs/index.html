@@ -25,11 +25,11 @@
     </div>
   </div>
   <div style="width: 630px; max-width: 100%">
-    <pre><code class="language-js">import server from &quot;@server/next&quot;;
+    <pre><code class="language-js">import server from "@server/next";
 
 export default server()
-  .get(&quot;/&quot;, () =&gt; &quot;Hello world&quot;)
-  .post(&quot;/users&quot;, ctx =&gt; {
+  .get("/", () =&gt; "Hello world")
+  .post("/users", ctx =&gt; {
     console.log(ctx.body);
     return { id: 100 };
   });</code></pre>
@@ -168,14 +168,14 @@ export default server()
     </div>
   </div>
   <div>
-    <pre><code class="language-js">import server from &quot;@server/next&quot;;
+    <pre><code class="language-js">import server from "@server/next";
 
-export default server({
-  store,
-  auth: &quot;cookie:github&quot;,
-})
-  .get(&quot;/me&quot;, ctx =&gt; ctx.user || 401);
-// visit /auth/login/github to sign in</code></pre>
+const auth = "cookie:github";
+
+// visit /auth/login/github to sign in
+export default server({ store, auth })
+  .get("/me", ctx =&gt; ctx.user || 401);
+</code></pre>
   </div>
 </section>
 
@@ -184,26 +184,26 @@ export default server({
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>Fully typed</h2>
+      <h2>Typed parameters</h2>
       <p>
-        Type inference covers URL parameters, request bodies and providers, so
+        Route parameters are read straight from the URL and typed for you, so
         mistakes are caught as you type.
       </p>
       <p>
-        Typed parameters carry their format, so
-        <code>:id(number)</code> arrives as a <code>number</code> rather than a
-        string.
+        Add a format like <code>:id(number)</code> and the value arrives as a
+        <code>number</code> rather than a string, and mark optional segments
+        with <code>?</code>.
       </p>
     </div>
   </div>
   <div>
-    <pre><code class="language-js">server().get(
-  &quot;/user/:id(number)&quot;,
-  ctx =&gt; {
-    // id is inferred as a number
-    return User.find(ctx.url.params.id);
-  },
-);</code></pre>
+    <pre><code class="language-js">server()
+  // ctx.url.params.name is a string
+  .get("/user/:name", ...)
+  // ctx.url.params.id is a number
+  .get("/user/:id(number)", ...)
+  // ctx.url.params.cId is optional
+  .get("/books/:id/comments/:cId?", ...);</code></pre>
   </div>
 </section>
 
@@ -224,10 +224,8 @@ export default server({
     </div>
   </div>
   <div>
-    <pre><code class="language-js">export default server({
-  uploads: &quot;./uploads&quot;,
-})
-  .post(&quot;/avatar&quot;, ctx =&gt; {
+    <pre><code class="language-js">export default server({ uploads: "./uploads" })
+  .post("/avatar", ctx =&gt; {
     // { name, id, path, type, size }
     return ctx.body.avatar;
   });</code></pre>
@@ -249,9 +247,11 @@ export default server({
   </div>
   <div>
     <pre><code class="language-js">server()
-  .get(&quot;/&quot;, () =&gt; file(&quot;./index.html&quot;))
-  .socket(&quot;message&quot;, ctx =&gt; {
+  .get("/", () =&gt; file("./index.html"))
+  .socket("open", ctx =&gt; ctx.socket.send("Hi!"))
+  .socket("message", ctx =&gt; {
     ctx.socket.send(`You said: ${ctx.body}`);
+    ctx.sockets.forEach(s =&gt; s.send(ctx.body));
   });</code></pre>
   </div>
 </section>
@@ -269,11 +269,11 @@ export default server({
     </div>
   </div>
   <div>
-    <pre><code class="language-js">import server from &quot;@server/next&quot;;
+    <pre><code class="language-js">import server from "@server/next";
 
 // Same file on Node, Bun, Cloudflare, Netlify
 export default server()
-  .get(&quot;/&quot;, () =&gt; &quot;Hello from anywhere&quot;);</code></pre>
+  .get("/", () =&gt; "Hello from anywhere");</code></pre>
   </div>
 </section>
 
@@ -296,11 +296,11 @@ export default server()
   <div>
     <pre><code class="language-js">import server, { file } from "@server/next";
 
-  server()
-  .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)
-  .get(&quot;/json&quot;, () =&gt; ({ ok: true }))
-  .get(&quot;/gone&quot;, () =&gt; 404)
-  .get(&quot;/file&quot;, () =&gt; file(&quot;./a.pdf&quot;));</code></pre>
+server()
+  .get("/text", () =&gt; "Hello")
+  .get("/json", () =&gt; ({ ok: true }))
+  .get("/gone", () =&gt; 404)
+  .get("/file", () =&gt; file("./a.pdf"));</code></pre>
   </div>
 </section>
 
@@ -319,11 +319,11 @@ export default server()
   </div>
   <div>
     <pre><code class="language-js">const api = server()
-  .get(&quot;/hello&quot;, () =&gt; &quot;Hi!&quot;)
+  .get("/hello", () =&gt; "Hi!")
   .test();
 
-const res = await api.get(&quot;/hello&quot;);
-expect(await res.text()).toBe(&quot;Hi!&quot;);</code></pre>
+const res = await api.get("/hello");
+expect(await res.text()).toBe("Hi!");</code></pre>
   </div>
 </section>
 
