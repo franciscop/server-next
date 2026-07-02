@@ -162,8 +162,7 @@ export default server()
       </p>
       <p>
         Sessions, signed cookies and CSRF-protected flows are handled for you,
-        and the signed-in user is available on <code>ctx.user</code> for every
-        request.
+        and the signed-in user is available on <code>ctx.user</code>.
       </p>
     </div>
   </div>
@@ -248,7 +247,6 @@ export default server({ store, auth })
   <div>
     <pre><code class="language-js">server()
   .get("/", () =&gt; file("./index.html"))
-  .socket("open", ctx =&gt; ctx.socket.send("Hi!"))
   .socket("message", ctx =&gt; {
     ctx.socket.send(`You said: ${ctx.body}`);
     ctx.sockets.forEach(s =&gt; s.send(ctx.body));
