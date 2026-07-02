@@ -224,8 +224,14 @@ export default server({ store, auth })
   <div>
     <pre><code class="language-js">export default server({ uploads: "./uploads" })
   .post("/avatar", ctx =&gt; {
-    // { name, id, path, type, size }
-    return ctx.body.avatar;
+    console.log(ctx.body.avatar);
+    // {
+    //   id: "f3a9c2e1.png",
+    //   name: "me.png",
+    //   path: "/home/.../uploads/f3a9c2e1.png",
+    //   type: "image/png",
+    //   size: 345465,
+    // }
   });</code></pre>
   </div>
 </section>
@@ -308,19 +314,33 @@ server()
     <div class="content">
       <h2>Testing built in</h2>
       <p>
-        Every server includes an in-process test client. It calls your routes
-        directly, with no ports, mocking or network, and returns the real
-        <code>Response</code> to assert against.
+        Call <code>.test()</code> on any server for an in-process client that
+        runs requests through the full middleware stack, with no ports,
+        mocking or network.
+      </p>
+      <p>
+        It mirrors every HTTP method and sends JSON, <code>FormData</code> or
+        streams as the body. Each call returns a standard
+        <code>Response</code>, so you assert on the same
+        <code>status</code>, headers and <code>.json()</code> a real client
+        would get.
       </p>
     </div>
   </div>
   <div>
     <pre><code class="language-js">const api = server()
   .get("/hello", () =&gt; "Hi!")
+  .post("/echo", ctx =&gt; ctx.body)
   .test();
 
-const res = await api.get("/hello");
-expect(await res.text()).toBe("Hi!");</code></pre>
+const res = await api.post("/echo", {
+  name: "Francisco",
+});
+
+expect(res.status).toBe(200);
+expect(await res.json()).toEqual({
+  name: "Francisco",
+});</code></pre>
   </div>
 </section>
 
