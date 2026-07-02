@@ -61,7 +61,7 @@ export default server()
         <img
           width="22"
           height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lock.svg"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/user.svg"
         />
         <h3>Authentication</h3>
       </header>
@@ -270,16 +270,17 @@ export default server()
     <div class="content">
       <h2>Simple responses</h2>
       <p>
-        Return a string, an object, a status code, a file or a stream, and the
-        correct response and headers are sent for you.
+        Return a string, object, status code, file or stream from any route
+        handler.
+      </p>
+      <p>
+        Server.js infers the response, content type and headers, so there is no
+        <code>res.send()</code> to wire up.
       </p>
     </div>
   </div>
   <div>
-    <pre><code class="language-js">import server, { file } from &quot;@server/next&quot;;
-
-// Return a value; the response is inferred
-server()
+    <pre><code class="language-js">server()
   .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)
   .get(&quot;/json&quot;, () =&gt; ({ ok: true }))
   .get(&quot;/gone&quot;, () =&gt; 404)
