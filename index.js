@@ -54,7 +54,7 @@ ServerError_default.extend({
     message: "Invalid Authorization type '{strategy}', valid one is '{valid}'"
   },
   AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" },
-  AUTH_NO_PROVIDER: "No provider passed to the option 'auth.provider'",
+  AUTH_NO_PROVIDER: "No provider passed to the option 'auth.providers'",
   AUTH_INVALID_PROVIDER: {
     status: 401,
     message: "Invalid provider '{provider}', valid ones are: '{valid}'"
@@ -1113,37 +1113,27 @@ function defaultCleanUser(fullUser) {
   const { password: _password, ...user } = fullUser;
   return user;
 }
-var providersKeys = Object.keys(providers_default);
-function getProviders(provider) {
-  if (typeof provider === "string") {
-    provider = provider.split("|");
-  }
-  const invalidProvider = provider.find((p) => !providersKeys.includes(p));
-  if (invalidProvider) {
-    throw new Error(
-      `Provider "${invalidProvider}" not found, available ones are "${providersKeys.join('", "')}"`
-    );
-  }
-  return provider;
-}
+var available = Object.keys(providers_default);
 function parseAuthOptions(auth2, all) {
   if (!auth2) return null;
   if (typeof auth2 === "string") {
-    const [strategy2, providerRaw] = auth2.split(":");
-    const provider2 = providerRaw && providerRaw.split("|");
-    auth2 = { strategy: strategy2, provider: provider2 };
+    const [strategy2, provider] = auth2.split(":");
+    auth2 = { strategy: strategy2, providers: provider ? [provider] : [] };
   }
-  if (!auth2.strategy) {
-    throw new Error("Auth options needs a strategy");
-  }
-  if (!auth2.strategy.length) {
+  if (!auth2.strategy?.length) {
     throw new Error("Auth options needs a strategy");
   }
   const strategy = auth2.strategy;
-  if (!auth2.provider?.length) {
+  const list = Array.isArray(auth2.providers) ? auth2.providers : auth2.providers ? [auth2.providers] : [];
+  if (!list.length) {
     throw new Error("Auth options needs a provider");
   }
-  const provider = getProviders(auth2.provider);
+  const invalid = list.find((p) => !available.includes(p));
+  if (invalid) {
+    throw new Error(
+      `Provider "${invalid}" not found, available ones are "${available.join('", "')}"`
+    );
+  }
   const redirect2 = auth2.redirect || defaultRedirect;
   const cleanUser = auth2.cleanUser || defaultCleanUser;
   if (!auth2.store && !all.store) {
@@ -1155,13 +1145,10 @@ function parseAuthOptions(auth2, all) {
   const store = auth2.store || all.store.prefix("user:");
   const session2 = auth2.session || all.store.prefix("auth:");
   return {
-    // Base main configuration
     strategy,
-    provider,
-    // Extra configuration
+    providers: list,
     redirect: redirect2,
     cleanUser,
-    // Stores for the auth session and users
     store,
     session: session2
   };
@@ -1452,7 +1439,7 @@ function config(options = {}) {
   });
   const loc = (v) => typeof v === "string" ? v : "enabled";
   if (settings.auth) {
-    log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
+    log.message("auth", `${settings.auth.providers.join(", ")} auth enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
@@ -2062,10 +2049,10 @@ async function getUser(ctx) {
       valid: options.strategy
     });
   }
-  if (!options.provider.includes(auth2.provider)) {
+  if (!options.providers.includes(auth2.provider)) {
     throw ServerError_default.AUTH_INVALID_PROVIDER({
       provider: auth2.provider,
-      valid: options.provider
+      valid: options.providers
     });
   }
   const user = await ctx.options.auth.store.get(auth2.user);
@@ -2109,7 +2096,7 @@ function auth(app) {
     ctx.user = await getUser(ctx);
   });
   app.post("/auth/logout", logout);
-  const enabled = app.settings.auth.provider;
+  const enabled = app.settings.auth.providers;
   for (const name of oauth2) {
     if (!enabled.includes(name)) continue;
     const key = name.toUpperCase();

@@ -18,10 +18,10 @@ export default async function getUser(ctx: Context): Promise<AuthUser> {
       valid: options.strategy,
     });
   }
-  if (!options.provider.includes(auth.provider)) {
+  if (!options.providers.includes(auth.provider)) {
     throw ServerError.AUTH_INVALID_PROVIDER({
       provider: auth.provider,
-      valid: options.provider,
+      valid: options.providers,
     });
   }
   // if (!auth) throw ServerError.AUTH_NO_SESSION();

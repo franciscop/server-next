@@ -145,19 +145,13 @@ export type AuthUser<T = Record<string, any>> = T & {
   email: string;
 };
 
-// We only have 2 providers now, add more as we add more
-type ProviderString = Provider | `${Provider}|${Provider}`;
-// | `${Provider}|${Provider}|${Provider}`
-// | `${Provider}|${Provider}|${Provider}|${Provider}`
-// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`
-// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`
-// | `${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}|${Provider}`;
-
+// The string form takes a single provider (`<strategy>:<provider>`). For several
+// providers, use the object form with a `providers` array.
 export type AuthOption =
-  | `${Strategy}:${Provider | ProviderString}`
+  | `${Strategy}:${Provider}`
   | {
-      provider: Provider | ProviderString | Provider[];
       strategy: Strategy;
+      providers: Provider | Provider[];
       session?: KVStore;
       store?: KVStore;
       redirect?: string;
@@ -165,7 +159,7 @@ export type AuthOption =
     };
 
 export type AuthSettings = {
-  provider: Provider[];
+  providers: Provider[];
   strategy: Strategy;
 
   // The store with the original source of users

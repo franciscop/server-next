@@ -126,7 +126,7 @@ export default function config(options: Options = {}): Settings {
   // Startup summary: one concise line per configured module (only with `log`)
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
   if (settings.auth) {
-    log.message("auth", `${settings.auth.provider.join(", ")} auth enabled`);
+    log.message("auth", `${settings.auth.providers.join(", ")} auth enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));

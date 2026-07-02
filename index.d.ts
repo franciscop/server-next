@@ -104,17 +104,16 @@ type AuthUser<T = Record<string, any>> = T & {
     strategy: Strategy;
     email: string;
 };
-type ProviderString = Provider | `${Provider}|${Provider}`;
-type AuthOption = `${Strategy}:${Provider | ProviderString}` | {
-    provider: Provider | ProviderString | Provider[];
+type AuthOption = `${Strategy}:${Provider}` | {
     strategy: Strategy;
+    providers: Provider | Provider[];
     session?: KVStore;
     store?: KVStore;
     redirect?: string;
     cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
 };
 type AuthSettings = {
-    provider: Provider[];
+    providers: Provider[];
     strategy: Strategy;
     store: KVStore;
     session: KVStore;

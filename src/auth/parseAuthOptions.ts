@@ -8,20 +8,7 @@ function defaultCleanUser(fullUser: any) {
   return user;
 }
 
-const providersKeys = Object.keys(providers);
-function getProviders(provider: string | string[]): Provider[] {
-  if (typeof provider === "string") {
-    provider = provider.split("|");
-  }
-
-  const invalidProvider = provider.find((p) => !providersKeys.includes(p));
-  if (invalidProvider) {
-    throw new Error(
-      `Provider "${invalidProvider}" not found, available ones are "${providersKeys.join('", "')}"`,
-    );
-  }
-  return provider as Provider[];
-}
+const available = Object.keys(providers);
 
 export default function parseAuthOptions(
   auth: Options["auth"],
@@ -29,23 +16,32 @@ export default function parseAuthOptions(
 ): Settings["auth"] {
   if (!auth) return null;
 
+  // The string form is a single provider (`<strategy>:<provider>`). For several
+  // providers, use the object form with a `providers` array.
   if (typeof auth === "string") {
-    const [strategy, providerRaw] = auth.split(":") as [Strategy, string];
-    const provider = providerRaw && (providerRaw.split("|") as Provider[]);
-    auth = { strategy, provider };
+    const [strategy, provider] = auth.split(":") as [Strategy, Provider];
+    auth = { strategy, providers: provider ? [provider] : [] };
   }
-  if (!auth.strategy) {
-    throw new Error("Auth options needs a strategy");
-  }
-  if (!auth.strategy.length) {
+
+  if (!auth.strategy?.length) {
     throw new Error("Auth options needs a strategy");
   }
   const strategy = auth.strategy;
 
-  if (!auth.provider?.length) {
+  const list = Array.isArray(auth.providers)
+    ? auth.providers
+    : auth.providers
+      ? [auth.providers]
+      : [];
+  if (!list.length) {
     throw new Error("Auth options needs a provider");
   }
-  const provider = getProviders(auth.provider);
+  const invalid = list.find((p) => !available.includes(p));
+  if (invalid) {
+    throw new Error(
+      `Provider "${invalid}" not found, available ones are "${available.join('", "')}"`,
+    );
+  }
 
   const redirect = auth.redirect || defaultRedirect;
   const cleanUser = auth.cleanUser || defaultCleanUser;
@@ -60,15 +56,10 @@ export default function parseAuthOptions(
   const session = auth.session || all.store.prefix("auth:");
 
   return {
-    // Base main configuration
     strategy,
-    provider,
-
-    // Extra configuration
+    providers: list,
     redirect,
     cleanUser,
-
-    // Stores for the auth session and users
     store,
     session,
   };

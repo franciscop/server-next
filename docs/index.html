@@ -48,11 +48,14 @@ export default server()
         <img
           width="22"
           height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/hash.svg"
         />
-        <h3>Batteries on</h3>
+        <h3>Fully Typed</h3>
       </header>
-      <p>All the basics work as expected by default. Just write your app!</p>
+      <p>
+        Type inference for URL params, request bodies and providers, so you
+        never mistype a route.
+      </p>
     </div>
   </div>
   <div>
@@ -61,13 +64,29 @@ export default server()
         <img
           width="22"
           height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/modern.svg"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lock.svg"
         />
-        <h3>Modern ES7+</h3>
+        <h3>Authentication</h3>
       </header>
       <p>
-        Use the clean syntax <code>async</code>, <code>await</code>,
-        <code>import</code>, <code>export</code>, etc.
+        OAuth, email and password, sessions and CSRF-protected flows, all in a
+        single option.
+      </p>
+    </div>
+  </div>
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
+        />
+        <h3>Batteries on</h3>
+      </header>
+      <p>
+        Routing, uploads, sessions and static files work by default. Just write
+        your app!
       </p>
     </div>
   </div>
@@ -81,10 +100,22 @@ export default server()
         />
         <h3>Integrations</h3>
       </header>
-      <p>The same code works in Node, Bun, Vercel, Cloudflare, Netlify, etc.</p>
+      <p>The same code works in Node, Bun, Cloudflare, Netlify, etc.</p>
     </div>
   </div>
-
+  <div>
+    <div class="feature">
+      <header>
+        <img
+          width="22"
+          height="22"
+          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/play.svg"
+        />
+        <h3>Testing</h3>
+      </header>
+      <p>A built-in, in-process test client. No ports, no mocks, no network.</p>
+    </div>
+  </div>
   <div>
     <div class="feature">
       <header>
@@ -95,33 +126,7 @@ export default server()
         />
         <h3>Documented</h3>
       </header>
-      <p>Extensive docs, tutorials and videos make it easy to learn.</p>
-    </div>
-  </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lock.svg"
-        />
-        <h3>Secure</h3>
-      </header>
-      <p>Safe by default while fully configurable CORS, CSRF, JWT, etc.</p>
-    </div>
-  </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/lego.svg"
-        />
-        <h3>Extensible</h3>
-      </header>
-      <p>Compatible with thousands of existing Express.js libraries.</p>
+      <p>Extensive docs and examples make it easy to learn.</p>
     </div>
   </div>
 </section>
@@ -143,13 +148,39 @@ export default server()
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>✨ Type Inference</h2>
-      <p>Advanced type inference so you never mistype a URL parameter.</p>
+      <h2>💬 Just return a value</h2>
       <p>
-        We added the <em>description</em>, a representative <em>example</em> and
-        even a <em>link</em> for more information for
-        <strong>every one</strong> of the methods available! We want you to have
-        the best development experience possible with React Test!
+        Return a string, an object, a status code, a file or a stream, and
+        Server.js sends the right response with the right headers. No
+        <code>res.send()</code> boilerplate.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import server, { file } from &quot;@server/next&quot;;
+
+server()
+  .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)         // text/plain
+  .get(&quot;/json&quot;, () =&gt; ({ ok: true }))  // application/json
+  .get(&quot;/gone&quot;, () =&gt; 404)             // status code
+  .get(&quot;/file&quot;, () =&gt; file(&quot;./a.pdf&quot;)); // streamed file</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>✨ Fully Typed</h2>
+      <p>
+        Advanced type inference so you never mistype a URL parameter, a body
+        field, or a provider.
+      </p>
+      <p>
+        Every route method carries a <em>description</em>, a representative
+        <em>example</em> and even a <em>link</em> to the docs, right in your
+        editor.
       </p>
     </div>
   </div>
@@ -163,170 +194,124 @@ export default server()
   </div>
 </section>
 
-<!-- <section class="hero flex one two-900 center">
-    <div>
-        <div class="content">
-            <h2>🚂 Render and assert</h2>
-            <p>
-                Allows you to render React components and make assertions
-                against it with Jest or other testing libraries.
-            </p>
-            <p>
-                You can use the library methods to read values like
-                <code>.text()</code>, or get a node with
-                <code>.get(index)</code> and then use the native DOM API.
-            </p>
-        </div>
-    </div>
-    <div>
-        <pre><code class="language-js">import $ from &quot;react-test&quot;;
+<br />
 
-it(&quot;renders a simple title&quot;, () =&gt; {
-  const title = $(&lt;h1&gt;Hello&lt;/h1&gt;);
-  expect(title.text()).toBe(&quot;Hello&quot;);
-  expect(title.attr(&quot;id&quot;)).toBe(null);
-  expect(title.get(0).nodeName).toBe(&quot;H1&quot;);
-  // ...
-});</code></pre>
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>🔑 Authentication built in</h2>
+      <p>
+        Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or
+        email and password with a single option.
+      </p>
+      <p>
+        Sessions, signed cookies and CSRF-protected flows are handled for you,
+        and the logged-in user is on <code>ctx.user</code> for every request.
+      </p>
     </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import server from &quot;@server/next&quot;;
+
+export default server({ store, auth: &quot;cookie:github&quot; })
+  .get(&quot;/me&quot;, ctx =&gt; ctx.user || 401);
+// send users to /auth/login/github to sign in</code></pre>
+  </div>
 </section>
 
 <br />
 
 <section class="hero flex one two-900 center">
-    <div>
-        <div class="content">
-            <h2>
-                <img
-                    width="26"
-                    height="26"
-                    style="vertical-align: middle"
-                    src="https://raw.githubusercontent.com/franciscop/react-test/master/assets/jest.svg"
-                />
-                Clear Jest Matchers
-            </h2>
-            <p>
-                We've also created
-                <a href="/documentation#jest-matchers"
-                    >a series of Jest Matchers</a
-                >
-                (included by default if you use Jest) that makes the tests more
-                readable and the error messages when a test fails very clear.
-            </p>
-            <p>
-                They can be used in single elements and for a set of elements,
-                both in the affirmative and negative form.
-            </p>
-        </div>
+  <div>
+    <div class="content">
+      <h2>📦 Uploads that just work</h2>
+      <p>
+        Files in a request are streamed straight to storage as they arrive,
+        never buffered in memory, so even large uploads stay cheap.
+      </p>
+      <p>
+        Point <code>uploads</code> at a local folder or an S3-style bucket, and
+        read the stored file right off <code>ctx.body</code>.
+      </p>
     </div>
-    <div>
-        <pre><code class="language-js">import $ from &quot;react-test&quot;;
-
-it(&quot;renders a simple title&quot;, () =&gt; {
-  const title = $(&lt;h1&gt;Hello&lt;/h1&gt;);
-  expect(title).toHaveText(&quot;Hello&quot;);
-  expect(title).not.toHaveAttribute(&quot;id&quot;);
-  expect(title).toMatchSelector(&quot;h1&quot;);
-  // ...
-});</code></pre>
-    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">export default server({ uploads: &quot;./uploads&quot; })
+  .post(&quot;/avatar&quot;, ctx =&gt; {
+    // { name, id, path, type, size }
+    return ctx.body.avatar;
+  });</code></pre>
+  </div>
 </section>
 
 <br />
 
 <section class="hero flex one two-900 center">
-    <div>
-        <div class="content">
-            <h2>👆 Simulate user actions</h2>
-            <p>
-                This is where this library gets really valuable! Emulating user
-                interactions is as easy as it could ever be. There's
-                <a href="/documentation#library-api">multiple event helpers</a>
-                available.
-            </p>
-            <p>
-                For example, to
-                <a href="/documentation#counter">test a Counter</a> that
-                increments when clicked: render and assert the initial status,
-                then await for a user click, and finally make more assertions.
-            </p>
-        </div>
+  <div>
+    <div class="content">
+      <h2>🔌 Real-time WebSockets</h2>
+      <p>
+        Handle WebSocket events with the same routing style. Reply to one
+        client with <code>ctx.socket</code>, or broadcast to all of
+        <code>ctx.sockets</code>.
+      </p>
     </div>
-    <div>
-        <pre><code class="language-js">import $ from &quot;react-test&quot;;
-import Counter from &quot;./Counter&quot;;
-
-it(&quot;Can increment a counter&quot;, async () =&gt; {
-  const counter = $(&lt;Counter /&gt;);
-  expect(counter).toHaveText(&quot;0&quot;);
-  await counter.click();
-  await counter.click();
-  expect(counter).toHaveText(&quot;2&quot;);
-});</code></pre>
-    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">server()
+  .get(&quot;/&quot;, () =&gt; file(&quot;./index.html&quot;))
+  .socket(&quot;message&quot;, ctx =&gt; {
+    ctx.socket.send(`You said: ${ctx.body}`);
+  });</code></pre>
+  </div>
 </section>
 
 <br />
 
 <section class="hero flex one two-900 center">
-    <div>
-        <div class="content">
-            <h2>⏱ Timers, async, etc.</h2>
-            <p>
-                There's other helpers for common React workflows: waiting for a
-                network call, for a specific DOM element, or for fixed amount of
-                time before doing assertions.
-            </p>
-            <p>
-                You can use
-                <a href="/documentation#delay"><code>.delay()</code></a> for a
-                simple timer or
-                <a href="/documentation#until"><code>until()</code></a>
-                for more complex DOM behavior.
-            </p>
-        </div>
+  <div>
+    <div class="content">
+      <h2>🌍 Write once, run anywhere</h2>
+      <p>
+        The exact same file runs on Node, Bun, Cloudflare Workers and Netlify
+        Functions. No adapters, no platform-specific entry points.
+      </p>
     </div>
-    <div>
-        <pre><code class="language-js">import $, {until } from &quot;react-test&quot;;
-import UserList from &quot;./UserList&quot;;
+  </div>
+  <div>
+    <pre><code class="language-js">import server from &quot;@server/next&quot;;
 
-it(&quot;waits for a DOM change&quot;, async () =&gt; {
-  const users = $(&lt;UserList /&gt;);
-  expect(users.find(&quot;li&quot;)).toHaveLength(0);
-  await until(users).find(&quot;li&quot;);
-  expect(users.find(&quot;li&quot;)).toHaveLength(10);
-});</code></pre>
-    </div>
+// Deploys unchanged to Node, Bun, Cloudflare, Netlify
+export default server()
+  .get(&quot;/&quot;, () =&gt; &quot;Hello from anywhere&quot;);</code></pre>
+  </div>
 </section>
 
 <br />
 
 <section class="hero flex one two-900 center">
-    <div>
-        <div class="content">
-            <h2>✨ Magic Autocomplete</h2>
-            <p>
-                Added jsdocs so the expected parameters and return value will be
-                clearly defined in your IDE/Code Editor.
-            </p>
-            <p>
-                We added the <em>description</em>, a representative
-                <em>example</em> and even a <em>link</em> for more information
-                for <strong>every one</strong> of the methods available! We want
-                you to have the best development experience possible with React
-                Test!
-            </p>
-        </div>
+  <div>
+    <div class="content">
+      <h2>🧪 Testing without the ceremony</h2>
+      <p>
+        Every server has a built-in, in-process test client. No ports, no
+        mocking, no network round-trips.
+      </p>
+      <p>
+        Call your routes directly and assert on the real
+        <code>Response</code>, so tests stay fast and close to production.
+      </p>
     </div>
-    <div>
-        <div class="splash">
-            <img
-                width="535"
-                src="https://raw.githubusercontent.com/franciscop/react-test/master/assets/autocomplete.webp"
-            />
-        </div>
-    </div>
-</section> -->
+  </div>
+  <div>
+    <pre><code class="language-js">const api = server()
+  .get(&quot;/hello&quot;, () =&gt; &quot;Hi!&quot;)
+  .test();
+
+const res = await api.get(&quot;/hello&quot;);
+expect(await res.text()).toBe(&quot;Hi!&quot;);</code></pre>
+  </div>
+</section>
 
 <div class="separator">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">

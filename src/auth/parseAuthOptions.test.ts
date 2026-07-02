@@ -15,57 +15,40 @@ describe("parseAuthOptions", () => {
     const result = parseAuthOptions("cookie:email", { store });
     expect(result).not.toBeNull();
     expect(result?.strategy).toBe("cookie");
-    expect(result?.provider).toEqual(["email"]);
+    expect(result?.providers).toEqual(["email"]);
   });
 
-  it("parses string format with multiple providers 'strategy:provider1|provider2'", () => {
-    const result = parseAuthOptions("jwt:email|github", { store });
-    expect(result).not.toBeNull();
-    expect(result?.strategy).toBe("jwt");
-    expect(result?.provider).toEqual(["email", "github"]);
-  });
-
-  it("parses object format with single provider", () => {
+  it("parses object format with a single provider", () => {
     const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email" },
+      { strategy: "cookie", providers: "email" },
       { store },
     );
     expect(result).not.toBeNull();
     expect(result?.strategy).toBe("cookie");
-    expect(result?.provider).toEqual(["email"]);
+    expect(result?.providers).toEqual(["email"]);
   });
 
-  it("parses object format with provider array", () => {
+  it("parses object format with a providers array", () => {
     const result = parseAuthOptions(
-      { strategy: "jwt", provider: ["email", "github"] },
+      { strategy: "token", providers: ["email", "github"] },
       { store },
     );
     expect(result).not.toBeNull();
-    expect(result?.strategy).toBe("jwt");
-    expect(result?.provider).toEqual(["email", "github"]);
-  });
-
-  it("parses object format with pipe-separated providers", () => {
-    const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email|github" },
-      { store },
-    );
-    expect(result).not.toBeNull();
-    expect(result?.strategy).toBe("cookie");
-    expect(result?.provider).toEqual(["email", "github"]);
+    expect(result?.strategy).toBe("token");
+    expect(result?.providers).toEqual(["email", "github"]);
   });
 
   it("throws error when strategy is missing", () => {
     expect(() => {
       // @ts-expect-error
-      parseAuthOptions({ provider: "email" }, { store });
+      parseAuthOptions({ providers: "email" }, { store });
     }).toThrow("Auth options needs a strategy");
   });
 
   it("throws error when strategy is empty", () => {
     expect(() => {
       // @ts-expect-error
-      parseAuthOptions({ strategy: "", provider: "email" }, { store });
+      parseAuthOptions({ strategy: "", providers: "email" }, { store });
     }).toThrow("Auth options needs a strategy");
   });
 
@@ -92,7 +75,7 @@ describe("parseAuthOptions", () => {
   it("uses auth.session when provided", () => {
     const sessionStore = kv(new Map());
     const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email", session: sessionStore },
+      { strategy: "cookie", providers: "email", session: sessionStore },
       { store },
     );
     expect(result?.session).toBe(sessionStore);
@@ -107,7 +90,7 @@ describe("parseAuthOptions", () => {
   it("uses auth.store when provided", () => {
     const userStore = kv(new Map());
     const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email", store: userStore },
+      { strategy: "cookie", providers: "email", store: userStore },
       { store },
     );
     expect(result?.store).toBe(userStore);
@@ -121,7 +104,7 @@ describe("parseAuthOptions", () => {
 
   it("uses custom redirect when provided", () => {
     const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email", redirect: "/dashboard" },
+      { strategy: "cookie", providers: "email", redirect: "/dashboard" },
       { store },
     );
     expect(result?.redirect).toBe("/dashboard");
@@ -135,7 +118,7 @@ describe("parseAuthOptions", () => {
   it("uses custom cleanUser function when provided", () => {
     const customClean = <T>(user: T) => user;
     const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email", cleanUser: customClean },
+      { strategy: "cookie", providers: "email", cleanUser: customClean },
       { store },
     );
     expect(result?.cleanUser).toBe(customClean);
@@ -150,13 +133,5 @@ describe("parseAuthOptions", () => {
     });
     expect(cleanedUser).toEqual({ id: 1, email: "test@test.com" });
     expect(cleanedUser).not.toHaveProperty("password");
-  });
-
-  it("handles pipe-separated providers in object format", () => {
-    const result = parseAuthOptions(
-      { strategy: "cookie", provider: "email|github" },
-      { store },
-    );
-    expect(result?.provider).toEqual(["email", "github"]);
   });
 });

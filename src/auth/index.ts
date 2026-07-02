@@ -23,7 +23,7 @@ export default function auth(app: Server) {
   // state (clearing the session) and so shouldn't be triggered by a prefetch.
   app.post("/auth/logout", logout);
 
-  const enabled = app.settings.auth.provider;
+  const enabled = app.settings.auth.providers;
 
   for (const name of oauth) {
     if (!enabled.includes(name)) continue;
