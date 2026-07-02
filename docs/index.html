@@ -2,15 +2,17 @@
 
 <section class="hero flex center nowrap">
   <div>
-    <h1 class="flex center" style="gap: 12px">
-      Server Next
-      <a href="https://github.com/franciscop/server-next/actions"
+    <div style="display: flex; align-items: center; gap: 12px">
+      <h1 style="margin: 0">Server Next</h1>
+      <a
+        href="https://github.com/franciscop/server-next/actions"
+        style="display: flex"
         ><img
           src="https://github.com/franciscop/server-next/workflows/tests/badge.svg"
           alt="tests"
       /></a>
-    </h1>
-    <p style="max-width: 620px">
+    </div>
+    <p style="max-width: 620px; margin-top: 1rem">
       A modern JavaScript server with the essentials built in: routing,
       authentication, uploads, WebSockets and testing.
     </p>
@@ -91,8 +93,7 @@ export default server()
         <h3>Batteries included</h3>
       </header>
       <p>
-        Routing, sessions, uploads, validation, websockets, auth and many
-        more.
+        Routing, sessions, uploads, validation, websockets, auth and many more.
       </p>
     </div>
   </div>
@@ -119,9 +120,7 @@ export default server()
         />
         <h3>Testing</h3>
       </header>
-      <p>
-        Testing helpers built-in, with no ports, mocking or network needed.
-      </p>
+      <p>Testing helpers built-in, with no ports, mocking or network needed.</p>
     </div>
   </div>
   <div>
@@ -158,8 +157,8 @@ export default server()
     <div class="content">
       <h2>Authentication built in</h2>
       <p>
-        Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or
-        email and password with a single option.
+        Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or email
+        and password with a single option.
       </p>
       <p>
         Sessions, signed cookies and CSRF-protected flows are handled for you,
@@ -219,8 +218,8 @@ export default server({
         buffered in memory, so large uploads stay inexpensive.
       </p>
       <p>
-        Point <code>uploads</code> at a local folder or an S3-compatible
-        bucket, and read the stored file from <code>ctx.body</code>.
+        Point <code>uploads</code> at a local folder or an S3-compatible bucket,
+        and read the stored file from <code>ctx.body</code>.
       </p>
     </div>
   </div>
@@ -295,7 +294,9 @@ export default server()
     </div>
   </div>
   <div>
-    <pre><code class="language-js">server()
+    <pre><code class="language-js">import server, { file } from "@server/next";
+
+  server()
   .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)
   .get(&quot;/json&quot;, () =&gt; ({ ok: true }))
   .get(&quot;/gone&quot;, () =&gt; 404)
