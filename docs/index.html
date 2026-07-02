@@ -4,8 +4,8 @@
   <div>
     <h1>Server Next</h1>
     <p style="max-width: 620px">
-      A library to easily create a modern JS server. Handles HTTP, Websockets
-      and all the small details:
+      A modern JavaScript server with the essentials built in: routing,
+      authentication, uploads, WebSockets and testing.
     </p>
     <pre class="small">npm install @server/next</pre>
     <div class="buttons">
@@ -50,10 +50,10 @@ export default server()
           height="22"
           src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/hash.svg"
         />
-        <h3>Fully Typed</h3>
+        <h3>Fully typed</h3>
       </header>
       <p>
-        Type inference for URL params, request bodies and providers, so you
+        Type inference for URL parameters, request bodies and providers, so you
         never mistype a route.
       </p>
     </div>
@@ -69,8 +69,8 @@ export default server()
         <h3>Authentication</h3>
       </header>
       <p>
-        OAuth, email and password, sessions and CSRF-protected flows, all in a
-        single option.
+        OAuth, email and password, sessions and CSRF-protected flows in a single
+        option.
       </p>
     </div>
   </div>
@@ -82,12 +82,9 @@ export default server()
           height="22"
           src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
         />
-        <h3>Batteries on</h3>
+        <h3>Batteries included</h3>
       </header>
-      <p>
-        Routing, uploads, sessions and static files work by default. Just write
-        your app!
-      </p>
+      <p>Routing, uploads, sessions and static files all work by default.</p>
     </div>
   </div>
   <div>
@@ -100,7 +97,7 @@ export default server()
         />
         <h3>Integrations</h3>
       </header>
-      <p>The same code works in Node, Bun, Cloudflare, Netlify, etc.</p>
+      <p>The same code runs on Node, Bun, Cloudflare, Netlify and more.</p>
     </div>
   </div>
   <div>
@@ -113,7 +110,9 @@ export default server()
         />
         <h3>Testing</h3>
       </header>
-      <p>A built-in, in-process test client. No ports, no mocks, no network.</p>
+      <p>
+        A built-in, in-process test client, with no ports, mocking or network.
+      </p>
     </div>
   </div>
   <div>
@@ -126,7 +125,7 @@ export default server()
         />
         <h3>Documented</h3>
       </header>
-      <p>Extensive docs and examples make it easy to learn.</p>
+      <p>Extensive documentation and examples for every feature.</p>
     </div>
   </div>
 </section>
@@ -148,74 +147,27 @@ export default server()
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>💬 Just return a value</h2>
-      <p>
-        Return a string, an object, a status code, a file or a stream, and
-        Server.js sends the right response with the right headers. No
-        <code>res.send()</code> boilerplate.
-      </p>
-    </div>
-  </div>
-  <div>
-    <pre><code class="language-js">import server, { file } from &quot;@server/next&quot;;
-
-server()
-  .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)         // text/plain
-  .get(&quot;/json&quot;, () =&gt; ({ ok: true }))  // application/json
-  .get(&quot;/gone&quot;, () =&gt; 404)             // status code
-  .get(&quot;/file&quot;, () =&gt; file(&quot;./a.pdf&quot;)); // streamed file</code></pre>
-  </div>
-</section>
-
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>✨ Fully Typed</h2>
-      <p>
-        Advanced type inference so you never mistype a URL parameter, a body
-        field, or a provider.
-      </p>
-      <p>
-        Every route method carries a <em>description</em>, a representative
-        <em>example</em> and even a <em>link</em> to the docs, right in your
-        editor.
-      </p>
-    </div>
-  </div>
-  <div>
-    <div class="splash">
-      <img
-        width="535"
-        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/type-inference.jpg"
-      />
-    </div>
-  </div>
-</section>
-
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>🔑 Authentication built in</h2>
+      <h2>Authentication built in</h2>
       <p>
         Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or
         email and password with a single option.
       </p>
       <p>
         Sessions, signed cookies and CSRF-protected flows are handled for you,
-        and the logged-in user is on <code>ctx.user</code> for every request.
+        and the signed-in user is available on <code>ctx.user</code> for every
+        request.
       </p>
     </div>
   </div>
   <div>
     <pre><code class="language-js">import server from &quot;@server/next&quot;;
 
-export default server({ store, auth: &quot;cookie:github&quot; })
+export default server({
+  store,
+  auth: &quot;cookie:github&quot;,
+})
   .get(&quot;/me&quot;, ctx =&gt; ctx.user || 401);
-// send users to /auth/login/github to sign in</code></pre>
+// visit /auth/login/github to sign in</code></pre>
   </div>
 </section>
 
@@ -224,19 +176,49 @@ export default server({ store, auth: &quot;cookie:github&quot; })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>📦 Uploads that just work</h2>
+      <h2>Fully typed</h2>
       <p>
-        Files in a request are streamed straight to storage as they arrive,
-        never buffered in memory, so even large uploads stay cheap.
+        Type inference covers URL parameters, request bodies and providers, so
+        mistakes are caught as you type.
       </p>
       <p>
-        Point <code>uploads</code> at a local folder or an S3-style bucket, and
-        read the stored file right off <code>ctx.body</code>.
+        Typed parameters carry their format, so
+        <code>:id(number)</code> arrives as a <code>number</code> rather than a
+        string.
       </p>
     </div>
   </div>
   <div>
-    <pre><code class="language-js">export default server({ uploads: &quot;./uploads&quot; })
+    <pre><code class="language-js">server().get(
+  &quot;/user/:id(number)&quot;,
+  ctx =&gt; {
+    // id is inferred as a number
+    return User.find(ctx.url.params.id);
+  },
+);</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>File uploads</h2>
+      <p>
+        Uploaded files are streamed to storage as they arrive rather than
+        buffered in memory, so large uploads stay inexpensive.
+      </p>
+      <p>
+        Point <code>uploads</code> at a local folder or an S3-compatible
+        bucket, and read the stored file from <code>ctx.body</code>.
+      </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">export default server({
+  uploads: &quot;./uploads&quot;,
+})
   .post(&quot;/avatar&quot;, ctx =&gt; {
     // { name, id, path, type, size }
     return ctx.body.avatar;
@@ -249,11 +231,11 @@ export default server({ store, auth: &quot;cookie:github&quot; })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>🔌 Real-time WebSockets</h2>
+      <h2>WebSockets</h2>
       <p>
-        Handle WebSocket events with the same routing style. Reply to one
-        client with <code>ctx.socket</code>, or broadcast to all of
-        <code>ctx.sockets</code>.
+        Handle WebSocket events with the same routing API. Reply to a single
+        client with <code>ctx.socket</code>, or broadcast to every connection
+        with <code>ctx.sockets</code>.
       </p>
     </div>
   </div>
@@ -271,17 +253,17 @@ export default server({ store, auth: &quot;cookie:github&quot; })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>🌍 Write once, run anywhere</h2>
+      <h2>Runs everywhere</h2>
       <p>
-        The exact same file runs on Node, Bun, Cloudflare Workers and Netlify
-        Functions. No adapters, no platform-specific entry points.
+        The same file runs on Node, Bun, Cloudflare Workers and Netlify
+        Functions, with no adapters or platform-specific entry points.
       </p>
     </div>
   </div>
   <div>
     <pre><code class="language-js">import server from &quot;@server/next&quot;;
 
-// Deploys unchanged to Node, Bun, Cloudflare, Netlify
+// Same file on Node, Bun, Cloudflare, Netlify
 export default server()
   .get(&quot;/&quot;, () =&gt; &quot;Hello from anywhere&quot;);</code></pre>
   </div>
@@ -292,14 +274,35 @@ export default server()
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>🧪 Testing without the ceremony</h2>
+      <h2>Simple responses</h2>
       <p>
-        Every server has a built-in, in-process test client. No ports, no
-        mocking, no network round-trips.
+        Return a string, an object, a status code, a file or a stream, and the
+        correct response and headers are sent for you.
       </p>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import server, { file } from &quot;@server/next&quot;;
+
+// Return a value; the response is inferred
+server()
+  .get(&quot;/text&quot;, () =&gt; &quot;Hello&quot;)
+  .get(&quot;/json&quot;, () =&gt; ({ ok: true }))
+  .get(&quot;/gone&quot;, () =&gt; 404)
+  .get(&quot;/file&quot;, () =&gt; file(&quot;./a.pdf&quot;));</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>Testing built in</h2>
       <p>
-        Call your routes directly and assert on the real
-        <code>Response</code>, so tests stay fast and close to production.
+        Every server includes an in-process test client. It calls your routes
+        directly, with no ports, mocking or network, and returns the real
+        <code>Response</code> to assert against.
       </p>
     </div>
   </div>
