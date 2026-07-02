@@ -3,6 +3,18 @@
 <section class="hero flex center nowrap">
   <div>
     <h1>Server Next</h1>
+    <p class="badges">
+      <a href="https://www.npmjs.com/package/@server/next"
+        ><img
+          src="https://img.shields.io/npm/v/@server/next?label=@server/next&amp;color=greenlime"
+          alt="@server/next"
+      /></a>
+      <a href="https://github.com/franciscop/server-next/actions"
+        ><img
+          src="https://github.com/franciscop/server-next/workflows/tests/badge.svg"
+          alt="tests"
+      /></a>
+    </p>
     <p style="max-width: 620px">
       A modern JavaScript server with the essentials built in: routing,
       authentication, uploads, WebSockets and testing.
@@ -274,8 +286,8 @@ export default server()
         handler.
       </p>
       <p>
-        Server.js infers the response, content type and headers, so there is no
-        <code>res.send()</code> to wire up.
+        Server.js infers the response, content type and headers, so handlers
+        just return data.
       </p>
     </div>
   </div>

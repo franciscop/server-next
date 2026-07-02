@@ -12,7 +12,6 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
   // In Bun, the 2nd fetch arg is the server object (with .requestIP/.upgrade)
   const ctx = await createWinter(request, app, env);
   const res = await handleRequest(app, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 
@@ -56,6 +55,5 @@ export const Netlify = async (
   }
   const ctx = await createWinter(request, app);
   const res = await handleRequest(app, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };

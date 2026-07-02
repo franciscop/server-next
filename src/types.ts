@@ -297,12 +297,6 @@ export type BunEnv = Record<string, string> & {
   upgrade?: (req: Request) => boolean;
 };
 
-export type EventCallback = (data: Context & SerializableValue) => void;
-type Events = Record<string, EventCallback[]> & {
-  on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
-  trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
-};
-
 export type Context<
   Params extends Record<string, string | undefined> = Record<string, string>,
   O extends ServerConfig = object,
@@ -334,7 +328,6 @@ export type Context<
     : AuthUser;
   // user?: O extends { User: infer U } ? U & AuthUser : AuthUser;
   init: number;
-  events: Events;
   req?: Request;
   res?: Response & { cookies?: Record<string, string> };
   app: Server;

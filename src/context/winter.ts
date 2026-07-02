@@ -6,7 +6,6 @@ import {
   parseHeaders,
   setBodySource,
 } from "../helpers";
-import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
 
 export default async function createWinter(
@@ -39,8 +38,6 @@ export default async function createWinter(
     getStream: () => req.body ?? undefined,
   };
 
-  const events = createEvents();
-
   const ctx: Context = {
     options: app.settings,
     platform: app.platform,
@@ -51,7 +48,6 @@ export default async function createWinter(
     cookies,
     session: {},
     init,
-    events,
     app,
     ip: clientIp(headers, {
       remoteAddress: server?.requestIP?.(req)?.address || "",

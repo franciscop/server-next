@@ -2371,22 +2371,6 @@ function timer(ctx) {
 // src/context/node.ts
 import { TLSSocket } from "tls";
 
-// src/context/createEvents.ts
-function createEvents() {
-  const events = {};
-  events.on = (name, callback3) => {
-    events[name] = events[name] || [];
-    events[name].push(callback3);
-  };
-  events.trigger = (name, data) => {
-    if (!events[name]) return;
-    for (const cb of events[name]) {
-      cb(data);
-    }
-  };
-  return events;
-}
-
 // src/context/isValidMethod.ts
 var methods = [
   "get",
@@ -2430,7 +2414,6 @@ async function createNode(req, app) {
     }),
     getStream: () => toWeb(req)
   };
-  const events = createEvents();
   const ctx = {
     options: app.settings,
     platform: app.platform,
@@ -2441,7 +2424,6 @@ async function createNode(req, app) {
     cookies: cookies2,
     session: {},
     init,
-    events,
     app,
     ip: clientIp(headers2, {
       remoteAddress: req.socket.remoteAddress || "",
@@ -2472,7 +2454,6 @@ async function createWinter(req, app, server2) {
     getBuffer: async () => Buffer.from(await req.arrayBuffer()),
     getStream: () => req.body ?? void 0
   };
-  const events = createEvents();
   const ctx = {
     options: app.settings,
     platform: app.platform,
@@ -2483,7 +2464,6 @@ async function createWinter(req, app, server2) {
     cookies: cookies2,
     session: {},
     init,
-    events,
     app,
     ip: clientIp(headers2, {
       remoteAddress: server2?.requestIP?.(req)?.address || "",
@@ -2500,7 +2480,6 @@ var Winter = async (app, request, env2) => {
   Object.assign(globalThis.env, env2);
   const ctx = await createWinter(request, app, env2);
   const res = await handleRequest(app, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 var Node = async (app) => {
@@ -2532,7 +2511,6 @@ var Netlify = async (app, request, context) => {
   }
   const ctx = await createWinter(request, app);
   const res = await handleRequest(app, ctx);
-  ctx.events.trigger("finish", { ...ctx, res, end: performance.now() });
   return res;
 };
 

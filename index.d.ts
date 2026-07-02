@@ -196,11 +196,6 @@ type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>
 type BunEnv = Record<string, string> & {
     upgrade?: (req: Request) => boolean;
 };
-type EventCallback = (data: Context & SerializableValue) => void;
-type Events = Record<string, EventCallback[]> & {
-    on?: (key: string, cb: (value?: Context & SerializableValue) => void) => void;
-    trigger?: (key: string, value?: Partial<Context & SerializableValue>) => void;
-};
 type Context<Params extends Record<string, string | undefined> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
     ip: string;
@@ -223,7 +218,6 @@ type Context<Params extends Record<string, string | undefined> = Record<string, 
         User?: infer U;
     } ? U extends Record<"User", infer Inner> ? Inner : AuthUser : AuthUser;
     init: number;
-    events: Events;
     req?: Request;
     res?: Response & {
         cookies?: Record<string, string>;
@@ -457,4 +451,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type EventCallback, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

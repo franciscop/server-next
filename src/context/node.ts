@@ -9,7 +9,6 @@ import {
   setBodySource,
   toWeb,
 } from "../helpers";
-import createEvents from "./createEvents";
 import isValidMethod from "./isValidMethod";
 
 // Headers come like [title1, value1, title2, value2, ...]
@@ -58,8 +57,6 @@ export default async function createNode(
     getStream: () => toWeb(req),
   };
 
-  const events = createEvents();
-
   const ctx: Context = {
     options: app.settings,
     platform: app.platform,
@@ -70,7 +67,6 @@ export default async function createNode(
     cookies,
     session: {},
     init,
-    events,
     app,
     ip: clientIp(headers, {
       remoteAddress: req.socket.remoteAddress || "",
