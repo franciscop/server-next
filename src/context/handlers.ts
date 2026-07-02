@@ -17,8 +17,10 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
 
 export const Node = async (app: Server) => {
   const http = await import("node:http");
-  http
-    .createServer(async (request: IncomingMessage, response) => {
+  const { attachWebsocket } = await import("../helpers/wsNode");
+
+  const server = http.createServer(
+    async (request: IncomingMessage, response) => {
       const ctx = await createNode(request, app);
       if ("error" in ctx) throw ctx.error;
 
@@ -31,15 +33,17 @@ export const Node = async (app: Server) => {
         response.write(out.body || "");
       }
       response.end();
-    })
-    .listen(app.settings.port, () => {
-      app.settings.log.start(`http://localhost:${app.settings.port}/`);
-      if (app.handlers.socket.length) {
-        console.warn(
-          "[server] WebSockets (.socket()) are only supported on Bun, not Node",
-        );
-      }
-    });
+    },
+  );
+
+  // WebSockets: handle the HTTP upgrade and bridge to the `.socket()` handlers
+  attachWebsocket(server, app);
+
+  server.listen(app.settings.port, () => {
+    app.settings.log.start(`http://localhost:${app.settings.port}/`);
+  });
+
+  return server;
 };
 
 export const Netlify = async (

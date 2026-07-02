@@ -1,3 +1,5 @@
+import * as http from 'http';
+
 type LimitOptions = {
     maxSize?: number | string;
     minSize?: number | string;
@@ -343,7 +345,7 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
     port?: number;
     constructor(options?: Options);
     self(): this;
-    node(): Promise<void>;
+    node(): Promise<http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>>;
     fetch(request: Request, env?: BunEnv): Promise<Response>;
     callback(request: Request, context: unknown): Promise<Response>;
     test(): {

@@ -2525,25 +2525,26 @@ var Winter = async (app, request, env2) => {
 };
 var Node = async (app) => {
   const http = await import("http");
-  http.createServer(async (request, response) => {
-    const ctx = await createNode(request, app);
-    if ("error" in ctx) throw ctx.error;
-    const out = await handleRequest(app, ctx);
-    response.writeHead(out.status || 200, parseHeaders_default(out.headers));
-    if (out.body instanceof ReadableStream) {
-      await iterate(out.body, (chunk) => response.write(chunk));
-    } else {
-      response.write(out.body || "");
+  const { attachWebsocket } = await import("./wsNode-GEJUCJQ7.js");
+  const server2 = http.createServer(
+    async (request, response) => {
+      const ctx = await createNode(request, app);
+      if ("error" in ctx) throw ctx.error;
+      const out = await handleRequest(app, ctx);
+      response.writeHead(out.status || 200, parseHeaders_default(out.headers));
+      if (out.body instanceof ReadableStream) {
+        await iterate(out.body, (chunk) => response.write(chunk));
+      } else {
+        response.write(out.body || "");
+      }
+      response.end();
     }
-    response.end();
-  }).listen(app.settings.port, () => {
+  );
+  attachWebsocket(server2, app);
+  server2.listen(app.settings.port, () => {
     app.settings.log.start(`http://localhost:${app.settings.port}/`);
-    if (app.handlers.socket.length) {
-      console.warn(
-        "[server] WebSockets (.socket()) are only supported on Bun, not Node"
-      );
-    }
   });
+  return server2;
 };
 var Netlify = async (app, request, context) => {
   request.context = context;
