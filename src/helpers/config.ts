@@ -2,6 +2,7 @@ import parseAuthOptions from "../auth/parseAuthOptions";
 import Bucket from "./bucket";
 import createId from "./createId";
 import createLogger from "./logger";
+import { resolveSecurity } from "./security";
 import { UploadPipeline } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
@@ -23,11 +24,9 @@ export default function config(options: Options = {}): Settings {
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
     body: options.body ?? "parse",
-    // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
-    // when clients connect directly so a client can't spoof its IP).
-    security: {
-      trustProxy: options.security?.trustProxy ?? true,
-    },
+    // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
+    // the added headers off; see resolveSecurity for the defaults.
+    security: resolveSecurity(options.security),
   };
 
   // CORS

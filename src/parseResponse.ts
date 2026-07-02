@@ -1,5 +1,6 @@
 import {
   applyCors,
+  applySecurity,
   createCookies,
   createId,
   iteratorAsyncToReadable,
@@ -86,6 +87,9 @@ export default async function parseResponse(
 
   // If we have CORS, set the proper headers up
   applyCors(out, ctx);
+
+  // Secure-by-default response headers (X-Frame-Options, nosniff, HSTS, ...)
+  applySecurity(out, ctx);
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count

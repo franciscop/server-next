@@ -187,10 +187,26 @@ export type Logger = {
 export type SecurityOptions = {
   // Trust X-Forwarded-* headers for ctx.ip (on by default)
   trustProxy?: boolean;
+  // Secure-by-default response headers. Each accepts `false` to turn it off, or
+  // a string to override the value. The first group is on by default.
+  frameguard?: boolean | string; // X-Frame-Options, default 'SAMEORIGIN'
+  noSniff?: boolean; // X-Content-Type-Options: nosniff, default on
+  referrerPolicy?: boolean | string; // default 'strict-origin-when-cross-origin'
+  hsts?: boolean | string; // Strict-Transport-Security (production only)
+  xssProtection?: boolean; // X-XSS-Protection: 0, default on
+  // Opt-in (off unless set):
+  csp?: boolean | string; // Content-Security-Policy
+  coop?: boolean | string; // Cross-Origin-Opener-Policy
+  corp?: boolean | string; // Cross-Origin-Resource-Policy
+  permissionsPolicy?: string; // Permissions-Policy
 };
 
 export type SecuritySettings = {
   trustProxy: boolean;
+  // Resolved static headers applied to every response
+  headers: Record<string, string>;
+  // Resolved HSTS value, applied only on production (HTTPS) responses
+  hsts: string | null;
 };
 
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
@@ -209,7 +225,7 @@ export type Options = {
   onError?: OnError;
   log?: LogLevel | boolean;
   favicon?: string | Bucket;
-  security?: SecurityOptions;
+  security?: boolean | SecurityOptions;
   body?: BodyMode;
 };
 

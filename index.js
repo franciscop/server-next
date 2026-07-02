@@ -1358,6 +1358,47 @@ function createLogger(level) {
   };
 }
 
+// src/helpers/security.ts
+function resolveSecurity(security) {
+  const off = security === false;
+  const o = security && typeof security === "object" ? security : {};
+  const val = (v, def) => v === false ? null : v === true || v == null ? def : v;
+  const map2 = off ? {} : {
+    "x-frame-options": val(o.frameguard, "SAMEORIGIN"),
+    "x-content-type-options": o.noSniff === false ? null : "nosniff",
+    "referrer-policy": val(
+      o.referrerPolicy,
+      "strict-origin-when-cross-origin"
+    ),
+    "x-xss-protection": o.xssProtection === false ? null : "0",
+    // Opt-in: default off
+    "content-security-policy": val(o.csp, null),
+    "cross-origin-opener-policy": val(o.coop, null),
+    "cross-origin-resource-policy": val(o.corp, null),
+    "permissions-policy": o.permissionsPolicy ?? null
+  };
+  const headers2 = {};
+  for (const key in map2) {
+    const value = map2[key];
+    if (value) headers2[key] = value;
+  }
+  return {
+    trustProxy: o.trustProxy ?? true,
+    headers: headers2,
+    hsts: off ? null : val(o.hsts, "max-age=15552000; includeSubDomains")
+  };
+}
+function applySecurity(res, ctx) {
+  const security = ctx.options.security;
+  if (!security) return;
+  for (const key in security.headers) {
+    if (!res.headers.has(key)) res.headers.set(key, security.headers[key]);
+  }
+  if (security.hsts && ctx.platform.production && !res.headers.has("strict-transport-security")) {
+    res.headers.set("strict-transport-security", security.hsts);
+  }
+}
+
 // src/helpers/config.ts
 function config(options = {}) {
   const env2 = globalThis.env;
@@ -1371,11 +1412,9 @@ function config(options = {}) {
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
     body: options.body ?? "parse",
-    // Trust X-Forwarded-* headers for ctx.ip (on by default; set it to false
-    // when clients connect directly so a client can't spoof its IP).
-    security: {
-      trustProxy: options.security?.trustProxy ?? true
-    }
+    // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
+    // the added headers off; see resolveSecurity for the defaults.
+    security: resolveSecurity(options.security)
   };
   options.cors = options.cors || env2.CORS || null;
   if (options.cors) {
@@ -1600,6 +1639,7 @@ async function parseResponse(out, ctx) {
     throw new Error(`Invalid response type ${out}`);
   }
   applyCors(out, ctx);
+  applySecurity(out, ctx);
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
@@ -1756,6 +1796,7 @@ async function getResponse(app, ctx) {
   } catch (error) {
     const res = await ctx.options.onError(error, ctx);
     applyCors(res, ctx);
+    applySecurity(res, ctx);
     return res;
   }
 }

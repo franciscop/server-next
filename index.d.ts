@@ -129,9 +129,20 @@ type Logger = {
 };
 type SecurityOptions = {
     trustProxy?: boolean;
+    frameguard?: boolean | string;
+    noSniff?: boolean;
+    referrerPolicy?: boolean | string;
+    hsts?: boolean | string;
+    xssProtection?: boolean;
+    csp?: boolean | string;
+    coop?: boolean | string;
+    corp?: boolean | string;
+    permissionsPolicy?: string;
 };
 type SecuritySettings = {
     trustProxy: boolean;
+    headers: Record<string, string>;
+    hsts: string | null;
 };
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 type Options = {
@@ -150,7 +161,7 @@ type Options = {
     onError?: OnError;
     log?: LogLevel | boolean;
     favicon?: string | Bucket;
-    security?: SecurityOptions;
+    security?: boolean | SecurityOptions;
     body?: BodyMode;
 };
 type Settings = {

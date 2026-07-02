@@ -3,6 +3,7 @@ import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
 import { resolveBody } from "./body";
 import { applyCors } from "./cors";
+import { applySecurity } from "./security";
 import define from "./define";
 import validate from "./validate";
 
@@ -75,6 +76,7 @@ async function getResponse(
     // can't even read the error status of a cross-origin request.
     const res = await ctx.options.onError(error, ctx);
     applyCors(res, ctx);
+    applySecurity(res, ctx);
     return res;
   }
 }

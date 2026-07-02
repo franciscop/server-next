@@ -15,6 +15,7 @@ export { default as iteratorToReadable } from "./iteratorToReadable";
 export { default as parseBody } from "./parseBody";
 export { default as parseCookies } from "./parseCookies";
 export { default as parseHeaders } from "./parseHeaders";
+export { applySecurity, resolveSecurity } from "./security";
 export { default as toWeb } from "./toWeb";
 export { default as types } from "./types";
 export { default as verify } from "./verify";
