@@ -3,7 +3,10 @@ import { Readable } from "node:stream";
 import server, { status } from ".";
 import createNode from "./context/node";
 import { resolveBody } from "./helpers";
+import { cleanupBuckets, realBucket } from "./tests/realBucket";
 import type { Bucket } from "./types";
+
+afterAll(cleanupBuckets);
 
 const json = { "content-type": "application/json" };
 
@@ -66,14 +69,9 @@ describe("body: stream", () => {
     const api = server({ uploads: "./src/tests/uploads" })
       .post("/uploads/:id", { body: "stream" }, async (ctx) => {
         const uploads = ctx.options.uploads as Bucket;
-        const dest = uploads.folder
-          ? uploads.folder(ctx.url.params.id)
-          : uploads;
-        const path = (await dest.write(
-          "movie.txt",
-          ctx.body as ReadableStream,
-        )) as string;
-        return { path };
+        const file = uploads.folder!(ctx.url.params.id).file("movie.txt");
+        await file.write(ctx.body as ReadableStream);
+        return { path: file.path };
       })
       .test();
 
@@ -83,6 +81,23 @@ describe("body: stream", () => {
     expect(await fsp.readFile(path, "utf8")).toBe("pretend-this-is-a-big-file");
 
     await fsp.rm("./src/tests/uploads/abc123", { recursive: true, force: true });
+  });
+
+  it("streams into a real bucket's folder() (bucket lib)", async () => {
+    const uploads = realBucket();
+    const api = server({ uploads })
+      .post("/uploads/:id", { body: "stream" }, async (ctx) => {
+        const up = ctx.options.uploads as Bucket;
+        const file = up.folder!(ctx.url.params.id).file("movie.txt");
+        await file.write(ctx.body as ReadableStream);
+        return { path: file.path };
+      })
+      .test();
+
+    const res = await api.post("/uploads/abc123", "into-a-real-bucket");
+    const { path } = await res.json();
+    expect(path).toMatch(/abc123\/movie\.txt$/);
+    expect(await fsp.readFile(path, "utf8")).toBe("into-a-real-bucket");
   });
 
   it("runs middleware (a guard) before the body is consumed", async () => {

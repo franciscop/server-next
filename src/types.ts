@@ -63,15 +63,29 @@ export type Cookie = {
 
 export type RouterMethod = "*" | Method;
 
+// Mirrors the `bucket` library's IBucketFile: a handle to a single object.
+// `write()` returns void, so the stored location is read back from `.path`.
+export type BucketFile = {
+  readonly path: string;
+  readonly id: string;
+  readonly name: string;
+  exists(): Promise<boolean>;
+  write(
+    content: string | Buffer | ReadableStream,
+    options?: { type?: string },
+  ): Promise<void>;
+  stream(): ReadableStream;
+  bytes(): Promise<Uint8Array>;
+  remove(): Promise<void>;
+};
+
+// Mirrors the `bucket` library's IBucket. The framework only ever needs
+// `file(name)`; `folder(prefix)` is an optional convenience for user handlers
+// that want to scope storage (e.g. per-request folders), so it's not required
+// of a backend the framework is handed.
 export type Bucket = {
-  location?: string;
-  read: (path: string) => Promise<ReadableStream | null>;
-  write: (
-    path: string,
-    data: string | Buffer | ReadableStream,
-  ) => Promise<void | string>;
-  delete: (path: string) => Promise<boolean>;
-  folder?: (prefix: string) => Bucket;
+  file(name: string): BucketFile;
+  folder?(prefix: string): Bucket;
 };
 
 export type UploadedFile = {
@@ -224,7 +238,7 @@ export type Options = {
   openapi?: any;
   onError?: OnError;
   log?: LogLevel | boolean;
-  favicon?: string | Bucket;
+  favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
   body?: BodyMode;
 };
@@ -242,7 +256,7 @@ export type Settings = {
   openapi?: any;
   onError?: OnError;
   log: Logger;
-  favicon?: string | Bucket;
+  favicon?: string | BucketFile;
   security: SecuritySettings;
   body: BodyMode;
 };

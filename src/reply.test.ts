@@ -1,4 +1,25 @@
-import server, { cookies, download, send, type } from ".";
+import server, { cookies, download, send, status, type } from ".";
+
+describe("null-body statuses", () => {
+  // 204/205/304/101 must not carry a body, or Node/undici throws when building
+  // the Response. Bun is lenient, so this guards against a Node-only 500.
+  for (const code of [204, 205, 304]) {
+    it(`send() produces a bodyless ${code}`, () => {
+      const res = status(code).send();
+      expect(res.status).toBe(code);
+      expect(res.body).toBe(null);
+    });
+
+    it(`serves a ${code} over the app`, async () => {
+      const res = await server()
+        .get("/", () => status(code).send())
+        .test()
+        .get("/");
+      expect(res.status).toBe(code);
+      expect(await res.text()).toBe("");
+    });
+  }
+});
 
 const EXPIRED = "Thu, 01 Jan 1970 00:00:00 GMT";
 

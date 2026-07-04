@@ -1,5 +1,6 @@
-import type { Bucket } from "..";
+import type { Bucket, BucketFile } from "..";
 import createId from "./createId";
+import mimes from "./mimes";
 import { getExt, UploadPipeline } from "./upload";
 
 type Dest = Bucket | UploadPipeline | null | undefined;
@@ -37,26 +38,17 @@ function isProbablyText(buffer: Buffer): boolean {
   return true;
 }
 
-// Common content-type → extension, used to name a raw single-file body that has
-// no filename of its own. Falls back to the subtype, then ".bin".
-const MIME_EXT: Record<string, string> = {
-  "application/json": ".json",
-  "application/pdf": ".pdf",
-  "application/zip": ".zip",
-  "text/plain": ".txt",
-  "text/html": ".html",
-  "text/csv": ".csv",
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/gif": ".gif",
-  "image/webp": ".webp",
-  "image/svg+xml": ".svg",
-  "video/mp4": ".mp4",
-  "audio/mpeg": ".mp3",
-};
+// helpers/mimes.ts maps extension → MIME; reverse it (last mapping wins, so the
+// canonical extension like `jpg`/`html` beats `jpeg`/`htm`) to name a raw
+// single-file body that has no filename of its own.
+const extByMime: Record<string, string> = {};
+for (const ext in mimes) extByMime[mimes[ext]] = ext;
+
+// Content-type → extension. Falls back to the subtype, then ".bin".
 function extFromType(type: string): string {
   const base = (type || "").split(";")[0].trim().toLowerCase();
-  if (MIME_EXT[base]) return MIME_EXT[base];
+  const ext = extByMime[base];
+  if (ext) return `.${ext}`;
   const sub = base.split("/")[1];
   return sub && /^[a-z0-9]+$/.test(sub) ? `.${sub}` : ".bin";
 }
@@ -127,7 +119,8 @@ type Part =
       type: string;
       id: string;
       controller: ReadableStreamDefaultController;
-      write: Promise<void | string>;
+      file: BucketFile;
+      write: Promise<void>;
       size: number;
     };
 
@@ -158,6 +151,7 @@ function startPart(headerStr: string, dest: Dest): Part {
       controller = c;
     },
   });
+  const file = dest.file(id);
   return {
     kind: "file",
     name,
@@ -165,7 +159,8 @@ function startPart(headerStr: string, dest: Dest): Part {
     type,
     id,
     controller,
-    write: dest.write(id, readable),
+    file,
+    write: file.write(readable, { type }),
     size: 0,
   };
 }
@@ -190,11 +185,11 @@ async function endPart(part: Part, body: Record<string, any>): Promise<void> {
     addField(body, part.name, ref);
   } else if (part.kind === "file") {
     part.controller.close();
-    const path = (await part.write) as string;
+    await part.write;
     addField(body, part.name, {
       name: part.filename,
       id: part.id,
-      path,
+      path: part.file.path,
       type: part.type,
       size: part.size,
     });
@@ -286,6 +281,7 @@ async function streamToBucket(
   bucket: Bucket,
 ): Promise<any> {
   const id = `${createId()}${extFromType(type)}`;
+  const file = bucket.file(id);
   let size = 0;
   let controller!: ReadableStreamDefaultController;
   const readable = new ReadableStream({
@@ -293,15 +289,15 @@ async function streamToBucket(
       controller = c;
     },
   });
-  const write = bucket.write(id, readable);
+  const write = file.write(readable, { type });
   for await (const chunk of asIterable(stream)) {
     controller.enqueue(chunk);
     size += chunk.byteLength;
   }
   controller.close();
-  const path = (await write) as string;
+  await write;
   if (!size) return undefined;
-  return { name: id, id, path, type, size };
+  return { name: id, id, path: file.path, type, size };
 }
 
 // Turns a request body into `ctx.body`. Accepts a Buffer or a web ReadableStream

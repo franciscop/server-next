@@ -1,4 +1,5 @@
 import type { Bucket, UploadedFile } from "../types";
+import bucketDefault from "./bucket";
 import createId from "./createId";
 
 export type LimitOptions = {
@@ -36,16 +37,23 @@ export async function saveFileToBucket(
 ): Promise<UploadedFile> {
   const ext = getExt(originalName);
   const id = `${createId()}${ext}`;
-  const path = (await bucket.write(id, data)) as string;
-  return { name: originalName, id, path, type: contentType, size: data.length };
+  const file = bucket.file(id);
+  await file.write(data, { type: contentType });
+  return {
+    name: originalName,
+    id,
+    path: file.path,
+    type: contentType,
+    size: data.length,
+  };
 }
 
 export class UploadPipeline {
   private _bucket: Bucket | null;
   private _limits: LimitOptions = {};
 
-  constructor(bucket?: Bucket | null) {
-    this._bucket = bucket ?? null;
+  constructor(bucket?: Bucket | string | null) {
+    this._bucket = bucketDefault(bucket ?? undefined);
   }
 
   limit(options: LimitOptions): this {
@@ -53,8 +61,8 @@ export class UploadPipeline {
     return this;
   }
 
-  store(bucket: Bucket): this {
-    this._bucket = bucket;
+  store(bucket: Bucket | string): this {
+    this._bucket = bucketDefault(bucket);
     return this;
   }
 
@@ -100,6 +108,8 @@ export class UploadPipeline {
   }
 }
 
-export default function upload(bucket?: Bucket | null): UploadPipeline {
+export default function upload(
+  bucket?: Bucket | string | null,
+): UploadPipeline {
   return new UploadPipeline(bucket);
 }

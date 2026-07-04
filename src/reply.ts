@@ -1,4 +1,4 @@
-import { createCookies, toWeb, types } from "./helpers";
+import { createCookies, mimes, toWeb } from "./helpers";
 import isReadableStream from "./helpers/isReadableStream";
 import type { Cookie } from "./types";
 
@@ -26,7 +26,7 @@ class Reply {
 
   type(type?: string): this {
     if (!type) return this;
-    type = types[type.replace(/^\./, "")] || type;
+    type = mimes[type.replace(/^\./, "")] || type;
     this.res.headers.set("content-type", type);
     return this;
   }
@@ -105,6 +105,13 @@ class Reply {
 
   send(body: string | Buffer | ReadableStream | any = ""): Response {
     const { status = 200, headers } = this.res;
+
+    // 101/204/205/304 are "null body status" codes: a Response carrying any body
+    // (even "") throws in spec-compliant runtimes like Node/undici (Bun is
+    // lenient), so send nothing regardless of what was passed.
+    if (status === 101 || status === 204 || status === 205 || status === 304) {
+      return new Response(null, { status, headers });
+    }
 
     if (typeof body === "string") {
       if (!headers.get("content-type")) {

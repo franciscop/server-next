@@ -8,12 +8,12 @@ type LimitOptions = {
 declare class UploadPipeline {
     private _bucket;
     private _limits;
-    constructor(bucket?: Bucket | null);
+    constructor(bucket?: Bucket | string | null);
     limit(options: LimitOptions): this;
-    store(bucket: Bucket): this;
+    store(bucket: Bucket | string): this;
     processFile(originalName: string, data: Buffer, contentType: string): Promise<UploadedFile>;
 }
-declare function upload(bucket?: Bucket | null): UploadPipeline;
+declare function upload(bucket?: Bucket | string | null): UploadPipeline;
 
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 type ServerConfig<Session = {}, User = {}> = {
@@ -51,12 +51,21 @@ type Cookie = {
     sameSite?: "Strict" | "Lax" | "None";
 };
 type RouterMethod = "*" | Method;
+type BucketFile = {
+    readonly path: string;
+    readonly id: string;
+    readonly name: string;
+    exists(): Promise<boolean>;
+    write(content: string | Buffer | ReadableStream, options?: {
+        type?: string;
+    }): Promise<void>;
+    stream(): ReadableStream;
+    bytes(): Promise<Uint8Array>;
+    remove(): Promise<void>;
+};
 type Bucket = {
-    location?: string;
-    read: (path: string) => Promise<ReadableStream | null>;
-    write: (path: string, data: string | Buffer | ReadableStream) => Promise<void | string>;
-    delete: (path: string) => Promise<boolean>;
-    folder?: (prefix: string) => Bucket;
+    file(name: string): BucketFile;
+    folder?(prefix: string): Bucket;
 };
 type UploadedFile = {
     name: string;
@@ -162,7 +171,7 @@ type Options = {
     openapi?: any;
     onError?: OnError;
     log?: LogLevel | boolean;
-    favicon?: string | Bucket;
+    favicon?: string | BucketFile;
     security?: boolean | SecurityOptions;
     body?: BodyMode;
 };
@@ -181,7 +190,7 @@ type Settings = {
     openapi?: any;
     onError?: OnError;
     log: Logger;
-    favicon?: string | Bucket;
+    favicon?: string | BucketFile;
     security: SecuritySettings;
     body: BodyMode;
 };
@@ -342,6 +351,11 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
     platform: Platform;
     sockets: any[];
     websocket: any;
+    faviconCache?: {
+        bytes: Buffer;
+        type: string;
+        etag: string;
+    } | null;
     port?: number;
     constructor(options?: Options);
     self(): this;
@@ -464,4 +478,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BucketFile, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

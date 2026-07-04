@@ -1,5 +1,5 @@
 // From https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-const types: Record<string, string> = {
+export default {
   aac: "audio/aac",
   abw: "application/x-abiword",
   arc: "application/x-freearc",
@@ -78,6 +78,4 @@ const types: Record<string, string> = {
   "3gp": "video/3gpp",
   "3g2": "video/3gpp2",
   "7z": "application/x-7z-compressed",
-};
-
-export default types;
+} as Record<string, string>;

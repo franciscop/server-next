@@ -1,4 +1,5 @@
 import { handleRequest, iterate, parseHeaders } from "../helpers";
+import { attachWebsocket } from "../helpers/wsNode";
 
 import type { IncomingMessage } from "node:http";
 import type { BunEnv, Server } from "..";
@@ -17,7 +18,6 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
 
 export const Node = async (app: Server) => {
   const http = await import("node:http");
-  const { attachWebsocket } = await import("../helpers/wsNode");
 
   const server = http.createServer(
     async (request: IncomingMessage, response) => {
@@ -37,7 +37,7 @@ export const Node = async (app: Server) => {
   );
 
   // WebSockets: handle the HTTP upgrade and bridge to the `.socket()` handlers
-  attachWebsocket(server, app);
+  await attachWebsocket(server, app);
 
   server.listen(app.settings.port, () => {
     app.settings.log.start(`http://localhost:${app.settings.port}/`);

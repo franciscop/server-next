@@ -1,5 +1,7 @@
-import type { Bucket } from "..";
 import parseBody from "./parseBody";
+import { cleanupBuckets, realBucket } from "../tests/realBucket";
+
+afterAll(cleanupBuckets);
 
 const BOUNDARY = "----WebKitFormBoundaryvef1fLxmoUdYZWXp";
 const CONTENT_TYPE = `multipart/form-data; boundary=${BOUNDARY}`;
@@ -40,11 +42,7 @@ const getBody = () => {
   return body;
 };
 
-const mockBucket = (): Bucket => ({
-  read: async () => null,
-  write: async (name) => `/mock/${name}`,
-  delete: async () => false,
-});
+const mockBucket = realBucket;
 
 describe("parseBody", () => {
   it("can parse text fields from a multipart body", async () => {
@@ -69,7 +67,7 @@ describe("parseBody", () => {
     expect(body.profile).toMatchObject({
       name: "profile.md",
       id: expect.stringMatching(/^\w{16}\.md$/),
-      path: expect.stringMatching(/^\/mock\/\w{16}\.md$/),
+      path: expect.stringMatching(/\/\w{16}\.md$/),
       type: "text/plain",
       size: expect.any(Number),
     });
@@ -79,7 +77,7 @@ describe("parseBody", () => {
     expect(body.gallery[0]).toMatchObject({
       name: "A.txt",
       id: expect.stringMatching(/^\w{16}\.txt$/),
-      path: expect.stringMatching(/^\/mock\/\w{16}\.txt$/),
+      path: expect.stringMatching(/\/\w{16}\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
     });

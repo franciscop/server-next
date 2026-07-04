@@ -1,6 +1,11 @@
-import type { Bucket } from "..";
 import parseBody from "./parseBody";
+import { cleanupBuckets, count, realBucket } from "../tests/realBucket";
 import upload, { getExt, UploadPipeline } from "./upload";
+
+afterAll(cleanupBuckets);
+
+// A real `bucket` FileSystem instance; `count()` reports how many files exist.
+const mockBucket = realBucket;
 
 // Builds a minimal multipart buffer with one text field and one file
 function makeMultipart(
@@ -26,19 +31,6 @@ function makeMultipart(
     contentType: `multipart/form-data; boundary=${boundary}`,
   };
 }
-
-const mockBucket = (): Bucket & { written: Map<string, Buffer> } => {
-  const written = new Map<string, Buffer>();
-  return {
-    written,
-    read: async () => null,
-    write: async (name, value) => {
-      written.set(name, value as Buffer);
-      return `/mock/${name}`;
-    },
-    delete: async () => true,
-  };
-};
 
 describe("getExt", () => {
   it("returns extension with leading dot, lowercased", () => {
@@ -235,7 +227,7 @@ describe("upload() builder", () => {
       const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
-      expect(bucket.written.size).toBe(1);
+      expect(await count(bucket)).toBe(1);
     });
 
     it("store() overrides the bucket passed to upload()", async () => {
@@ -244,8 +236,8 @@ describe("upload() builder", () => {
       const pipeline = upload(firstBucket).store(secondBucket);
       const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
       await parseBody(raw, contentType, pipeline);
-      expect(firstBucket.written.size).toBe(0);
-      expect(secondBucket.written.size).toBe(1);
+      expect(await count(firstBucket)).toBe(0);
+      expect(await count(secondBucket)).toBe(1);
     });
   });
 

@@ -4,51 +4,59 @@ import path from "node:path";
 import bucket from "./bucket";
 
 const bucketPath = new URL("../tests/uploads/", import.meta.url).pathname;
-const localBucket = bucket(bucketPath);
+const localBucket = bucket(bucketPath)!;
 
 describe("bucket", () => {
   afterAll(async () => {
     const filePath = path.join(bucketPath, "testFile.txt");
-    if (fs.existsSync(filePath)) {
-      await fsp.unlink(filePath);
-    }
+    if (fs.existsSync(filePath)) await fsp.unlink(filePath);
+    await fsp.rm(path.join(bucketPath, "sub"), {
+      recursive: true,
+      force: true,
+    });
   });
 
-  it("writes a file", async () => {
-    const filePath = await localBucket.write("testFile.txt", "Hello, World!");
-    expect(
-      typeof filePath === "string" && filePath.endsWith("testFile.txt"),
-    ).toBe(true);
+  it("writes a file and exposes its path", async () => {
+    const file = localBucket.file("testFile.txt");
+    await file.write("Hello, World!");
+    expect(file.path.endsWith("testFile.txt")).toBe(true);
+    expect(await file.exists()).toBe(true);
   });
 
-  it("reads a file", async () => {
-    const stream = await localBucket.read("testFile.txt");
-    expect(stream).not.toBeNull();
-    let data = "";
-    const reader = stream.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      data += new TextDecoder().decode(value);
-    }
-    expect(data).toBe("Hello, World!");
+  it("streams a file back", async () => {
+    const stream = localBucket.file("testFile.txt").stream();
+    expect(await new Response(stream).text()).toBe("Hello, World!");
   });
 
-  it("deletes a file", async () => {
-    const filePath = path.join(bucketPath, "testFile.txt");
-    await fsp.unlink(filePath);
-    const stream = await localBucket.read("testFile.txt");
-    expect(stream).toBeNull();
+  it("reads the raw bytes", async () => {
+    const bytes = await localBucket.file("testFile.txt").bytes();
+    expect(Buffer.from(bytes).toString()).toBe("Hello, World!");
   });
 
-  it("removes an existing file", async () => {
-    await localBucket.write("testFile.txt", "To be deleted");
-    const isDeleted = await localBucket.delete("testFile.txt");
-    expect(isDeleted).toBe(true);
+  it("reports a missing file", async () => {
+    expect(await localBucket.file("nonExistent.txt").exists()).toBe(false);
   });
 
-  it("tries to remove a non-existing file", async () => {
-    const isDeleted = await localBucket.delete("nonExistentFile.txt");
-    expect(isDeleted).toBe(false);
+  it("removes a file", async () => {
+    const file = localBucket.file("testFile.txt");
+    await file.write("To be deleted");
+    expect(await file.exists()).toBe(true);
+    await file.remove();
+    expect(await file.exists()).toBe(false);
+  });
+
+  it("remove() on a missing file does not throw", async () => {
+    await localBucket.file("nope.txt").remove();
+  });
+
+  it("scopes writes under folder()", async () => {
+    const file = localBucket.folder("sub").file("nested.txt");
+    await file.write("nested");
+    expect(file.path).toMatch(/uploads\/sub\/nested\.txt$/);
+    expect(await file.exists()).toBe(true);
+  });
+
+  it("refuses a path that escapes the root", () => {
+    expect(() => localBucket.file("../secret")).toThrow();
   });
 });

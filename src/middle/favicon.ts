@@ -1,29 +1,41 @@
-import pathPattern from "../pathPattern";
-import { file, type } from "../reply";
-import type { Context } from "../types";
+import { etag } from "../helpers";
+import { status, type } from "../reply";
+import type { BucketFile, Context } from "../types";
 
-// Handle GET /favicon.ico:
-// - if a `favicon` option is set, serve it from disk (a path) or a Bucket;
-// - otherwise reply 204 so the browser stops asking and it doesn't 404.
-//
-// favicon runs as a global middleware in every chain, so before answering with
-// 204 we defer to a user-defined /favicon.ico route (and a public/favicon.ico,
-// which `assets` serves earlier still wins).
+// 1 day of cache
+const CACHE_CONTROL = "public, max-age=86400";
+const ext = (name: string) => name.split(".").pop() || "ico";
+
+async function loadFavicon(
+  fav: string | BucketFile,
+): Promise<{ bytes: Buffer; type: string; etag: string } | null> {
+  try {
+    const type = ext(typeof fav === "string" ? fav : fav?.name);
+    const bytes =
+      typeof fav === "string"
+        ? await (await import("node:fs/promises")).readFile(fav)
+        : Buffer.from(await fav.bytes());
+    return { bytes, type, etag: etag(bytes) };
+  } catch {
+    return null;
+  }
+}
+
 export default async function favicon(ctx: Context) {
-  if (ctx.method !== "get") return;
-  if (ctx.url.pathname !== "/favicon.ico") return;
-
   const fav = ctx.options.favicon;
-  if (fav) {
-    if (typeof fav === "string") return file(fav);
-    const icon = await fav.read("favicon.ico");
-    return icon ? type("ico").send(icon) : 204;
+  if (!fav) return; // registered only when configured; defensive
+
+  // If it's null we want to skip it, so do not simplify
+  if (ctx.app.faviconCache === undefined) {
+    ctx.app.faviconCache = await loadFavicon(fav);
+  }
+  const entry = ctx.app.faviconCache;
+  if (!entry) return 204; // configured but the file is missing
+
+  const headers = { "cache-control": CACHE_CONTROL, etag: entry.etag };
+  if (ctx.headers["if-none-match"] === entry.etag) {
+    return status(304).headers(headers).send();
   }
 
-  const handled = ctx.app.handlers.get.some((route) =>
-    pathPattern(route.path, "/favicon.ico"),
-  );
-  if (handled) return;
-
-  return 204;
+  return type(entry.type).headers(headers).send(entry.bytes);
 }

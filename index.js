@@ -130,6 +130,163 @@ function createId(source, size = 16) {
   return randomId(size);
 }
 
+// src/helpers/mimes.ts
+var mimes_default = {
+  aac: "audio/aac",
+  abw: "application/x-abiword",
+  arc: "application/x-freearc",
+  avif: "image/avif",
+  avi: "video/x-msvideo",
+  azw: "application/vnd.amazon.ebook",
+  bin: "application/octet-stream",
+  bmp: "image/bmp",
+  bz: "application/x-bzip",
+  bz2: "application/x-bzip2",
+  cda: "application/x-cdf",
+  csh: "application/x-csh",
+  css: "text/css",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  eot: "application/vnd.ms-fontobject",
+  epub: "application/epub+zip",
+  gz: "application/gzip",
+  gif: "image/gif",
+  htm: "text/html",
+  html: "text/html",
+  ico: "image/vnd.microsoft.icon",
+  ics: "text/calendar",
+  jar: "application/java-archive",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "text/javascript",
+  json: "application/json",
+  jsonld: "application/ld+json",
+  md: "text/markdown",
+  mid: "audio/midi",
+  midi: "audio/midi",
+  mjs: "text/javascript",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  mpeg: "video/mpeg",
+  mpkg: "application/vnd.apple.installer+xml",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odt: "application/vnd.oasis.opendocument.text",
+  oga: "audio/ogg",
+  ogv: "video/ogg",
+  ogx: "application/ogg",
+  opus: "audio/opus",
+  otf: "font/otf",
+  png: "image/png",
+  pdf: "application/pdf",
+  php: "application/x-httpd-php",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rar: "application/vnd.rar",
+  rtf: "application/rtf",
+  sh: "application/x-sh",
+  svg: "image/svg+xml",
+  tar: "application/x-tar",
+  text: "text/plain",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  ts: "video/mp2t",
+  ttf: "font/ttf",
+  txt: "text/plain",
+  vsd: "application/vnd.visio",
+  wav: "audio/wav",
+  weba: "audio/webm",
+  webm: "video/webm",
+  webp: "image/webp",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  xhtml: "application/xhtml+xml",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xml: "application/xml",
+  xul: "application/vnd.mozilla.xul+xml",
+  zip: "application/zip",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  "7z": "application/x-7z-compressed"
+};
+
+// src/helpers/bucket.ts
+import * as fs from "fs";
+import * as fsp from "fs/promises";
+import * as path from "path";
+function localBucket(root) {
+  const base = path.resolve(root);
+  const resolveKey = (name) => {
+    if (!name) throw new Error("File name is required");
+    const full = path.resolve(base, name.replace(/^\/+/, ""));
+    if (full !== base && !full.startsWith(base + path.sep)) {
+      throw new Error(`Path "${name}" escapes the bucket root`);
+    }
+    return full;
+  };
+  const file2 = (name) => {
+    const full = resolveKey(name);
+    return {
+      path: full,
+      id: name.replace(/^\/+/, ""),
+      name: path.basename(name),
+      async exists() {
+        const stats = await fsp.stat(full).catch(() => null);
+        return !!stats?.isFile();
+      },
+      async write(content) {
+        await fsp.mkdir(path.dirname(full), { recursive: true });
+        if (content instanceof ReadableStream) {
+          const writable = fs.createWriteStream(full);
+          for await (const chunk of content) {
+            writable.write(chunk);
+          }
+          await new Promise((resolve2, reject) => {
+            writable.on("error", reject);
+            writable.end(() => resolve2());
+          });
+          return;
+        }
+        await fsp.writeFile(full, content);
+      },
+      stream() {
+        const nodeStream = fs.createReadStream(full);
+        return new ReadableStream({
+          start(controller) {
+            nodeStream.on("data", (chunk) => controller.enqueue(chunk));
+            nodeStream.on("end", () => controller.close());
+            nodeStream.on("error", (err) => controller.error(err));
+          },
+          cancel() {
+            nodeStream.destroy();
+          }
+        });
+      },
+      async bytes() {
+        return new Uint8Array(await fsp.readFile(full));
+      },
+      async remove() {
+        await fsp.unlink(full).catch(() => {
+        });
+      }
+    };
+  };
+  return {
+    file: file2,
+    folder: (prefix) => localBucket(path.join(base, prefix))
+  };
+}
+function bucket(root) {
+  if (!root) return null;
+  if (typeof root === "string") return localBucket(root);
+  if (typeof root.file === "function") return root;
+  throw new Error(
+    "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
+  );
+}
+
 // src/helpers/upload.ts
 function parseBytes(value) {
   if (typeof value === "number") return value;
@@ -148,24 +305,31 @@ function getExt(filename) {
   if (i <= 0) return ".bin";
   return filename.slice(i).toLowerCase();
 }
-async function saveFileToBucket(originalName, data, bucket, contentType) {
-  const ext = getExt(originalName);
-  const id = `${createId()}${ext}`;
-  const path2 = await bucket.write(id, data);
-  return { name: originalName, id, path: path2, type: contentType, size: data.length };
+async function saveFileToBucket(originalName, data, bucket2, contentType) {
+  const ext2 = getExt(originalName);
+  const id = `${createId()}${ext2}`;
+  const file2 = bucket2.file(id);
+  await file2.write(data, { type: contentType });
+  return {
+    name: originalName,
+    id,
+    path: file2.path,
+    type: contentType,
+    size: data.length
+  };
 }
 var UploadPipeline = class {
   _bucket;
   _limits = {};
-  constructor(bucket) {
-    this._bucket = bucket ?? null;
+  constructor(bucket2) {
+    this._bucket = bucket(bucket2 ?? void 0);
   }
   limit(options) {
     this._limits = { ...this._limits, ...options };
     return this;
   }
-  store(bucket) {
-    this._bucket = bucket;
+  store(bucket2) {
+    this._bucket = bucket(bucket2);
     return this;
   }
   async processFile(originalName, data, contentType) {
@@ -181,10 +345,10 @@ var UploadPipeline = class {
       );
     }
     if (fileType && fileType.length > 0) {
-      const ext = getExt(originalName);
+      const ext2 = getExt(originalName);
       const mime = contentType.toLowerCase();
       const allowed = fileType.some(
-        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
+        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext2
       );
       if (!allowed) {
         throw new Error(
@@ -200,8 +364,8 @@ var UploadPipeline = class {
     return saveFileToBucket(originalName, data, this._bucket, contentType);
   }
 };
-function upload(bucket) {
-  return new UploadPipeline(bucket);
+function upload(bucket2) {
+  return new UploadPipeline(bucket2);
 }
 
 // src/helpers/parseBody.ts
@@ -231,24 +395,12 @@ function isProbablyText(buffer) {
   }
   return true;
 }
-var MIME_EXT = {
-  "application/json": ".json",
-  "application/pdf": ".pdf",
-  "application/zip": ".zip",
-  "text/plain": ".txt",
-  "text/html": ".html",
-  "text/csv": ".csv",
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/gif": ".gif",
-  "image/webp": ".webp",
-  "image/svg+xml": ".svg",
-  "video/mp4": ".mp4",
-  "audio/mpeg": ".mp3"
-};
+var extByMime = {};
+for (const ext2 in mimes_default) extByMime[mimes_default[ext2]] = ext2;
 function extFromType(type2) {
   const base = (type2 || "").split(";")[0].trim().toLowerCase();
-  if (MIME_EXT[base]) return MIME_EXT[base];
+  const ext2 = extByMime[base];
+  if (ext2) return `.${ext2}`;
   const sub = base.split("/")[1];
   return sub && /^[a-z0-9]+$/.test(sub) ? `.${sub}` : ".bin";
 }
@@ -303,6 +455,7 @@ function startPart(headerStr, dest) {
       controller = c;
     }
   });
+  const file2 = dest.file(id);
   return {
     kind: "file",
     name,
@@ -310,7 +463,8 @@ function startPart(headerStr, dest) {
     type: type2,
     id,
     controller,
-    write: dest.write(id, readable),
+    file: file2,
+    write: file2.write(readable, { type: type2 }),
     size: 0
   };
 }
@@ -333,11 +487,11 @@ async function endPart(part, body) {
     addField(body, part.name, ref);
   } else if (part.kind === "file") {
     part.controller.close();
-    const path2 = await part.write;
+    await part.write;
     addField(body, part.name, {
       name: part.filename,
       id: part.id,
-      path: path2,
+      path: part.file.path,
       type: part.type,
       size: part.size
     });
@@ -401,8 +555,9 @@ async function parseMultipart(stream, boundary, dest) {
   if (part) await endPart(part, body);
   return body;
 }
-async function streamToBucket(stream, type2, bucket) {
+async function streamToBucket(stream, type2, bucket2) {
   const id = `${createId()}${extFromType(type2)}`;
+  const file2 = bucket2.file(id);
   let size = 0;
   let controller;
   const readable = new ReadableStream({
@@ -410,15 +565,15 @@ async function streamToBucket(stream, type2, bucket) {
       controller = c;
     }
   });
-  const write = bucket.write(id, readable);
+  const write = file2.write(readable, { type: type2 });
   for await (const chunk of asIterable(stream)) {
     controller.enqueue(chunk);
     size += chunk.byteLength;
   }
   controller.close();
-  const path2 = await write;
+  await write;
   if (!size) return void 0;
-  return { name: id, id, path: path2, type: type2, size };
+  return { name: id, id, path: file2.path, type: type2, size };
 }
 async function parseBody(input, contentType, dest) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
@@ -524,13 +679,13 @@ var Reply = class {
   }
   type(type2) {
     if (!type2) return this;
-    type2 = types_default[type2.replace(/^\./, "")] || type2;
+    type2 = mimes_default[type2.replace(/^\./, "")] || type2;
     this.res.headers.set("content-type", type2);
     return this;
   }
   download(name) {
-    const ext = name?.split(".").pop();
-    if (ext && !this.res.headers.get("content-type")) this.type(ext);
+    const ext2 = name?.split(".").pop();
+    if (ext2 && !this.res.headers.get("content-type")) this.type(ext2);
     const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
     return this.headers("content-disposition", `attachment${filename}`);
   }
@@ -570,9 +725,9 @@ var Reply = class {
   async file(path2) {
     try {
       const fs2 = await import("fs");
-      const ext = path2.split(".").pop();
+      const ext2 = path2.split(".").pop();
       const stream = fs2.createReadStream(path2);
-      return this.type(ext).send(stream);
+      return this.type(ext2).send(stream);
     } catch (error) {
       if (error.code === "ENOENT") {
         return this.status(404).send();
@@ -582,6 +737,9 @@ var Reply = class {
   }
   send(body = "") {
     const { status: status2 = 200, headers: headers2 } = this.res;
+    if (status2 === 101 || status2 === 204 || status2 === 205 || status2 === 304) {
+      return new Response(null, { status: status2, headers: headers2 });
+    }
     if (typeof body === "string") {
       if (!headers2.get("content-type")) {
         const isHtml = body.trim().startsWith("<");
@@ -1154,101 +1312,6 @@ function parseAuthOptions(auth2, all) {
   };
 }
 
-// src/helpers/bucket.ts
-import * as fs from "fs";
-import * as fsp from "fs/promises";
-import * as path from "path";
-function thinLocalBucket(root) {
-  const absolute = (name) => {
-    if (!name) throw new Error("File name is required");
-    return path.resolve(path.join(root, name));
-  };
-  return {
-    location: path.resolve(root),
-    read: async (name) => {
-      const fullPath = absolute(name);
-      const stats = await fsp.stat(fullPath).catch(() => null);
-      if (!stats?.isFile()) return null;
-      const nodeStream = fs.createReadStream(fullPath);
-      return new ReadableStream({
-        start(controller) {
-          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
-          nodeStream.on("end", () => controller.close());
-          nodeStream.on("error", (err) => controller.error(err));
-        },
-        cancel() {
-          nodeStream.destroy();
-        }
-      });
-    },
-    write: async (name, value, type2) => {
-      const fullPath = absolute(name);
-      if (!value) return fs.createWriteStream(fullPath);
-      await fsp.mkdir(path.dirname(fullPath), { recursive: true });
-      if (value instanceof ReadableStream) {
-        const writable = fs.createWriteStream(fullPath);
-        for await (const chunk of value) {
-          writable.write(chunk);
-        }
-        await new Promise((resolve2, reject) => {
-          writable.on("error", reject);
-          writable.end(resolve2);
-        });
-        return fullPath;
-      }
-      await fsp.writeFile(fullPath, value, type2);
-      return fullPath;
-    },
-    delete: async (name) => {
-      const fullPath = absolute(name);
-      try {
-        await fsp.unlink(fullPath);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    folder: (prefix) => thinLocalBucket(path.join(root, prefix))
-  };
-}
-function thinBunBucket(s3, prefix = "") {
-  const key = (name) => prefix ? `${prefix}/${name}` : name;
-  return {
-    read: async (name) => {
-      const file2 = s3.file(key(name));
-      if (!await file2.exists()) return null;
-      return await file2.stream();
-    },
-    write: async (name, value) => {
-      const file2 = s3.file(key(name));
-      if (value) {
-        await file2.write(value);
-        return key(name);
-      }
-      return s3.presign(key(name), {
-        expiresIn: 3600,
-        acl: "public-read-write"
-      });
-    },
-    delete: async (name) => {
-      const file2 = s3.file(key(name));
-      if (!await file2.exists()) return null;
-      return await file2.delete();
-    },
-    folder: (sub) => thinBunBucket(s3, key(sub))
-  };
-}
-function bucket_default(root) {
-  if (!root) return null;
-  if (typeof root === "string") {
-    return thinLocalBucket(root);
-  }
-  if (root.file && root.write) {
-    return thinBunBucket(root);
-  }
-  return root;
-}
-
 // src/helpers/color.ts
 var map = {
   reset: 0,
@@ -1452,8 +1515,8 @@ function config(options = {}) {
     }
     settings.cors = cors2;
   }
-  settings.public = options.public ? bucket_default(options.public) : null;
-  settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket_default(options.uploads) : null;
+  settings.public = options.public ? bucket(options.public) : null;
+  settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket(options.uploads) : null;
   if (options.favicon) settings.favicon = options.favicon;
   settings.store = options.store ?? null;
   settings.cookies = options.cookies ?? null;
@@ -1525,6 +1588,16 @@ function applyCors(res, ctx) {
   if (ctx.method === "options") {
     res.headers.set("Access-Control-Max-Age", "86400");
   }
+}
+
+// src/helpers/etag.ts
+function etag(bytes) {
+  let h = 2166136261;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i];
+    h = Math.imul(h, 16777619);
+  }
+  return `"${bytes.length.toString(16)}-${(h >>> 0).toString(16)}"`;
 }
 
 // src/helpers/createWebsocket.ts
@@ -1916,89 +1989,6 @@ function toWeb(nodeStream) {
   });
 }
 
-// src/helpers/types.ts
-var types = {
-  aac: "audio/aac",
-  abw: "application/x-abiword",
-  arc: "application/x-freearc",
-  avif: "image/avif",
-  avi: "video/x-msvideo",
-  azw: "application/vnd.amazon.ebook",
-  bin: "application/octet-stream",
-  bmp: "image/bmp",
-  bz: "application/x-bzip",
-  bz2: "application/x-bzip2",
-  cda: "application/x-cdf",
-  csh: "application/x-csh",
-  css: "text/css",
-  csv: "text/csv",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  gz: "application/gzip",
-  gif: "image/gif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/vnd.microsoft.icon",
-  ics: "text/calendar",
-  jar: "application/java-archive",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "text/javascript",
-  json: "application/json",
-  jsonld: "application/ld+json",
-  md: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mjs: "text/javascript",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpeg: "video/mpeg",
-  mpkg: "application/vnd.apple.installer+xml",
-  odp: "application/vnd.oasis.opendocument.presentation",
-  ods: "application/vnd.oasis.opendocument.spreadsheet",
-  odt: "application/vnd.oasis.opendocument.text",
-  oga: "audio/ogg",
-  ogv: "video/ogg",
-  ogx: "application/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  png: "image/png",
-  pdf: "application/pdf",
-  php: "application/x-httpd-php",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sh: "application/x-sh",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  text: "text/plain",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  ts: "video/mp2t",
-  ttf: "font/ttf",
-  txt: "text/plain",
-  vsd: "application/vnd.visio",
-  wav: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xul: "application/vnd.mozilla.xul+xml",
-  zip: "application/zip",
-  "3gp": "video/3gpp",
-  "3g2": "video/3gpp2",
-  "7z": "application/x-7z-compressed"
-};
-var types_default = types;
-
 // src/helpers/verify.ts
 import * as crypto3 from "crypto";
 function timingSafeEqual(a, b) {
@@ -2168,28 +2158,38 @@ async function assets(ctx) {
   if (ctx.method !== "get") return;
   if (ctx.url.pathname === "/") return;
   try {
-    const asset = await ctx.options.public.read(ctx.url.pathname);
-    if (!asset) return;
-    return type(ctx.url.pathname.split(".").pop()).send(asset);
+    const asset = ctx.options.public.file(ctx.url.pathname);
+    if (!await asset.exists()) return;
+    return type(ctx.url.pathname.split(".").pop()).send(asset.stream());
   } catch {
   }
 }
 
 // src/middle/favicon.ts
-async function favicon(ctx) {
-  if (ctx.method !== "get") return;
-  if (ctx.url.pathname !== "/favicon.ico") return;
-  const fav = ctx.options.favicon;
-  if (fav) {
-    if (typeof fav === "string") return file(fav);
-    const icon = await fav.read("favicon.ico");
-    return icon ? type("ico").send(icon) : 204;
+var CACHE_CONTROL = "public, max-age=86400";
+var ext = (name) => name.split(".").pop() || "ico";
+async function loadFavicon(fav) {
+  try {
+    const type2 = ext(typeof fav === "string" ? fav : fav?.name);
+    const bytes = typeof fav === "string" ? await (await import("fs/promises")).readFile(fav) : Buffer.from(await fav.bytes());
+    return { bytes, type: type2, etag: etag(bytes) };
+  } catch {
+    return null;
   }
-  const handled = ctx.app.handlers.get.some(
-    (route) => pathPattern(route.path, "/favicon.ico")
-  );
-  if (handled) return;
-  return 204;
+}
+async function favicon(ctx) {
+  const fav = ctx.options.favicon;
+  if (!fav) return;
+  if (ctx.app.faviconCache === void 0) {
+    ctx.app.faviconCache = await loadFavicon(fav);
+  }
+  const entry = ctx.app.faviconCache;
+  if (!entry) return 204;
+  const headers2 = { "cache-control": CACHE_CONTROL, etag: entry.etag };
+  if (ctx.headers["if-none-match"] === entry.etag) {
+    return status(304).headers(headers2).send();
+  }
+  return type(entry.type).headers(headers2).send(entry.bytes);
 }
 
 // src/middle/openapi.ts
@@ -2409,6 +2409,168 @@ function timer(ctx) {
   ctx.time = createTime();
 }
 
+// src/helpers/wsNode.ts
+var GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+var CONTINUATION = 0;
+var TEXT = 1;
+var BINARY = 2;
+var CLOSE = 8;
+var PING = 9;
+var PONG = 10;
+function encodeFrame(payload, opcode) {
+  const len = payload.length;
+  let header;
+  if (len < 126) {
+    header = Buffer.from([128 | opcode, len]);
+  } else if (len < 65536) {
+    header = Buffer.allocUnsafe(4);
+    header[0] = 128 | opcode;
+    header[1] = 126;
+    header.writeUInt16BE(len, 2);
+  } else {
+    header = Buffer.allocUnsafe(10);
+    header[0] = 128 | opcode;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(len), 2);
+  }
+  return Buffer.concat([header, payload]);
+}
+var NodeWebSocket = class {
+  socket;
+  handlers;
+  buffer;
+  fragments;
+  fragmentOpcode;
+  closed;
+  readyState;
+  constructor(socket, handlers) {
+    this.socket = socket;
+    this.handlers = handlers;
+    this.buffer = Buffer.alloc(0);
+    this.fragments = [];
+    this.fragmentOpcode = TEXT;
+    this.closed = false;
+    this.readyState = 1;
+  }
+  send(data) {
+    if (this.closed) return;
+    const isString = typeof data === "string";
+    const payload = isString ? Buffer.from(data) : Buffer.from(data);
+    this.socket.write(encodeFrame(payload, isString ? TEXT : BINARY));
+  }
+  close(code = 1e3, reason = "") {
+    if (this.closed) return;
+    const payload = Buffer.alloc(2 + Buffer.byteLength(reason));
+    payload.writeUInt16BE(code, 0);
+    payload.write(reason, 2);
+    try {
+      this.socket.write(encodeFrame(payload, CLOSE));
+    } catch {
+    }
+    this.shutdown();
+  }
+  // Called once, whether the peer closed, the socket died, or we closed.
+  shutdown() {
+    if (this.closed) return;
+    this.closed = true;
+    this.readyState = 3;
+    try {
+      this.socket.end();
+    } catch {
+    }
+    this.handlers.onClose();
+  }
+  // Feed raw bytes from the TCP socket; parses as many complete frames as it can
+  // and buffers the remainder for the next chunk.
+  receive(chunk) {
+    this.buffer = this.buffer.length ? Buffer.concat([this.buffer, chunk]) : chunk;
+    while (true) {
+      const buf = this.buffer;
+      if (buf.length < 2) return;
+      const fin = (buf[0] & 128) !== 0;
+      const opcode = buf[0] & 15;
+      const masked = (buf[1] & 128) !== 0;
+      let len = buf[1] & 127;
+      let offset = 2;
+      if (len === 126) {
+        if (buf.length < 4) return;
+        len = buf.readUInt16BE(2);
+        offset = 4;
+      } else if (len === 127) {
+        if (buf.length < 10) return;
+        len = Number(buf.readBigUInt64BE(2));
+        offset = 10;
+      }
+      let mask = null;
+      if (masked) {
+        if (buf.length < offset + 4) return;
+        mask = buf.subarray(offset, offset + 4);
+        offset += 4;
+      }
+      if (buf.length < offset + len) return;
+      const payload = Buffer.from(buf.subarray(offset, offset + len));
+      if (mask) {
+        for (let i = 0; i < len; i++) payload[i] ^= mask[i & 3];
+      }
+      this.buffer = buf.subarray(offset + len);
+      this.frame(fin, opcode, payload);
+    }
+  }
+  frame(fin, opcode, payload) {
+    if (opcode === CLOSE) {
+      this.shutdown();
+      return;
+    }
+    if (opcode === PING) {
+      if (!this.closed) this.socket.write(encodeFrame(payload, PONG));
+      return;
+    }
+    if (opcode === PONG) return;
+    if (opcode === CONTINUATION) {
+      this.fragments.push(payload);
+    } else {
+      this.fragments = [payload];
+      this.fragmentOpcode = opcode;
+    }
+    if (!fin) return;
+    const full = this.fragments.length === 1 ? this.fragments[0] : Buffer.concat(this.fragments);
+    this.fragments = [];
+    const body = this.fragmentOpcode === TEXT ? full.toString("utf8") : full;
+    this.handlers.onMessage(body);
+  }
+};
+async function attachWebsocket(server2, app) {
+  const { createHash } = await import("crypto");
+  server2.on("upgrade", (req, socket, head) => {
+    const key = req.headers["sec-websocket-key"];
+    const upgrade = String(req.headers.upgrade || "").toLowerCase();
+    if (upgrade !== "websocket" || !key || !app.handlers.socket.length) {
+      socket.destroy();
+      return;
+    }
+    const accept = createHash("sha1").update(key + GUID).digest("base64");
+    socket.write(
+      `HTTP/1.1 101 Switching Protocols\r
+Upgrade: websocket\r
+Connection: Upgrade\r
+Sec-WebSocket-Accept: ${accept}\r
+\r
+`
+    );
+    socket.setTimeout(0);
+    socket.setNoDelay(true);
+    const ws = new NodeWebSocket(socket, {
+      onMessage: (body) => app.websocket.message(ws, body),
+      onClose: () => app.websocket.close(ws)
+    });
+    app.websocket.open(ws);
+    if (head?.length) ws.receive(head);
+    socket.on("data", (chunk) => ws.receive(chunk));
+    socket.on("close", () => ws.shutdown());
+    socket.on("error", () => ws.shutdown());
+  });
+}
+
 // src/context/node.ts
 import { TLSSocket } from "tls";
 
@@ -2525,7 +2687,6 @@ var Winter = async (app, request, env2) => {
 };
 var Node = async (app) => {
   const http = await import("http");
-  const { attachWebsocket } = await import("./wsNode-GEJUCJQ7.js");
   const server2 = http.createServer(
     async (request, response) => {
       const ctx = await createNode(request, app);
@@ -2540,7 +2701,7 @@ var Node = async (app) => {
       response.end();
     }
   );
-  attachWebsocket(server2, app);
+  await attachWebsocket(server2, app);
   server2.listen(app.settings.port, () => {
     app.settings.log.start(`http://localhost:${app.settings.port}/`);
   });
@@ -2687,6 +2848,9 @@ var Server = class extends Router {
   platform;
   sockets;
   websocket;
+  // Lazily-loaded favicon bytes, cached per server until restart (see favicon
+  // middleware). `undefined` = not loaded yet; `null` = configured but missing.
+  faviconCache;
   port;
   constructor(options = {}) {
     super();
@@ -2705,7 +2869,7 @@ var Server = class extends Router {
     this.use(timer);
     if (this.settings.cors) this.use(preflight);
     this.use(assets);
-    this.use(favicon);
+    if (this.settings.favicon) this.get("/favicon.ico", favicon);
     this.use(session);
     if (this.settings.auth) {
       auth(this);

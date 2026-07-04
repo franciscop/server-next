@@ -8,10 +8,9 @@ export default async function assets(ctx: Context) {
   // `index.html`, but that's easy with `.get('/', () => file('index.html'))
   if (ctx.url.pathname === "/") return;
   try {
-    // TODO: streaming
-    const asset = await ctx.options.public.read(ctx.url.pathname);
-    if (!asset) return;
-    return type(ctx.url.pathname.split(".").pop()).send(asset);
+    const asset = ctx.options.public.file(ctx.url.pathname);
+    if (!(await asset.exists())) return;
+    return type(ctx.url.pathname.split(".").pop()).send(asset.stream());
   } catch {
     // NO-OP; if there's no file, keep going the normal flow
   }

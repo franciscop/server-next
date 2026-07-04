@@ -2,7 +2,15 @@ import "./errors/index";
 import "./polyfill";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import { assets, auth, favicon, openapi, preflight, session, timer } from "./middle";
+import {
+  assets,
+  auth,
+  favicon,
+  openapi,
+  preflight,
+  session,
+  timer,
+} from "./middle";
 
 import * as handlers from "./context/handlers";
 import { Router } from "./router";
@@ -21,6 +29,10 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
 
   sockets: any[];
   websocket: any;
+
+  // Lazily-loaded favicon bytes, cached per server until restart (see favicon
+  // middleware). `undefined` = not loaded yet; `null` = configured but missing.
+  faviconCache?: { bytes: Buffer; type: string; etag: string } | null;
 
   port?: number;
 
@@ -48,7 +60,7 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
     this.use(timer);
     if (this.settings.cors) this.use(preflight);
     this.use(assets);
-    this.use(favicon);
+    if (this.settings.favicon) this.get("/favicon.ico", favicon);
     this.use(session);
 
     if (this.settings.auth) {
@@ -96,9 +108,9 @@ export default function server<
   return new Server<ServerConfig<Session, User>>(options).self();
 }
 
+export { default as upload } from "./helpers/upload";
+export type { LimitOptions, UploadPipeline } from "./helpers/upload";
 export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./ServerError";
-export { default as upload } from "./helpers/upload";
-export type { LimitOptions, UploadPipeline } from "./helpers/upload";
 export type * from "./types";

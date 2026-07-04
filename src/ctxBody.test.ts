@@ -1,30 +1,14 @@
 import fsp from "node:fs/promises";
 import server from ".";
 import parseBody from "./helpers/parseBody";
+import { cleanupBuckets, realBucket } from "./tests/realBucket";
 import type { Bucket, SerializableValue } from "./types";
 
-// A bucket that actually consumes the stream and records the bytes, so tests can
-// assert both the file reference shape AND that the content streamed correctly.
-function capturingBucket() {
-  const files = new Map<string, Buffer>();
-  const make = (prefix = ""): Bucket & { files: Map<string, Buffer> } => ({
-    files,
-    location: prefix,
-    read: async () => null,
-    write: async (name, value) => {
-      const key = prefix ? `${prefix}/${name}` : name;
-      const buf =
-        value instanceof ReadableStream
-          ? Buffer.from(await new Response(value as BodyInit).arrayBuffer())
-          : Buffer.from(value as Buffer);
-      files.set(key, buf);
-      return `/cap/${key}`;
-    },
-    delete: async () => true,
-    folder: (p: string) => make(prefix ? `${prefix}/${p}` : p),
-  });
-  return make();
-}
+// Use a real `bucket` FileSystem instance so tests exercise the actual canonical
+// interface (streaming writes, reading bytes back), not a hand-rolled mock.
+const capturingBucket = realBucket;
+
+afterAll(cleanupBuckets);
 
 // Enqueue `data` in chunks of `size` bytes, so the parser sees boundaries split
 // across chunk borders (size = 1 is the meanest case).
@@ -364,7 +348,7 @@ describe("streaming parser: chunk splitting", () => {
         type: "application/octet-stream",
       });
       // the file content survived chunking exactly
-      expect(bucket.files.get(out.file.id)?.toString()).toBe(
+      expect(await bucket.file(out.file.id).text()).toBe(
         "line1\r\nline2\r\n--not-the-boundary\r\nend",
       );
       expect(out.file.size).toBe(
@@ -380,7 +364,7 @@ describe("streaming parser: chunk splitting", () => {
     ]);
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(body, 997), MULTIPART, bucket);
-    expect(bucket.files.get(out.blob.id)?.toString()).toBe(big);
+    expect(await bucket.file(out.blob.id).text()).toBe(big);
     expect(out.blob.size).toBe(Buffer.byteLength(big));
   });
 
@@ -391,7 +375,9 @@ describe("streaming parser: chunk splitting", () => {
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(bytes, 5), "image/png", bucket);
     expect(out.size).toBe(1000);
-    expect(bucket.files.get(out.id)?.equals(bytes)).toBe(true);
+    expect(Buffer.from(await bucket.file(out.id).bytes()).equals(bytes)).toBe(
+      true,
+    );
   });
 });
 

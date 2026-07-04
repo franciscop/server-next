@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
 import type { Server } from "..";
 
 // Node has no built-in WebSocket server, so we implement the bits of RFC 6455
 // we need: the upgrade handshake plus a frame codec (masking, fragmentation,
-// ping/pong/close, and 7/16/64-bit lengths). This file is imported only from
-// the Node path (handlers.Node), so `node:crypto` never loads on other runtimes.
+// ping/pong/close, and 7/16/64-bit lengths). This module is imported normally
+// (bundled into index.js), but its only Node-specific dependency (`node:crypto`)
+// is imported lazily inside attachWebsocket, so it never loads on other runtimes
+// (attachWebsocket only ever runs on the Node path).
 
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -169,7 +170,9 @@ export class NodeWebSocket {
 // Attaches WebSocket upgrade handling to a Node http.Server. On a valid upgrade
 // it completes the handshake and bridges the connection to the shared
 // `app.websocket` handlers (open/message/close) used by `.socket()` routes.
-export function attachWebsocket(server: any, app: Server): void {
+// `node:crypto` is imported here (lazily) so this module stays runtime-agnostic.
+export async function attachWebsocket(server: any, app: Server): Promise<void> {
+  const { createHash } = await import("node:crypto");
   server.on("upgrade", (req: any, socket: any, head: Buffer) => {
     const key = req.headers["sec-websocket-key"];
     const upgrade = String(req.headers.upgrade || "").toLowerCase();
