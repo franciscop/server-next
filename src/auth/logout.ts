@@ -3,19 +3,20 @@ import { cookies } from "../reply";
 import findSessionId from "./findSessionId";
 
 export default async function logout(ctx: Context): Promise<Body> {
-  const session = findSessionId(ctx);
   const { strategy } = ctx.user;
-  await ctx.options.auth.session.del(session);
-
   if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
+
+  // `jwt` is stateless: there's no server-side session to revoke, the client
+  // just discards the token. The others delete their stored session record.
+  if (!strategy.includes("jwt")) {
+    await ctx.options.auth.session.del(findSessionId(ctx));
+  }
+
+  if (strategy.includes("token") || strategy.includes("jwt")) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
     return cookies({ authentication: null }).redirect("/");
-  }
-  if (strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
   }
   if (strategy.includes("key")) {
     throw new Error("Key auth not supported yet");

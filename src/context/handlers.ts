@@ -27,12 +27,20 @@ export const Node = async (app: Server) => {
       const out = await handleRequest(app, ctx);
 
       response.writeHead(out.status || 200, parseHeaders(out.headers));
-      if (out.body instanceof ReadableStream) {
-        await iterate(out.body, (chunk) => response.write(chunk));
-      } else {
-        response.write(out.body || "");
+      try {
+        if (out.body instanceof ReadableStream) {
+          await iterate(out.body, (chunk) => response.write(chunk));
+        } else {
+          response.write(out.body || "");
+        }
+        response.end();
+      } catch {
+        // The stream errored after the headers (and maybe some body) were sent,
+        // so we can't change the status. Abort the connection so the client sees
+        // a truncated/failed response rather than a clean end, and we don't leak
+        // an unhandled rejection out of the request callback.
+        if (!response.destroyed) response.destroy();
       }
-      response.end();
     },
   );
 

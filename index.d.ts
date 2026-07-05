@@ -30,11 +30,15 @@ declare namespace JSX {
     }
 }
 type BodyMode = "parse" | "raw" | "stream";
+type BodyOption = BodyMode | {
+    mode?: BodyMode;
+    max?: number | string | false;
+};
 type RouteOptions = {
     tags?: string | string[];
     title?: string;
     description?: string;
-    body?: BodyMode;
+    body?: BodyOption;
 };
 type Route = {
     path: string;
@@ -51,15 +55,23 @@ type Cookie = {
     sameSite?: "Strict" | "Lax" | "None";
 };
 type RouterMethod = "*" | Method;
+type FileInfo = {
+    exists: boolean;
+    size: number;
+    date: Date | null;
+    type?: string | null;
+};
 type BucketFile = {
     readonly path: string;
     readonly id: string;
     readonly name: string;
     exists(): Promise<boolean>;
+    info?(): Promise<FileInfo>;
     write(content: string | Buffer | ReadableStream, options?: {
         type?: string;
     }): Promise<void>;
     stream(): ReadableStream;
+    slice?(start: number, end?: number): BucketFile;
     bytes(): Promise<Uint8Array>;
     remove(): Promise<void>;
 };
@@ -102,7 +114,7 @@ type KVStore = {
     keys: () => Promise<string[]>;
 };
 type Provider = "email" | "github" | "google" | "microsoft" | "discord" | "facebook" | "apple";
-type Strategy = "cookie" | "jwt" | "token";
+type Strategy = "cookie" | "jwt" | "token" | "key";
 type AuthSession = {
     id: string;
     provider: Provider;
@@ -115,9 +127,10 @@ type AuthUser<T = Record<string, any>> = T & {
     strategy: Strategy;
     email: string;
 };
-type AuthOption = `${Strategy}:${Provider}` | {
+type AuthOption = `${Strategy}:${Provider}` | "key" | {
     strategy: Strategy;
-    providers: Provider | Provider[];
+    providers?: Provider | Provider[];
+    key?: string;
     session?: KVStore;
     store?: KVStore;
     redirect?: string;
@@ -128,6 +141,7 @@ type AuthSettings = {
     strategy: Strategy;
     store: KVStore;
     session: KVStore;
+    key?: string;
     cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
     redirect: string;
 };
@@ -173,7 +187,7 @@ type Options = {
     log?: LogLevel | boolean;
     favicon?: string | BucketFile;
     security?: boolean | SecurityOptions;
-    body?: BodyMode;
+    body?: BodyOption;
 };
 type Settings = {
     port: number;
@@ -192,7 +206,7 @@ type Settings = {
     log: Logger;
     favicon?: string | BucketFile;
     security: SecuritySettings;
-    body: BodyMode;
+    body: BodyOption;
 };
 type Time = {
     (name: string): void;
@@ -478,4 +492,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BucketFile, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

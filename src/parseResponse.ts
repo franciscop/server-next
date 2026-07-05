@@ -104,17 +104,26 @@ export default async function parseResponse(
       throw ServerError.NO_STORE();
     }
 
-    // Persistence is based on the Token
-    // Persistence is based on the Cookies
-    // No session cookies, generate a _persistent_ cookie
-    if (!ctx.cookies.session) {
+    // Reuse the incoming session cookie, or mint a new id. The SAME id must be
+    // used both for the Set-Cookie and the store key, or a fresh session is
+    // saved under a key the next request can never look up.
+    let id = ctx.cookies.session;
+    if (!id) {
+      id = createId();
+      // Harden the session cookie: JS can't read it (HttpOnly), it isn't sent
+      // over plain HTTP in production (Secure), and it's SameSite=Lax.
       out.headers.append(
         "set-cookie",
-        createCookies("session", { value: createId() }),
+        createCookies("session", {
+          value: id,
+          path: "/",
+          httpOnly: true,
+          secure: ctx.platform.production,
+          sameSite: "Lax",
+        }),
       );
     }
 
-    const id = ctx.cookies.session;
     // Saves the session in the session store
     // Note that this is async but we are totally fine deferring it
     ctx.options.session.store.set(id, ctx.session);

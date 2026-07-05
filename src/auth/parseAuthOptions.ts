@@ -28,6 +28,22 @@ export default function parseAuthOptions(
   }
   const strategy = auth.strategy;
 
+  // `key` auth is a single shared secret (M2M / API key): no users, store,
+  // session or provider. The secret comes from the option or the AUTH_KEY env.
+  if (strategy === "key") {
+    const key = auth.key || env.AUTH_KEY;
+    if (!key) {
+      throw new Error("`key` auth needs the AUTH_KEY env var (or auth.key)");
+    }
+    return {
+      strategy,
+      providers: [],
+      key,
+      redirect: auth.redirect || defaultRedirect,
+      cleanUser: auth.cleanUser || defaultCleanUser,
+    } as Settings["auth"];
+  }
+
   const list = Array.isArray(auth.providers)
     ? auth.providers
     : auth.providers

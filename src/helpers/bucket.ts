@@ -20,8 +20,35 @@ function localBucket(root: string): Bucket {
     return full;
   };
 
-  const file = (name: string): BucketFile => {
+  // `win` is an optional byte window [start, end) (end exclusive; end may be
+  // Infinity for an open-ended slice), applied to reads so slice() views work.
+  const file = (
+    name: string,
+    win?: { start: number; end: number },
+  ): BucketFile => {
     const full = resolveKey(name);
+
+    // Read the file, or the current window, as a web ReadableStream. fs ranges
+    // are inclusive on both ends, so a window [start, end) reads up to end - 1.
+    const read = (): ReadableStream => {
+      let opts: { start?: number; end?: number } | undefined;
+      if (win) {
+        opts = { start: win.start };
+        if (Number.isFinite(win.end)) opts.end = Math.max(win.start, win.end - 1);
+      }
+      const nodeStream = fs.createReadStream(full, opts);
+      return new ReadableStream({
+        start(controller) {
+          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
+          nodeStream.on("end", () => controller.close());
+          nodeStream.on("error", (err) => controller.error(err));
+        },
+        cancel() {
+          nodeStream.destroy();
+        },
+      });
+    };
+
     return {
       path: full,
       id: name.replace(/^\/+/, ""),
@@ -30,6 +57,26 @@ function localBucket(root: string): Bucket {
       async exists(): Promise<boolean> {
         const stats = await fsp.stat(full).catch(() => null);
         return !!stats?.isFile();
+      },
+
+      async info() {
+        const stats = await fsp.stat(full).catch(() => null);
+        const exists = !!stats?.isFile();
+        const total = stats?.size ?? 0;
+        // A window reports its clamped length, like the real bucket's slice.
+        const size = win
+          ? Math.max(0, Math.min(win.end, total) - win.start)
+          : total;
+        return { exists, size, date: stats?.mtime ?? null };
+      },
+
+      // Read-only view of [start, end), composed relative to the current window.
+      slice(start: number, end?: number): BucketFile {
+        const base = win?.start ?? 0;
+        const cap = win?.end ?? Number.POSITIVE_INFINITY;
+        const s = Math.min(cap, base + Math.max(0, start));
+        const e = end === undefined ? cap : Math.min(cap, base + end);
+        return file(name, { start: s, end: e });
       },
 
       async write(content): Promise<void> {
@@ -51,20 +98,11 @@ function localBucket(root: string): Bucket {
       },
 
       stream(): ReadableStream {
-        const nodeStream = fs.createReadStream(full);
-        return new ReadableStream({
-          start(controller) {
-            nodeStream.on("data", (chunk) => controller.enqueue(chunk));
-            nodeStream.on("end", () => controller.close());
-            nodeStream.on("error", (err) => controller.error(err));
-          },
-          cancel() {
-            nodeStream.destroy();
-          },
-        });
+        return read();
       },
 
       async bytes(): Promise<Uint8Array> {
+        if (win) return new Uint8Array(await new Response(read()).arrayBuffer());
         return new Uint8Array(await fsp.readFile(full));
       },
 

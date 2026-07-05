@@ -106,6 +106,21 @@ export default function config(options: Options = {}): Settings {
     settings.auth = parseAuthOptions(options.auth || env.AUTH || null, options);
   }
 
+  // The `jwt` strategy signs tokens with `secret`. With no secret set, config
+  // generates a random `unsafe-` one per process, which would invalidate every
+  // token on restart and across instances, so warn loudly (always, not gated on
+  // the `log` level, since it silently breaks auth).
+  if (
+    settings.auth?.strategy.includes("jwt") &&
+    settings.secret.startsWith("unsafe-")
+  ) {
+    console.warn(
+      "[server:auth] jwt strategy with no SECRET set: tokens are signed with a " +
+        "random per-process secret, so they break on restart and across " +
+        "instances. Set the SECRET environment variable (or the `secret` option).",
+    );
+  }
+
   // OpenAPI
   if (options.openapi) {
     if (options.openapi === true) {

@@ -36,11 +36,17 @@ declare namespace JSX {
 // bytes as a Buffer, or the unread stream itself (a web ReadableStream).
 export type BodyMode = "parse" | "raw" | "stream";
 
+// How the request body is read, plus per-body constraints. The string form is a
+// shorthand for `{ mode }`. `max` limits the total request size (413 if larger).
+export type BodyOption =
+  | BodyMode
+  | { mode?: BodyMode; max?: number | string | false };
+
 export type RouteOptions = {
   tags?: string | string[];
   title?: string;
   description?: string;
-  body?: BodyMode;
+  body?: BodyOption;
   // [key: string]: any;
 };
 
@@ -63,6 +69,15 @@ export type Cookie = {
 
 export type RouterMethod = "*" | Method;
 
+// Subset of the `bucket` library's FileInfo: file metadata used to build cheap
+// cache validators (ETag / Last-Modified) without reading the bytes.
+export type FileInfo = {
+  exists: boolean;
+  size: number;
+  date: Date | null;
+  type?: string | null;
+};
+
 // Mirrors the `bucket` library's IBucketFile: a handle to a single object.
 // `write()` returns void, so the stored location is read back from `.path`.
 export type BucketFile = {
@@ -70,11 +85,18 @@ export type BucketFile = {
   readonly id: string;
   readonly name: string;
   exists(): Promise<boolean>;
+  // Optional: metadata in one call (size/date/type). `bucket` files provide it;
+  // used for conditional-request caching of static assets.
+  info?(): Promise<FileInfo>;
   write(
     content: string | Buffer | ReadableStream,
     options?: { type?: string },
   ): Promise<void>;
   stream(): ReadableStream;
+  // Optional: a read-only view of the byte range `[start, end)` (end exclusive
+  // and optional, like Blob.slice), whose stream()/bytes() read just that range.
+  // Used to answer HTTP Range requests for static assets.
+  slice?(start: number, end?: number): BucketFile;
   bytes(): Promise<Uint8Array>;
   remove(): Promise<void>;
 };
@@ -143,7 +165,7 @@ export type Provider =
   | "discord"
   | "facebook"
   | "apple";
-export type Strategy = "cookie" | "jwt" | "token";
+export type Strategy = "cookie" | "jwt" | "token" | "key";
 
 export type AuthSession = {
   id: string;
@@ -163,9 +185,12 @@ export type AuthUser<T = Record<string, any>> = T & {
 // providers, use the object form with a `providers` array.
 export type AuthOption =
   | `${Strategy}:${Provider}`
+  | "key" // shared-secret auth (reads AUTH_KEY), no provider needed
   | {
       strategy: Strategy;
-      providers: Provider | Provider[];
+      providers?: Provider | Provider[];
+      // Shared secret for the `key` strategy (defaults to the AUTH_KEY env var).
+      key?: string;
       session?: KVStore;
       store?: KVStore;
       redirect?: string;
@@ -181,6 +206,9 @@ export type AuthSettings = {
 
   // The temporal information of active sessions/devices
   session: KVStore;
+
+  // The shared secret for the `key` strategy (no users/store/session)
+  key?: string;
 
   cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
   redirect: string;
@@ -240,7 +268,7 @@ export type Options = {
   log?: LogLevel | boolean;
   favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
-  body?: BodyMode;
+  body?: BodyOption;
 };
 
 export type Settings = {
@@ -258,7 +286,7 @@ export type Settings = {
   log: Logger;
   favicon?: string | BucketFile;
   security: SecuritySettings;
-  body: BodyMode;
+  body: BodyOption;
 };
 
 export type Time = {

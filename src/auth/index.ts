@@ -19,6 +19,10 @@ export default function auth(app: Server) {
     ctx.user = await getUser(ctx);
   });
 
+  // `key` is a stateless shared secret: no users, so no login/logout/provider
+  // routes, just the getUser check above.
+  if (app.settings.auth.strategy === "key") return;
+
   // One logout route for every provider and strategy. POST, since it changes
   // state (clearing the session) and so shouldn't be triggered by a prefetch.
   app.post("/auth/logout", logout);

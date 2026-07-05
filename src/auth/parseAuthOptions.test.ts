@@ -54,7 +54,6 @@ describe("parseAuthOptions", () => {
 
   it("throws error when provider is missing", () => {
     expect(() => {
-      // @ts-expect-error
       parseAuthOptions({ strategy: "cookie" }, { store });
     }).toThrow("Auth options needs a provider");
   });

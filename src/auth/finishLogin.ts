@@ -1,5 +1,6 @@
 import type { Context } from "..";
 import { createId } from "../helpers";
+import { signJwt } from "../helpers/jwt";
 import { cookies, status } from "../reply";
 
 type LoginInput = {
@@ -44,8 +45,16 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
   user = await cleanUser(user);
 
   if (input.store !== false) await settings.store.set(key, user);
-  await settings.session.set(auth.id, auth, { expires: "1w" });
+  // `jwt` is stateless (the signed token carries the session), so only the
+  // opaque strategies persist the auth record in the session store.
+  if (!strategy.includes("jwt")) {
+    await settings.session.set(auth.id, auth, { expires: "1w" });
+  }
 
+  if (strategy.includes("jwt")) {
+    const token = await signJwt(auth, ctx.options.secret, 7 * 24 * 60 * 60);
+    return status(201).json({ ...user, token });
+  }
   if (strategy.includes("token")) {
     return status(201).json({ ...user, token: auth.id });
   }
@@ -58,7 +67,6 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
       sameSite: "Lax",
     }).redirect(settings.redirect);
   }
-  if (strategy.includes("jwt")) throw new Error("JWT auth not supported yet");
   if (strategy.includes("key")) throw new Error("Key auth not supported yet");
   throw new Error("Unknown auth type");
 }

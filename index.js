@@ -226,8 +226,26 @@ function localBucket(root) {
     }
     return full;
   };
-  const file2 = (name) => {
+  const file2 = (name, win) => {
     const full = resolveKey(name);
+    const read = () => {
+      let opts;
+      if (win) {
+        opts = { start: win.start };
+        if (Number.isFinite(win.end)) opts.end = Math.max(win.start, win.end - 1);
+      }
+      const nodeStream = fs.createReadStream(full, opts);
+      return new ReadableStream({
+        start(controller) {
+          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
+          nodeStream.on("end", () => controller.close());
+          nodeStream.on("error", (err) => controller.error(err));
+        },
+        cancel() {
+          nodeStream.destroy();
+        }
+      });
+    };
     return {
       path: full,
       id: name.replace(/^\/+/, ""),
@@ -235,6 +253,21 @@ function localBucket(root) {
       async exists() {
         const stats = await fsp.stat(full).catch(() => null);
         return !!stats?.isFile();
+      },
+      async info() {
+        const stats = await fsp.stat(full).catch(() => null);
+        const exists = !!stats?.isFile();
+        const total = stats?.size ?? 0;
+        const size = win ? Math.max(0, Math.min(win.end, total) - win.start) : total;
+        return { exists, size, date: stats?.mtime ?? null };
+      },
+      // Read-only view of [start, end), composed relative to the current window.
+      slice(start, end) {
+        const base2 = win?.start ?? 0;
+        const cap = win?.end ?? Number.POSITIVE_INFINITY;
+        const s = Math.min(cap, base2 + Math.max(0, start));
+        const e = end === void 0 ? cap : Math.min(cap, base2 + end);
+        return file2(name, { start: s, end: e });
       },
       async write(content) {
         await fsp.mkdir(path.dirname(full), { recursive: true });
@@ -252,19 +285,10 @@ function localBucket(root) {
         await fsp.writeFile(full, content);
       },
       stream() {
-        const nodeStream = fs.createReadStream(full);
-        return new ReadableStream({
-          start(controller) {
-            nodeStream.on("data", (chunk) => controller.enqueue(chunk));
-            nodeStream.on("end", () => controller.close());
-            nodeStream.on("error", (err) => controller.error(err));
-          },
-          cancel() {
-            nodeStream.destroy();
-          }
-        });
+        return read();
       },
       async bytes() {
+        if (win) return new Uint8Array(await new Response(read()).arrayBuffer());
         return new Uint8Array(await fsp.readFile(full));
       },
       async remove() {
@@ -602,17 +626,34 @@ async function parseBody(input, contentType, dest) {
   return streamToBucket(toStream(input), type2, dest);
 }
 
+// src/helpers/StatusError.ts
+var StatusError = class extends Error {
+  status;
+  constructor(msg, status2 = 500) {
+    super(msg);
+    this.status = status2;
+  }
+};
+
 // src/helpers/body.ts
+var INF = Number.POSITIVE_INFINITY;
+var resolveMax = (max) => max === false || max == null ? INF : parseBytes(max);
+var tooLarge = (max) => new StatusError(`Request body exceeds the ${max}-byte limit`, 413);
 var sources = /* @__PURE__ */ new WeakMap();
 function setBodySource(ctx, source) {
   sources.set(ctx, source);
 }
-async function resolveBody(ctx, mode) {
+async function resolveBody(ctx, body) {
   const source = sources.get(ctx);
   if (!source) return void 0;
+  const mode = typeof body === "string" ? body : body?.mode ?? "parse";
+  const max = resolveMax(typeof body === "object" ? body?.max : void 0);
+  const declared = Number(ctx.headers["content-length"]);
+  if (max !== INF && declared > max) throw tooLarge(max);
   if (mode === "stream") return source.getStream();
   if (mode === "raw") {
     const raw = await source.getBuffer();
+    if (raw.length > max) throw tooLarge(max);
     if (!raw.length) return void 0;
     if (!ctx.headers["content-length"]) {
       ctx.headers["content-length"] = String(raw.length);
@@ -626,11 +667,12 @@ async function resolveBody(ctx, mode) {
     new TransformStream({
       transform(chunk, controller) {
         size += chunk.byteLength;
+        if (size > max) return controller.error(tooLarge(max));
         controller.enqueue(chunk);
       }
     })
   );
-  const body = await parseBody(
+  const parsed = await parseBody(
     counted,
     ctx.headers["content-type"],
     ctx.options.uploads
@@ -638,7 +680,7 @@ async function resolveBody(ctx, mode) {
   if (size && !ctx.headers["content-length"]) {
     ctx.headers["content-length"] = String(size);
   }
-  return body;
+  return parsed;
 }
 
 // src/helpers/clientIp.ts
@@ -787,6 +829,73 @@ var json = (...args) => r().json(...args);
 var file = (...args) => r().file(...args);
 var redirect = (...args) => r().redirect(...args);
 
+// src/helpers/jwt.ts
+var enc = new TextEncoder();
+var dec = new TextDecoder();
+var b64url = (data) => {
+  const bytes = typeof data === "string" ? enc.encode(data) : data;
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var unb64url = (seg) => {
+  let b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+  b64 += "=".repeat((4 - b64.length % 4) % 4);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
+var hmacKey = (secret) => crypto.subtle.importKey(
+  "raw",
+  enc.encode(secret),
+  { name: "HMAC", hash: "SHA-256" },
+  false,
+  ["sign", "verify"]
+);
+async function signJwt(payload, secret, expires) {
+  const now = Math.floor(Date.now() / 1e3);
+  const claims = {
+    iat: now,
+    ...expires ? { exp: now + expires } : {},
+    ...payload
+  };
+  const head = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = b64url(JSON.stringify(claims));
+  const data = `${head}.${body}`;
+  const key = await hmacKey(secret);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+  return `${data}.${b64url(new Uint8Array(sig))}`;
+}
+async function verifyJwt(token, secret) {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [head, body, sig] = parts;
+  let header;
+  try {
+    header = JSON.parse(dec.decode(unb64url(head)));
+  } catch {
+    return null;
+  }
+  if (header?.alg !== "HS256") return null;
+  const key = await hmacKey(secret);
+  const ok = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    unb64url(sig),
+    enc.encode(`${head}.${body}`)
+  );
+  if (!ok) return null;
+  let payload;
+  try {
+    payload = JSON.parse(dec.decode(unb64url(body)));
+  } catch {
+    return null;
+  }
+  if (payload?.exp && Math.floor(Date.now() / 1e3) >= payload.exp) return null;
+  return payload;
+}
+
 // src/auth/finishLogin.ts
 async function finishLogin(ctx, input) {
   const settings = ctx.options.auth;
@@ -807,7 +916,13 @@ async function finishLogin(ctx, input) {
   }
   user = await cleanUser(user);
   if (input.store !== false) await settings.store.set(key, user);
-  await settings.session.set(auth2.id, auth2, { expires: "1w" });
+  if (!strategy.includes("jwt")) {
+    await settings.session.set(auth2.id, auth2, { expires: "1w" });
+  }
+  if (strategy.includes("jwt")) {
+    const token = await signJwt(auth2, ctx.options.secret, 7 * 24 * 60 * 60);
+    return status(201).json({ ...user, token });
+  }
   if (strategy.includes("token")) {
     return status(201).json({ ...user, token: auth2.id });
   }
@@ -820,7 +935,6 @@ async function finishLogin(ctx, input) {
       sameSite: "Lax"
     }).redirect(settings.redirect);
   }
-  if (strategy.includes("jwt")) throw new Error("JWT auth not supported yet");
   if (strategy.includes("key")) throw new Error("Key auth not supported yet");
   throw new Error("Unknown auth type");
 }
@@ -909,7 +1023,7 @@ function clearState() {
 // src/auth/providers/apple.ts
 var AUTHORIZE = "https://appleid.apple.com/auth/authorize";
 var TOKEN = "https://appleid.apple.com/auth/token";
-var b64url = (data) => {
+var b64url2 = (data) => {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
   let bin = "";
   for (const byte of bytes) bin += String.fromCharCode(byte);
@@ -931,7 +1045,7 @@ var clientSecret = async () => {
     aud: "https://appleid.apple.com",
     sub: env.APPLE_ID
   };
-  const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+  const data = `${b64url2(JSON.stringify(header))}.${b64url2(JSON.stringify(payload))}`;
   const pem = String(env.APPLE_PRIVATE_KEY).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
@@ -946,7 +1060,7 @@ var clientSecret = async () => {
     key,
     new TextEncoder().encode(data)
   );
-  return `${data}.${b64url(new Uint8Array(sig))}`;
+  return `${data}.${b64url2(new Uint8Array(sig))}`;
 };
 var login = (ctx) => {
   const { state, cookie } = startState(ctx, true);
@@ -1282,6 +1396,19 @@ function parseAuthOptions(auth2, all) {
     throw new Error("Auth options needs a strategy");
   }
   const strategy = auth2.strategy;
+  if (strategy === "key") {
+    const key = auth2.key || env.AUTH_KEY;
+    if (!key) {
+      throw new Error("`key` auth needs the AUTH_KEY env var (or auth.key)");
+    }
+    return {
+      strategy,
+      providers: [],
+      key,
+      redirect: auth2.redirect || defaultRedirect,
+      cleanUser: auth2.cleanUser || defaultCleanUser
+    };
+  }
   const list = Array.isArray(auth2.providers) ? auth2.providers : auth2.providers ? [auth2.providers] : [];
   if (!list.length) {
     throw new Error("Auth options needs a provider");
@@ -1529,6 +1656,11 @@ function config(options = {}) {
   if (options.auth || env2.AUTH) {
     settings.auth = parseAuthOptions(options.auth || env2.AUTH || null, options);
   }
+  if (settings.auth?.strategy.includes("jwt") && settings.secret.startsWith("unsafe-")) {
+    console.warn(
+      "[server:auth] jwt strategy with no SECRET set: tokens are signed with a random per-process secret, so they break on restart and across instances. Set the SECRET environment variable (or the `secret` option)."
+    );
+  }
   if (options.openapi) {
     if (options.openapi === true) {
       settings.openapi = {};
@@ -1720,13 +1852,20 @@ async function parseResponse(out, ctx) {
     if (!ctx.options.session?.store) {
       throw ServerError_default.NO_STORE();
     }
-    if (!ctx.cookies.session) {
+    let id = ctx.cookies.session;
+    if (!id) {
+      id = createId();
       out.headers.append(
         "set-cookie",
-        createCookies("session", { value: createId() })
+        createCookies("session", {
+          value: id,
+          path: "/",
+          httpOnly: true,
+          secure: ctx.platform.production,
+          sameSite: "Lax"
+        })
       );
     }
-    const id = ctx.cookies.session;
     ctx.options.session.store.set(id, ctx.session);
   }
   if (ctx.options.cookies) {
@@ -1786,15 +1925,6 @@ function pathPattern(pattern, path2) {
   if (allSame) return params;
   return null;
 }
-
-// src/helpers/StatusError.ts
-var StatusError = class extends Error {
-  status;
-  constructor(msg, status2 = 500) {
-    super(msg);
-    this.status = status2;
-  }
-};
 
 // src/helpers/validate.ts
 function validate(ctx, schema) {
@@ -2035,6 +2165,14 @@ async function verify(password, hash3) {
   });
 }
 
+// src/helpers/safeEqual.ts
+function safeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 // src/auth/findSessionId.ts
 var validateToken = (authorization) => {
   const [type2, id] = authorization.trim().split(" ");
@@ -2067,12 +2205,41 @@ function findSessionId(ctx) {
 }
 
 // src/auth/getUser.ts
+function getKeyUser(ctx) {
+  const expected = ctx.options.auth.key;
+  const header = ctx.headers.authorization;
+  if (!header) return;
+  const [type2, provided] = header.trim().split(" ");
+  if (type2?.toLowerCase() !== "bearer" || !provided) {
+    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+  }
+  if (!expected || !safeEqual(provided, expected)) {
+    throw ServerError_default.AUTH_INVALID_TOKEN();
+  }
+  return { id: "key", strategy: "key", provider: "key" };
+}
+async function getAuthSession(ctx) {
+  const strategy = ctx.options.auth.strategy;
+  if (strategy.includes("jwt")) {
+    const header = ctx.headers.authorization;
+    if (!header) return;
+    const [type2, token] = header.trim().split(" ");
+    if (type2?.toLowerCase() !== "bearer" || !token) {
+      throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+    }
+    const payload = await verifyJwt(token, ctx.options.secret);
+    if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
+    return payload;
+  }
+  const id = findSessionId(ctx);
+  if (!id) return;
+  return ctx.options.auth.session.get(id);
+}
 async function getUser(ctx) {
   if (!ctx.options.auth) return;
   const options = ctx.options.auth;
-  const sessionId = findSessionId(ctx);
-  if (!sessionId) return;
-  const auth2 = await options.session.get(sessionId);
+  if (options.strategy === "key") return getKeyUser(ctx);
+  const auth2 = await getAuthSession(ctx);
   if (!auth2) return;
   if (options.strategy !== auth2.strategy) {
     throw ServerError_default.AUTH_INVALID_STRATEGY({
@@ -2095,18 +2262,16 @@ async function getUser(ctx) {
 
 // src/auth/logout.ts
 async function logout(ctx) {
-  const session2 = findSessionId(ctx);
   const { strategy } = ctx.user;
-  await ctx.options.auth.session.del(session2);
   if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
+  if (!strategy.includes("jwt")) {
+    await ctx.options.auth.session.del(findSessionId(ctx));
+  }
+  if (strategy.includes("token") || strategy.includes("jwt")) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
     return cookies({ authentication: null }).redirect("/");
-  }
-  if (strategy.includes("jwt")) {
-    throw new Error("JWT auth not supported yet");
   }
   if (strategy.includes("key")) {
     throw new Error("Key auth not supported yet");
@@ -2126,6 +2291,7 @@ function auth(app) {
   app.use(async function middle(ctx) {
     ctx.user = await getUser(ctx);
   });
+  if (app.settings.auth.strategy === "key") return;
   app.post("/auth/logout", logout);
   const enabled = app.settings.auth.providers;
   for (const name of oauth2) {
@@ -2152,21 +2318,78 @@ function auth(app) {
   }
 }
 
+// src/helpers/parseRange.ts
+function parseRange(header, size) {
+  if (!header) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+  const [, rawStart, rawEnd] = match;
+  if (rawStart === "" && rawEnd === "") return null;
+  let start;
+  let end;
+  if (rawStart === "") {
+    const n = Number(rawEnd);
+    if (n <= 0) return "unsatisfiable";
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd === "" ? size - 1 : Number(rawEnd);
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (size === 0 || start > end || start >= size) return "unsatisfiable";
+  return { start, end: Math.min(end, size - 1) };
+}
+
 // src/middle/assets.ts
+var CACHE_CONTROL = "public, max-age=3600";
 async function assets(ctx) {
   if (!ctx.options.public) return;
   if (ctx.method !== "get") return;
   if (ctx.url.pathname === "/") return;
   try {
-    const asset = ctx.options.public.file(ctx.url.pathname);
-    if (!await asset.exists()) return;
-    return type(ctx.url.pathname.split(".").pop()).send(asset.stream());
+    const key = ctx.url.pathname.replace(/^\/+/, "");
+    const file2 = ctx.options.public.file(key);
+    const meta = file2.info ? await file2.info() : null;
+    if (meta ? !meta.exists : !await file2.exists()) return;
+    const ext2 = ctx.url.pathname.split(".").pop();
+    const ctype = meta?.type || ext2;
+    const headers2 = { "cache-control": CACHE_CONTROL };
+    let tag;
+    if (meta) {
+      const stamp = meta.date ? meta.date.getTime() : 0;
+      tag = `W/"${meta.size.toString(16)}-${stamp.toString(16)}"`;
+      headers2.etag = tag;
+      if (meta.date) headers2["last-modified"] = meta.date.toUTCString();
+    }
+    const canRange = !!(meta && file2.slice);
+    if (canRange) headers2["accept-ranges"] = "bytes";
+    if (tag && ctx.headers["if-none-match"] === tag) {
+      return status(304).headers(headers2).send();
+    }
+    const rangeHeader = ctx.headers.range;
+    const ifRange = ctx.headers["if-range"];
+    if (meta && file2.slice && rangeHeader && (!ifRange || ifRange === tag)) {
+      const range = parseRange(rangeHeader, meta.size);
+      if (range === "unsatisfiable") {
+        return status(416).headers({ ...headers2, "content-range": `bytes */${meta.size}` }).send();
+      }
+      if (range) {
+        const { start, end } = range;
+        return type(ctype).status(206).headers({
+          ...headers2,
+          "content-range": `bytes ${start}-${end}/${meta.size}`,
+          "content-length": String(end - start + 1)
+        }).send(file2.slice(start, end + 1).stream());
+      }
+    }
+    return type(ctype).headers(headers2).send(file2.stream());
   } catch {
   }
 }
 
 // src/middle/favicon.ts
-var CACHE_CONTROL = "public, max-age=86400";
+var CACHE_CONTROL2 = "public, max-age=86400";
 var ext = (name) => name.split(".").pop() || "ico";
 async function loadFavicon(fav) {
   try {
@@ -2185,7 +2408,7 @@ async function favicon(ctx) {
   }
   const entry = ctx.app.faviconCache;
   if (!entry) return 204;
-  const headers2 = { "cache-control": CACHE_CONTROL, etag: entry.etag };
+  const headers2 = { "cache-control": CACHE_CONTROL2, etag: entry.etag };
   if (ctx.headers["if-none-match"] === entry.etag) {
     return status(304).headers(headers2).send();
   }
@@ -2693,12 +2916,16 @@ var Node = async (app) => {
       if ("error" in ctx) throw ctx.error;
       const out = await handleRequest(app, ctx);
       response.writeHead(out.status || 200, parseHeaders_default(out.headers));
-      if (out.body instanceof ReadableStream) {
-        await iterate(out.body, (chunk) => response.write(chunk));
-      } else {
-        response.write(out.body || "");
+      try {
+        if (out.body instanceof ReadableStream) {
+          await iterate(out.body, (chunk) => response.write(chunk));
+        } else {
+          response.write(out.body || "");
+        }
+        response.end();
+      } catch {
+        if (!response.destroyed) response.destroy();
       }
-      response.end();
     }
   );
   await attachWebsocket(server2, app);

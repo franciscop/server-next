@@ -44,6 +44,39 @@ describe("session", () => {
   });
 });
 
+describe("new session (no incoming cookie)", () => {
+  // Regression for the bug where a freshly-issued session is stored under the
+  // OLD cookie id (undefined) instead of the new id sent in Set-Cookie, so it
+  // can never be read back. Expected to FAIL until parseResponse is fixed.
+  const store = kv(new Map());
+  const api = server({ store })
+    .post("/inc", (ctx) => {
+      ctx.session.count = Number(ctx.session.count || 0) + 1;
+      return { count: ctx.session.count };
+    })
+    .get("/count", (ctx) => ({ count: ctx.session.count ?? null }))
+    .test();
+
+  it("persists the session under the cookie it issued", async () => {
+    // First request: no cookie -> the server issues a session cookie
+    const res = await api.post("/inc", {});
+    expect(await res.json()).toEqual({ count: 1 });
+
+    const setCookie = res.headers.get("set-cookie") || "";
+    const id = setCookie.match(/session=([^;]+)/)?.[1];
+    expect(id).toBeTruthy();
+    // The session cookie is hardened (HttpOnly + SameSite; Secure in prod).
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Lax");
+
+    // Second request WITH that exact cookie: the count must be remembered
+    const res2 = await api.get("/count", {
+      headers: { cookie: `session=${id}` },
+    });
+    expect(await res2.json()).toEqual({ count: 1 });
+  });
+});
+
 describe("missing store", () => {
   const api = server({ store: null })
     .get("/read", (ctx) => `Bye ${ctx.session.a}`)

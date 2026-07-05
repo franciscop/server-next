@@ -8,7 +8,7 @@ export type LimitOptions = {
   fileType?: string[];
 };
 
-function parseBytes(value: number | string): number {
+export function parseBytes(value: number | string): number {
   if (typeof value === "number") return value;
   const units: Record<string, number> = {
     b: 1,

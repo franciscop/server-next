@@ -1,5 +1,13 @@
-import type { BodyMode, Context } from "../types";
+import type { BodyOption, Context } from "../types";
 import parseBody from "./parseBody";
+import StatusError from "./StatusError";
+import { parseBytes } from "./upload";
+
+const INF = Number.POSITIVE_INFINITY;
+const resolveMax = (max: number | string | false | undefined): number =>
+  max === false || max == null ? INF : parseBytes(max);
+const tooLarge = (max: number) =>
+  new StatusError(`Request body exceeds the ${max}-byte limit`, 413);
 
 // The runtime-specific way to read the request body, attached by each context
 // builder (node.ts / winter.ts) and consumed once by resolveBody. Kept off the
@@ -22,14 +30,26 @@ export function setBodySource(ctx: Context, source: BodySource): void {
 // This runs at dispatch (after routing) so a per-route mode can take effect and
 // a `stream` route never buffers. Both builders normalize getStream() to a web
 // ReadableStream, so ctx.body is the same shape on Node and the web runtimes.
-export async function resolveBody(ctx: Context, mode: BodyMode): Promise<any> {
+export async function resolveBody(
+  ctx: Context,
+  body: BodyOption,
+): Promise<any> {
   const source = sources.get(ctx);
   if (!source) return undefined;
+
+  const mode = typeof body === "string" ? body : (body?.mode ?? "parse");
+  const max = resolveMax(typeof body === "object" ? body?.max : undefined);
+
+  // Reject up front when the client declares a body larger than the limit, so we
+  // never start reading an oversized request (works for every mode).
+  const declared = Number(ctx.headers["content-length"]);
+  if (max !== INF && declared > max) throw tooLarge(max);
 
   if (mode === "stream") return source.getStream();
 
   if (mode === "raw") {
     const raw = await source.getBuffer();
+    if (raw.length > max) throw tooLarge(max);
     if (!raw.length) return undefined;
     // Reflect the real received size when the client didn't send Content-Length
     // (e.g. chunked uploads), so ctx.headers and the request log are accurate.
@@ -52,11 +72,14 @@ export async function resolveBody(ctx: Context, mode: BodyMode): Promise<any> {
     new TransformStream({
       transform(chunk, controller) {
         size += (chunk as Uint8Array).byteLength;
+        // Enforce the limit as bytes flow, so a chunked/undeclared body can't
+        // slip past the Content-Length pre-check.
+        if (size > max) return controller.error(tooLarge(max));
         controller.enqueue(chunk);
       },
     }),
   );
-  const body = await parseBody(
+  const parsed = await parseBody(
     counted,
     ctx.headers["content-type"],
     ctx.options.uploads,
@@ -64,5 +87,5 @@ export async function resolveBody(ctx: Context, mode: BodyMode): Promise<any> {
   if (size && !ctx.headers["content-length"]) {
     ctx.headers["content-length"] = String(size);
   }
-  return body;
+  return parsed;
 }
