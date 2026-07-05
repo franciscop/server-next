@@ -230,7 +230,9 @@ type ParamsToObject<Params extends string> = {
 };
 type PathToParams<Path extends string> = ParamsToObject<ExtractPathParams<Path>>;
 type BunEnv = Record<string, string> & {
-    upgrade?: (req: Request) => boolean;
+    upgrade?: (req: Request, options?: {
+        data?: any;
+    }) => boolean;
 };
 type Context<Params extends Record<string, string | undefined> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
@@ -407,9 +409,9 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
             signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
-        post: (path: string, body?: string | number | boolean | ArrayBuffer | {
+        post: (path: string, body?: string | number | boolean | ArrayBuffer | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+        } | SerializableValue[], options?: {
             cache?: RequestCache;
             credentials?: RequestCredentials;
             headers?: HeadersInit;
@@ -424,9 +426,9 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
             signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
-        put: (path: string, body?: string | number | boolean | ArrayBuffer | {
+        put: (path: string, body?: string | number | boolean | ArrayBuffer | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+        } | SerializableValue[], options?: {
             cache?: RequestCache;
             credentials?: RequestCredentials;
             headers?: HeadersInit;
@@ -441,9 +443,9 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
             signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
-        patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
+        patch: (path: string, body?: string | number | boolean | ArrayBuffer | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams | {
             [key: string]: SerializableValue;
-        } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
+        } | SerializableValue[], options?: {
             cache?: RequestCache;
             credentials?: RequestCredentials;
             headers?: HeadersInit;

@@ -352,7 +352,7 @@ export type PathToParams<Path extends string> = ParamsToObject<
 >;
 
 export type BunEnv = Record<string, string> & {
-  upgrade?: (req: Request) => boolean;
+  upgrade?: (req: Request, options?: { data?: any }) => boolean;
 };
 
 export type Context<

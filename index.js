@@ -1736,9 +1736,10 @@ function etag(bytes) {
 function createWebsocket(sockets, handlers) {
   const run = (event, socket, body) => {
     const routes = handlers.socket?.filter((r2) => r2.path === event) ?? [];
+    const user = socket.user ?? socket.data?.user;
     for (const route of routes) {
       for (const fn of route.fns) {
-        fn({ socket, sockets, body });
+        fn({ socket, sockets, body, user });
       }
     }
   };
@@ -2632,6 +2633,13 @@ function timer(ctx) {
   ctx.time = createTime();
 }
 
+// src/auth/socketUser.ts
+async function socketUser(app, headers2, cookies2) {
+  if (!app.settings.auth) return void 0;
+  const ctx = { options: app.settings, headers: headers2, cookies: cookies2 };
+  return getUser(ctx);
+}
+
 // src/helpers/wsNode.ts
 var GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 var CONTINUATION = 0;
@@ -2666,6 +2674,9 @@ var NodeWebSocket = class {
   fragmentOpcode;
   closed;
   readyState;
+  // The auth user resolved from the upgrade request (see attachWebsocket), or
+  // undefined for an anonymous connection. Read by socket handlers as `ctx.user`.
+  user;
   constructor(socket, handlers) {
     this.socket = socket;
     this.handlers = handlers;
@@ -2764,10 +2775,21 @@ var NodeWebSocket = class {
 };
 async function attachWebsocket(server2, app) {
   const { createHash } = await import("crypto");
-  server2.on("upgrade", (req, socket, head) => {
+  server2.on("upgrade", async (req, socket, head) => {
     const key = req.headers["sec-websocket-key"];
     const upgrade = String(req.headers.upgrade || "").toLowerCase();
     if (upgrade !== "websocket" || !key || !app.handlers.socket.length) {
+      socket.destroy();
+      return;
+    }
+    const cookies2 = parseCookies(req.headers.cookie);
+    let user;
+    try {
+      user = await socketUser(app, req.headers, cookies2);
+    } catch {
+      socket.write(
+        "HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
+      );
       socket.destroy();
       return;
     }
@@ -2786,6 +2808,7 @@ Sec-WebSocket-Accept: ${accept}\r
       onMessage: (body) => app.websocket.message(ws, body),
       onClose: () => app.websocket.close(ws)
     });
+    ws.user = user;
     app.websocket.open(ws);
     if (head?.length) ws.receive(head);
     socket.on("data", (chunk) => ws.receive(chunk));
@@ -2902,7 +2925,20 @@ async function createWinter(req, app, server2) {
 
 // src/context/handlers.ts
 var Winter = async (app, request, env2) => {
-  if (env2?.upgrade(request)) return;
+  if (env2?.upgrade) {
+    const wantsWs = String(request.headers.get("upgrade") || "").toLowerCase() === "websocket";
+    if (wantsWs) {
+      const headers2 = parseHeaders_default(request.headers);
+      const cookies2 = parseCookies(headers2.cookie);
+      let user;
+      try {
+        user = await socketUser(app, headers2, cookies2);
+      } catch {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      if (env2.upgrade(request, { data: { user } })) return;
+    }
+  }
   Object.assign(globalThis.env, env2);
   const ctx = await createWinter(request, app, env2);
   const res = await handleRequest(app, ctx);
