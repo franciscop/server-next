@@ -31,3 +31,7 @@ const app = new Hono()
 app.get('/', (c) => c.text('Hello Hono!'))
 export default handle(app)
 ```
+
+### How do I render HTML templates?
+
+Server.js has no built-in template engine; return the rendered string from your route and it's served as `text/html`. See [Templates](#templates) for EJS, Pug and Handlebars examples, or [JSX](#jsx) on Bun.

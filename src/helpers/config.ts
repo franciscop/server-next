@@ -29,6 +29,11 @@ export default function config(options: Options = {}): Settings {
     security: resolveSecurity(options.security),
   };
 
+  // Response caching: a default Cache-Control for GET responses, plus auto-ETag.
+  // Kept raw (resolved per-request in applyCache) so a route's `cache` option can
+  // override it the same way `body` does. Off by default.
+  if (options.cache !== undefined) settings.cache = options.cache;
+
   // CORS
   options.cors = options.cors || env.CORS || null;
   if (options.cors) {
@@ -151,6 +156,7 @@ export default function config(options: Options = {}): Settings {
     log.message("cors", origin);
   }
   if (settings.favicon) log.message("favicon", loc(settings.favicon));
+  if (settings.cache !== undefined) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
 
   return settings;

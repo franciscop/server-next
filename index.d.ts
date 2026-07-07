@@ -34,11 +34,13 @@ type BodyOption = BodyMode | {
     mode?: BodyMode;
     max?: number | string | false;
 };
+type CacheOption = string | number | false;
 type RouteOptions = {
     tags?: string | string[];
     title?: string;
     description?: string;
     body?: BodyOption;
+    cache?: CacheOption;
 };
 type Route = {
     path: string;
@@ -188,6 +190,7 @@ type Options = {
     favicon?: string | BucketFile;
     security?: boolean | SecurityOptions;
     body?: BodyOption;
+    cache?: CacheOption;
 };
 type Settings = {
     port: number;
@@ -207,6 +210,7 @@ type Settings = {
     favicon?: string | BucketFile;
     security: SecuritySettings;
     body: BodyOption;
+    cache?: CacheOption;
 };
 type Time = {
     (name: string): void;
@@ -345,6 +349,7 @@ declare class Reply {
     type(type?: string): this;
     download(name?: string): this;
     headers(key: string | Record<string, string>, value?: string): this;
+    cache(value: CacheOption): this;
     cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
     json(body: unknown): Response;
     redirect(path: string): Response;
@@ -355,6 +360,7 @@ type Params<K extends keyof Reply> = Reply[K] extends (...args: infer A) => any 
 declare const status: (...args: Params<"status">) => Reply;
 declare const headers: (...args: Params<"headers">) => Reply;
 declare const type: (...args: Params<"type">) => Reply;
+declare const cache: (...args: Params<"cache">) => Reply;
 declare const download: (...args: Params<"download">) => Reply;
 declare const cookies: (...args: Params<"cookies">) => Reply;
 declare const send: (...args: Params<"send">) => Response;
@@ -494,4 +500,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };

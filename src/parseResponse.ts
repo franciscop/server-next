@@ -1,4 +1,5 @@
 import {
+  applyCache,
   applyCors,
   applySecurity,
   createCookies,
@@ -90,6 +91,11 @@ export default async function parseResponse(
 
   // Secure-by-default response headers (X-Frame-Options, nosniff, HSTS, ...)
   applySecurity(out, ctx);
+
+  // Cache-Control default (route/global `cache`) + auto-ETag with a 304
+  // short-circuit. May rebuild `out`, so it runs before session/cookie headers
+  // are appended below (those land on the response we actually return).
+  out = await applyCache(out, ctx);
 
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count

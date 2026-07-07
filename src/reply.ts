@@ -1,6 +1,6 @@
-import { createCookies, mimes, toWeb } from "./helpers";
+import { createCookies, mimes, resolveCache, toWeb } from "./helpers";
 import isReadableStream from "./helpers/isReadableStream";
-import type { Cookie } from "./types";
+import type { CacheOption, Cookie } from "./types";
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 const EXPIRED = new Date(0).toUTCString();
@@ -50,6 +50,12 @@ class Reply {
     }
 
     this.res.headers.append(key, value);
+    return this;
+  }
+
+  cache(value: CacheOption): this {
+    const resolved = resolveCache(value);
+    if (resolved) this.res.headers.set("cache-control", resolved);
     return this;
   }
 
@@ -164,6 +170,7 @@ const r = () => new Reply();
 export const status = (...args: Params<"status">) => r().status(...args);
 export const headers = (...args: Params<"headers">) => r().headers(...args);
 export const type = (...args: Params<"type">) => r().type(...args);
+export const cache = (...args: Params<"cache">) => r().cache(...args);
 export const download = (...args: Params<"download">) => r().download(...args);
 export const cookies = (...args: Params<"cookies">) => r().cookies(...args);
 export const send = (...args: Params<"send">) => r().send(...args);

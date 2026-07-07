@@ -1,4 +1,5 @@
 export { resolveBody, setBodySource } from "./body";
+export { applyCache, resolveCache } from "./cache";
 export { default as clientIp } from "./clientIp";
 export { default as config } from "./config";
 export { default as cors, applyCors } from "./cors";

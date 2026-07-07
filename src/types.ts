@@ -42,11 +42,16 @@ export type BodyOption =
   | BodyMode
   | { mode?: BodyMode; max?: number | string | false };
 
+// How responses are cached: a duration ('1h'), a number of seconds, or `false`
+// (`0`) for no-store. Sets `Cache-Control`; for anything fancier, use headers().
+export type CacheOption = string | number | false;
+
 export type RouteOptions = {
   tags?: string | string[];
   title?: string;
   description?: string;
   body?: BodyOption;
+  cache?: CacheOption;
   // [key: string]: any;
 };
 
@@ -269,6 +274,7 @@ export type Options = {
   favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
   body?: BodyOption;
+  cache?: CacheOption;
 };
 
 export type Settings = {
@@ -287,6 +293,7 @@ export type Settings = {
   favicon?: string | BucketFile;
   security: SecuritySettings;
   body: BodyOption;
+  cache?: CacheOption;
 };
 
 export type Time = {

@@ -683,6 +683,97 @@ async function resolveBody(ctx, body) {
   return parsed;
 }
 
+// src/helpers/createCookies.ts
+var EXPIRED = (/* @__PURE__ */ new Date(0)).toUTCString();
+var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
+parse.millisecond = parse.ms = 1e-3;
+parse.second = parse.sec = parse.s = parse[""] = 1;
+parse.minute = parse.min = parse.m = parse.s * 60;
+parse.hour = parse.hr = parse.h = parse.m * 60;
+parse.day = parse.d = parse.h * 24;
+parse.week = parse.wk = parse.w = parse.d * 7;
+parse.year = parse.yr = parse.y = parse.d * 365.25;
+parse.month = parse.b = parse.y / 12;
+function parse(str) {
+  if (str === null || str === void 0) return null;
+  if (typeof str === "number") return str;
+  if (typeof str !== "string") {
+    throw new Error(`Not a string: ${str} (${typeof str})`);
+  }
+  str = str.toLowerCase().replace(/[,_]/g, "");
+  const [_, value, units] = times.exec(str) || [];
+  if (!units) return null;
+  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
+  if (!unitValue) return null;
+  const result = unitValue * parseFloat(value);
+  return Math.abs(Math.round(result * 1e3));
+}
+function normalizeExpires(expires) {
+  if (expires === null || expires === void 0) return void 0;
+  if (expires === 0) return EXPIRED;
+  if (typeof expires === "string") {
+    if (/^[\d._]+\w+$/.test(expires)) {
+      return new Date(Date.now() + parse(expires)).toUTCString();
+    } else {
+      return expires;
+    }
+  }
+  if (typeof expires === "number") {
+    return new Date(Date.now() + expires).toUTCString();
+  }
+  if (expires instanceof Date) {
+    return expires.toUTCString();
+  }
+  return void 0;
+}
+function createCookies(key, val) {
+  if (val.value === null) val.expires = EXPIRED;
+  const { value, path: path2, expires, maxAge, httpOnly, secure, sameSite } = val;
+  let str = `${key}=${value || ""};Path=${path2 || "/"}`;
+  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
+  if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
+  if (httpOnly) str += ";HttpOnly";
+  if (secure) str += ";Secure";
+  if (sameSite) str += `;SameSite=${sameSite}`;
+  return str;
+}
+
+// src/helpers/etag.ts
+function etag(bytes) {
+  let h = 2166136261;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i];
+    h = Math.imul(h, 16777619);
+  }
+  return `"${bytes.length.toString(16)}-${(h >>> 0).toString(16)}"`;
+}
+
+// src/helpers/cache.ts
+function resolveCache(value) {
+  if (value === false || value === 0) return "no-store";
+  if (typeof value === "number") return `public, max-age=${Math.round(value)}`;
+  if (typeof value !== "string") return null;
+  const ms = parse(value);
+  return ms === null ? null : `public, max-age=${Math.round(ms / 1e3)}`;
+}
+async function applyCache(out, ctx) {
+  if (ctx.method !== "get" || out.status !== 200) return out;
+  if (!out.headers.has("cache-control")) {
+    const value = resolveCache(ctx.options.cache);
+    if (value) out.headers.set("cache-control", value);
+  }
+  if (out.headers.has("etag") || !out.headers.has("content-length")) return out;
+  const bytes = new Uint8Array(await out.arrayBuffer());
+  const tag = etag(bytes);
+  const headers2 = new Headers(out.headers);
+  headers2.set("etag", tag);
+  if (ctx.headers["if-none-match"] === tag) {
+    headers2.delete("content-length");
+    return new Response(null, { status: 304, headers: headers2 });
+  }
+  return new Response(bytes, { status: 200, headers: headers2 });
+}
+
 // src/helpers/clientIp.ts
 var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
 var normalize = (ip) => ip.replace(/^::ffff:/, "");
@@ -707,7 +798,7 @@ function isReadableStream(obj) {
 }
 
 // src/reply.ts
-var EXPIRED = (/* @__PURE__ */ new Date(0)).toUTCString();
+var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
 var Reply = class {
   res;
   constructor() {
@@ -743,6 +834,11 @@ var Reply = class {
     this.res.headers.append(key, value);
     return this;
   }
+  cache(value) {
+    const resolved = resolveCache(value);
+    if (resolved) this.res.headers.set("cache-control", resolved);
+    return this;
+  }
   cookies(key, value) {
     if (typeof key === "object") {
       Object.entries(key).map(([key2, value2]) => this.cookies(key2, value2));
@@ -752,7 +848,7 @@ var Reply = class {
       Object.values(value).map((val) => this.cookies(key, val));
       return this;
     }
-    if (value === null) return this.cookies(key, { expires: EXPIRED });
+    if (value === null) return this.cookies(key, { expires: EXPIRED2 });
     if (typeof value !== "object") return this.cookies(key, { value });
     return this.headers("set-cookie", createCookies(key, value));
   }
@@ -822,6 +918,7 @@ var r = () => new Reply();
 var status = (...args) => r().status(...args);
 var headers = (...args) => r().headers(...args);
 var type = (...args) => r().type(...args);
+var cache = (...args) => r().cache(...args);
 var download = (...args) => r().download(...args);
 var cookies = (...args) => r().cookies(...args);
 var send = (...args) => r().send(...args);
@@ -937,61 +1034,6 @@ async function finishLogin(ctx, input) {
   }
   if (strategy.includes("key")) throw new Error("Key auth not supported yet");
   throw new Error("Unknown auth type");
-}
-
-// src/helpers/createCookies.ts
-var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
-var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
-parse.millisecond = parse.ms = 1e-3;
-parse.second = parse.sec = parse.s = parse[""] = 1;
-parse.minute = parse.min = parse.m = parse.s * 60;
-parse.hour = parse.hr = parse.h = parse.m * 60;
-parse.day = parse.d = parse.h * 24;
-parse.week = parse.wk = parse.w = parse.d * 7;
-parse.year = parse.yr = parse.y = parse.d * 365.25;
-parse.month = parse.b = parse.y / 12;
-function parse(str) {
-  if (str === null || str === void 0) return null;
-  if (typeof str === "number") return str;
-  if (typeof str !== "string") {
-    throw new Error(`Not a string: ${str} (${typeof str})`);
-  }
-  str = str.toLowerCase().replace(/[,_]/g, "");
-  const [_, value, units] = times.exec(str) || [];
-  if (!units) return null;
-  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
-  if (!unitValue) return null;
-  const result = unitValue * parseFloat(value);
-  return Math.abs(Math.round(result * 1e3));
-}
-function normalizeExpires(expires) {
-  if (expires === null || expires === void 0) return void 0;
-  if (expires === 0) return EXPIRED2;
-  if (typeof expires === "string") {
-    if (/^[\d._]+\w+$/.test(expires)) {
-      return new Date(Date.now() + parse(expires)).toUTCString();
-    } else {
-      return expires;
-    }
-  }
-  if (typeof expires === "number") {
-    return new Date(Date.now() + expires).toUTCString();
-  }
-  if (expires instanceof Date) {
-    return expires.toUTCString();
-  }
-  return void 0;
-}
-function createCookies(key, val) {
-  if (val.value === null) val.expires = EXPIRED2;
-  const { value, path: path2, expires, maxAge, httpOnly, secure, sameSite } = val;
-  let str = `${key}=${value || ""};Path=${path2 || "/"}`;
-  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
-  if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
-  if (httpOnly) str += ";HttpOnly";
-  if (secure) str += ";Secure";
-  if (sameSite) str += `;SameSite=${sameSite}`;
-  return str;
 }
 
 // src/auth/state.ts
@@ -1606,6 +1648,7 @@ function config(options = {}) {
     // the added headers off; see resolveSecurity for the defaults.
     security: resolveSecurity(options.security)
   };
+  if (options.cache !== void 0) settings.cache = options.cache;
   options.cors = options.cors || env2.CORS || null;
   if (options.cors) {
     const cors2 = {
@@ -1683,6 +1726,7 @@ function config(options = {}) {
     log.message("cors", origin);
   }
   if (settings.favicon) log.message("favicon", loc(settings.favicon));
+  if (settings.cache !== void 0) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
   return settings;
 }
@@ -1720,16 +1764,6 @@ function applyCors(res, ctx) {
   if (ctx.method === "options") {
     res.headers.set("Access-Control-Max-Age", "86400");
   }
-}
-
-// src/helpers/etag.ts
-function etag(bytes) {
-  let h = 2166136261;
-  for (let i = 0; i < bytes.length; i++) {
-    h ^= bytes[i];
-    h = Math.imul(h, 16777619);
-  }
-  return `"${bytes.length.toString(16)}-${(h >>> 0).toString(16)}"`;
 }
 
 // src/helpers/createWebsocket.ts
@@ -1846,6 +1880,7 @@ async function parseResponse(out, ctx) {
   }
   applyCors(out, ctx);
   applySecurity(out, ctx);
+  out = await applyCache(out, ctx);
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
@@ -3173,6 +3208,7 @@ function server(options) {
 export {
   Server,
   ServerError_default as ServerError,
+  cache,
   cookies,
   server as default,
   download,
