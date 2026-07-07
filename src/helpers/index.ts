@@ -11,7 +11,6 @@ export { default as define } from "./define";
 export { default as getMachine } from "./getMachine";
 export { default as handleRequest } from "./handleRequest";
 export { default as hash } from "./hash";
-export { default as iterate } from "./iterate";
 export { default as iteratorAsyncToReadable } from "./iteratorAsyncToReadable";
 export { default as iteratorToReadable } from "./iteratorToReadable";
 export { default as parseBody } from "./parseBody";

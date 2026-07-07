@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import type { BunEnv, Server } from "..";
 import socketUser from "../auth/socketUser";
-import { handleRequest, iterate, parseCookies, parseHeaders } from "../helpers";
+import { handleRequest, parseCookies, parseHeaders } from "../helpers";
 import { attachWebsocket } from "../helpers/wsNode";
 import createNode from "./node";
 import createWinter from "./winter";
@@ -50,7 +50,15 @@ export const Node = async (app: Server) => {
 			response.writeHead(out.status || 200, parseHeaders(out.headers));
 			try {
 				if (out.body instanceof ReadableStream) {
-					await iterate(out.body, (chunk) => response.write(chunk));
+					// Cancel the reader on disconnect so the source cleans up, instead
+					// of looping forever writing to a dead socket.
+					const reader = out.body.getReader();
+					response.on("close", () => reader.cancel().catch(() => {}));
+					while (true) {
+						const { value, done } = await reader.read();
+						if (done) break;
+						response.write(value);
+					}
 				} else {
 					response.write(out.body || "");
 				}

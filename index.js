@@ -2064,22 +2064,14 @@ async function hash2(password) {
   });
 }
 
-// src/helpers/iterate.ts
-async function iterate(stream, cb) {
-  const reader = stream.getReader();
-  while (true) {
-    const chunk = await reader.read();
-    if (chunk.done || !chunk.value) return;
-    cb(chunk.value);
-  }
-}
-
 // src/helpers/iteratorAsyncToReadable.ts
 function iteratorAsyncToReadable(asyncGenerator) {
+  let cancelled = false;
   return new ReadableStream({
     async pull(controller) {
       try {
         const { value, done } = await asyncGenerator.next();
+        if (cancelled) return;
         if (done) {
           controller.close();
           return;
@@ -2090,8 +2082,10 @@ function iteratorAsyncToReadable(asyncGenerator) {
         controller.error(err);
       }
     },
-    cancel() {
-      console.log("Stream cancelled");
+    // Return the generator so its `finally {}` runs and releases resources.
+    async cancel(reason) {
+      cancelled = true;
+      await asyncGenerator.return?.(reason);
     }
   });
 }
@@ -2989,7 +2983,14 @@ var Node = async (app) => {
       response.writeHead(out.status || 200, parseHeaders_default(out.headers));
       try {
         if (out.body instanceof ReadableStream) {
-          await iterate(out.body, (chunk) => response.write(chunk));
+          const reader = out.body.getReader();
+          response.on("close", () => reader.cancel().catch(() => {
+          }));
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            response.write(value);
+          }
         } else {
           response.write(out.body || "");
         }
