@@ -264,6 +264,13 @@ export type SecuritySettings = {
 
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 
+// A hook over every outgoing HTTP response. Return a Response to replace it
+// (sent as-is, no re-finalizing), or nothing to leave it unchanged.
+type OnResponse = (
+  response: Response,
+  ctx: Context,
+) => Response | void | Promise<Response | void>;
+
 export type Options = {
   port?: number;
   secret?: string;
@@ -276,6 +283,7 @@ export type Options = {
   auth?: AuthOption;
   openapi?: any;
   onError?: OnError;
+  onResponse?: OnResponse;
   log?: LogLevel | boolean;
   favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
@@ -295,6 +303,7 @@ export type Settings = {
   auth?: AuthSettings;
   openapi?: any;
   onError?: OnError;
+  onResponse?: OnResponse;
   log: Logger;
   favicon?: string | BucketFile;
   security: SecuritySettings;

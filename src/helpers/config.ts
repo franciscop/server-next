@@ -142,6 +142,9 @@ export default function config(options: Options = {}): Settings {
       });
     });
 
+  // Optional "after the response" hook; undefined simply means no hook.
+  settings.onResponse = options.onResponse;
+
   // Startup summary: one concise line per configured module (only with `log`)
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
   if (settings.auth) {

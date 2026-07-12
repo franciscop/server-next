@@ -204,6 +204,7 @@ type SecuritySettings = {
     hsts: string | null;
 };
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
+type OnResponse = (response: Response, ctx: Context) => Response | void | Promise<Response | void>;
 type Options = {
     port?: number;
     secret?: string;
@@ -218,6 +219,7 @@ type Options = {
     auth?: AuthOption;
     openapi?: any;
     onError?: OnError;
+    onResponse?: OnResponse;
     log?: LogLevel | boolean;
     favicon?: string | BucketFile;
     security?: boolean | SecurityOptions;
@@ -238,6 +240,7 @@ type Settings = {
     auth?: AuthSettings;
     openapi?: any;
     onError?: OnError;
+    onResponse?: OnResponse;
     log: Logger;
     favicon?: string | BucketFile;
     security: SecuritySettings;

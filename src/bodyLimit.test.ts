@@ -44,12 +44,59 @@ describe("body.max (request size limit)", () => {
     expect(res.status).toBe(413);
   });
 
-  it("has no limit by default", async () => {
+  it("defaults to a 1mb limit", async () => {
     const api = server()
+      .post("/", (ctx) => (typeof ctx.body === "string" ? "ok" : ctx.body))
+      .test();
+    // Under 1mb passes...
+    expect((await api.post("/", "x".repeat(500_000))).status).toBe(200);
+    // ...over 1mb is rejected with a 413.
+    const big = await api.post("/", "x".repeat(1_100_000));
+    expect(big.status).toBe(413);
+  });
+
+  it("max: false disables the limit", async () => {
+    const api = server({ body: { max: false } })
+      .post("/", () => "ok")
+      .test();
+    expect((await api.post("/", "x".repeat(2_000_000))).status).toBe(200);
+  });
+
+  it("does not count multipart file bytes against the limit", async () => {
+    // A 200kb file under a 10kb body limit must still succeed: file bytes stream
+    // to `uploads` and are exempt; only text fields would count.
+    const boundary = "----t";
+    const file = "F".repeat(200_000);
+    const raw =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="avatar"; filename="a.bin"\r\n` +
+      `Content-Type: application/octet-stream\r\n\r\n` +
+      `${file}\r\n` +
+      `--${boundary}--\r\n`;
+    const api = server({ uploads: "./uploads", body: { max: "10kb" } })
+      .post("/", (ctx) => ({ size: (ctx.body as any).avatar.size }))
+      .test();
+    const res = await api.post("/", raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).size).toBe(200_000);
+  });
+
+  it("does count multipart text fields against the limit", async () => {
+    const boundary = "----t";
+    const raw =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="bio"\r\n\r\n` +
+      `${"b".repeat(50_000)}\r\n` +
+      `--${boundary}--\r\n`;
+    const api = server({ uploads: "./uploads", body: { max: "10kb" } })
       .post("/", (ctx) => ctx.body)
       .test();
-    const res = await api.post("/", "x".repeat(10_000));
-    expect(res.status).toBe(200);
+    const res = await api.post("/", raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+    });
+    expect(res.status).toBe(413);
   });
 
   it("the string shorthand still selects the mode", async () => {

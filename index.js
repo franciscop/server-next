@@ -89,127 +89,13 @@ if (typeof process !== "undefined") {
   Object.assign(globalThis.env, process.env);
 }
 
-// src/helpers/createId.ts
-var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
-var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
-var cyrb53 = (str, seed = 0) => {
-  if (typeof str !== "string") str = String(str);
-  let h1 = 3735928559 ^ seed;
-  let h2 = 1103547991 ^ seed;
-  for (let i = 0, ch; i < str.length; i++) {
-    ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
+// src/helpers/StatusError.ts
+var StatusError = class extends Error {
+  status;
+  constructor(msg, status2 = 500) {
+    super(msg);
+    this.status = status2;
   }
-  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
-  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
-  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
-  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
-  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-};
-var hash = (str, size) => {
-  let chars = "";
-  let num = cyrb53(str);
-  for (let i = 0; i < size; i++) {
-    if (num < alphabet.length) num = cyrb53(str, i);
-    chars += alphabet[num % alphabet.length];
-    num = Math.floor(num / alphabet.length);
-  }
-  return chars;
-};
-var randomId = (size = 16) => {
-  let id = "";
-  const bytes = random(size);
-  while (size--) {
-    id += alphabet[bytes[size] & 61];
-  }
-  return id;
-};
-function createId(source, size = 16) {
-  if (source) return hash(source, size);
-  return randomId(size);
-}
-
-// src/helpers/mimes.ts
-var mimes_default = {
-  aac: "audio/aac",
-  abw: "application/x-abiword",
-  arc: "application/x-freearc",
-  avif: "image/avif",
-  avi: "video/x-msvideo",
-  azw: "application/vnd.amazon.ebook",
-  bin: "application/octet-stream",
-  bmp: "image/bmp",
-  bz: "application/x-bzip",
-  bz2: "application/x-bzip2",
-  cda: "application/x-cdf",
-  csh: "application/x-csh",
-  css: "text/css",
-  csv: "text/csv",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  gz: "application/gzip",
-  gif: "image/gif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/vnd.microsoft.icon",
-  ics: "text/calendar",
-  jar: "application/java-archive",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "text/javascript",
-  json: "application/json",
-  jsonld: "application/ld+json",
-  md: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mjs: "text/javascript",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpeg: "video/mpeg",
-  mpkg: "application/vnd.apple.installer+xml",
-  odp: "application/vnd.oasis.opendocument.presentation",
-  ods: "application/vnd.oasis.opendocument.spreadsheet",
-  odt: "application/vnd.oasis.opendocument.text",
-  oga: "audio/ogg",
-  ogv: "video/ogg",
-  ogx: "application/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  png: "image/png",
-  pdf: "application/pdf",
-  php: "application/x-httpd-php",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sh: "application/x-sh",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  text: "text/plain",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  ts: "video/mp2t",
-  ttf: "font/ttf",
-  txt: "text/plain",
-  vsd: "application/vnd.visio",
-  wav: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xul: "application/vnd.mozilla.xul+xml",
-  zip: "application/zip",
-  "3gp": "video/3gpp",
-  "3g2": "video/3gpp2",
-  "7z": "application/x-7z-compressed"
 };
 
 // src/helpers/bucket.ts
@@ -311,6 +197,47 @@ function bucket(root) {
   );
 }
 
+// src/helpers/createId.ts
+var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
+var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
+var cyrb53 = (str, seed = 0) => {
+  if (typeof str !== "string") str = String(str);
+  let h1 = 3735928559 ^ seed;
+  let h2 = 1103547991 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507);
+  h1 ^= Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507);
+  h2 ^= Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+};
+var hash = (str, size) => {
+  let chars = "";
+  let num = cyrb53(str);
+  for (let i = 0; i < size; i++) {
+    if (num < alphabet.length) num = cyrb53(str, i);
+    chars += alphabet[num % alphabet.length];
+    num = Math.floor(num / alphabet.length);
+  }
+  return chars;
+};
+var randomId = (size = 16) => {
+  let id = "";
+  const bytes = random(size);
+  while (size--) {
+    id += alphabet[bytes[size] & 61];
+  }
+  return id;
+};
+function createId(source, size = 16) {
+  if (source) return hash(source, size);
+  return randomId(size);
+}
+
 // src/helpers/upload.ts
 function parseBytes(value) {
   if (typeof value === "number") return value;
@@ -392,6 +319,108 @@ function upload(bucket2) {
   return new UploadPipeline(bucket2);
 }
 
+// src/helpers/bodyLimit.ts
+var INF = Number.POSITIVE_INFINITY;
+var DEFAULT_MAX = "1mb";
+var resolveMax = (max) => max === false ? INF : parseBytes(max == null ? DEFAULT_MAX : max);
+var UNITS = ["b", "kb", "mb", "gb", "tb"];
+function human(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return `${bytes}`;
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    UNITS.length - 1
+  );
+  const value = bytes / 1024 ** i;
+  const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded}${UNITS[i]}`;
+}
+var tooLarge = (max) => new StatusError(
+  `Request body exceeds the ${human(max)} limit. Raise it with body: { max: '10mb' } on the route or server, or set max: false to disable.`,
+  413
+);
+
+// src/helpers/mimes.ts
+var mimes_default = {
+  aac: "audio/aac",
+  abw: "application/x-abiword",
+  arc: "application/x-freearc",
+  avif: "image/avif",
+  avi: "video/x-msvideo",
+  azw: "application/vnd.amazon.ebook",
+  bin: "application/octet-stream",
+  bmp: "image/bmp",
+  bz: "application/x-bzip",
+  bz2: "application/x-bzip2",
+  cda: "application/x-cdf",
+  csh: "application/x-csh",
+  css: "text/css",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  eot: "application/vnd.ms-fontobject",
+  epub: "application/epub+zip",
+  gz: "application/gzip",
+  gif: "image/gif",
+  htm: "text/html",
+  html: "text/html",
+  ico: "image/vnd.microsoft.icon",
+  ics: "text/calendar",
+  jar: "application/java-archive",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "text/javascript",
+  json: "application/json",
+  jsonld: "application/ld+json",
+  md: "text/markdown",
+  mid: "audio/midi",
+  midi: "audio/midi",
+  mjs: "text/javascript",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  mpeg: "video/mpeg",
+  mpkg: "application/vnd.apple.installer+xml",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odt: "application/vnd.oasis.opendocument.text",
+  oga: "audio/ogg",
+  ogv: "video/ogg",
+  ogx: "application/ogg",
+  opus: "audio/opus",
+  otf: "font/otf",
+  png: "image/png",
+  pdf: "application/pdf",
+  php: "application/x-httpd-php",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rar: "application/vnd.rar",
+  rtf: "application/rtf",
+  sh: "application/x-sh",
+  svg: "image/svg+xml",
+  tar: "application/x-tar",
+  text: "text/plain",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  ts: "video/mp2t",
+  ttf: "font/ttf",
+  txt: "text/plain",
+  vsd: "application/vnd.visio",
+  wav: "audio/wav",
+  weba: "audio/webm",
+  webm: "video/webm",
+  webp: "image/webp",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  xhtml: "application/xhtml+xml",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xml: "application/xml",
+  xul: "application/vnd.mozilla.xul+xml",
+  zip: "application/zip",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  "7z": "application/x-7z-compressed"
+};
+
 // src/helpers/parseBody.ts
 function getBoundary(header) {
   if (!header) return null;
@@ -438,10 +467,18 @@ function toStream(input) {
     }
   });
 }
-async function toBuffer(input) {
-  if (!(input instanceof ReadableStream)) return input;
+async function toBuffer(input, max = INF) {
+  if (!(input instanceof ReadableStream)) {
+    if (input.length > max) throw tooLarge(max);
+    return input;
+  }
   const chunks = [];
-  for await (const chunk of asIterable(input)) chunks.push(Buffer.from(chunk));
+  let total = 0;
+  for await (const chunk of asIterable(input)) {
+    total += chunk.byteLength;
+    if (total > max) throw tooLarge(max);
+    chunks.push(Buffer.from(chunk));
+  }
   return Buffer.concat(chunks);
 }
 function parseUrlEncoded(text) {
@@ -522,13 +559,21 @@ async function endPart(part, body) {
   }
 }
 var BREAK = Buffer.from("\r\n\r\n");
-async function parseMultipart(stream, boundary, dest) {
+async function parseMultipart(stream, boundary, dest, max = INF) {
   const delim = Buffer.from(`\r
 --${boundary}`);
   const body = {};
   let buf = Buffer.from("\r\n");
   let state = "boundary";
   let part = null;
+  let textBytes = 0;
+  const feed = (p, data) => {
+    if (p.kind === "text") {
+      textBytes += data.length;
+      if (textBytes > max) throw tooLarge(max);
+    }
+    feedPart(p, data);
+  };
   for await (const chunk of asIterable(stream)) {
     buf = Buffer.concat([buf, Buffer.from(chunk)]);
     let advanced = true;
@@ -560,13 +605,13 @@ async function parseMultipart(stream, boundary, dest) {
         if (i === -1) {
           const safe = buf.length - (delim.length - 1);
           if (safe > 0 && part) {
-            feedPart(part, buf.subarray(0, safe));
+            feed(part, buf.subarray(0, safe));
             buf = buf.subarray(safe);
           }
           break;
         }
         if (part) {
-          feedPart(part, buf.subarray(0, i));
+          feed(part, buf.subarray(0, i));
           await endPart(part, body);
           part = null;
         }
@@ -599,24 +644,24 @@ async function streamToBucket(stream, type2, bucket2) {
   if (!size) return void 0;
   return { name: id, id, path: file2.path, type: type2, size };
 }
-async function parseBody(input, contentType, dest) {
+async function parseBody(input, contentType, dest, max = INF) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
   const boundary = type2 && /multipart\/form-data/i.test(type2) ? getBoundary(type2) : null;
-  if (boundary) return parseMultipart(toStream(input), boundary, dest);
+  if (boundary) return parseMultipart(toStream(input), boundary, dest, max);
   if (!type2 || /^text\//i.test(type2)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? buf.toString("utf-8") : void 0;
   }
   if (/application\/json/i.test(type2)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? JSON.parse(buf.toString("utf-8")) : void 0;
   }
   if (/application\/x-www-form-urlencoded/i.test(type2)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : void 0;
   }
   if (!dest) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? buf : void 0;
   }
   if (dest instanceof UploadPipeline) {
@@ -626,19 +671,7 @@ async function parseBody(input, contentType, dest) {
   return streamToBucket(toStream(input), type2, dest);
 }
 
-// src/helpers/StatusError.ts
-var StatusError = class extends Error {
-  status;
-  constructor(msg, status2 = 500) {
-    super(msg);
-    this.status = status2;
-  }
-};
-
 // src/helpers/body.ts
-var INF = Number.POSITIVE_INFINITY;
-var resolveMax = (max) => max === false || max == null ? INF : parseBytes(max);
-var tooLarge = (max) => new StatusError(`Request body exceeds the ${max}-byte limit`, 413);
 var sources = /* @__PURE__ */ new WeakMap();
 function setBodySource(ctx, source) {
   sources.set(ctx, source);
@@ -648,8 +681,11 @@ async function resolveBody(ctx, body) {
   if (!source) return void 0;
   const mode = typeof body === "string" ? body : body?.mode ?? "parse";
   const max = resolveMax(typeof body === "object" ? body?.max : void 0);
+  const contentType = String(ctx.headers["content-type"] || "");
+  const isMultipart = /multipart\/form-data/i.test(contentType);
   const declared = Number(ctx.headers["content-length"]);
-  if (max !== INF && declared > max) throw tooLarge(max);
+  const trustDeclared = !isMultipart && !ctx.options.uploads;
+  if (max !== INF && trustDeclared && declared > max) throw tooLarge(max);
   if (mode === "stream") return source.getStream();
   if (mode === "raw") {
     const raw = await source.getBuffer();
@@ -667,7 +703,6 @@ async function resolveBody(ctx, body) {
     new TransformStream({
       transform(chunk, controller) {
         size += chunk.byteLength;
-        if (size > max) return controller.error(tooLarge(max));
         controller.enqueue(chunk);
       }
     })
@@ -675,7 +710,8 @@ async function resolveBody(ctx, body) {
   const parsed = await parseBody(
     counted,
     ctx.headers["content-type"],
-    ctx.options.uploads
+    ctx.options.uploads,
+    max
   );
   if (size && !ctx.headers["content-length"]) {
     ctx.headers["content-length"] = String(size);
@@ -1543,16 +1579,16 @@ var STATUS_TEXT = {
   502: "Bad Gateway",
   503: "Service Unavailable"
 };
-var UNITS = ["b", "kb", "mb", "gb", "tb"];
+var UNITS2 = ["b", "kb", "mb", "gb", "tb"];
 function formatBytes(bytes) {
   if (!bytes || bytes < 0) return "0b";
   const i = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
-    UNITS.length - 1
+    UNITS2.length - 1
   );
   const value = bytes / 1024 ** i;
   const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${rounded}${UNITS[i]}`;
+  return `${rounded}${UNITS2[i]}`;
 }
 var SCOPE_COLORS = {
   start: "green",
@@ -1714,6 +1750,7 @@ function config(options = {}) {
       status: error.status || 500
     });
   });
+  settings.onResponse = options.onResponse;
   const loc = (v) => typeof v === "string" ? v : "enabled";
   if (settings.auth) {
     log.message("auth", `${settings.auth.providers.join(", ")} auth enabled`);
@@ -1999,7 +2036,11 @@ function validate(ctx, schema) {
 
 // src/helpers/handleRequest.ts
 async function handleRequest(app, ctx) {
-  const res = await getResponse(app, ctx);
+  let res = await getResponse(app, ctx);
+  if (res && ctx.options.onResponse) {
+    const replaced = await ctx.options.onResponse(res, ctx);
+    if (replaced) res = replaced;
+  }
   if (res) ctx.options.log.request(ctx, res);
   return res;
 }

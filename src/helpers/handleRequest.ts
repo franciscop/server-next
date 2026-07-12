@@ -11,7 +11,14 @@ export default async function handleRequest(
   app: Server,
   ctx: Context,
 ): Promise<Response | undefined> {
-  const res = await getResponse(app, ctx);
+  let res = await getResponse(app, ctx);
+  // The one "after the response" position (linear middleware has none): a hook
+  // over every finalized HTTP response — routes, static, 404s, onError output.
+  // Return a Response to replace it (sent verbatim), or nothing to leave it as is.
+  if (res && ctx.options.onResponse) {
+    const replaced = await ctx.options.onResponse(res, ctx);
+    if (replaced) res = replaced; // a returned Response replaces; nothing keeps it
+  }
   // Log the request once the final response is known (no-op unless `log` is on)
   if (res) ctx.options.log.request(ctx, res);
   return res;

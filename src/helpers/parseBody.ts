@@ -1,4 +1,5 @@
 import type { Bucket, BucketFile } from "..";
+import { INF, tooLarge } from "./bodyLimit";
 import createId from "./createId";
 import mimes from "./mimes";
 import { getExt, UploadPipeline } from "./upload";
@@ -65,10 +66,22 @@ function toStream(input: Input): ReadableStream {
   });
 }
 
-async function toBuffer(input: Input): Promise<Buffer> {
-  if (!(input instanceof ReadableStream)) return input;
+// Buffer a whole body into memory. `max` caps how much we'll accumulate before
+// throwing a 413 — this is the choke point where non-file bytes enter the heap.
+// File paths (pipeline/bucket) pass no max, since files are governed by
+// upload().limit(), not the body limit.
+async function toBuffer(input: Input, max: number = INF): Promise<Buffer> {
+  if (!(input instanceof ReadableStream)) {
+    if (input.length > max) throw tooLarge(max);
+    return input;
+  }
   const chunks: Buffer[] = [];
-  for await (const chunk of asIterable(input)) chunks.push(Buffer.from(chunk));
+  let total = 0;
+  for await (const chunk of asIterable(input)) {
+    total += chunk.byteLength;
+    if (total > max) throw tooLarge(max);
+    chunks.push(Buffer.from(chunk));
+  }
   return Buffer.concat(chunks);
 }
 
@@ -205,6 +218,7 @@ async function parseMultipart(
   stream: ReadableStream,
   boundary: string,
   dest: Dest,
+  max: number = INF,
 ): Promise<Record<string, any>> {
   // Every part is preceded by `\r\n--boundary`. Prepend a CRLF so the very first
   // boundary (which has none) matches the same delimiter as the rest.
@@ -213,6 +227,17 @@ async function parseMultipart(
   let buf = Buffer.from("\r\n");
   let state: "boundary" | "headers" | "body" = "boundary";
   let part: Part | null = null;
+
+  // Only text fields are buffered into memory (files stream to `dest`), so only
+  // their cumulative size counts against the body limit.
+  let textBytes = 0;
+  const feed = (p: Part, data: Buffer): void => {
+    if (p.kind === "text") {
+      textBytes += data.length;
+      if (textBytes > max) throw tooLarge(max);
+    }
+    feedPart(p, data);
+  };
 
   for await (const chunk of asIterable(stream)) {
     buf = Buffer.concat([buf, Buffer.from(chunk)]);
@@ -251,13 +276,13 @@ async function parseMultipart(
           // No delimiter yet: flush all but the tail that might be a split one
           const safe = buf.length - (delim.length - 1);
           if (safe > 0 && part) {
-            feedPart(part, buf.subarray(0, safe));
+            feed(part, buf.subarray(0, safe));
             buf = buf.subarray(safe);
           }
           break;
         }
         if (part) {
-          feedPart(part, buf.subarray(0, i));
+          feed(part, buf.subarray(0, i));
           await endPart(part, body);
           part = null;
         }
@@ -308,31 +333,37 @@ export default async function parseBody(
   input: Input,
   contentType?: string | string[],
   dest?: Dest,
+  max: number = INF,
 ): Promise<any> {
   const type = Array.isArray(contentType) ? contentType[0] : contentType;
 
-  // Multipart (Case A): stream-parse, files go to `dest` as they arrive
+  // Multipart (Case A): stream-parse, files go to `dest` as they arrive; only
+  // the buffered text fields count against `max`.
   const boundary =
     type && /multipart\/form-data/i.test(type) ? getBoundary(type) : null;
-  if (boundary) return parseMultipart(toStream(input), boundary, dest);
+  if (boundary) return parseMultipart(toStream(input), boundary, dest, max);
 
-  // Types that need the whole body in hand to make sense of it
+  // Types that need the whole body in hand to make sense of it: all buffered, so
+  // all counted against `max`.
   if (!type || /^text\//i.test(type)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? buf.toString("utf-8") : undefined;
   }
   if (/application\/json/i.test(type)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? JSON.parse(buf.toString("utf-8")) : undefined;
   }
   if (/application\/x-www-form-urlencoded/i.test(type)) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : undefined;
   }
 
-  // Case B: a single raw file as the whole body (image/*, video/*, octet-stream)
+  // Case B: a single raw file as the whole body (image/*, video/*, octet-stream).
+  // With no `dest` it becomes ctx.body as a Buffer (buffered → counted); with a
+  // `dest` it's a file (pipeline-buffered or streamed) → governed by
+  // upload().limit(), not the body limit, so uncounted.
   if (!dest) {
-    const buf = await toBuffer(input);
+    const buf = await toBuffer(input, max);
     return buf.length ? buf : undefined;
   }
   if (dest instanceof UploadPipeline) {
