@@ -1,4 +1,4 @@
-import server from "../..";
+import server, { file } from "../..";
 import z from "zod";
 
 const UserSchema = z.object({ name: z.string(), email: z.string() });
@@ -29,7 +29,7 @@ export default server({ openapi: true })
       return 200;
     },
   )
-  .del("/users/:id(number)", (ctx) => {
+  .delete("/users/:id(number)", (ctx) => {
     console.log(ctx.url.params.id);
     return 200;
   });

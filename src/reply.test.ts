@@ -208,3 +208,34 @@ describe("Reply", () => {
     });
   });
 });
+
+describe("returning a bare Reply (no terminal call)", () => {
+  // A handler may return a chainable helper directly, e.g. `return status(401)`,
+  // and it is finalized as if `.send()` had been called (empty body).
+  it("returns a bare status() as that status", async () => {
+    const res = await server()
+      .get("/", () => status(401))
+      .test()
+      .get("/");
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("");
+  });
+
+  it("keeps headers set on a bare type()", async () => {
+    const res = await server()
+      .get("/", () => type("html"))
+      .test()
+      .get("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+  });
+
+  it("emits the cookie set on a bare cookies()", async () => {
+    const res = await server()
+      .get("/", () => cookies("token", "abc"))
+      .test()
+      .get("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toContain("token=abc");
+  });
+});

@@ -15,6 +15,38 @@ declare class UploadPipeline {
 }
 declare function upload(bucket?: Bucket | string | null): UploadPipeline;
 
+type CookieOptions = string | string[] | Cookie | Cookie[] | null;
+interface ResponseData {
+    headers: Headers;
+    status?: number;
+}
+declare class Reply$1 {
+    res: ResponseData;
+    constructor();
+    status(status: number): this;
+    type(type?: string): this;
+    download(name?: string): this;
+    headers(key: string | Record<string, string>, value?: string): this;
+    cache(value: CacheOption): this;
+    cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
+    json(body: unknown): Response;
+    redirect(path: string): Response;
+    file(path: string): Promise<Response>;
+    send(body?: string | Buffer | ReadableStream | any): Response;
+}
+type Params<K extends keyof Reply$1> = Reply$1[K] extends (...args: infer A) => any ? A : never;
+declare const status: (...args: Params<"status">) => Reply$1;
+declare const headers: (...args: Params<"headers">) => Reply$1;
+declare const type: (...args: Params<"type">) => Reply$1;
+declare const cache: (...args: Params<"cache">) => Reply$1;
+declare const download: (...args: Params<"download">) => Reply$1;
+declare const cookies: (...args: Params<"cookies">) => Reply$1;
+declare const send: (...args: Params<"send">) => Response;
+declare const json: (...args: Params<"json">) => Response;
+declare const file: (...args: Params<"file">) => Promise<Response>;
+declare const redirect: (...args: Params<"redirect">) => Response;
+
+type Reply = ReturnType<typeof status>;
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 type ServerConfig<Session = {}, User = {}> = {
     Session?: Session;
@@ -266,7 +298,7 @@ type Context<Params extends Record<string, string | undefined> = Record<string, 
     };
     app: Server;
 };
-type InlineReply = Response | {
+type InlineReply = Response | Reply | {
     body: string;
     headers?: Headers;
 } | SerializableValue | JSX.Element | Buffer | ReadableStream;
@@ -336,37 +368,6 @@ declare class Router<O extends ServerConfig = object> {
     use(router: Router): this;
 }
 declare function router(): Router;
-
-type CookieOptions = string | string[] | Cookie | Cookie[] | null;
-interface ResponseData {
-    headers: Headers;
-    status?: number;
-}
-declare class Reply {
-    res: ResponseData;
-    constructor();
-    status(status: number): this;
-    type(type?: string): this;
-    download(name?: string): this;
-    headers(key: string | Record<string, string>, value?: string): this;
-    cache(value: CacheOption): this;
-    cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
-    json(body: unknown): Response;
-    redirect(path: string): Response;
-    file(path: string): Promise<Response>;
-    send(body?: string | Buffer | ReadableStream | any): Response;
-}
-type Params<K extends keyof Reply> = Reply[K] extends (...args: infer A) => any ? A : never;
-declare const status: (...args: Params<"status">) => Reply;
-declare const headers: (...args: Params<"headers">) => Reply;
-declare const type: (...args: Params<"type">) => Reply;
-declare const cache: (...args: Params<"cache">) => Reply;
-declare const download: (...args: Params<"download">) => Reply;
-declare const cookies: (...args: Params<"cookies">) => Reply;
-declare const send: (...args: Params<"send">) => Response;
-declare const json: (...args: Params<"json">) => Response;
-declare const file: (...args: Params<"file">) => Promise<Response>;
-declare const redirect: (...args: Params<"redirect">) => Response;
 
 declare class Server<O extends ServerConfig = {}> extends Router<O> {
     settings: Settings;

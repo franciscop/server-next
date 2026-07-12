@@ -1836,6 +1836,9 @@ async function parseResponse(out, ctx) {
   if (typeof out === "function") {
     out = await out(ctx);
   }
+  if (out && typeof out.send === "function" && out.res?.headers instanceof Headers) {
+    out = out.send();
+  }
   if (out instanceof Blob) {
     out = new Response(out, { headers: { "Content-Type": out.type } });
   }

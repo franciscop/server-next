@@ -22,6 +22,14 @@ export default async function parseResponse(
     out = await out(ctx);
   }
 
+  // A bare Reply — e.g. `return status(401)` with no terminal `.send()`/`.json()`
+  // — is finalized by sending an empty body, keeping the status and headers it
+  // set. Chainable helpers (status/type/headers/cache/cookies/download) all
+  // return a Reply, so any of them may be returned directly.
+  if (out && typeof out.send === "function" && out.res?.headers instanceof Headers) {
+    out = out.send();
+  }
+
   if (out instanceof Blob) {
     out = new Response(out, { headers: { "Content-Type": out.type } });
   }

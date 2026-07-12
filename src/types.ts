@@ -2,6 +2,12 @@
 // by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
 import type { UploadPipeline } from "./helpers/upload";
+import type { status } from "./reply";
+
+// The chainable reply helpers (status/type/headers/cache/cookies/download) all
+// return this. A handler may return one directly (e.g. `return status(401)`),
+// finalized as an empty-body response; see parseResponse.
+type Reply = ReturnType<typeof status>;
 
 export type Method =
   | "get"
@@ -400,6 +406,7 @@ export type Context<
 
 export type InlineReply =
   | Response
+  | Reply
   | { body: string; headers?: Headers }
   | SerializableValue
   | JSX.Element

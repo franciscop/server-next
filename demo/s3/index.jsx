@@ -9,4 +9,4 @@ export default server({ public: s3, uploads: s3 })
       <button>Upload</button>
     </form>
   ))
-  .post("/", ({ body }) => redirect(`/${body.profile}`));
+  .post("/", ({ body }) => redirect(`/${body.profile.id}`));
