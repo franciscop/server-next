@@ -5,7 +5,10 @@ import server from ".";
 import { toWeb } from "./helpers";
 
 describe("request body formats", () => {
-  const api = server({ uploads: "./src/tests/uploads" })
+  const UPLOADS = "./src/tests/uploads/_body";
+  afterAll(() => fsp.rm(UPLOADS, { recursive: true, force: true }));
+
+  const api = server({ uploads: UPLOADS })
     .post("/", (ctx: Context) => ctx.body)
     .test();
 
