@@ -85,16 +85,29 @@ export default function config(options: Options = {}): Settings {
   }
 
   // Bucket
-  settings.public = options.public ? Bucket(options.public) : null;
-  settings.uploads =
-    options.uploads instanceof UploadPipeline
-      ? options.uploads
-      : options.uploads
-        ? Bucket(options.uploads)
-        : null;
+  const publicDir = options.public || env.PUBLIC;
+  settings.public = publicDir ? Bucket(publicDir) : null;
+  // uploads: a path/Bucket streams files straight through (unvalidated); the
+  // object form `{ bucket, maxSize, minSize, fileType }` adds validation, which
+  // buffers each file to check it, via an internal pipeline. No limits set on
+  // the object form → still just stream to the bucket.
+  const up = options.uploads;
+  if (!up) {
+    settings.uploads = null;
+  } else if (typeof up === "object" && "bucket" in up) {
+    const { bucket, maxSize, minSize, fileType } = up;
+    const hasLimits =
+      maxSize != null || minSize != null || fileType != null;
+    settings.uploads = hasLimits
+      ? new UploadPipeline(bucket).limit({ maxSize, minSize, fileType })
+      : Bucket(bucket);
+  } else {
+    settings.uploads = Bucket(up);
+  }
 
   // Favicon served at /favicon.ico (path or Bucket)
-  if (options.favicon) settings.favicon = options.favicon;
+  const favicon = options.favicon || env.FAVICON;
+  if (favicon) settings.favicon = favicon;
 
   // Stores
   settings.store = options.store ?? null;

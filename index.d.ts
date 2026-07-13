@@ -10,10 +10,8 @@ declare class UploadPipeline {
     private _limits;
     constructor(bucket?: Bucket | string | null);
     limit(options: LimitOptions): this;
-    store(bucket: Bucket | string): this;
     processFile(originalName: string, data: Buffer, contentType: string): Promise<UploadedFile>;
 }
-declare function upload(bucket?: Bucket | string | null): UploadPipeline;
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 interface ResponseData {
@@ -31,7 +29,7 @@ declare class Reply$1 {
     cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
     json(body: unknown): Response;
     redirect(path: string): Response;
-    file(path: string): Promise<Response>;
+    file(path: string | BucketFile): Promise<Response>;
     send(body?: string | Buffer | ReadableStream | any): Response;
 }
 type Params<K extends keyof Reply$1> = Reply$1[K] extends (...args: infer A) => any ? A : never;
@@ -99,6 +97,7 @@ type BucketFile = {
     readonly path: string;
     readonly id: string;
     readonly name: string;
+    readonly type?: string;
     exists(): Promise<boolean>;
     info?(): Promise<FileInfo>;
     write(content: string | Buffer | ReadableStream, options?: {
@@ -119,6 +118,9 @@ type UploadedFile = {
     path: string;
     type: string;
     size: number;
+};
+type UploadOptions = LimitOptions & {
+    bucket: string | Bucket;
 };
 type CorsSettings = {
     origin: string | boolean;
@@ -209,7 +211,7 @@ type Options = {
     port?: number;
     secret?: string;
     public?: string | Bucket;
-    uploads?: string | Bucket | UploadPipeline;
+    uploads?: string | Bucket | UploadOptions;
     store?: KVStore;
     cookies?: KVStore;
     session?: KVStore | {
@@ -301,7 +303,7 @@ type Context<Params extends Record<string, string | undefined> = Record<string, 
     };
     app: Server;
 };
-type InlineReply = Response | Reply | {
+type InlineReply = Response | Reply | BucketFile | {
     body: string;
     headers?: Headers;
 } | SerializableValue | JSX.Element | Buffer | ReadableStream;
@@ -504,4 +506,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LimitOptions, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, UploadPipeline, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type, upload };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

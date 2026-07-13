@@ -102,6 +102,90 @@ var StatusError = class extends Error {
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
+
+// src/helpers/mimes.ts
+var mimes_default = {
+  aac: "audio/aac",
+  abw: "application/x-abiword",
+  arc: "application/x-freearc",
+  avif: "image/avif",
+  avi: "video/x-msvideo",
+  azw: "application/vnd.amazon.ebook",
+  bin: "application/octet-stream",
+  bmp: "image/bmp",
+  bz: "application/x-bzip",
+  bz2: "application/x-bzip2",
+  cda: "application/x-cdf",
+  csh: "application/x-csh",
+  css: "text/css",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  eot: "application/vnd.ms-fontobject",
+  epub: "application/epub+zip",
+  gz: "application/gzip",
+  gif: "image/gif",
+  htm: "text/html",
+  html: "text/html",
+  ico: "image/vnd.microsoft.icon",
+  ics: "text/calendar",
+  jar: "application/java-archive",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "text/javascript",
+  json: "application/json",
+  jsonld: "application/ld+json",
+  md: "text/markdown",
+  mid: "audio/midi",
+  midi: "audio/midi",
+  mjs: "text/javascript",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  mpeg: "video/mpeg",
+  mpkg: "application/vnd.apple.installer+xml",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odt: "application/vnd.oasis.opendocument.text",
+  oga: "audio/ogg",
+  ogv: "video/ogg",
+  ogx: "application/ogg",
+  opus: "audio/opus",
+  otf: "font/otf",
+  png: "image/png",
+  pdf: "application/pdf",
+  php: "application/x-httpd-php",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rar: "application/vnd.rar",
+  rtf: "application/rtf",
+  sh: "application/x-sh",
+  svg: "image/svg+xml",
+  tar: "application/x-tar",
+  text: "text/plain",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  ts: "video/mp2t",
+  ttf: "font/ttf",
+  txt: "text/plain",
+  vsd: "application/vnd.visio",
+  wav: "audio/wav",
+  weba: "audio/webm",
+  webm: "video/webm",
+  webp: "image/webp",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  xhtml: "application/xhtml+xml",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xml: "application/xml",
+  xul: "application/vnd.mozilla.xul+xml",
+  zip: "application/zip",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  "7z": "application/x-7z-compressed"
+};
+
+// src/helpers/bucket.ts
 function localBucket(root) {
   const base = path.resolve(root);
   const resolveKey = (name) => {
@@ -114,6 +198,7 @@ function localBucket(root) {
   };
   const file2 = (name, win) => {
     const full = resolveKey(name);
+    const type2 = mimes_default[path.extname(name).slice(1).toLowerCase()];
     const read = () => {
       let opts;
       if (win) {
@@ -136,6 +221,7 @@ function localBucket(root) {
       path: full,
       id: name.replace(/^\/+/, ""),
       name: path.basename(name),
+      type: type2,
       async exists() {
         const stats = await fsp.stat(full).catch(() => null);
         return !!stats?.isFile();
@@ -145,7 +231,7 @@ function localBucket(root) {
         const exists = !!stats?.isFile();
         const total = stats?.size ?? 0;
         const size = win ? Math.max(0, Math.min(win.end, total) - win.start) : total;
-        return { exists, size, date: stats?.mtime ?? null };
+        return { exists, size, date: stats?.mtime ?? null, type: type2 };
       },
       // Read-only view of [start, end), composed relative to the current window.
       slice(start, end) {
@@ -279,10 +365,6 @@ var UploadPipeline = class {
     this._limits = { ...this._limits, ...options };
     return this;
   }
-  store(bucket2) {
-    this._bucket = bucket(bucket2);
-    return this;
-  }
   async processFile(originalName, data, contentType) {
     const { maxSize, minSize, fileType } = this._limits;
     if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
@@ -308,16 +390,11 @@ var UploadPipeline = class {
       }
     }
     if (!this._bucket) {
-      throw new Error(
-        `No destination configured. Pass a bucket to upload() or call .store()`
-      );
+      throw new Error(`No upload destination configured (missing bucket)`);
     }
     return saveFileToBucket(originalName, data, this._bucket, contentType);
   }
 };
-function upload(bucket2) {
-  return new UploadPipeline(bucket2);
-}
 
 // src/helpers/bodyLimit.ts
 var INF = Number.POSITIVE_INFINITY;
@@ -338,88 +415,6 @@ var tooLarge = (max) => new StatusError(
   `Request body exceeds the ${human(max)} limit. Raise it with body: { max: '10mb' } on the route or server, or set max: false to disable.`,
   413
 );
-
-// src/helpers/mimes.ts
-var mimes_default = {
-  aac: "audio/aac",
-  abw: "application/x-abiword",
-  arc: "application/x-freearc",
-  avif: "image/avif",
-  avi: "video/x-msvideo",
-  azw: "application/vnd.amazon.ebook",
-  bin: "application/octet-stream",
-  bmp: "image/bmp",
-  bz: "application/x-bzip",
-  bz2: "application/x-bzip2",
-  cda: "application/x-cdf",
-  csh: "application/x-csh",
-  css: "text/css",
-  csv: "text/csv",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  gz: "application/gzip",
-  gif: "image/gif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/vnd.microsoft.icon",
-  ics: "text/calendar",
-  jar: "application/java-archive",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "text/javascript",
-  json: "application/json",
-  jsonld: "application/ld+json",
-  md: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mjs: "text/javascript",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpeg: "video/mpeg",
-  mpkg: "application/vnd.apple.installer+xml",
-  odp: "application/vnd.oasis.opendocument.presentation",
-  ods: "application/vnd.oasis.opendocument.spreadsheet",
-  odt: "application/vnd.oasis.opendocument.text",
-  oga: "audio/ogg",
-  ogv: "video/ogg",
-  ogx: "application/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  png: "image/png",
-  pdf: "application/pdf",
-  php: "application/x-httpd-php",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sh: "application/x-sh",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  text: "text/plain",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  ts: "video/mp2t",
-  ttf: "font/ttf",
-  txt: "text/plain",
-  vsd: "application/vnd.visio",
-  wav: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xul: "application/vnd.mozilla.xul+xml",
-  zip: "application/zip",
-  "3gp": "video/3gpp",
-  "3g2": "video/3gpp2",
-  "7z": "application/x-7z-compressed"
-};
 
 // src/helpers/parseBody.ts
 function getBoundary(header) {
@@ -897,6 +892,10 @@ var Reply = class {
     return this.headers("location", path2).status(302).send();
   }
   async file(path2) {
+    if (typeof path2 !== "string") {
+      if (!await path2.exists()) return this.status(404).send();
+      return this.type(path2.type).send(path2.stream());
+    }
     try {
       const fs2 = await import("fs");
       const ext2 = path2.split(".").pop();
@@ -925,7 +924,7 @@ var Reply = class {
       return new Response(body, { status: status2, headers: headers2 });
     }
     const name = body?.constructor?.name;
-    if (name === "Buffer") {
+    if (body instanceof Uint8Array) {
       if (!headers2.has("content-length")) {
         headers2.set("content-length", String(body.length));
       }
@@ -1721,9 +1720,20 @@ function config(options = {}) {
     }
     settings.cors = cors2;
   }
-  settings.public = options.public ? bucket(options.public) : null;
-  settings.uploads = options.uploads instanceof UploadPipeline ? options.uploads : options.uploads ? bucket(options.uploads) : null;
-  if (options.favicon) settings.favicon = options.favicon;
+  const publicDir = options.public || env2.PUBLIC;
+  settings.public = publicDir ? bucket(publicDir) : null;
+  const up = options.uploads;
+  if (!up) {
+    settings.uploads = null;
+  } else if (typeof up === "object" && "bucket" in up) {
+    const { bucket: bucket2, maxSize, minSize, fileType } = up;
+    const hasLimits = maxSize != null || minSize != null || fileType != null;
+    settings.uploads = hasLimits ? new UploadPipeline(bucket2).limit({ maxSize, minSize, fileType }) : bucket(bucket2);
+  } else {
+    settings.uploads = bucket(up);
+  }
+  const favicon2 = options.favicon || env2.FAVICON;
+  if (favicon2) settings.favicon = favicon2;
   settings.store = options.store ?? null;
   settings.cookies = options.cookies ?? null;
   if (options.session) {
@@ -1878,6 +1888,16 @@ async function parseResponse(out, ctx) {
   }
   if (out instanceof Blob) {
     out = new Response(out, { headers: { "Content-Type": out.type } });
+  }
+  if (out && typeof out.stream === "function" && typeof out.bytes === "function" && typeof out.exists === "function" && typeof out.name === "string") {
+    if (!await out.exists()) {
+      out = new Response(null, { status: 404 });
+    } else {
+      out = new Response(
+        out.stream(),
+        out.type ? { headers: { "content-type": out.type } } : void 0
+      );
+    }
   }
   if (out instanceof ReadableStream) {
     out = new Response(out);
@@ -3264,6 +3284,5 @@ export {
   router,
   send,
   status,
-  type,
-  upload
+  type
 };

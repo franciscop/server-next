@@ -61,11 +61,6 @@ export class UploadPipeline {
     return this;
   }
 
-  store(bucket: Bucket | string): this {
-    this._bucket = bucketDefault(bucket);
-    return this;
-  }
-
   async processFile(
     originalName: string,
     data: Buffer,
@@ -99,17 +94,9 @@ export class UploadPipeline {
     }
 
     if (!this._bucket) {
-      throw new Error(
-        `No destination configured. Pass a bucket to upload() or call .store()`,
-      );
+      throw new Error(`No upload destination configured (missing bucket)`);
     }
 
     return saveFileToBucket(originalName, data, this._bucket, contentType);
   }
-}
-
-export default function upload(
-  bucket?: Bucket | string | null,
-): UploadPipeline {
-  return new UploadPipeline(bucket);
 }

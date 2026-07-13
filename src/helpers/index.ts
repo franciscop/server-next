@@ -20,5 +20,4 @@ export { applySecurity, resolveSecurity } from "./security";
 export { default as toWeb } from "./toWeb";
 export { default as mimes } from "./mimes";
 export { default as verify } from "./verify";
-export { default as upload } from "./upload";
 export type { LimitOptions, UploadPipeline } from "./upload";

@@ -1,6 +1,7 @@
+import server from "..";
+import { cleanupBuckets, realBucket } from "../tests/realBucket";
 import parseBody from "./parseBody";
-import { cleanupBuckets, count, realBucket } from "../tests/realBucket";
-import upload, { getExt, UploadPipeline } from "./upload";
+import { getExt, UploadPipeline } from "./upload";
 
 afterAll(cleanupBuckets);
 
@@ -52,19 +53,23 @@ describe("getExt consistency", () => {
   it("lowercases the extension used in the stored id", async () => {
     const bucket = mockBucket();
     const { raw, contentType } = makeMultipart("Photo.JPG", "data", "image/jpeg");
-    const body = await parseBody(raw, contentType, upload(bucket));
+    const body = await parseBody(raw, contentType, new UploadPipeline(bucket));
     // id must use lowercase extension, not .JPG
     expect(body.file.id).toMatch(/^\w{16}\.jpg$/);
   });
 
-  it("plain bucket and pipeline produce the same UploadedFile shape", async () => {
+  it("plain bucket and validated pipeline produce the same UploadedFile shape", async () => {
     const b1 = mockBucket();
     const b2 = mockBucket();
     const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
 
     // same raw buffer, two different destinations
     const bodyViaBucket = await parseBody(raw, contentType, b1);
-    const bodyViaPipeline = await parseBody(raw, contentType, upload(b2));
+    const bodyViaPipeline = await parseBody(
+      raw,
+      contentType,
+      new UploadPipeline(b2),
+    );
 
     // shapes must be identical
     expect(Object.keys(bodyViaBucket.file).sort()).toEqual(
@@ -79,38 +84,12 @@ describe("getExt consistency", () => {
   });
 });
 
-describe("upload() builder", () => {
-  describe("construction", () => {
-    it("can be created without arguments", () => {
-      expect(upload()).toBeInstanceOf(UploadPipeline);
-    });
-
-    it("can be created with a bucket", () => {
-      expect(upload(mockBucket())).toBeInstanceOf(UploadPipeline);
-    });
-
-    it("limit() returns the same pipeline instance for chaining", () => {
-      const pipeline = upload();
-      expect(pipeline.limit({ maxSize: "10mb" })).toBe(pipeline);
-    });
-
-    it("store() returns the same pipeline instance for chaining", () => {
-      const pipeline = upload();
-      expect(pipeline.store(mockBucket())).toBe(pipeline);
-    });
-
-    it("can chain limit() and store()", () => {
-      const pipeline = upload()
-        .limit({ maxSize: "10mb", fileType: ["image/jpeg"] })
-        .store(mockBucket());
-      expect(pipeline).toBeInstanceOf(UploadPipeline);
-    });
-  });
-
-  describe("limit: maxSize", () => {
+// Validation is exercised at the parseBody layer via the internal pipeline the
+// `uploads` object form builds (see the public tests further down).
+describe("upload validation", () => {
+  describe("maxSize", () => {
     it("rejects files exceeding maxSize in bytes", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ maxSize: 10 });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ maxSize: 10 });
       const { raw, contentType } = makeMultipart("photo.jpg", "a".repeat(100));
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
         /too large/i,
@@ -118,8 +97,7 @@ describe("upload() builder", () => {
     });
 
     it("rejects files exceeding maxSize in string form (kb)", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ maxSize: "1kb" });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ maxSize: "1kb" });
       const { raw, contentType } = makeMultipart("photo.jpg", "x".repeat(2000));
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
         /too large/i,
@@ -127,18 +105,16 @@ describe("upload() builder", () => {
     });
 
     it("accepts files within maxSize", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ maxSize: "10mb" });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ maxSize: "10mb" });
       const { raw, contentType } = makeMultipart("photo.jpg", "small content");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
     });
   });
 
-  describe("limit: minSize", () => {
+  describe("minSize", () => {
     it("rejects files below minSize", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ minSize: "1mb" });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ minSize: "1mb" });
       const { raw, contentType } = makeMultipart("photo.jpg", "tiny");
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
         /too small/i,
@@ -146,126 +122,117 @@ describe("upload() builder", () => {
     });
 
     it("accepts files meeting minSize", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ minSize: 4 });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ minSize: 4 });
       const { raw, contentType } = makeMultipart("photo.jpg", "four");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
     });
   });
 
-  describe("limit: fileType", () => {
+  describe("fileType", () => {
     it("rejects by mime type", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ fileType: ["image/png"] });
-      const { raw, contentType } = makeMultipart(
-        "photo.jpg",
-        "data",
-        "image/jpeg",
-      );
+      const pipeline = new UploadPipeline(mockBucket()).limit({
+        fileType: ["image/png"],
+      });
+      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
         /file type/i,
       );
     });
 
     it("rejects by extension", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ fileType: [".png"] });
-      const { raw, contentType } = makeMultipart(
-        "photo.jpg",
-        "data",
-        "image/jpeg",
-      );
+      const pipeline = new UploadPipeline(mockBucket()).limit({
+        fileType: [".png"],
+      });
+      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
         /file type/i,
       );
     });
 
     it("accepts a matching mime type", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ fileType: ["image/jpeg"] });
-      const { raw, contentType } = makeMultipart(
-        "photo.jpg",
-        "data",
-        "image/jpeg",
-      );
+      const pipeline = new UploadPipeline(mockBucket()).limit({
+        fileType: ["image/jpeg"],
+      });
+      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
     });
 
     it("accepts a matching extension", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ fileType: [".jpg"] });
-      const { raw, contentType } = makeMultipart(
-        "photo.jpg",
-        "data",
-        "image/jpeg",
-      );
+      const pipeline = new UploadPipeline(mockBucket()).limit({
+        fileType: [".jpg"],
+      });
+      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
     });
 
     it("accepts when extension or mime matches (OR logic)", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({
+      const pipeline = new UploadPipeline(mockBucket()).limit({
         fileType: [".png", "image/jpeg"],
       });
-      const { raw, contentType } = makeMultipart(
-        "photo.jpg",
-        "data",
-        "image/jpeg",
-      );
+      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.file).toBeDefined();
     });
   });
 
-  describe("store()", () => {
-    it("uses the bucket set via store() when none passed to upload()", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload().store(bucket);
-      const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
-      const body = await parseBody(raw, contentType, pipeline);
-      expect(body.file).toBeDefined();
-      expect(await count(bucket)).toBe(1);
-    });
-
-    it("store() overrides the bucket passed to upload()", async () => {
-      const firstBucket = mockBucket();
-      const secondBucket = mockBucket();
-      const pipeline = upload(firstBucket).store(secondBucket);
-      const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
-      await parseBody(raw, contentType, pipeline);
-      expect(await count(firstBucket)).toBe(0);
-      expect(await count(secondBucket)).toBe(1);
-    });
-  });
-
-  describe("text fields are unaffected by pipeline", () => {
+  describe("text fields are unaffected", () => {
     it("still parses text fields when a file is validated and stored", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket);
+      const pipeline = new UploadPipeline(mockBucket());
       const { raw, contentType } = makeMultipart("photo.jpg", "imgdata", "image/jpeg");
       const body = await parseBody(raw, contentType, pipeline);
       expect(body.text).toBe("hello");
     });
 
     it("still parses text fields when a file is rejected", async () => {
-      const bucket = mockBucket();
-      const pipeline = upload(bucket).limit({ maxSize: 1 });
+      const pipeline = new UploadPipeline(mockBucket()).limit({ maxSize: 1 });
       const { raw, contentType } = makeMultipart("photo.jpg", "toolarge", "image/jpeg");
       // The whole parse rejects when a file fails validation
       await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow();
     });
   });
+});
 
-  describe("pipeline without a destination", () => {
-    it("throws when no bucket is configured anywhere", async () => {
-      const pipeline = upload();
-      const { raw, contentType } = makeMultipart("photo.jpg", "data");
-      await expect(parseBody(raw, contentType, pipeline)).rejects.toThrow(
-        /destination/i,
-      );
+describe("uploads option (object form)", () => {
+  const post = (uploads: any, file = "small", type = "image/jpeg", name = "photo.jpg") => {
+    const { raw, contentType } = makeMultipart(name, file, type);
+    return server({ uploads })
+      .post("/", (ctx) => ({ ok: !!(ctx.body as any).file }))
+      .test()
+      .post("/", raw, { headers: { "content-type": contentType } });
+  };
+
+  it("accepts a file within the limits", async () => {
+    const res = await post({
+      bucket: mockBucket(),
+      maxSize: "1mb",
+      fileType: ["image/jpeg", ".jpg"],
     });
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+  });
+
+  it("rejects a file over maxSize", async () => {
+    const res = await post({ bucket: mockBucket(), maxSize: 10 }, "a".repeat(100));
+    expect(res.status).toBe(500);
+  });
+
+  it("rejects a disallowed fileType", async () => {
+    const res = await post({ bucket: mockBucket(), fileType: ["image/png"] });
+    expect(res.status).toBe(500);
+  });
+
+  it("streams unvalidated when given just a bucket", async () => {
+    const res = await post(mockBucket());
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+  });
+
+  it("streams unvalidated for an object with no limits", async () => {
+    const res = await post({ bucket: mockBucket() });
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 });

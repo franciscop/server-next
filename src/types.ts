@@ -1,7 +1,7 @@
 // Through this file, "options" refers to the ones that are accepted
 // by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
-import type { UploadPipeline } from "./helpers/upload";
+import type { LimitOptions, UploadPipeline } from "./helpers/upload";
 import type { status } from "./reply";
 
 // The chainable reply helpers (status/type/headers/cache/cookies/download) all
@@ -95,6 +95,8 @@ export type BucketFile = {
   readonly path: string;
   readonly id: string;
   readonly name: string;
+  // The file's MIME type, when the bucket knows it (like Blob/File.type).
+  readonly type?: string;
   exists(): Promise<boolean>;
   // Optional: metadata in one call (size/date/type). `bucket` files provide it;
   // used for conditional-request caching of static assets.
@@ -127,6 +129,12 @@ export type UploadedFile = {
   path: string;
   type: string;
   size: number;
+};
+
+// The `uploads` option's object form: where to store files, plus optional
+// per-file validation. A bare path/Bucket streams files through unvalidated.
+export type UploadOptions = LimitOptions & {
+  bucket: string | Bucket;
 };
 
 export type CorsSettings = {
@@ -275,7 +283,7 @@ export type Options = {
   port?: number;
   secret?: string;
   public?: string | Bucket;
-  uploads?: string | Bucket | UploadPipeline;
+  uploads?: string | Bucket | UploadOptions;
   store?: KVStore;
   cookies?: KVStore;
   session?: KVStore | { store: KVStore };
@@ -416,6 +424,7 @@ export type Context<
 export type InlineReply =
   | Response
   | Reply
+  | BucketFile
   | { body: string; headers?: Headers }
   | SerializableValue
   | JSX.Element

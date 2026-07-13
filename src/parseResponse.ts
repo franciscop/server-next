@@ -34,6 +34,26 @@ export default async function parseResponse(
     out = new Response(out, { headers: { "Content-Type": out.type } });
   }
 
+  // A bucket file handle (from `bucket.file(name)`): stream it back with a
+  // content-type guessed from its name, and a 404 when it doesn't exist. Lets a
+  // guarded route serve a stored/private file with `return bucket.file(id)`.
+  if (
+    out &&
+    typeof out.stream === "function" &&
+    typeof out.bytes === "function" &&
+    typeof out.exists === "function" &&
+    typeof out.name === "string"
+  ) {
+    if (!(await out.exists())) {
+      out = new Response(null, { status: 404 });
+    } else {
+      out = new Response(
+        out.stream(),
+        out.type ? { headers: { "content-type": out.type } } : undefined,
+      );
+    }
+  }
+
   if (out instanceof ReadableStream) {
     out = new Response(out);
   }

@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
 import type { Bucket, BucketFile } from "..";
+import mimes from "./mimes";
 
 // A built-in local-filesystem bucket implementing the canonical `bucket`
 // interface (file/folder), so `@server/next` works with just a directory path,
@@ -28,6 +29,10 @@ function localBucket(root: string): Bucket {
   ): BucketFile => {
     const full = resolveKey(name);
 
+    // The MIME type derived from the file's extension (undefined if unknown), so
+    // consumers like reply.file() get it straight off the handle.
+    const type = mimes[path.extname(name).slice(1).toLowerCase()];
+
     // Read the file, or the current window, as a web ReadableStream. fs ranges
     // are inclusive on both ends, so a window [start, end) reads up to end - 1.
     const read = (): ReadableStream => {
@@ -53,6 +58,7 @@ function localBucket(root: string): Bucket {
       path: full,
       id: name.replace(/^\/+/, ""),
       name: path.basename(name),
+      type,
 
       async exists(): Promise<boolean> {
         const stats = await fsp.stat(full).catch(() => null);
@@ -67,7 +73,7 @@ function localBucket(root: string): Bucket {
         const size = win
           ? Math.max(0, Math.min(win.end, total) - win.start)
           : total;
-        return { exists, size, date: stats?.mtime ?? null };
+        return { exists, size, date: stats?.mtime ?? null, type };
       },
 
       // Read-only view of [start, end), composed relative to the current window.

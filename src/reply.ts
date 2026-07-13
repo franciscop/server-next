@@ -1,6 +1,6 @@
 import { createCookies, mimes, resolveCache, toWeb } from "./helpers";
 import isReadableStream from "./helpers/isReadableStream";
-import type { CacheOption, Cookie } from "./types";
+import type { BucketFile, CacheOption, Cookie } from "./types";
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 const EXPIRED = new Date(0).toUTCString();
@@ -95,7 +95,13 @@ class Reply {
     return this.headers("location", path).status(302).send();
   }
 
-  async file(path: string): Promise<Response> {
+  async file(path: string | BucketFile): Promise<Response> {
+    // A bucket file handle: stream it with a type guessed from its name, and a
+    // 404 when it's missing — the same contract as a disk path below.
+    if (typeof path !== "string") {
+      if (!(await path.exists())) return this.status(404).send();
+      return this.type(path.type).send(path.stream());
+    }
     try {
       const fs = await import("node:fs");
       const ext = path.split(".").pop();
@@ -131,11 +137,13 @@ class Reply {
     }
 
     const name = body?.constructor?.name;
-    if (name === "Buffer") {
+    // Buffer or any typed array (e.g. the Uint8Array from a bucket file's
+    // bytes()) is sent as raw bytes.
+    if (body instanceof Uint8Array) {
       if (!headers.has("content-length")) {
         headers.set("content-length", String(body.length));
       }
-      return new Response(body, { status, headers });
+      return new Response(body as BodyInit, { status, headers });
     }
 
     if (typeof body?.getReader === "function") {

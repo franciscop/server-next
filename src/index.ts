@@ -108,8 +108,6 @@ export default function server<
   return new Server<ServerConfig<Session, User>>(options).self();
 }
 
-export { default as upload } from "./helpers/upload";
-export type { LimitOptions, UploadPipeline } from "./helpers/upload";
 export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./ServerError";
