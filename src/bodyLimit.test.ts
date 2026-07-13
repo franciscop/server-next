@@ -1,4 +1,9 @@
+import { rm } from "node:fs/promises";
 import server from ".";
+
+// Throwaway uploads dir under the gitignored src/tests/uploads/, cleaned up after.
+const UPLOADS = new URL("./tests/uploads/_bodylimit/", import.meta.url).pathname;
+afterAll(() => rm(UPLOADS, { recursive: true, force: true }));
 
 describe("body.max (request size limit)", () => {
   it("413s when Content-Length exceeds the limit", async () => {
@@ -73,7 +78,7 @@ describe("body.max (request size limit)", () => {
       `Content-Type: application/octet-stream\r\n\r\n` +
       `${file}\r\n` +
       `--${boundary}--\r\n`;
-    const api = server({ uploads: "./uploads", body: { max: "10kb" } })
+    const api = server({ uploads: UPLOADS, body: { max: "10kb" } })
       .post("/", (ctx) => ({ size: (ctx.body as any).avatar.size }))
       .test();
     const res = await api.post("/", raw, {
@@ -90,7 +95,7 @@ describe("body.max (request size limit)", () => {
       `Content-Disposition: form-data; name="bio"\r\n\r\n` +
       `${"b".repeat(50_000)}\r\n` +
       `--${boundary}--\r\n`;
-    const api = server({ uploads: "./uploads", body: { max: "10kb" } })
+    const api = server({ uploads: UPLOADS, body: { max: "10kb" } })
       .post("/", (ctx) => ctx.body)
       .test();
     const res = await api.post("/", raw, {
@@ -104,5 +109,24 @@ describe("body.max (request size limit)", () => {
       .post("/", (ctx) => (Buffer.isBuffer(ctx.body) ? "raw" : "other"))
       .test();
     expect(await (await api.post("/", "hi")).text()).toBe("raw");
+  });
+
+  it("does not cap `stream` mode (its bytes are never buffered)", async () => {
+    const api = server({ body: { mode: "stream", max: "8b" } })
+      .post("/", async (ctx) =>
+        String((await new Response(ctx.body as ReadableStream).text()).length),
+      )
+      .test();
+    // A chunked body (no Content-Length) of 13 bytes, well over the 8b `max`.
+    const stream = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode("hello ")); // 6
+        c.enqueue(new TextEncoder().encode("world!!")); // +7 = 13
+        c.close();
+      },
+    });
+    const res = await api.post("/", stream);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("13"); // all bytes reached the handler
   });
 });

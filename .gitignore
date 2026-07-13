@@ -1,6 +1,7 @@
 # APP
 demo/session/store/*.json
 src/tests/uploads/
+/uploads/
 
 # LOCKFILES (remove for apps)
 package-lock.json
