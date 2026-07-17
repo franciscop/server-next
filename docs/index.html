@@ -1,9 +1,199 @@
-<br />
+<style>
+  .hero,
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 30px;
+    margin: 40px 0;
+  }
+  .hero > *,
+  .row > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  @media (min-width: 700px) {
+    .hero > *,
+    .row > * {
+      flex-basis: calc(50% - 15px);
+    }
+  }
+  .content {
+    max-width: 520px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  h2 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  p {
+    margin: 0 0 6px;
+    color: var(--text-soft);
+    font-size: 16px;
+  }
+  a {
+    color: var(--primary);
+  }
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .button {
+    display: inline-block;
+    padding: 6px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    background: var(--primary);
+    color: #fff;
+    border: 1px solid transparent;
+    transition: box-shadow 0.2s;
+  }
+  .button:hover {
+    box-shadow: inset 0 0 0 99em rgba(0, 0, 0, 0.12);
+  }
+  .button.ghost {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text);
+  }
+  .button.ghost:hover {
+    box-shadow: inset 0 0 0 99em rgba(0, 0, 0, 0.05);
+  }
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    border-radius: 10px;
+    padding: 9px 11px;
+    overflow-x: auto;
+    font: 13px/1.7 var(--font-mono);
+    color: var(--text);
+  }
+  pre.install {
+    display: inline-block;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+  @media (min-width: 600px) {
+    pre {
+      padding: 16px 18px;
+    }
+  }
+  p code {
+    background: var(--code-bg);
+    padding: 0 5px;
+    border-radius: 5px;
+    font: 0.9em/1 var(--font-mono);
+  }
+  pre code .comment {
+    color: #8a94a6;
+  }
+  pre code .keyword {
+    color: var(--primary-dark);
+  }
+  pre code .string {
+    color: var(--color-tip);
+  }
+  pre code .number {
+    color: #905;
+  }
+  pre code .type {
+    color: var(--color-note);
+  }
+  pre code .function {
+    color: #ca0029;
+  }
+  pre code .operator {
+    color: #a67f59;
+  }
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .features > .feature {
+    flex: 1 1 100%;
+  }
+  @media (min-width: 500px) {
+    .features {
+      gap: 30px;
+    }
+    .features > .feature {
+      flex-basis: calc(50% - 15px);
+    }
+  }
+  @media (min-width: 900px) {
+    .features > .feature {
+      flex-basis: calc(33.333% - 20px);
+    }
+  }
+  .feature {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 15px 17px;
+    box-shadow: 0 1px 3px rgba(20, 20, 45, 0.05);
+  }
+  .feature header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .feature header img {
+    width: 22px;
+    height: 22px;
+    flex: none;
+  }
+  .feature header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .feature p {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 14.5px;
+  }
+  .separator {
+    margin: 52px 0;
+  }
+  .separator svg {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .separator circle {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 1.5;
+  }
+  .separator line {
+    stroke: var(--line);
+    stroke-width: 2;
+  }
+  footer {
+    margin-top: 8px;
+    text-align: center;
+  }
+</style>
 
-<section class="hero flex center nowrap">
+<section class="hero">
   <div>
     <div style="display: flex; align-items: center; gap: 20px">
-      <h1 style="margin: 0">Server Next</h1>
+      <h1>Server Next</h1>
       <a
         href="https://github.com/franciscop/server-next/actions"
         style="display: flex"
@@ -16,15 +206,15 @@
       A modern JavaScript server with the essentials built in: routing,
       authentication, uploads, WebSockets and testing.
     </p>
-    <pre class="small">npm install @server/next</pre>
+    <pre class="install">npm install @server/next</pre>
     <div class="buttons">
       <a class="button" href="/documentation#getting-started"
         >Getting Started</a
       >
-      <a class="pseudo button" href="/documentation">Documentation</a>
+      <a class="button ghost" href="/documentation">Documentation</a>
     </div>
   </div>
-  <div style="width: 630px; max-width: 100%">
+  <div>
     <pre><code class="language-js">import server from "@server/next";
 
 export default server()
@@ -38,133 +228,117 @@ export default server()
 
 <div class="separator">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
-    <circle cx="10" cy="10" r="3" />
+    <circle cx="10" cy="10" r="1" />
     <line x1="20" y1="10" x2="260" y2="10" />
-    <circle cx="270" cy="10" r="3" />
-    <circle class="empty" cx="283" cy="10" r="3" />
-    <circle class="empty" cx="300" cy="10" r="5" />
-    <circle class="empty" cx="317" cy="10" r="3" />
-    <circle cx="330" cy="10" r="3" />
+    <circle cx="270" cy="10" r="2" />
+    <circle cx="283" cy="10" r="3" />
+    <circle cx="300" cy="10" r="5" />
+    <circle cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="2" />
     <line x1="340" y1="10" x2="580" y2="10" />
-    <circle cx="590" cy="10" r="3" />
+    <circle cx="590" cy="10" r="1" />
   </svg>
 </div>
 
-<section class="features flex one two-500 three-900">
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/hash.svg"
-        />
-        <h3>Fully typed</h3>
-      </header>
-      <p>
-        From route params to request bodies so you can write with confidence.
-      </p>
-    </div>
+<section class="features">
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/hash.svg"
+      />
+      <h3>Fully typed</h3>
+    </header>
+    <p>From route params to request bodies so you can write with confidence.</p>
   </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/user.svg"
-        />
-        <h3>Authentication</h3>
-      </header>
-      <p>
-        Supports Google, Github, Facebook, email, etc. login with cookies or
-        tokens.
-      </p>
-    </div>
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/user.svg"
+      />
+      <h3>Authentication</h3>
+    </header>
+    <p>
+      Supports Google, Github, Facebook, email, etc. login with cookies or
+      tokens.
+    </p>
   </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
-        />
-        <h3>Batteries included</h3>
-      </header>
-      <p>
-        Routing, sessions, uploads, validation, websockets, auth and many more.
-      </p>
-    </div>
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/battery.svg"
+      />
+      <h3>Batteries included</h3>
+    </header>
+    <p>
+      Routing, sessions, uploads, validation, websockets, auth and many more.
+    </p>
   </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/blocks.svg"
-        />
-        <h3>Integrations</h3>
-      </header>
-      <p>The same code runs on Node, Bun, Cloudflare, Netlify and more.</p>
-    </div>
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/blocks.svg"
+      />
+      <h3>Integrations</h3>
+    </header>
+    <p>The same code runs on Node, Bun, Cloudflare, Netlify and more.</p>
   </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/flask.svg"
-        />
-        <h3>Testing</h3>
-      </header>
-      <p>Testing helpers built-in, with no ports, mocking or network needed.</p>
-    </div>
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/flask.svg"
+      />
+      <h3>Testing</h3>
+    </header>
+    <p>Testing helpers built-in, with no ports, mocking or network needed.</p>
   </div>
-  <div>
-    <div class="feature">
-      <header>
-        <img
-          width="22"
-          height="22"
-          src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/document.svg"
-        />
-        <h3>Documented</h3>
-      </header>
-      <p>Extensive documentation and examples for every feature.</p>
-    </div>
+  <div class="feature">
+    <header>
+      <img
+        width="22"
+        height="22"
+        src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/document.svg"
+      />
+      <h3>Documented</h3>
+    </header>
+    <p>Extensive documentation and examples for every feature.</p>
   </div>
 </section>
 
 <div class="separator">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
-    <circle cx="10" cy="10" r="3" />
+    <circle cx="10" cy="10" r="1" />
     <line x1="20" y1="10" x2="260" y2="10" />
-    <circle cx="270" cy="10" r="3" />
-    <circle class="empty" cx="283" cy="10" r="3" />
-    <circle class="empty" cx="300" cy="10" r="5" />
-    <circle class="empty" cx="317" cy="10" r="3" />
-    <circle cx="330" cy="10" r="3" />
+    <circle cx="270" cy="10" r="2" />
+    <circle cx="283" cy="10" r="3" />
+    <circle cx="300" cy="10" r="5" />
+    <circle cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="2" />
     <line x1="340" y1="10" x2="580" y2="10" />
-    <circle cx="590" cy="10" r="3" />
+    <circle cx="590" cy="10" r="1" />
   </svg>
 </div>
 
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Authentication built in</h2>
-      <p>
-        Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or email
-        and password with a single option.
-      </p>
-      <p>
-        Sessions, signed cookies and CSRF-protected flows are handled for you,
-        and the signed-in user is available on <code>ctx.user</code>.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>Authentication built in</h2>
+    <p>
+      Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or email
+      and password with a single option.
+    </p>
+    <p>
+      Sessions, signed cookies and CSRF-protected flows are handled for you, and
+      the signed-in user is available on <code>ctx.user</code>.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
@@ -178,21 +352,17 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Typed parameters</h2>
-      <p>
-        Route parameters are read straight from the URL and typed for you, so
-        mistakes are caught as you type.
-      </p>
-      <p>
-        Add a format like <code>:id(number)</code> and the value arrives as a
-        <code>number</code>, and mark optional segments with <code>?</code>.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>Typed parameters</h2>
+    <p>
+      Route parameters are read straight from the URL and typed for you, so
+      mistakes are caught as you type.
+    </p>
+    <p>
+      Add a format like <code>:id(number)</code> and the value arrives as a
+      <code>number</code>, and mark optional segments with <code>?</code>.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">server()
@@ -205,21 +375,17 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>File uploads</h2>
-      <p>
-        Uploaded files are streamed to storage as they arrive rather than
-        buffered in memory, so large uploads stay inexpensive.
-      </p>
-      <p>
-        Point <code>uploads</code> at a local folder or an S3-compatible bucket,
-        and read the stored file from <code>ctx.body</code>.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>File uploads</h2>
+    <p>
+      Uploaded files are streamed to storage as they arrive rather than buffered
+      in memory, so large uploads stay inexpensive.
+    </p>
+    <p>
+      Point <code>uploads</code> at a local folder or an S3-compatible bucket,
+      and read the stored file from <code>ctx.body</code>.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">export default server({ uploads: "./uploads" })
@@ -236,18 +402,14 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>WebSockets</h2>
-      <p>
-        Handle WebSocket events with the same routing API. Reply to a single
-        client with <code>ctx.socket</code>, or broadcast to every connection
-        with <code>ctx.sockets</code>.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>WebSockets</h2>
+    <p>
+      Handle WebSocket events with the same routing API. Reply to a single
+      client with <code>ctx.socket</code>, or broadcast to every connection with
+      <code>ctx.sockets</code>.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">server()
@@ -259,17 +421,13 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Runs everywhere</h2>
-      <p>
-        The same file runs on Node, Bun, Cloudflare Workers and Netlify
-        Functions, with no adapters or platform-specific entry points.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>Runs everywhere</h2>
+    <p>
+      The same file runs on Node, Bun, Cloudflare Workers and Netlify Functions,
+      with no adapters or platform-specific entry points.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
@@ -280,21 +438,17 @@ export default server()
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Simple responses</h2>
-      <p>
-        Return a string, object, status code, file or stream from any route
-        handler.
-      </p>
-      <p>
-        Server.js infers the response, content type and headers, so handlers
-        just return data.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>Simple responses</h2>
+    <p>
+      Return a string, object, status code, file or stream from any route
+      handler.
+    </p>
+    <p>
+      Server.js infers the response, content type and headers, so handlers just
+      return data.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">import server, { file } from "@server/next";
@@ -307,25 +461,20 @@ server()
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Testing built in</h2>
-      <p>
-        Call <code>.test()</code> on any server for an in-process client that
-        runs requests through the full middleware stack, with no ports,
-        mocking or network.
-      </p>
-      <p>
-        It mirrors every HTTP method and sends JSON, <code>FormData</code> or
-        streams as the body. Each call returns a standard
-        <code>Response</code>, so you assert on the same
-        <code>status</code>, headers and <code>.json()</code> a real client
-        would get.
-      </p>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>Testing built in</h2>
+    <p>
+      Call <code>.test()</code> on any server for an in-process client that runs
+      requests through the full middleware stack, with no ports, mocking or
+      network.
+    </p>
+    <p>
+      It mirrors every HTTP method and sends JSON, <code>FormData</code> or
+      streams as the body. Each call returns a standard <code>Response</code>,
+      so you assert on the same <code>status</code>, headers and
+      <code>.json()</code> a real client would get.
+    </p>
   </div>
   <div>
     <pre><code class="language-js">const api = server()
@@ -333,33 +482,29 @@ server()
   .post("/echo", ctx =&gt; ctx.body)
   .test();
 
-const res = await api.post("/echo", {
-  name: "Francisco",
-});
+const res = await api.post("/echo", { name: "Francisco" });
 
 expect(res.status).toBe(200);
-expect(await res.json()).toEqual({
-  name: "Francisco",
-});</code></pre>
+expect(await res.json()).toEqual({ name: "Francisco" });</code></pre>
   </div>
 </section>
 
 <div class="separator">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 20">
-    <circle cx="10" cy="10" r="3" />
+    <circle cx="10" cy="10" r="1" />
     <line x1="20" y1="10" x2="260" y2="10" />
-    <circle cx="270" cy="10" r="3" />
-    <circle class="empty" cx="283" cy="10" r="3" />
-    <circle class="empty" cx="300" cy="10" r="5" />
-    <circle class="empty" cx="317" cy="10" r="3" />
-    <circle cx="330" cy="10" r="3" />
+    <circle cx="270" cy="10" r="2" />
+    <circle cx="283" cy="10" r="3" />
+    <circle cx="300" cy="10" r="5" />
+    <circle cx="317" cy="10" r="3" />
+    <circle cx="330" cy="10" r="2" />
     <line x1="340" y1="10" x2="580" y2="10" />
-    <circle cx="590" cy="10" r="3" />
+    <circle cx="590" cy="10" r="1" />
   </svg>
 </div>
 
-<div style="text-align: center">
+<footer>
   <p>
     Created by <a href="https://francisco.io/" target="_blank">Francisco</a>.
   </p>
-</div>
+</footer>
