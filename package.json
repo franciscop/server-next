@@ -45,6 +45,18 @@
     "menu": {
       "Documentation": "/documentation",
       "Github": "https://github.com/franciscop/server-next"
+    },
+    "documentation": {
+      "Documentation": ["docs/0. Documentation.md", "docs/1. Getting Started.md"],
+      "Guides": "docs/2. Guides.md",
+      "Options": "docs/3. Options.md",
+      "Router": "docs/4. Router.md",
+      "Context": "docs/5. Context.md",
+      "Reply": "docs/6. Reply.md",
+      "Authentication": "docs/7. Authentication.md",
+      "Testing": "docs/8. Testing.md",
+      "Platforms": "docs/9. Platforms.md",
+      "FAQ": "docs/A. FAQ.md"
     }
   },
   "devDependencies": {
