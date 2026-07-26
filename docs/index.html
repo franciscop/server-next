@@ -164,6 +164,7 @@ export default server()
         Sessions, signed cookies and CSRF-protected flows are handled for you,
         and the signed-in user is available on <code>ctx.user</code>.
       </p>
+      <a class="button ghost" href="/documentation/authentication">Read more &rarr;</a>
     </div>
   </div>
   <div>
@@ -183,33 +184,6 @@ export default server({ store, auth })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>Typed parameters</h2>
-      <p>
-        Route parameters are read straight from the URL and typed for you, so
-        mistakes are caught as you type.
-      </p>
-      <p>
-        Add a format like <code>:id(number)</code> and the value arrives as a
-        <code>number</code>, and mark optional segments with <code>?</code>.
-      </p>
-    </div>
-  </div>
-  <div>
-    <pre><code class="language-js">server()
-  // ctx.url.params.name is a string
-  .get("/user/:name", ...)
-  // ctx.url.params.id is a number
-  .get("/user/:id(number)", ...)
-  // ctx.url.params.cId is optional
-  .get("/books/:id/comments/:cId?", ...);</code></pre>
-  </div>
-</section>
-
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
       <h2>File uploads</h2>
       <p>
         Uploaded files are streamed to storage as they arrive rather than
@@ -219,6 +193,7 @@ export default server({ store, auth })
         Point <code>uploads</code> at a local folder or an S3-compatible bucket,
         and read the stored file from <code>ctx.body</code>.
       </p>
+      <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
     </div>
   </div>
   <div>
@@ -241,12 +216,151 @@ export default server({ store, auth })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
+      <h2>JSX rendering, optional</h2>
+      <p>
+        On Bun, return JSX straight from a route and it is sent as HTML. It is
+        opt-in with no runtime dependency, just enable it in your
+        <code>tsconfig.json</code>.
+      </p>
+      <p>
+        Interpolation is escaped, so your pages are safe from XSS by default.
+      </p>
+      <a class="button ghost" href="/documentation/guides#jsx">Read more &rarr;</a>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">export default server()
+  .get("/", () =&gt; (
+    &lt;html lang="en"&gt;
+      &lt;body&gt;
+        &lt;h1&gt;Hello {name}&lt;/h1&gt;
+      &lt;/body&gt;
+    &lt;/html&gt;
+  ));</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>HTMX</h2>
+      <p>
+        No integration needed, return HTML fragments from your routes and let
+        HTMX swap them in.
+      </p>
+      <p>
+        It blends especially well with JSX, whose escaped interpolation keeps
+        those fragments safe from XSS.
+      </p>
+      <a class="button ghost" href="/documentation/guides#htmx">Read more &rarr;</a>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">import server, { file } from "@server/next";
+
+export default server()
+  .get("/", () =&gt; file("index.html"))
+  .post("/clicked", () =&gt; (
+    &lt;button hx-post="/clicked"&gt;Clicked!&lt;/button&gt;
+  ));</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>Typed parameters</h2>
+      <p>
+        Route parameters are read straight from the URL and typed for you, so
+        mistakes are caught as you type.
+      </p>
+      <p>
+        Add a format like <code>:id(number)</code> and the value arrives as a
+        <code>number</code>, and mark optional segments with <code>?</code>.
+      </p>
+      <a class="button ghost" href="/documentation/router#parameters">Read more &rarr;</a>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">server()
+  // ctx.url.params.name is a string
+  .get("/user/:name", ...)
+  // ctx.url.params.id is a number
+  .get("/user/:id(number)", ...)
+  // ctx.url.params.cId is optional
+  .get("/books/:id/comments/:cId?", ...);</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>Upload validation</h2>
+      <p>
+        Add size and type limits right on the <code>uploads</code> option, and
+        oversized or wrong-type files are rejected before your handler runs.
+      </p>
+      <p>
+        Each stored file gets a random, unguessable id, so nothing is
+        overwritten or predictable.
+      </p>
+      <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">export default server({
+  uploads: {
+    bucket: "./uploads",
+    maxSize: "5mb",
+    fileType: ["image/jpeg", "image/png"],
+  },
+}).post("/avatar", ctx =&gt; ctx.body.avatar);</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
+      <h2>Proxy with fetch()</h2>
+      <p>
+        Return a <code>fetch()</code> response straight from a route and it is
+        forwarded as-is: status, headers and a streamed body.
+      </p>
+      <p>
+        That is all you need for a backend-for-frontend, an API gateway, or
+        hiding an upstream key from the browser.
+      </p>
+      <a class="button ghost" href="/documentation/guides#proxying-requests">Read more &rarr;</a>
+    </div>
+  </div>
+  <div>
+    <pre><code class="language-js">export default server()
+  .get("/gh/*", ctx =&gt;
+    fetch(`https://api.github.com${ctx.url.pathname.slice(3)}`)
+  );</code></pre>
+  </div>
+</section>
+
+<br />
+
+<section class="hero flex one two-900 center">
+  <div>
+    <div class="content">
       <h2>WebSockets</h2>
       <p>
         Handle WebSocket events with the same routing API. Reply to a single
         client with <code>ctx.socket</code>, or broadcast to every connection
         with <code>ctx.sockets</code>.
       </p>
+      <a class="button ghost" href="/documentation/guides#websockets">Read more &rarr;</a>
     </div>
   </div>
   <div>
@@ -264,27 +378,6 @@ export default server({ store, auth })
 <section class="hero flex one two-900 center">
   <div>
     <div class="content">
-      <h2>Runs everywhere</h2>
-      <p>
-        The same file runs on Node, Bun, Cloudflare Workers and Netlify
-        Functions, with no adapters or platform-specific entry points.
-      </p>
-    </div>
-  </div>
-  <div>
-    <pre><code class="language-js">import server from "@server/next";
-
-// Same file on Node, Bun, Cloudflare, Netlify
-export default server()
-  .get("/", () =&gt; "Hello from anywhere");</code></pre>
-  </div>
-</section>
-
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
       <h2>Simple responses</h2>
       <p>
         Return a string, object, status code, file or stream from any route
@@ -294,6 +387,7 @@ export default server()
         Server.js infers the response, content type and headers, so handlers
         just return data.
       </p>
+      <a class="button ghost" href="/documentation/reply">Read more &rarr;</a>
     </div>
   </div>
   <div>
@@ -325,6 +419,7 @@ server()
         <code>status</code>, headers and <code>.json()</code> a real client
         would get.
       </p>
+      <a class="button ghost" href="/documentation/testing">Read more &rarr;</a>
     </div>
   </div>
   <div>
