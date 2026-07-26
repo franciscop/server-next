@@ -357,12 +357,12 @@ export default server({ store, auth })
   <div class="content">
     <h2>File uploads</h2>
     <p>
-      Uploaded files are streamed to storage as they arrive rather than buffered
-      in memory, so large uploads stay inexpensive.
+      Files stream straight to storage as they arrive, never held in memory, so
+      even large uploads stay fast and cheap.
     </p>
     <p>
       Point <code>uploads</code> at a local folder or an S3-compatible bucket,
-      and read the stored file from <code>ctx.body</code>.
+      and each stored file shows up on <code>ctx.body</code>.
     </p>
     <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
   </div>
@@ -383,13 +383,15 @@ export default server({ store, auth })
 
 <section class="row">
   <div class="content">
-    <h2>JSX rendering, optional</h2>
+    <h2>JSX rendering</h2>
     <p>
-      On Bun, return JSX straight from a route and it is sent as HTML. It is
-      opt-in with no runtime dependency, just enable it in your
-      <code>tsconfig.json</code>.
+      On Bun you can return JSX from a route and it is sent as HTML. It is
+      opt-in by updating your <code>tsconfig.json</code>.
     </p>
-    <p>Interpolation is escaped, so your pages are safe from XSS by default.</p>
+    <p>
+      This is the primary recommended templating engine, but it is NOT React,
+      just JSX. Interpolation is escaped and safe from XSS.
+    </p>
     <a class="button ghost" href="/documentation/guides#jsx">Read more &rarr;</a>
   </div>
   <div>
