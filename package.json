@@ -59,9 +59,7 @@
       "Platforms": "docs/9. Platforms.md",
       "FAQ": "docs/A. FAQ.md"
     },
-    "tutorials": {
-      "Build a REST API": "docs/tutorials/1. REST API.md"
-    }
+    "tutorials": "docs/tutorials"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",
