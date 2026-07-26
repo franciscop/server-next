@@ -343,10 +343,11 @@ export default server()
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
+import kv from "polystore";
 
-const auth = "cookie:github";
+const auth = "cookie:github"; // sign in /auth/login/github
+const store = kv(new Map()); // in-memory sessions
 
-// visit /auth/login/github to sign in
 export default server({ store, auth })
   .get("/me", ctx =&gt; ctx.user || 401);
 </code></pre>
