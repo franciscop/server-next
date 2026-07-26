@@ -328,22 +328,6 @@ export default server()
   </svg>
 </div>
 
-<<<<<<< HEAD
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Authentication built in</h2>
-      <p>
-        Add OAuth (GitHub, Google, Microsoft, Discord, Facebook, Apple) or email
-        and password with a single option.
-      </p>
-      <p>
-        Sessions, signed cookies and CSRF-protected flows are handled for you,
-        and the signed-in user is available on <code>ctx.user</code>.
-      </p>
-      <a class="button ghost" href="/documentation/authentication">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
     <h2>Authentication built in</h2>
@@ -355,7 +339,7 @@ export default server()
       Sessions, signed cookies and CSRF-protected flows are handled for you, and
       the signed-in user is available on <code>ctx.user</code>.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/authentication">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
@@ -369,23 +353,18 @@ export default server({ store, auth })
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>File uploads</h2>
-      <p>
-        Uploaded files are streamed to storage as they arrive rather than
-        buffered in memory, so large uploads stay inexpensive.
-      </p>
-      <p>
-        Point <code>uploads</code> at a local folder or an S3-compatible bucket,
-        and read the stored file from <code>ctx.body</code>.
-      </p>
-      <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>File uploads</h2>
+    <p>
+      Uploaded files are streamed to storage as they arrive rather than buffered
+      in memory, so large uploads stay inexpensive.
+    </p>
+    <p>
+      Point <code>uploads</code> at a local folder or an S3-compatible bucket,
+      and read the stored file from <code>ctx.body</code>.
+    </p>
+    <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">export default server({ uploads: "./uploads" })
@@ -402,22 +381,16 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>JSX rendering, optional</h2>
-      <p>
-        On Bun, return JSX straight from a route and it is sent as HTML. It is
-        opt-in with no runtime dependency, just enable it in your
-        <code>tsconfig.json</code>.
-      </p>
-      <p>
-        Interpolation is escaped, so your pages are safe from XSS by default.
-      </p>
-      <a class="button ghost" href="/documentation/guides#jsx">Read more &rarr;</a>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>JSX rendering, optional</h2>
+    <p>
+      On Bun, return JSX straight from a route and it is sent as HTML. It is
+      opt-in with no runtime dependency, just enable it in your
+      <code>tsconfig.json</code>.
+    </p>
+    <p>Interpolation is escaped, so your pages are safe from XSS by default.</p>
+    <a class="button ghost" href="/documentation/guides#jsx">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">export default server()
@@ -431,22 +404,18 @@ export default server({ store, auth })
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>HTMX</h2>
-      <p>
-        No integration needed, return HTML fragments from your routes and let
-        HTMX swap them in.
-      </p>
-      <p>
-        It blends especially well with JSX, whose escaped interpolation keeps
-        those fragments safe from XSS.
-      </p>
-      <a class="button ghost" href="/documentation/guides#htmx">Read more &rarr;</a>
-    </div>
+<section class="row">
+  <div class="content">
+    <h2>HTMX</h2>
+    <p>
+      No integration needed, return HTML fragments from your routes and let HTMX
+      swap them in.
+    </p>
+    <p>
+      It blends especially well with JSX, whose escaped interpolation keeps those
+      fragments safe from XSS.
+    </p>
+    <a class="button ghost" href="/documentation/guides#htmx">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">import server, { file } from "@server/next";
@@ -459,23 +428,6 @@ export default server()
   </div>
 </section>
 
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Typed parameters</h2>
-      <p>
-        Route parameters are read straight from the URL and typed for you, so
-        mistakes are caught as you type.
-      </p>
-      <p>
-        Add a format like <code>:id(number)</code> and the value arrives as a
-        <code>number</code>, and mark optional segments with <code>?</code>.
-      </p>
-      <a class="button ghost" href="/documentation/router#parameters">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
     <h2>Typed parameters</h2>
@@ -487,7 +439,7 @@ export default server()
       Add a format like <code>:id(number)</code> and the value arrives as a
       <code>number</code>, and mark optional segments with <code>?</code>.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/router#parameters">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">server()
@@ -500,36 +452,18 @@ export default server()
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Upload validation</h2>
-      <p>
-        Add size and type limits right on the <code>uploads</code> option, and
-        oversized or wrong-type files are rejected before your handler runs.
-      </p>
-      <p>
-        Each stored file gets a random, unguessable id, so nothing is
-        overwritten or predictable.
-      </p>
-      <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
-    <h2>File uploads</h2>
+    <h2>Upload validation</h2>
     <p>
-      Uploaded files are streamed to storage as they arrive rather than buffered
-      in memory, so large uploads stay inexpensive.
+      Add size and type limits right on the <code>uploads</code> option, and
+      oversized or wrong-type files are rejected before your handler runs.
     </p>
     <p>
-      Point <code>uploads</code> at a local folder or an S3-compatible bucket,
-      and read the stored file from <code>ctx.body</code>.
+      Each stored file gets a random, unguessable id, so nothing is overwritten
+      or predictable.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">export default server({
@@ -542,33 +476,18 @@ export default server()
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Proxy with fetch()</h2>
-      <p>
-        Return a <code>fetch()</code> response straight from a route and it is
-        forwarded as-is: status, headers and a streamed body.
-      </p>
-      <p>
-        That is all you need for a backend-for-frontend, an API gateway, or
-        hiding an upstream key from the browser.
-      </p>
-      <a class="button ghost" href="/documentation/guides#proxying-requests">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
-    <h2>WebSockets</h2>
+    <h2>Proxy with fetch()</h2>
     <p>
-      Handle WebSocket events with the same routing API. Reply to a single
-      client with <code>ctx.socket</code>, or broadcast to every connection with
-      <code>ctx.sockets</code>.
+      Return a <code>fetch()</code> response straight from a route and it is
+      forwarded as-is: status, headers and a streamed body.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <p>
+      That is all you need for a backend-for-frontend, an API gateway, or hiding
+      an upstream key from the browser.
+    </p>
+    <a class="button ghost" href="/documentation/guides#proxying-requests">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">export default server()
@@ -578,29 +497,15 @@ export default server()
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>WebSockets</h2>
-      <p>
-        Handle WebSocket events with the same routing API. Reply to a single
-        client with <code>ctx.socket</code>, or broadcast to every connection
-        with <code>ctx.sockets</code>.
-      </p>
-      <a class="button ghost" href="/documentation/guides#websockets">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
-    <h2>Runs everywhere</h2>
+    <h2>WebSockets</h2>
     <p>
-      The same file runs on Node, Bun, Cloudflare Workers and Netlify Functions,
-      with no adapters or platform-specific entry points.
+      Handle WebSocket events with the same routing API. Reply to a single
+      client with <code>ctx.socket</code>, or broadcast to every connection with
+      <code>ctx.sockets</code>.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/guides#websockets">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">server()
@@ -612,24 +517,6 @@ export default server()
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Simple responses</h2>
-      <p>
-        Return a string, object, status code, file or stream from any route
-        handler.
-      </p>
-      <p>
-        Server.js infers the response, content type and headers, so handlers
-        just return data.
-      </p>
-      <a class="button ghost" href="/documentation/reply">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
     <h2>Simple responses</h2>
@@ -641,7 +528,7 @@ export default server()
       Server.js infers the response, content type and headers, so handlers just
       return data.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/reply">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">import server, { file } from "@server/next";
@@ -654,28 +541,6 @@ server()
   </div>
 </section>
 
-<<<<<<< HEAD
-<br />
-
-<section class="hero flex one two-900 center">
-  <div>
-    <div class="content">
-      <h2>Testing built in</h2>
-      <p>
-        Call <code>.test()</code> on any server for an in-process client that
-        runs requests through the full middleware stack, with no ports,
-        mocking or network.
-      </p>
-      <p>
-        It mirrors every HTTP method and sends JSON, <code>FormData</code> or
-        streams as the body. Each call returns a standard
-        <code>Response</code>, so you assert on the same
-        <code>status</code>, headers and <code>.json()</code> a real client
-        would get.
-      </p>
-      <a class="button ghost" href="/documentation/testing">Read more &rarr;</a>
-    </div>
-=======
 <section class="row">
   <div class="content">
     <h2>Testing built in</h2>
@@ -690,7 +555,7 @@ server()
       so you assert on the same <code>status</code>, headers and
       <code>.json()</code> a real client would get.
     </p>
->>>>>>> 780381d90c89fd6a3375309f415cef528c999629
+    <a class="button ghost" href="/documentation/testing">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">const api = server()
