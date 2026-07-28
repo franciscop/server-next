@@ -3,7 +3,7 @@ import Bucket from "./bucket";
 import createId from "./createId";
 import createLogger from "./logger";
 import { resolveSecurity } from "./security";
-import { UploadPipeline } from "./upload";
+import { parseBytes } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
 
@@ -87,22 +87,21 @@ export default function config(options: Options = {}): Settings {
   // Bucket
   const publicDir = options.public || env.PUBLIC;
   settings.public = publicDir ? Bucket(publicDir) : null;
-  // uploads: a path/Bucket streams files straight through (unvalidated); the
-  // object form `{ bucket, maxSize, minSize, fileType }` adds validation, which
-  // buffers each file to check it, via an internal pipeline. No limits set on
-  // the object form → still just stream to the bucket.
+  // uploads: every form resolves to the same shape, `{ bucket, maxSize,
+  // minSize, fileType }`, with the bucket resolved and undefined leaves meaning
+  // "no limit". Limits make parseBody buffer each file to check it before
+  // writing; without them files stream straight through.
   const up = options.uploads;
   if (!up) {
     settings.uploads = null;
   } else if (typeof up === "object" && "bucket" in up) {
     const { bucket, maxSize, minSize, fileType } = up;
-    const hasLimits =
-      maxSize != null || minSize != null || fileType != null;
-    settings.uploads = hasLimits
-      ? new UploadPipeline(bucket).limit({ maxSize, minSize, fileType })
-      : Bucket(bucket);
+    // A bad size string ('5megs') fails here at boot, not on the first upload
+    if (maxSize != null) parseBytes(maxSize);
+    if (minSize != null) parseBytes(minSize);
+    settings.uploads = { bucket: Bucket(bucket), maxSize, minSize, fileType };
   } else {
-    settings.uploads = Bucket(up);
+    settings.uploads = { bucket: Bucket(up) };
   }
 
   // Favicon served at /favicon.ico (path or Bucket)

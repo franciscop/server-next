@@ -70,7 +70,7 @@ describe("simple post works", () => {
   it("can post new data", async () => {
     const res = await api.post("/", "New Data");
     expect(res.status).toBe(201);
-    expect(res.headers.get("content-type")).toBe("text/plain");
+    expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(await res.text()).toBe("New Data");
   });
 

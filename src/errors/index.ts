@@ -1,6 +1,11 @@
 import ServerError from "../ServerError";
 
 ServerError.extend({
+  PATH_TRAVERSAL: {
+    status: 400,
+    message:
+      "The route param '{param}' tries to climb the path ('{value}'). If this route legitimately receives paths, set security: { traversalProtection: false }",
+  },
   NO_STORE: "You need a 'store' to write 'ctx.session'",
   NO_STORE_WRITE: "You need a 'store' to write 'ctx.session.{key}'",
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",

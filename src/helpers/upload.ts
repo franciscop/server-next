@@ -1,5 +1,4 @@
 import type { Bucket, UploadedFile } from "../types";
-import bucketDefault from "./bucket";
 import createId from "./createId";
 
 export type LimitOptions = {
@@ -48,55 +47,39 @@ export async function saveFileToBucket(
   };
 }
 
-export class UploadPipeline {
-  private _bucket: Bucket | null;
-  private _limits: LimitOptions = {};
+// Checks a buffered file against the `uploads` limits, throwing a descriptive
+// error when it fails. Called before the file is written, so only valid files
+// ever reach the bucket.
+export function validateFile(
+  originalName: string,
+  data: Buffer,
+  contentType: string,
+  limits: LimitOptions,
+): void {
+  const { maxSize, minSize, fileType } = limits;
 
-  constructor(bucket?: Bucket | string | null) {
-    this._bucket = bucketDefault(bucket ?? undefined);
+  if (maxSize !== undefined && data.length > parseBytes(maxSize)) {
+    throw new Error(
+      `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`,
+    );
   }
 
-  limit(options: LimitOptions): this {
-    this._limits = { ...this._limits, ...options };
-    return this;
+  if (minSize !== undefined && data.length < parseBytes(minSize)) {
+    throw new Error(
+      `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`,
+    );
   }
 
-  async processFile(
-    originalName: string,
-    data: Buffer,
-    contentType: string,
-  ): Promise<UploadedFile> {
-    const { maxSize, minSize, fileType } = this._limits;
-
-    if (maxSize !== undefined && data.length > parseBytes(maxSize)) {
+  if (fileType && fileType.length > 0) {
+    const ext = getExt(originalName);
+    const mime = contentType.toLowerCase();
+    const allowed = fileType.some(
+      (t) => t.toLowerCase() === mime || t.toLowerCase() === ext,
+    );
+    if (!allowed) {
       throw new Error(
-        `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`,
+        `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`,
       );
     }
-
-    if (minSize !== undefined && data.length < parseBytes(minSize)) {
-      throw new Error(
-        `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`,
-      );
-    }
-
-    if (fileType && fileType.length > 0) {
-      const ext = getExt(originalName);
-      const mime = contentType.toLowerCase();
-      const allowed = fileType.some(
-        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext,
-      );
-      if (!allowed) {
-        throw new Error(
-          `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`,
-        );
-      }
-    }
-
-    if (!this._bucket) {
-      throw new Error(`No upload destination configured (missing bucket)`);
-    }
-
-    return saveFileToBucket(originalName, data, this._bucket, contentType);
   }
 }

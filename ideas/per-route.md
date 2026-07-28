@@ -39,7 +39,7 @@ Global stays the default; a route's `uploads` replaces it just like `body`/`cach
 Two gaps:
 
 1. `uploads` isn't in `RouteOptions` (`src/types.ts`), so it doesn't typecheck.
-2. Route options are merged **raw** (`handleRequest.ts`: `ctx.options = { ...app.settings, ...route.options }`). The server-level `uploads` is normalized to a `Bucket` (or `UploadPipeline`) in `config.ts`, but a per-route `uploads: "./avatars"` would land on `ctx.options.uploads` as a plain **string**, and `parseBody` calls `.file()` / `.folder()` on it, which throws.
+2. Route options are merged **raw** (`handleRequest.ts`: `ctx.options = { ...app.settings, ...route.options }`). The server-level `uploads` is normalized to a `Bucket` (plus `uploadLimits`) in `config.ts`, but a per-route `uploads: "./avatars"` would land on `ctx.options.uploads` as a plain **string**, and `parseBody` calls `.file()` / `.folder()` on it, which throws.
 
 `body` and `cache` work per route only because their raw value is *already* the
 final shape the request path consumes; `uploads` needs resolving first.
@@ -48,7 +48,7 @@ final shape the request path consumes; `uploads` needs resolving first.
 
 - Add `uploads?: string | Bucket | UploadOptions` to `RouteOptions`.
 - Factor the uploads-normalization out of `config.ts` (the string/Bucket/object
-  → `Bucket | UploadPipeline` logic) into a shared helper.
+  → `Bucket` + `uploadLimits` logic) into a shared helper.
 - Apply it when a route's options are merged (or lazily in `resolveBody`), so
   `ctx.options.uploads` is always a resolved bucket regardless of origin.
 - Same pattern would let other resolved options (`cors`, `security`, `session`,

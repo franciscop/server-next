@@ -179,7 +179,7 @@ describe("ctx.body parse: multipart files", () => {
       size: 7,
     });
     // the bytes actually streamed to disk
-    expect(await fsp.readFile(out.avatar.path, "utf8")).toBe("PNGDATA");
+    expect(await fsp.readFile(`${TMP}/${out.avatar.path}`, "utf8")).toBe("PNGDATA");
   });
 
   it("stores multiple distinct files", async () => {
@@ -190,8 +190,8 @@ describe("ctx.body parse: multipart files", () => {
     const res = await api.post("/", body, { headers: { "content-type": MULTIPART } });
     const out = await res.json();
 
-    expect(await fsp.readFile(out.doc.path, "utf8")).toBe("alpha");
-    expect(await fsp.readFile(out.img.path, "utf8")).toBe("betabeta");
+    expect(await fsp.readFile(`${TMP}/${out.doc.path}`, "utf8")).toBe("alpha");
+    expect(await fsp.readFile(`${TMP}/${out.img.path}`, "utf8")).toBe("betabeta");
     expect(out.doc.size).toBe(5);
     expect(out.img.size).toBe(8);
   });
@@ -207,8 +207,8 @@ describe("ctx.body parse: multipart files", () => {
     expect(out.photos).toHaveLength(2);
     expect(out.photos[0].name).toBe("a.txt");
     expect(out.photos[1].name).toBe("b.txt");
-    expect(await fsp.readFile(out.photos[0].path, "utf8")).toBe("one");
-    expect(await fsp.readFile(out.photos[1].path, "utf8")).toBe("two");
+    expect(await fsp.readFile(`${TMP}/${out.photos[0].path}`, "utf8")).toBe("one");
+    expect(await fsp.readFile(`${TMP}/${out.photos[1].path}`, "utf8")).toBe("two");
   });
 
   it("skips file parts when no bucket is configured, keeping fields", async () => {
@@ -242,7 +242,7 @@ describe("ctx.body parse: raw single file (Case B)", () => {
       type: "video/mp4",
       size: 7,
     });
-    expect(await fsp.readFile(out.path, "utf8")).toBe("a movie");
+    expect(await fsp.readFile(`${TMP}/${out.path}`, "utf8")).toBe("a movie");
   });
 
   it("uses .bin when the content-type has no clean subtype", async () => {

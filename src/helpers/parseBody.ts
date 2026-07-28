@@ -2,9 +2,11 @@ import type { Bucket, BucketFile } from "..";
 import { INF, tooLarge } from "./bodyLimit";
 import createId from "./createId";
 import mimes from "./mimes";
-import { getExt, UploadPipeline } from "./upload";
+import { getExt, type LimitOptions, saveFileToBucket, validateFile } from "./upload";
 
-type Dest = Bucket | UploadPipeline | null | undefined;
+// Where files go: a bare Bucket streams them through as they arrive; with any
+// limit set, each file is buffered whole, validated, and only then written.
+type Dest = Bucket | ({ bucket: Bucket } & LimitOptions) | null | undefined;
 type Input = Buffer | ReadableStream;
 
 function getBoundary(header?: string): string | null {
@@ -68,8 +70,8 @@ function toStream(input: Input): ReadableStream {
 
 // Buffer a whole body into memory. `max` caps how much we'll accumulate before
 // throwing a 413 — this is the choke point where non-file bytes enter the heap.
-// File paths (pipeline/bucket) pass no max, since files are governed by
-// upload().limit(), not the body limit.
+// File paths pass no max, since files are governed by the `uploads` limits,
+// not the body limit.
 async function toBuffer(input: Input, max: number = INF): Promise<Buffer> {
   if (!(input instanceof ReadableStream)) {
     if (input.length > max) throw tooLarge(max);
@@ -118,11 +120,12 @@ type Part =
   | { kind: "text"; name: string; chunks: Buffer[] }
   | { kind: "drop" }
   | {
-      kind: "pipefile";
+      kind: "validated";
       name: string;
       filename: string;
       type: string;
-      pipeline: UploadPipeline;
+      bucket: Bucket;
+      limits: LimitOptions;
       chunks: Buffer[];
     }
   | {
@@ -137,7 +140,11 @@ type Part =
       size: number;
     };
 
-function startPart(headerStr: string, dest: Dest): Part {
+function startPart(
+  headerStr: string,
+  bucket: Bucket | null | undefined,
+  limits: LimitOptions | undefined,
+): Part {
   const name = getMatching(headerStr, /name="(.+?)"/)
     .trim()
     .replace(/\[\]$/, "");
@@ -150,13 +157,13 @@ function startPart(headerStr: string, dest: Dest): Part {
     getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() ||
     "application/octet-stream";
 
-  if (!dest) return { kind: "drop" };
-  if (dest instanceof UploadPipeline) {
-    return { kind: "pipefile", name, filename, type, pipeline: dest, chunks: [] };
+  if (!bucket) return { kind: "drop" };
+  if (limits) {
+    return { kind: "validated", name, filename, type, bucket, limits, chunks: [] };
   }
 
-  // Plain Bucket: open a stream now and pipe the part's bytes into it as they
-  // arrive, so a large file is never fully buffered.
+  // No limits: open a stream now and pipe the part's bytes into the bucket as
+  // they arrive, so a large file is never fully buffered.
   const id = `${createId()}${getExt(filename)}`;
   let controller!: ReadableStreamDefaultController;
   const readable = new ReadableStream({
@@ -164,7 +171,7 @@ function startPart(headerStr: string, dest: Dest): Part {
       controller = c;
     },
   });
-  const file = dest.file(id);
+  const file = bucket.file(id);
   return {
     kind: "file",
     name,
@@ -180,7 +187,7 @@ function startPart(headerStr: string, dest: Dest): Part {
 
 function feedPart(part: Part, data: Buffer): void {
   if (data.length === 0) return;
-  if (part.kind === "text" || part.kind === "pipefile") part.chunks.push(data);
+  if (part.kind === "text" || part.kind === "validated") part.chunks.push(data);
   else if (part.kind === "file") {
     part.controller.enqueue(data);
     part.size += data.length;
@@ -192,9 +199,10 @@ async function endPart(part: Part, body: Record<string, any>): Promise<void> {
     const buf = Buffer.concat(part.chunks);
     const value = isProbablyText(buf) ? buf.toString("utf-8").trim() : buf;
     addField(body, part.name, value);
-  } else if (part.kind === "pipefile") {
+  } else if (part.kind === "validated") {
     const buf = Buffer.concat(part.chunks);
-    const ref = await part.pipeline.processFile(part.filename, buf, part.type);
+    validateFile(part.filename, buf, part.type, part.limits);
+    const ref = await saveFileToBucket(part.filename, buf, part.bucket, part.type);
     addField(body, part.name, ref);
   } else if (part.kind === "file") {
     part.controller.close();
@@ -217,7 +225,8 @@ const BREAK = Buffer.from("\r\n\r\n");
 async function parseMultipart(
   stream: ReadableStream,
   boundary: string,
-  dest: Dest,
+  bucket: Bucket | null | undefined,
+  limits: LimitOptions | undefined,
   max: number = INF,
 ): Promise<Record<string, any>> {
   // Every part is preceded by `\r\n--boundary`. Prepend a CRLF so the very first
@@ -266,7 +275,7 @@ async function parseMultipart(
       } else if (state === "headers") {
         const i = buf.indexOf(BREAK);
         if (i === -1) break;
-        part = startPart(buf.subarray(0, i).toString("utf-8"), dest);
+        part = startPart(buf.subarray(0, i).toString("utf-8"), bucket, limits);
         buf = buf.subarray(i + BREAK.length);
         state = "body";
         advanced = true;
@@ -337,11 +346,26 @@ export default async function parseBody(
 ): Promise<any> {
   const type = Array.isArray(contentType) ? contentType[0] : contentType;
 
-  // Multipart (Case A): stream-parse, files go to `dest` as they arrive; only
-  // the buffered text fields count against `max`.
+  // Split the destination into the bucket and the optional validation limits
+  let bucket: Bucket | null | undefined;
+  let limits: LimitOptions | undefined;
+  if (dest && "bucket" in dest) {
+    bucket = dest.bucket;
+    const { maxSize, minSize, fileType } = dest;
+    if (maxSize != null || minSize != null || fileType != null) {
+      limits = { maxSize, minSize, fileType };
+    }
+  } else {
+    bucket = dest as Bucket | null | undefined;
+  }
+
+  // Multipart (Case A): stream-parse, files go to the bucket as they arrive;
+  // only the buffered text fields count against `max`.
   const boundary =
     type && /multipart\/form-data/i.test(type) ? getBoundary(type) : null;
-  if (boundary) return parseMultipart(toStream(input), boundary, dest, max);
+  if (boundary) {
+    return parseMultipart(toStream(input), boundary, bucket, limits, max);
+  }
 
   // Types that need the whole body in hand to make sense of it: all buffered, so
   // all counted against `max`.
@@ -359,18 +383,19 @@ export default async function parseBody(
   }
 
   // Case B: a single raw file as the whole body (image/*, video/*, octet-stream).
-  // With no `dest` it becomes ctx.body as a Buffer (buffered → counted); with a
-  // `dest` it's a file (pipeline-buffered or streamed) → governed by
-  // upload().limit(), not the body limit, so uncounted.
-  if (!dest) {
+  // With no bucket it becomes ctx.body as a Buffer (buffered → counted); with a
+  // bucket it's a file (validated-buffered or streamed) → governed by the
+  // `uploads` limits, not the body limit, so uncounted.
+  if (!bucket) {
     const buf = await toBuffer(input, max);
     return buf.length ? buf : undefined;
   }
-  if (dest instanceof UploadPipeline) {
+  if (limits) {
     const buf = await toBuffer(input);
-    return buf.length
-      ? dest.processFile(`upload${extFromType(type)}`, buf, type)
-      : undefined;
+    if (!buf.length) return undefined;
+    const name = `upload${extFromType(type)}`;
+    validateFile(name, buf, type, limits);
+    return saveFileToBucket(name, buf, bucket, type);
   }
-  return streamToBucket(toStream(input), type, dest);
+  return streamToBucket(toStream(input), type, bucket);
 }

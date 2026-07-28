@@ -17,9 +17,11 @@ export default async function assets(ctx: Context) {
     const file = ctx.options.public.file(key);
 
     // info() (size + mtime) gives a validator we can compute without reading the
-    // bytes; fall back to a bare existence check if the bucket has no info().
-    const meta = file.info ? await file.info() : null;
-    if (meta ? !meta.exists : !(await file.exists())) return;
+    // bytes, and null when the file is missing. Buckets without info() fall back
+    // to a bare existence check, so `hasInfo` tells the two "no meta" cases apart.
+    const info = file.info?.bind(file);
+    const meta = info ? await info() : null;
+    if (info ? !meta : !(await file.exists())) return;
 
     const ext = ctx.url.pathname.split(".").pop();
     const ctype = meta?.type || ext;
@@ -27,11 +29,11 @@ export default async function assets(ctx: Context) {
 
     let tag: string | undefined;
     if (meta) {
-      const stamp = meta.date ? meta.date.getTime() : 0;
+      const stamp = meta.modified ? meta.modified.getTime() : 0;
       // Weak validator (size + mtime), since we don't read the bytes to hash.
       tag = `W/"${meta.size.toString(16)}-${stamp.toString(16)}"`;
       headers.etag = tag;
-      if (meta.date) headers["last-modified"] = meta.date.toUTCString();
+      if (meta.modified) headers["last-modified"] = meta.modified.toUTCString();
     }
 
     // We can only honor ranges when the bucket can slice and we know the size.

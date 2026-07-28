@@ -65,7 +65,10 @@ export default function createCookies(key: string, val: Cookie): string {
   if (val.value === null) val.expires = EXPIRED;
   const { value, path, expires, maxAge, httpOnly, secure, sameSite } = val;
 
-  let str = `${key}=${value || ""};Path=${path || "/"}`;
+  // Encoded on write, decoded on read (parseCookies), so a value can hold the
+  // characters that would otherwise end it (';', ',', '=') or break the reader
+  // (a literal '%'). `??` keeps falsy values like 0 and false.
+  let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path || "/"}`;
   if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
   if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
   if (httpOnly) str += ";HttpOnly";

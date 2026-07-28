@@ -5,13 +5,6 @@ type LimitOptions = {
     minSize?: number | string;
     fileType?: string[];
 };
-declare class UploadPipeline {
-    private _bucket;
-    private _limits;
-    constructor(bucket?: Bucket | string | null);
-    limit(options: LimitOptions): this;
-    processFile(originalName: string, data: Buffer, contentType: string): Promise<UploadedFile>;
-}
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 interface ResponseData {
@@ -24,7 +17,7 @@ declare class Reply$1 {
     status(status: number): this;
     type(type?: string): this;
     download(name?: string): this;
-    headers(key: string | Record<string, string>, value?: string): this;
+    headers(key: string | Record<string, string | string[]>, value?: string | string[]): this;
     cache(value: CacheOption): this;
     cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
     json(body: unknown): Response;
@@ -88,18 +81,16 @@ type Cookie = {
 };
 type RouterMethod = "*" | Method;
 type FileInfo = {
-    exists: boolean;
     size: number;
-    date: Date | null;
-    type?: string | null;
+    type: string | null;
+    modified: Date;
 };
 type BucketFile = {
     readonly path: string;
-    readonly id: string;
     readonly name: string;
     readonly type?: string;
     exists(): Promise<boolean>;
-    info?(): Promise<FileInfo>;
+    info?(): Promise<FileInfo | null>;
     write(content: string | Buffer | ReadableStream, options?: {
         type?: string;
     }): Promise<void>;
@@ -195,6 +186,7 @@ type SecurityOptions = {
     referrerPolicy?: boolean | string;
     hsts?: boolean | string;
     xssProtection?: boolean;
+    traversalProtection?: boolean;
     csp?: boolean | string;
     coop?: boolean | string;
     corp?: boolean | string;
@@ -202,6 +194,7 @@ type SecurityOptions = {
 };
 type SecuritySettings = {
     trustProxy: boolean;
+    traversalProtection: boolean;
     headers: Record<string, string>;
     hsts: string | null;
 };
@@ -232,7 +225,9 @@ type Settings = {
     port: number;
     secret: string;
     public?: Bucket;
-    uploads?: Bucket | UploadPipeline;
+    uploads?: ({
+        bucket: Bucket;
+    } & LimitOptions) | null;
     store?: KVStore;
     cookies?: KVStore;
     session?: {

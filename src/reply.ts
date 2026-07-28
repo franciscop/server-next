@@ -1,4 +1,6 @@
 import { createCookies, mimes, resolveCache, toWeb } from "./helpers";
+import disposition from "./helpers/disposition";
+import isHtml from "./helpers/isHtml";
 import isReadableStream from "./helpers/isReadableStream";
 import type { BucketFile, CacheOption, Cookie } from "./types";
 
@@ -34,22 +36,32 @@ class Reply {
   download(name?: string): this {
     const ext = name?.split(".").pop();
     if (ext && !this.res.headers.get("content-type")) this.type(ext);
-    const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
-    return this.headers("content-disposition", `attachment${filename}`);
+    return this.headers("content-disposition", disposition(name));
   }
 
-  headers(key: string | Record<string, string>, value?: string): this {
+  headers(
+    key: string | Record<string, string | string[]>,
+    value?: string | string[],
+  ): this {
     if (typeof key !== "string") {
       Object.entries(key).map(([key, value]) => this.headers(key, value));
       return this;
     }
 
+    // An array sends the header once per value, for list headers like `Link`
     if (Array.isArray(value)) {
-      Object.values(value).map((val) => this.headers(key, val));
+      this.res.headers.delete(key);
+      for (const val of value) this.res.headers.append(key, val);
       return this;
     }
 
-    this.res.headers.append(key, value);
+    // Set-Cookie is the one header that must stack (cookies can't be merged
+    // into one line); any other header replaces, so the last write wins
+    if (key.toLowerCase() === "set-cookie") {
+      this.res.headers.append(key, value);
+    } else {
+      this.res.headers.set(key, value);
+    }
     return this;
   }
 
@@ -86,13 +98,26 @@ class Reply {
   }
 
   json(body: unknown): Response {
-    return this.headers("content-type", "application/json").send(
-      JSON.stringify(body),
-    );
+    // `undefined` stringifies to undefined, which would send an empty body
+    // labelled as JSON and throw on the client's res.json()
+    if (body === undefined) body = null;
+    // Fill-if-absent, so an explicit type()/headers() content-type always wins.
+    // Bare `application/json`, no charset. JSON is always UTF-8 by spec, and its
+    // media type defines no charset parameter (RFC 8259: "Adding one really has
+    // no effect on compliant recipients"), so it's redundant. Text types (text/*)
+    // do carry `; charset=utf-8`; JSON deliberately doesn't, matching Hono/Elysia
+    // and the fetch spec.
+    if (!this.res.headers.get("content-type")) {
+      this.res.headers.set("content-type", "application/json");
+    }
+    return this.send(JSON.stringify(body));
   }
 
   redirect(path: string): Response {
-    return this.headers("location", path).status(302).send();
+    // 302 is only the default: an explicitly set status (301/307/308) wins
+    this.headers("location", path);
+    if (this.res.status == null) this.res.status = 302;
+    return this.send();
   }
 
   async file(path: string | BucketFile): Promise<Response> {
@@ -102,13 +127,19 @@ class Reply {
       if (!(await path.exists())) return this.status(404).send();
       return this.type(path.type).send(path.stream());
     }
+    // A '..' segment means the path was built from input that climbed out of
+    // where it was meant to stay; `send` (Express) refuses these too. Normal
+    // paths are already resolved, since path.join() collapses the dots.
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) return this.status(404).send();
     try {
       const fs = await import("node:fs");
       const ext = path.split(".").pop();
+      // Missing files reject asynchronously, so 404 there as well as here
+      await fs.promises.access(path);
       const stream = fs.createReadStream(path);
       return this.type(ext).send(stream);
     } catch (error: any) {
-      if (error.code === "ENOENT") {
+      if (error.code === "ENOENT" || error.code === "EISDIR") {
         return this.status(404).send();
       }
       throw error;
@@ -125,10 +156,13 @@ class Reply {
       return new Response(null, { status, headers });
     }
 
+    // `null` means no body, as with `new Response(null)`; without this it would
+    // fall through to the JSON default and send the string "null"
+    if (body === null) body = "";
+
     if (typeof body === "string") {
       if (!headers.get("content-type")) {
-        const isHtml = body.trim().startsWith("<");
-        headers.set("content-type", isHtml ? "text/html" : "text/plain");
+        headers.set("content-type", isHtml(body) ? mimes.html : mimes.text);
       }
       if (!headers.has("content-length")) {
         headers.set("content-length", String(Buffer.byteLength(body)));
@@ -158,7 +192,8 @@ class Reply {
       return new Response(toWeb(body), { status, headers });
     }
 
-    // Default sends it as json
+    // Default sends it as json. Bare `application/json`, no charset: JSON is
+    // always UTF-8 by spec, so the param is redundant (see json() above).
     if (!headers.get("content-type")) {
       headers.set("content-type", "application/json");
     }

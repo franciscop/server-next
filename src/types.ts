@@ -1,7 +1,7 @@
 // Through this file, "options" refers to the ones that are accepted
 // by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
-import type { LimitOptions, UploadPipeline } from "./helpers/upload";
+import type { LimitOptions } from "./helpers/upload";
 import type { status } from "./reply";
 
 // The chainable reply helpers (status/type/headers/cache/cookies/download) all
@@ -81,26 +81,27 @@ export type Cookie = {
 export type RouterMethod = "*" | Method;
 
 // Subset of the `bucket` library's FileInfo: file metadata used to build cheap
-// cache validators (ETag / Last-Modified) without reading the bytes.
+// cache validators (ETag / Last-Modified) without reading the bytes. `info()`
+// resolves to null when the file doesn't exist, so these are always real.
 export type FileInfo = {
-  exists: boolean;
   size: number;
-  date: Date | null;
-  type?: string | null;
+  type: string | null;
+  modified: Date;
 };
 
-// Mirrors the `bucket` library's IBucketFile: a handle to a single object.
-// `write()` returns void, so the stored location is read back from `.path`.
+// Mirrors the `bucket` library's BucketFile: a handle to a single object.
 export type BucketFile = {
+  // The file's key within the bucket, like "avatars/me.jpg". Not a filesystem
+  // path, so it reads the same whether the bucket is local or in the cloud.
   readonly path: string;
-  readonly id: string;
+  // Just the filename, with no folder
   readonly name: string;
   // The file's MIME type, when the bucket knows it (like Blob/File.type).
   readonly type?: string;
   exists(): Promise<boolean>;
-  // Optional: metadata in one call (size/date/type). `bucket` files provide it;
-  // used for conditional-request caching of static assets.
-  info?(): Promise<FileInfo>;
+  // Optional: metadata in one call, or null when the file doesn't exist.
+  // `bucket` files provide it; used for conditional-request caching of assets.
+  info?(): Promise<FileInfo | null>;
   write(
     content: string | Buffer | ReadableStream,
     options?: { type?: string },
@@ -255,6 +256,8 @@ export type SecurityOptions = {
   referrerPolicy?: boolean | string; // default 'strict-origin-when-cross-origin'
   hsts?: boolean | string; // Strict-Transport-Security (production only)
   xssProtection?: boolean; // X-XSS-Protection: 0, default on
+  // Reject route params that climb the path ('../'), default on
+  traversalProtection?: boolean;
   // Opt-in (off unless set):
   csp?: boolean | string; // Content-Security-Policy
   coop?: boolean | string; // Cross-Origin-Opener-Policy
@@ -264,6 +267,8 @@ export type SecurityOptions = {
 
 export type SecuritySettings = {
   trustProxy: boolean;
+  // Reject route params containing a '..' path segment
+  traversalProtection: boolean;
   // Resolved static headers applied to every response
   headers: Record<string, string>;
   // Resolved HSTS value, applied only on production (HTTPS) responses
@@ -303,7 +308,7 @@ export type Settings = {
   port: number;
   secret: string;
   public?: Bucket;
-  uploads?: Bucket | UploadPipeline;
+  uploads?: ({ bucket: Bucket } & LimitOptions) | null;
   store?: KVStore;
   cookies?: KVStore;
   session?: { store: KVStore };

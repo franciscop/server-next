@@ -52,7 +52,8 @@ describe("bucket", () => {
   it("scopes writes under folder()", async () => {
     const file = localBucket.folder("sub").file("nested.txt");
     await file.write("nested");
-    expect(file.path).toMatch(/uploads\/sub\/nested\.txt$/);
+    // path is the key from the original bucket, prefix included
+    expect(file.path).toBe("sub/nested.txt");
     expect(await file.exists()).toBe(true);
   });
 

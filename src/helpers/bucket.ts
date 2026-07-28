@@ -7,7 +7,9 @@ import mimes from "./mimes";
 // A built-in local-filesystem bucket implementing the canonical `bucket`
 // interface (file/folder), so `@server/next` works with just a directory path,
 // no `bucket` install required. A real `bucket` instance is used as-is.
-function localBucket(root: string): Bucket {
+// `prefix` is what folder() has scoped into, kept so a file's `path` reads as
+// its key from the original bucket ("sub/a.txt"), matching a cloud bucket.
+function localBucket(root: string, prefix = ""): Bucket {
   const base = path.resolve(root);
 
   // Resolve a key under `root`, stripping any leading slash and refusing to
@@ -28,6 +30,9 @@ function localBucket(root: string): Bucket {
     win?: { start: number; end: number },
   ): BucketFile => {
     const full = resolveKey(name);
+    // `path` is the key inside the bucket, not the location on disk, so it
+    // reads the same here as it does for a cloud bucket.
+    const key = prefix + name.replace(/^\/+/, "");
 
     // The MIME type derived from the file's extension (undefined if unknown), so
     // consumers like reply.file() get it straight off the handle.
@@ -55,8 +60,7 @@ function localBucket(root: string): Bucket {
     };
 
     return {
-      path: full,
-      id: name.replace(/^\/+/, ""),
+      path: key,
       name: path.basename(name),
       type,
 
@@ -67,13 +71,13 @@ function localBucket(root: string): Bucket {
 
       async info() {
         const stats = await fsp.stat(full).catch(() => null);
-        const exists = !!stats?.isFile();
-        const total = stats?.size ?? 0;
+        // null means "no such file", the same contract as a real bucket
+        if (!stats?.isFile()) return null;
         // A window reports its clamped length, like the real bucket's slice.
         const size = win
-          ? Math.max(0, Math.min(win.end, total) - win.start)
-          : total;
-        return { exists, size, date: stats?.mtime ?? null, type };
+          ? Math.max(0, Math.min(win.end, stats.size) - win.start)
+          : stats.size;
+        return { size, type: type ?? null, modified: stats.mtime };
       },
 
       // Read-only view of [start, end), composed relative to the current window.
@@ -120,7 +124,8 @@ function localBucket(root: string): Bucket {
 
   return {
     file,
-    folder: (prefix: string): Bucket => localBucket(path.join(base, prefix)),
+    folder: (sub: string): Bucket =>
+      localBucket(path.join(base, sub), `${prefix}${sub.replace(/^\/+|\/+$/g, "")}/`),
   };
 }
 

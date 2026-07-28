@@ -67,7 +67,7 @@ describe("parseBody", () => {
     expect(body.profile).toMatchObject({
       name: "profile.md",
       id: expect.stringMatching(/^\w{16}\.md$/),
-      path: expect.stringMatching(/\/\w{16}\.md$/),
+      path: expect.stringMatching(/^\w{16}\.md$/),
       type: "text/plain",
       size: expect.any(Number),
     });
@@ -77,7 +77,7 @@ describe("parseBody", () => {
     expect(body.gallery[0]).toMatchObject({
       name: "A.txt",
       id: expect.stringMatching(/^\w{16}\.txt$/),
-      path: expect.stringMatching(/\/\w{16}\.txt$/),
+      path: expect.stringMatching(/^\w{16}\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
     });

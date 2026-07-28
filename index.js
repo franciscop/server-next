@@ -39,6 +39,10 @@ var ServerError_default = TypedServerError;
 
 // src/errors/index.ts
 ServerError_default.extend({
+  PATH_TRAVERSAL: {
+    status: 400,
+    message: "The route param '{param}' tries to climb the path ('{value}'). If this route legitimately receives paths, set security: { traversalProtection: false }"
+  },
   NO_STORE: "You need a 'store' to write 'ctx.session'",
   NO_STORE_WRITE: "You need a 'store' to write 'ctx.session.{key}'",
   NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
@@ -76,6 +80,7 @@ ServerError_default.extend({
   REGISTER_INVALID_PASSWORD: "The password you wrote is not correct",
   REGISTER_EMAIL_EXISTS: "Email is already registered"
 });
+var errors_default = ServerError_default;
 
 // src/polyfill.ts
 globalThis.env = {};
@@ -97,191 +102,6 @@ var StatusError = class extends Error {
     this.status = status2;
   }
 };
-
-// src/helpers/bucket.ts
-import * as fs from "fs";
-import * as fsp from "fs/promises";
-import * as path from "path";
-
-// src/helpers/mimes.ts
-var mimes_default = {
-  aac: "audio/aac",
-  abw: "application/x-abiword",
-  arc: "application/x-freearc",
-  avif: "image/avif",
-  avi: "video/x-msvideo",
-  azw: "application/vnd.amazon.ebook",
-  bin: "application/octet-stream",
-  bmp: "image/bmp",
-  bz: "application/x-bzip",
-  bz2: "application/x-bzip2",
-  cda: "application/x-cdf",
-  csh: "application/x-csh",
-  css: "text/css",
-  csv: "text/csv",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  gz: "application/gzip",
-  gif: "image/gif",
-  htm: "text/html",
-  html: "text/html",
-  ico: "image/vnd.microsoft.icon",
-  ics: "text/calendar",
-  jar: "application/java-archive",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "text/javascript",
-  json: "application/json",
-  jsonld: "application/ld+json",
-  md: "text/markdown",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mjs: "text/javascript",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpeg: "video/mpeg",
-  mpkg: "application/vnd.apple.installer+xml",
-  odp: "application/vnd.oasis.opendocument.presentation",
-  ods: "application/vnd.oasis.opendocument.spreadsheet",
-  odt: "application/vnd.oasis.opendocument.text",
-  oga: "audio/ogg",
-  ogv: "video/ogg",
-  ogx: "application/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  png: "image/png",
-  pdf: "application/pdf",
-  php: "application/x-httpd-php",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sh: "application/x-sh",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  text: "text/plain",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  ts: "video/mp2t",
-  ttf: "font/ttf",
-  txt: "text/plain",
-  vsd: "application/vnd.visio",
-  wav: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xul: "application/vnd.mozilla.xul+xml",
-  zip: "application/zip",
-  "3gp": "video/3gpp",
-  "3g2": "video/3gpp2",
-  "7z": "application/x-7z-compressed"
-};
-
-// src/helpers/bucket.ts
-function localBucket(root) {
-  const base = path.resolve(root);
-  const resolveKey = (name) => {
-    if (!name) throw new Error("File name is required");
-    const full = path.resolve(base, name.replace(/^\/+/, ""));
-    if (full !== base && !full.startsWith(base + path.sep)) {
-      throw new Error(`Path "${name}" escapes the bucket root`);
-    }
-    return full;
-  };
-  const file2 = (name, win) => {
-    const full = resolveKey(name);
-    const type2 = mimes_default[path.extname(name).slice(1).toLowerCase()];
-    const read = () => {
-      let opts;
-      if (win) {
-        opts = { start: win.start };
-        if (Number.isFinite(win.end)) opts.end = Math.max(win.start, win.end - 1);
-      }
-      const nodeStream = fs.createReadStream(full, opts);
-      return new ReadableStream({
-        start(controller) {
-          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
-          nodeStream.on("end", () => controller.close());
-          nodeStream.on("error", (err) => controller.error(err));
-        },
-        cancel() {
-          nodeStream.destroy();
-        }
-      });
-    };
-    return {
-      path: full,
-      id: name.replace(/^\/+/, ""),
-      name: path.basename(name),
-      type: type2,
-      async exists() {
-        const stats = await fsp.stat(full).catch(() => null);
-        return !!stats?.isFile();
-      },
-      async info() {
-        const stats = await fsp.stat(full).catch(() => null);
-        const exists = !!stats?.isFile();
-        const total = stats?.size ?? 0;
-        const size = win ? Math.max(0, Math.min(win.end, total) - win.start) : total;
-        return { exists, size, date: stats?.mtime ?? null, type: type2 };
-      },
-      // Read-only view of [start, end), composed relative to the current window.
-      slice(start, end) {
-        const base2 = win?.start ?? 0;
-        const cap = win?.end ?? Number.POSITIVE_INFINITY;
-        const s = Math.min(cap, base2 + Math.max(0, start));
-        const e = end === void 0 ? cap : Math.min(cap, base2 + end);
-        return file2(name, { start: s, end: e });
-      },
-      async write(content) {
-        await fsp.mkdir(path.dirname(full), { recursive: true });
-        if (content instanceof ReadableStream) {
-          const writable = fs.createWriteStream(full);
-          for await (const chunk of content) {
-            writable.write(chunk);
-          }
-          await new Promise((resolve2, reject) => {
-            writable.on("error", reject);
-            writable.end(() => resolve2());
-          });
-          return;
-        }
-        await fsp.writeFile(full, content);
-      },
-      stream() {
-        return read();
-      },
-      async bytes() {
-        if (win) return new Uint8Array(await new Response(read()).arrayBuffer());
-        return new Uint8Array(await fsp.readFile(full));
-      },
-      async remove() {
-        await fsp.unlink(full).catch(() => {
-        });
-      }
-    };
-  };
-  return {
-    file: file2,
-    folder: (prefix) => localBucket(path.join(base, prefix))
-  };
-}
-function bucket(root) {
-  if (!root) return null;
-  if (typeof root === "string") return localBucket(root);
-  if (typeof root.file === "function") return root;
-  throw new Error(
-    "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
-  );
-}
 
 // src/helpers/createId.ts
 var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
@@ -355,46 +175,31 @@ async function saveFileToBucket(originalName, data, bucket2, contentType) {
     size: data.length
   };
 }
-var UploadPipeline = class {
-  _bucket;
-  _limits = {};
-  constructor(bucket2) {
-    this._bucket = bucket(bucket2 ?? void 0);
+function validateFile(originalName, data, contentType, limits) {
+  const { maxSize, minSize, fileType } = limits;
+  if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
+    throw new Error(
+      `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
+    );
   }
-  limit(options) {
-    this._limits = { ...this._limits, ...options };
-    return this;
+  if (minSize !== void 0 && data.length < parseBytes(minSize)) {
+    throw new Error(
+      `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
+    );
   }
-  async processFile(originalName, data, contentType) {
-    const { maxSize, minSize, fileType } = this._limits;
-    if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
+  if (fileType && fileType.length > 0) {
+    const ext2 = getExt(originalName);
+    const mime = contentType.toLowerCase();
+    const allowed = fileType.some(
+      (t) => t.toLowerCase() === mime || t.toLowerCase() === ext2
+    );
+    if (!allowed) {
       throw new Error(
-        `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
+        `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
       );
     }
-    if (minSize !== void 0 && data.length < parseBytes(minSize)) {
-      throw new Error(
-        `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
-      );
-    }
-    if (fileType && fileType.length > 0) {
-      const ext2 = getExt(originalName);
-      const mime = contentType.toLowerCase();
-      const allowed = fileType.some(
-        (t) => t.toLowerCase() === mime || t.toLowerCase() === ext2
-      );
-      if (!allowed) {
-        throw new Error(
-          `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
-        );
-      }
-    }
-    if (!this._bucket) {
-      throw new Error(`No upload destination configured (missing bucket)`);
-    }
-    return saveFileToBucket(originalName, data, this._bucket, contentType);
   }
-};
+}
 
 // src/helpers/bodyLimit.ts
 var INF = Number.POSITIVE_INFINITY;
@@ -415,6 +220,88 @@ var tooLarge = (max) => new StatusError(
   `Request body exceeds the ${human(max)} limit. Raise it with body: { max: '10mb' } on the route or server, or set max: false to disable.`,
   413
 );
+
+// src/helpers/mimes.ts
+var mimes_default = {
+  aac: "audio/aac",
+  abw: "application/x-abiword",
+  arc: "application/x-freearc",
+  avif: "image/avif",
+  avi: "video/x-msvideo",
+  azw: "application/vnd.amazon.ebook",
+  bin: "application/octet-stream",
+  bmp: "image/bmp",
+  bz: "application/x-bzip",
+  bz2: "application/x-bzip2",
+  cda: "application/x-cdf",
+  csh: "application/x-csh",
+  css: "text/css; charset=utf-8",
+  csv: "text/csv; charset=utf-8",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  eot: "application/vnd.ms-fontobject",
+  epub: "application/epub+zip",
+  gz: "application/gzip",
+  gif: "image/gif",
+  htm: "text/html; charset=utf-8",
+  html: "text/html; charset=utf-8",
+  ico: "image/vnd.microsoft.icon",
+  ics: "text/calendar; charset=utf-8",
+  jar: "application/java-archive",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "text/javascript; charset=utf-8",
+  json: "application/json",
+  jsonld: "application/ld+json",
+  md: "text/markdown; charset=utf-8",
+  mid: "audio/midi",
+  midi: "audio/midi",
+  mjs: "text/javascript; charset=utf-8",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  mpeg: "video/mpeg",
+  mpkg: "application/vnd.apple.installer+xml",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odt: "application/vnd.oasis.opendocument.text",
+  oga: "audio/ogg",
+  ogv: "video/ogg",
+  ogx: "application/ogg",
+  opus: "audio/opus",
+  otf: "font/otf",
+  png: "image/png",
+  pdf: "application/pdf",
+  php: "application/x-httpd-php",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rar: "application/vnd.rar",
+  rtf: "application/rtf",
+  sh: "application/x-sh",
+  svg: "image/svg+xml",
+  tar: "application/x-tar",
+  text: "text/plain; charset=utf-8",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  ts: "video/mp2t",
+  ttf: "font/ttf",
+  txt: "text/plain; charset=utf-8",
+  vsd: "application/vnd.visio",
+  wav: "audio/wav",
+  weba: "audio/webm",
+  webm: "video/webm",
+  webp: "image/webp",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  xhtml: "application/xhtml+xml",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xml: "application/xml",
+  xul: "application/vnd.mozilla.xul+xml",
+  zip: "application/zip",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  "7z": "application/x-7z-compressed"
+};
 
 // src/helpers/parseBody.ts
 function getBoundary(header) {
@@ -494,15 +381,15 @@ function addField(body, name, value) {
   if (!Array.isArray(body[name])) body[name] = [body[name]];
   body[name].push(value);
 }
-function startPart(headerStr, dest) {
+function startPart(headerStr, bucket2, limits) {
   const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
   if (!name) return { kind: "skip" };
   const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
   if (!filename) return { kind: "text", name, chunks: [] };
   const type2 = getMatching(headerStr, /Content-Type:\s*([^\r\n]+)/i).trim() || "application/octet-stream";
-  if (!dest) return { kind: "drop" };
-  if (dest instanceof UploadPipeline) {
-    return { kind: "pipefile", name, filename, type: type2, pipeline: dest, chunks: [] };
+  if (!bucket2) return { kind: "drop" };
+  if (limits) {
+    return { kind: "validated", name, filename, type: type2, bucket: bucket2, limits, chunks: [] };
   }
   const id = `${createId()}${getExt(filename)}`;
   let controller;
@@ -511,7 +398,7 @@ function startPart(headerStr, dest) {
       controller = c;
     }
   });
-  const file2 = dest.file(id);
+  const file2 = bucket2.file(id);
   return {
     kind: "file",
     name,
@@ -526,7 +413,7 @@ function startPart(headerStr, dest) {
 }
 function feedPart(part, data) {
   if (data.length === 0) return;
-  if (part.kind === "text" || part.kind === "pipefile") part.chunks.push(data);
+  if (part.kind === "text" || part.kind === "validated") part.chunks.push(data);
   else if (part.kind === "file") {
     part.controller.enqueue(data);
     part.size += data.length;
@@ -537,9 +424,10 @@ async function endPart(part, body) {
     const buf = Buffer.concat(part.chunks);
     const value = isProbablyText(buf) ? buf.toString("utf-8").trim() : buf;
     addField(body, part.name, value);
-  } else if (part.kind === "pipefile") {
+  } else if (part.kind === "validated") {
     const buf = Buffer.concat(part.chunks);
-    const ref = await part.pipeline.processFile(part.filename, buf, part.type);
+    validateFile(part.filename, buf, part.type, part.limits);
+    const ref = await saveFileToBucket(part.filename, buf, part.bucket, part.type);
     addField(body, part.name, ref);
   } else if (part.kind === "file") {
     part.controller.close();
@@ -554,7 +442,7 @@ async function endPart(part, body) {
   }
 }
 var BREAK = Buffer.from("\r\n\r\n");
-async function parseMultipart(stream, boundary, dest, max = INF) {
+async function parseMultipart(stream, boundary, bucket2, limits, max = INF) {
   const delim = Buffer.from(`\r
 --${boundary}`);
   const body = {};
@@ -591,7 +479,7 @@ async function parseMultipart(stream, boundary, dest, max = INF) {
       } else if (state === "headers") {
         const i = buf.indexOf(BREAK);
         if (i === -1) break;
-        part = startPart(buf.subarray(0, i).toString("utf-8"), dest);
+        part = startPart(buf.subarray(0, i).toString("utf-8"), bucket2, limits);
         buf = buf.subarray(i + BREAK.length);
         state = "body";
         advanced = true;
@@ -641,8 +529,21 @@ async function streamToBucket(stream, type2, bucket2) {
 }
 async function parseBody(input, contentType, dest, max = INF) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
+  let bucket2;
+  let limits;
+  if (dest && "bucket" in dest) {
+    bucket2 = dest.bucket;
+    const { maxSize, minSize, fileType } = dest;
+    if (maxSize != null || minSize != null || fileType != null) {
+      limits = { maxSize, minSize, fileType };
+    }
+  } else {
+    bucket2 = dest;
+  }
   const boundary = type2 && /multipart\/form-data/i.test(type2) ? getBoundary(type2) : null;
-  if (boundary) return parseMultipart(toStream(input), boundary, dest, max);
+  if (boundary) {
+    return parseMultipart(toStream(input), boundary, bucket2, limits, max);
+  }
   if (!type2 || /^text\//i.test(type2)) {
     const buf = await toBuffer(input, max);
     return buf.length ? buf.toString("utf-8") : void 0;
@@ -655,15 +556,18 @@ async function parseBody(input, contentType, dest, max = INF) {
     const buf = await toBuffer(input, max);
     return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : void 0;
   }
-  if (!dest) {
+  if (!bucket2) {
     const buf = await toBuffer(input, max);
     return buf.length ? buf : void 0;
   }
-  if (dest instanceof UploadPipeline) {
+  if (limits) {
     const buf = await toBuffer(input);
-    return buf.length ? dest.processFile(`upload${extFromType(type2)}`, buf, type2) : void 0;
+    if (!buf.length) return void 0;
+    const name = `upload${extFromType(type2)}`;
+    validateFile(name, buf, type2, limits);
+    return saveFileToBucket(name, buf, bucket2, type2);
   }
-  return streamToBucket(toStream(input), type2, dest);
+  return streamToBucket(toStream(input), type2, bucket2);
 }
 
 // src/helpers/body.ts
@@ -760,7 +664,7 @@ function normalizeExpires(expires) {
 function createCookies(key, val) {
   if (val.value === null) val.expires = EXPIRED;
   const { value, path: path2, expires, maxAge, httpOnly, secure, sameSite } = val;
-  let str = `${key}=${value || ""};Path=${path2 || "/"}`;
+  let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path2 || "/"}`;
   if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
   if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
   if (httpOnly) str += ";HttpOnly";
@@ -823,6 +727,27 @@ function clientIp(headers2, opts = {}) {
   return normalize(remoteAddress);
 }
 
+// src/helpers/disposition.ts
+var encodeExt = (name) => encodeURIComponent(name).replace(
+  /['()*]/g,
+  (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+);
+function disposition(name) {
+  if (!name) return "attachment";
+  const clean = name.replace(/[\r\n]/g, "").split(/[\\/]/).pop() || "";
+  if (!clean) return "attachment";
+  const ascii = clean.replace(/[^\x20-\x7e]/g, "?");
+  const value = `attachment; filename="${ascii.replace(/["\\]/g, "\\$&")}"`;
+  if (clean === ascii) return value;
+  return `${value}; filename*=UTF-8''${encodeExt(clean)}`;
+}
+
+// src/helpers/isHtml.ts
+var TAG = /^\s*<[a-zA-Z!/]/;
+function isHtml(body) {
+  return TAG.test(body);
+}
+
 // src/helpers/isReadableStream.ts
 function isReadableStream(obj) {
   return obj !== null && typeof obj === "object" && typeof obj.pipe === "function" && typeof obj.read === "function" && typeof obj.on === "function";
@@ -850,8 +775,7 @@ var Reply = class {
   download(name) {
     const ext2 = name?.split(".").pop();
     if (ext2 && !this.res.headers.get("content-type")) this.type(ext2);
-    const filename = name ? `; filename="${encodeURIComponent(name)}"` : "";
-    return this.headers("content-disposition", `attachment${filename}`);
+    return this.headers("content-disposition", disposition(name));
   }
   headers(key, value) {
     if (typeof key !== "string") {
@@ -859,10 +783,15 @@ var Reply = class {
       return this;
     }
     if (Array.isArray(value)) {
-      Object.values(value).map((val) => this.headers(key, val));
+      this.res.headers.delete(key);
+      for (const val of value) this.res.headers.append(key, val);
       return this;
     }
-    this.res.headers.append(key, value);
+    if (key.toLowerCase() === "set-cookie") {
+      this.res.headers.append(key, value);
+    } else {
+      this.res.headers.set(key, value);
+    }
     return this;
   }
   cache(value) {
@@ -884,25 +813,31 @@ var Reply = class {
     return this.headers("set-cookie", createCookies(key, value));
   }
   json(body) {
-    return this.headers("content-type", "application/json").send(
-      JSON.stringify(body)
-    );
+    if (body === void 0) body = null;
+    if (!this.res.headers.get("content-type")) {
+      this.res.headers.set("content-type", "application/json");
+    }
+    return this.send(JSON.stringify(body));
   }
   redirect(path2) {
-    return this.headers("location", path2).status(302).send();
+    this.headers("location", path2);
+    if (this.res.status == null) this.res.status = 302;
+    return this.send();
   }
   async file(path2) {
     if (typeof path2 !== "string") {
       if (!await path2.exists()) return this.status(404).send();
       return this.type(path2.type).send(path2.stream());
     }
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path2)) return this.status(404).send();
     try {
       const fs2 = await import("fs");
       const ext2 = path2.split(".").pop();
+      await fs2.promises.access(path2);
       const stream = fs2.createReadStream(path2);
       return this.type(ext2).send(stream);
     } catch (error) {
-      if (error.code === "ENOENT") {
+      if (error.code === "ENOENT" || error.code === "EISDIR") {
         return this.status(404).send();
       }
       throw error;
@@ -913,10 +848,10 @@ var Reply = class {
     if (status2 === 101 || status2 === 204 || status2 === 205 || status2 === 304) {
       return new Response(null, { status: status2, headers: headers2 });
     }
+    if (body === null) body = "";
     if (typeof body === "string") {
       if (!headers2.get("content-type")) {
-        const isHtml = body.trim().startsWith("<");
-        headers2.set("content-type", isHtml ? "text/html" : "text/plain");
+        headers2.set("content-type", isHtml(body) ? mimes_default.html : mimes_default.text);
       }
       if (!headers2.has("content-length")) {
         headers2.set("content-length", String(Buffer.byteLength(body)));
@@ -1516,6 +1451,106 @@ function parseAuthOptions(auth2, all) {
   };
 }
 
+// src/helpers/bucket.ts
+import * as fs from "fs";
+import * as fsp from "fs/promises";
+import * as path from "path";
+function localBucket(root, prefix = "") {
+  const base = path.resolve(root);
+  const resolveKey = (name) => {
+    if (!name) throw new Error("File name is required");
+    const full = path.resolve(base, name.replace(/^\/+/, ""));
+    if (full !== base && !full.startsWith(base + path.sep)) {
+      throw new Error(`Path "${name}" escapes the bucket root`);
+    }
+    return full;
+  };
+  const file2 = (name, win) => {
+    const full = resolveKey(name);
+    const key = prefix + name.replace(/^\/+/, "");
+    const type2 = mimes_default[path.extname(name).slice(1).toLowerCase()];
+    const read = () => {
+      let opts;
+      if (win) {
+        opts = { start: win.start };
+        if (Number.isFinite(win.end)) opts.end = Math.max(win.start, win.end - 1);
+      }
+      const nodeStream = fs.createReadStream(full, opts);
+      return new ReadableStream({
+        start(controller) {
+          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
+          nodeStream.on("end", () => controller.close());
+          nodeStream.on("error", (err) => controller.error(err));
+        },
+        cancel() {
+          nodeStream.destroy();
+        }
+      });
+    };
+    return {
+      path: key,
+      name: path.basename(name),
+      type: type2,
+      async exists() {
+        const stats = await fsp.stat(full).catch(() => null);
+        return !!stats?.isFile();
+      },
+      async info() {
+        const stats = await fsp.stat(full).catch(() => null);
+        if (!stats?.isFile()) return null;
+        const size = win ? Math.max(0, Math.min(win.end, stats.size) - win.start) : stats.size;
+        return { size, type: type2 ?? null, modified: stats.mtime };
+      },
+      // Read-only view of [start, end), composed relative to the current window.
+      slice(start, end) {
+        const base2 = win?.start ?? 0;
+        const cap = win?.end ?? Number.POSITIVE_INFINITY;
+        const s = Math.min(cap, base2 + Math.max(0, start));
+        const e = end === void 0 ? cap : Math.min(cap, base2 + end);
+        return file2(name, { start: s, end: e });
+      },
+      async write(content) {
+        await fsp.mkdir(path.dirname(full), { recursive: true });
+        if (content instanceof ReadableStream) {
+          const writable = fs.createWriteStream(full);
+          for await (const chunk of content) {
+            writable.write(chunk);
+          }
+          await new Promise((resolve2, reject) => {
+            writable.on("error", reject);
+            writable.end(() => resolve2());
+          });
+          return;
+        }
+        await fsp.writeFile(full, content);
+      },
+      stream() {
+        return read();
+      },
+      async bytes() {
+        if (win) return new Uint8Array(await new Response(read()).arrayBuffer());
+        return new Uint8Array(await fsp.readFile(full));
+      },
+      async remove() {
+        await fsp.unlink(full).catch(() => {
+        });
+      }
+    };
+  };
+  return {
+    file: file2,
+    folder: (sub) => localBucket(path.join(base, sub), `${prefix}${sub.replace(/^\/+|\/+$/g, "")}/`)
+  };
+}
+function bucket(root) {
+  if (!root) return null;
+  if (typeof root === "string") return localBucket(root);
+  if (typeof root.file === "function") return root;
+  throw new Error(
+    "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
+  );
+}
+
 // src/helpers/color.ts
 var map = {
   reset: 0,
@@ -1651,9 +1686,22 @@ function resolveSecurity(security) {
   }
   return {
     trustProxy: o.trustProxy ?? true,
+    traversalProtection: off ? false : o.traversalProtection !== false,
     headers: headers2,
     hsts: off ? null : val(o.hsts, "max-age=15552000; includeSubDomains")
   };
+}
+var CLIMBS = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
+var ABSOLUTE = /^(?:[\\/]|[a-zA-Z]:)/;
+function checkTraversal(params, ctx) {
+  if (!ctx.options.security?.traversalProtection) return;
+  for (const param in params) {
+    const value = params[param];
+    if (typeof value !== "string") continue;
+    if (CLIMBS.test(value) || ABSOLUTE.test(value)) {
+      throw errors_default.PATH_TRAVERSAL({ param, value });
+    }
+  }
 }
 function applySecurity(res, ctx) {
   const security = ctx.options.security;
@@ -1727,10 +1775,11 @@ function config(options = {}) {
     settings.uploads = null;
   } else if (typeof up === "object" && "bucket" in up) {
     const { bucket: bucket2, maxSize, minSize, fileType } = up;
-    const hasLimits = maxSize != null || minSize != null || fileType != null;
-    settings.uploads = hasLimits ? new UploadPipeline(bucket2).limit({ maxSize, minSize, fileType }) : bucket(bucket2);
+    if (maxSize != null) parseBytes(maxSize);
+    if (minSize != null) parseBytes(minSize);
+    settings.uploads = { bucket: bucket(bucket2), maxSize, minSize, fileType };
   } else {
-    settings.uploads = bucket(up);
+    settings.uploads = { bucket: bucket(up) };
   }
   const favicon2 = options.favicon || env2.FAVICON;
   if (favicon2) settings.favicon = favicon2;
@@ -1909,7 +1958,7 @@ async function parseResponse(out, ctx) {
     out = new Response(void 0, { status: out });
   }
   if (typeof out === "string") {
-    const type2 = /^\s*</.test(out) ? "text/html" : "text/plain";
+    const type2 = isHtml(out) ? mimes_default.html : mimes_default.text;
     out = new Response(out, {
       headers: {
         "content-type": type2,
@@ -2075,6 +2124,7 @@ async function getResponse(app, ctx) {
       if (Object.keys(route.options).length) {
         ctx.options = { ...app.settings, ...route.options };
       }
+      checkTraversal(params, ctx);
       ctx.body = await resolveBody(ctx, ctx.options.body);
       for (const cb of route.fns) {
         if (typeof cb === "function") {
@@ -2174,7 +2224,12 @@ function parseCookies(cookies2) {
   return Object.fromEntries(
     cookieStr.split(/;\s*/).map((part) => {
       const [key, ...rest] = part.split("=");
-      return [key, decodeURIComponent(rest.join("="))];
+      const value = rest.join("=");
+      try {
+        return [key, decodeURIComponent(value)];
+      } catch {
+        return [key, value];
+      }
     })
   );
 }
@@ -2444,17 +2499,18 @@ async function assets(ctx) {
   try {
     const key = ctx.url.pathname.replace(/^\/+/, "");
     const file2 = ctx.options.public.file(key);
-    const meta = file2.info ? await file2.info() : null;
-    if (meta ? !meta.exists : !await file2.exists()) return;
+    const info = file2.info?.bind(file2);
+    const meta = info ? await info() : null;
+    if (info ? !meta : !await file2.exists()) return;
     const ext2 = ctx.url.pathname.split(".").pop();
     const ctype = meta?.type || ext2;
     const headers2 = { "cache-control": CACHE_CONTROL };
     let tag;
     if (meta) {
-      const stamp = meta.date ? meta.date.getTime() : 0;
+      const stamp = meta.modified ? meta.modified.getTime() : 0;
       tag = `W/"${meta.size.toString(16)}-${stamp.toString(16)}"`;
       headers2.etag = tag;
-      if (meta.date) headers2["last-modified"] = meta.date.toUTCString();
+      if (meta.modified) headers2["last-modified"] = meta.modified.toUTCString();
     }
     const canRange = !!(meta && file2.slice);
     if (canRange) headers2["accept-ranges"] = "bytes";

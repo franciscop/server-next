@@ -6,7 +6,9 @@ import {
   createId,
   iteratorAsyncToReadable,
   iteratorToReadable,
+  mimes,
 } from "./helpers";
+import isHtml from "./helpers/isHtml";
 import { json } from "./reply";
 import ServerError from "./ServerError";
 
@@ -71,7 +73,7 @@ export default async function parseResponse(
 
   // A plain string will be converted to either html or plain
   if (typeof out === "string") {
-    const type = /^\s*</.test(out) ? "text/html" : "text/plain";
+    const type = isHtml(out) ? mimes.html : mimes.text;
     out = new Response(out, {
       headers: {
         "content-type": type,

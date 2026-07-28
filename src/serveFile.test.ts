@@ -106,3 +106,43 @@ describe("serving bucket files", () => {
     expect(await ok.text()).toBe("secret");
   });
 });
+
+// Containment has two independent layers, so a mistake in one still fails
+// closed: `traversalProtection` rejects the request at the router, and the
+// storage itself (a bucket, or file() below) refuses to leave its folder.
+describe("serving files stays inside the folder", () => {
+  const app = async () => {
+    const bucket = await seed("ok.jpg", "IMG");
+    return server({ security: { traversalProtection: false } })
+      .get("/b/:id", (ctx) => bucket.file(ctx.url.params.id))
+      .get("/f/:id", (ctx) => file(`${ROOT}${ctx.url.params.id}`));
+  };
+
+  it("serves a normal id with protection off", async () => {
+    const res = await (await app()).test().get("/b/ok.jpg");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("IMG");
+  });
+
+  it("a bucket refuses an id that climbs out", async () => {
+    // The bucket throws rather than reading a sibling file
+    const res = await (await app()).test().get("/b/..%2F..%2Fsecret.txt");
+    expect(res.status).toBe(500);
+    expect(await res.text()).toContain("escapes the bucket");
+  });
+
+  it("a bucket keeps an absolute id inside itself", async () => {
+    const res = await (await app()).test().get("/b/%2Fetc%2Fhosts");
+    expect(res.status).toBe(404);
+  });
+
+  it("file() refuses a path that climbs out", async () => {
+    const res = await (await app()).test().get("/f/..%2F..%2Fsecret.txt");
+    expect(res.status).toBe(404);
+  });
+
+  it("file() 404s a missing file instead of throwing", async () => {
+    const res = await (await app()).test().get("/f/nope.jpg");
+    expect(res.status).toBe(404);
+  });
+});

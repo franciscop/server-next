@@ -68,7 +68,7 @@ describe("body: stream", () => {
   it("streams the body straight into a bucket folder", async () => {
     const api = server({ uploads: "./src/tests/uploads" })
       .post("/uploads/:id", { body: "stream" }, async (ctx) => {
-        const uploads = ctx.options.uploads as Bucket;
+        const uploads = ctx.options.uploads!.bucket;
         const file = uploads.folder!(ctx.url.params.id).file("movie.txt");
         await file.write(ctx.body as ReadableStream);
         return { path: file.path };
@@ -77,8 +77,11 @@ describe("body: stream", () => {
 
     const res = await api.post("/uploads/abc123", "pretend-this-is-a-big-file");
     const { path } = await res.json();
-    expect(path).toMatch(/uploads\/abc123\/movie\.txt$/);
-    expect(await fsp.readFile(path, "utf8")).toBe("pretend-this-is-a-big-file");
+    // `path` is the key within the bucket, so it reads under the uploads root
+    expect(path).toBe("abc123/movie.txt");
+    expect(await fsp.readFile(`./src/tests/uploads/${path}`, "utf8")).toBe(
+      "pretend-this-is-a-big-file",
+    );
 
     await fsp.rm("./src/tests/uploads/abc123", { recursive: true, force: true });
   });
@@ -87,7 +90,7 @@ describe("body: stream", () => {
     const uploads = realBucket();
     const api = server({ uploads })
       .post("/uploads/:id", { body: "stream" }, async (ctx) => {
-        const up = ctx.options.uploads as Bucket;
+        const up = ctx.options.uploads!.bucket;
         const file = up.folder!(ctx.url.params.id).file("movie.txt");
         await file.write(ctx.body as ReadableStream);
         return { path: file.path };
@@ -96,8 +99,9 @@ describe("body: stream", () => {
 
     const res = await api.post("/uploads/abc123", "into-a-real-bucket");
     const { path } = await res.json();
-    expect(path).toMatch(/abc123\/movie\.txt$/);
-    expect(await fsp.readFile(path, "utf8")).toBe("into-a-real-bucket");
+    // The real bucket reports the same key shape, and reads back through it
+    expect(path).toBe("abc123/movie.txt");
+    expect(await uploads.file(path).text()).toBe("into-a-real-bucket");
   });
 
   it("runs middleware (a guard) before the body is consumed", async () => {

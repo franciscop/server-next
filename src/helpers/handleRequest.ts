@@ -3,7 +3,7 @@ import parseResponse from "../parseResponse";
 import pathPattern from "../pathPattern";
 import { resolveBody } from "./body";
 import { applyCors } from "./cors";
-import { applySecurity } from "./security";
+import { applySecurity, checkTraversal } from "./security";
 import define from "./define";
 import validate from "./validate";
 
@@ -43,6 +43,9 @@ async function getResponse(
       if (Object.keys(route.options).length) {
         ctx.options = { ...app.settings, ...route.options };
       }
+
+      // Reject '../' in params before any handler (or body) touches them
+      checkTraversal(params, ctx);
 
       // Now that the route (and its `body` mode) is known, read the body once.
       // A `stream` route gets the unread stream; the middleware in `fns` (auth,
