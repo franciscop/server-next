@@ -209,7 +209,6 @@ async function endPart(part: Part, body: Record<string, any>): Promise<void> {
     await part.write;
     addField(body, part.name, {
       name: part.filename,
-      id: part.id,
       path: part.file.path,
       type: part.type,
       size: part.size,
@@ -331,7 +330,7 @@ async function streamToBucket(
   controller.close();
   await write;
   if (!size) return undefined;
-  return { name: id, id, path: file.path, type, size };
+  return { name: id, path: file.path, type, size };
 }
 
 // Turns a request body into `ctx.body`. Accepts a Buffer or a web ReadableStream

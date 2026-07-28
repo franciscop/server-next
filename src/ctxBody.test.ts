@@ -174,7 +174,6 @@ describe("ctx.body parse: multipart files", () => {
     expect(out.title).toBe("my pic");
     expect(out.avatar).toMatchObject({
       name: "a.png",
-      id: expect.stringMatching(/^\w{16}\.png$/),
       type: "image/png",
       size: 7,
     });
@@ -238,7 +237,6 @@ describe("ctx.body parse: raw single file (Case B)", () => {
     const out = await res.json();
 
     expect(out).toMatchObject({
-      id: expect.stringMatching(/^\w{16}\.mp4$/),
       type: "video/mp4",
       size: 7,
     });
@@ -253,7 +251,7 @@ describe("ctx.body parse: raw single file (Case B)", () => {
     const res = await api.post("/", Buffer.from([1, 2, 3, 4]), {
       headers: { "content-type": "application/octet-stream" },
     });
-    expect((await res.json()).id).toMatch(/^\w{16}\.bin$/);
+    expect((await res.json()).path).toMatch(/^\w{16}\.bin$/);
   });
 
   it("returns the Buffer when no bucket is configured", async () => {
@@ -348,7 +346,7 @@ describe("streaming parser: chunk splitting", () => {
         type: "application/octet-stream",
       });
       // the file content survived chunking exactly
-      expect(await bucket.file(out.file.id).text()).toBe(
+      expect(await bucket.file(out.file.path).text()).toBe(
         "line1\r\nline2\r\n--not-the-boundary\r\nend",
       );
       expect(out.file.size).toBe(
@@ -364,7 +362,7 @@ describe("streaming parser: chunk splitting", () => {
     ]);
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(body, 997), MULTIPART, bucket);
-    expect(await bucket.file(out.blob.id).text()).toBe(big);
+    expect(await bucket.file(out.blob.path).text()).toBe(big);
     expect(out.blob.size).toBe(Buffer.byteLength(big));
   });
 
@@ -375,7 +373,7 @@ describe("streaming parser: chunk splitting", () => {
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(bytes, 5), "image/png", bucket);
     expect(out.size).toBe(1000);
-    expect(Buffer.from(await bucket.file(out.id).bytes()).equals(bytes)).toBe(
+    expect(Buffer.from(await bucket.file(out.path).bytes()).equals(bytes)).toBe(
       true,
     );
   });

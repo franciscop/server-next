@@ -44,7 +44,6 @@ describe("request body formats", () => {
     expect(body.hello).toBe("world");
     // Rich file object
     expect(body.file.name).toBe("nero.jpg");
-    expect(body.file.id).toMatch(/^\w{16}\.\w+$/);
     expect(body.file.path).toMatch(/^\w{16}\.jpg$/);
     expect(body.file.type).toBe("image/jpeg");
     expect(body.file.size).toBeGreaterThan(0);

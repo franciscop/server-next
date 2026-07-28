@@ -169,7 +169,6 @@ async function saveFileToBucket(originalName, data, bucket2, contentType) {
   await file2.write(data, { type: contentType });
   return {
     name: originalName,
-    id,
     path: file2.path,
     type: contentType,
     size: data.length
@@ -434,7 +433,6 @@ async function endPart(part, body) {
     await part.write;
     addField(body, part.name, {
       name: part.filename,
-      id: part.id,
       path: part.file.path,
       type: part.type,
       size: part.size
@@ -525,7 +523,7 @@ async function streamToBucket(stream, type2, bucket2) {
   controller.close();
   await write;
   if (!size) return void 0;
-  return { name: id, id, path: file2.path, type: type2, size };
+  return { name: id, path: file2.path, type: type2, size };
 }
 async function parseBody(input, contentType, dest, max = INF) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;

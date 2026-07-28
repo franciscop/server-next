@@ -105,7 +105,6 @@ type Bucket = {
 };
 type UploadedFile = {
     name: string;
-    id: string;
     path: string;
     type: string;
     size: number;

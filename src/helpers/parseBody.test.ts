@@ -66,7 +66,6 @@ describe("parseBody", () => {
 
     expect(body.profile).toMatchObject({
       name: "profile.md",
-      id: expect.stringMatching(/^\w{16}\.md$/),
       path: expect.stringMatching(/^\w{16}\.md$/),
       type: "text/plain",
       size: expect.any(Number),
@@ -76,7 +75,6 @@ describe("parseBody", () => {
     expect(body.gallery).toHaveLength(2);
     expect(body.gallery[0]).toMatchObject({
       name: "A.txt",
-      id: expect.stringMatching(/^\w{16}\.txt$/),
       path: expect.stringMatching(/^\w{16}\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
@@ -131,7 +129,7 @@ describe("parseBody", () => {
     expect(result.photo.type).toBe("image/jpeg");
   });
 
-  it("preserves original filename separate from generated id", async () => {
+  it("preserves the original filename separate from the stored key", async () => {
     let body = `--${BOUNDARY}\r\n`;
     body += 'Content-Disposition: form-data; name="photo"; filename="my photo (1).jpeg"\r\n';
     body += "Content-Type: image/jpeg\r\n\r\n";
@@ -145,7 +143,7 @@ describe("parseBody", () => {
     );
 
     expect(result.photo.name).toBe("my photo (1).jpeg");
-    expect(result.photo.id).not.toBe("my photo (1).jpeg");
+    expect(result.photo.path).not.toBe("my photo (1).jpeg");
     expect(result.photo.type).toBe("image/jpeg");
   });
 });

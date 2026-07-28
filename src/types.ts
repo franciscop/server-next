@@ -125,8 +125,9 @@ export type Bucket = {
 };
 
 export type UploadedFile = {
+  // The filename the client sent
   name: string;
-  id: string;
+  // Where it's stored: its key within the bucket, to read or serve it later
   path: string;
   type: string;
   size: number;

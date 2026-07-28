@@ -50,12 +50,12 @@ describe("getExt", () => {
 });
 
 describe("getExt consistency", () => {
-  it("lowercases the extension used in the stored id", async () => {
+  it("lowercases the extension used in the stored key", async () => {
     const bucket = mockBucket();
     const { raw, contentType } = makeMultipart("Photo.JPG", "data", "image/jpeg");
     const body = await parseBody(raw, contentType, bucket);
-    // id must use lowercase extension, not .JPG
-    expect(body.file.id).toMatch(/^\w{16}\.jpg$/);
+    // the stored key must use a lowercase extension, not .JPG
+    expect(body.file.path).toMatch(/^\w{16}\.jpg$/);
   });
 
   it("streamed and validated files produce the same UploadedFile shape", async () => {
@@ -77,9 +77,9 @@ describe("getExt consistency", () => {
     expect(streamed.file.name).toBe(validated.file.name);
     expect(streamed.file.type).toBe(validated.file.type);
     expect(streamed.file.size).toBe(validated.file.size);
-    // id is random so only check shape
-    expect(streamed.file.id).toMatch(/^\w{16}\.txt$/);
-    expect(validated.file.id).toMatch(/^\w{16}\.txt$/);
+    // the key is random, so only check its shape
+    expect(streamed.file.path).toMatch(/^\w{16}\.txt$/);
+    expect(validated.file.path).toMatch(/^\w{16}\.txt$/);
   });
 });
 

@@ -40,7 +40,6 @@ export async function saveFileToBucket(
   await file.write(data, { type: contentType });
   return {
     name: originalName,
-    id,
     path: file.path,
     type: contentType,
     size: data.length,
