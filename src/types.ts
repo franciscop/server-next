@@ -164,6 +164,11 @@ export type SerializableValue =
   | { [key: string]: SerializableValue }
   | Array<SerializableValue>;
 
+// Anything the `store` / `session` options accept: a plain `Map`, a Redis or
+// DynamoDB client, a `file://` path, or an already-wrapped store. It's passed
+// through polystore's `kv()` at boot, so routes always see a `KVStore`.
+export type StoreSource = KVStore | Map<string, any> | string | Record<string, any>;
+
 export type KVStore = {
   name?: string;
   prefix: (prefix?: string) => KVStore;
@@ -212,8 +217,8 @@ export type AuthOption =
       providers?: Provider | Provider[];
       // Shared secret for the `key` strategy (defaults to the AUTH_KEY env var).
       key?: string;
-      session?: KVStore;
-      store?: KVStore;
+      session?: StoreSource;
+      store?: StoreSource;
       redirect?: string;
       cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
     };
@@ -290,9 +295,8 @@ export type Options = {
   secret?: string;
   public?: string | Bucket;
   uploads?: string | Bucket | UploadOptions;
-  store?: KVStore;
-  cookies?: KVStore;
-  session?: KVStore | { store: KVStore };
+  store?: StoreSource;
+  session?: StoreSource | { store: StoreSource };
   cors?: CorsOptions;
   auth?: AuthOption;
   openapi?: any;
@@ -311,7 +315,6 @@ export type Settings = {
   public?: Bucket;
   uploads?: ({ bucket: Bucket } & LimitOptions) | null;
   store?: KVStore;
-  cookies?: KVStore;
   session?: { store: KVStore };
   cors?: CorsSettings;
   auth?: AuthSettings;

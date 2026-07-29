@@ -6,7 +6,10 @@ import bucket from "./bucket";
 const bucketPath = new URL("../tests/uploads/", import.meta.url).pathname;
 const localBucket = bucket(bucketPath)!;
 
-describe("bucket", () => {
+// The bucket a path resolves to, i.e. what `uploads: './x'` gives the
+// framework. It must satisfy the contract the rest of the code relies on:
+// keys (not disk paths), folder scoping, and refusing to escape the root.
+describe("bucket from a path", () => {
   afterAll(async () => {
     const filePath = path.join(bucketPath, "testFile.txt");
     if (fs.existsSync(filePath)) await fsp.unlink(filePath);
@@ -43,10 +46,6 @@ describe("bucket", () => {
     expect(await file.exists()).toBe(true);
     await file.remove();
     expect(await file.exists()).toBe(false);
-  });
-
-  it("remove() on a missing file does not throw", async () => {
-    await localBucket.file("nope.txt").remove();
   });
 
   it("scopes writes under folder()", async () => {

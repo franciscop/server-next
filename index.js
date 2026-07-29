@@ -175,7 +175,7 @@ async function saveFileToBucket(originalName, data, bucket2, contentType) {
   };
 }
 function validateFile(originalName, data, contentType, limits) {
-  const { maxSize, minSize, fileType } = limits;
+  const { maxSize, minSize, fileType: fileType2 } = limits;
   if (maxSize !== void 0 && data.length > parseBytes(maxSize)) {
     throw new Error(
       `File "${originalName}" is too large (${data.length} bytes, limit is ${maxSize})`
@@ -186,15 +186,15 @@ function validateFile(originalName, data, contentType, limits) {
       `File "${originalName}" is too small (${data.length} bytes, minimum is ${minSize})`
     );
   }
-  if (fileType && fileType.length > 0) {
+  if (fileType2 && fileType2.length > 0) {
     const ext2 = getExt(originalName);
     const mime = contentType.toLowerCase();
-    const allowed = fileType.some(
+    const allowed = fileType2.some(
       (t) => t.toLowerCase() === mime || t.toLowerCase() === ext2
     );
     if (!allowed) {
       throw new Error(
-        `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType.join(", ")})`
+        `File type not allowed for "${originalName}" (got "${contentType}", allowed: ${fileType2.join(", ")})`
       );
     }
   }
@@ -531,9 +531,9 @@ async function parseBody(input, contentType, dest, max = INF) {
   let limits;
   if (dest && "bucket" in dest) {
     bucket2 = dest.bucket;
-    const { maxSize, minSize, fileType } = dest;
-    if (maxSize != null || minSize != null || fileType != null) {
-      limits = { maxSize, minSize, fileType };
+    const { maxSize, minSize, fileType: fileType2 } = dest;
+    if (maxSize != null || minSize != null || fileType2 != null) {
+      limits = { maxSize, minSize, fileType: fileType2 };
     }
   } else {
     bucket2 = dest;
@@ -661,8 +661,8 @@ function normalizeExpires(expires) {
 }
 function createCookies(key, val) {
   if (val.value === null) val.expires = EXPIRED;
-  const { value, path: path2, expires, maxAge, httpOnly, secure, sameSite } = val;
-  let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path2 || "/"}`;
+  const { value, path, expires, maxAge, httpOnly, secure, sameSite } = val;
+  let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path || "/"}`;
   if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
   if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
   if (httpOnly) str += ";HttpOnly";
@@ -725,6 +725,16 @@ function clientIp(headers2, opts = {}) {
   return normalize(remoteAddress);
 }
 
+// src/helpers/store.ts
+import kv from "polystore";
+function toStore(source) {
+  const store = source;
+  if (store && typeof store.prefix === "function" && typeof store.get === "function" && typeof store.set === "function") {
+    return store;
+  }
+  return kv(source);
+}
+
 // src/helpers/disposition.ts
 var encodeExt = (name) => encodeURIComponent(name).replace(
   /['()*]/g,
@@ -738,6 +748,14 @@ function disposition(name) {
   const value = `attachment; filename="${ascii.replace(/["\\]/g, "\\$&")}"`;
   if (clean === ascii) return value;
   return `${value}; filename*=UTF-8''${encodeExt(clean)}`;
+}
+
+// src/helpers/fileType.ts
+function fileType(file2) {
+  if (file2.type) return file2.type;
+  const name = file2.path || file2.name || "";
+  const ext2 = name.split(".").pop()?.toLowerCase();
+  return ext2 ? mimes_default[ext2] : void 0;
 }
 
 // src/helpers/isHtml.ts
@@ -817,22 +835,22 @@ var Reply = class {
     }
     return this.send(JSON.stringify(body));
   }
-  redirect(path2) {
-    this.headers("location", path2);
+  redirect(path) {
+    this.headers("location", path);
     if (this.res.status == null) this.res.status = 302;
     return this.send();
   }
-  async file(path2) {
-    if (typeof path2 !== "string") {
-      if (!await path2.exists()) return this.status(404).send();
-      return this.type(path2.type).send(path2.stream());
+  async file(path) {
+    if (typeof path !== "string") {
+      if (!await path.exists()) return this.status(404).send();
+      return this.type(fileType(path)).send(path.stream());
     }
-    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path2)) return this.status(404).send();
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) return this.status(404).send();
     try {
-      const fs2 = await import("fs");
-      const ext2 = path2.split(".").pop();
-      await fs2.promises.access(path2);
-      const stream = fs2.createReadStream(path2);
+      const fs = await import("fs");
+      const ext2 = path.split(".").pop();
+      await fs.promises.access(path);
+      const stream = fs.createReadStream(path);
       return this.type(ext2).send(stream);
     } catch (error) {
       if (error.code === "ENOENT" || error.code === "EISDIR") {
@@ -1301,8 +1319,8 @@ var oauth = async (code) => {
       code
     })
   });
-  return (path2) => {
-    return fch(`https://api.github.com${path2}`, {
+  return (path) => {
+    return fch(`https://api.github.com${path}`, {
       headers: { Authorization: `Bearer ${res.access_token}` }
     });
   };
@@ -1437,112 +1455,24 @@ function parseAuthOptions(auth2, all) {
   if (!auth2.session && !all.store) {
     throw new Error("Need a sessionStore store for Auth");
   }
-  const store = auth2.store || all.store.prefix("user:");
-  const session2 = auth2.session || all.store.prefix("auth:");
+  const store = all.store ? toStore(all.store) : null;
+  const authStore = auth2.store ? toStore(auth2.store) : store.prefix("user:");
+  const sessionStore = auth2.session ? toStore(auth2.session) : store.prefix("auth:");
   return {
     strategy,
     providers: list,
     redirect: redirect2,
     cleanUser,
-    store,
-    session: session2
+    store: authStore,
+    session: sessionStore
   };
 }
 
 // src/helpers/bucket.ts
-import * as fs from "fs";
-import * as fsp from "fs/promises";
-import * as path from "path";
-function localBucket(root, prefix = "") {
-  const base = path.resolve(root);
-  const resolveKey = (name) => {
-    if (!name) throw new Error("File name is required");
-    const full = path.resolve(base, name.replace(/^\/+/, ""));
-    if (full !== base && !full.startsWith(base + path.sep)) {
-      throw new Error(`Path "${name}" escapes the bucket root`);
-    }
-    return full;
-  };
-  const file2 = (name, win) => {
-    const full = resolveKey(name);
-    const key = prefix + name.replace(/^\/+/, "");
-    const type2 = mimes_default[path.extname(name).slice(1).toLowerCase()];
-    const read = () => {
-      let opts;
-      if (win) {
-        opts = { start: win.start };
-        if (Number.isFinite(win.end)) opts.end = Math.max(win.start, win.end - 1);
-      }
-      const nodeStream = fs.createReadStream(full, opts);
-      return new ReadableStream({
-        start(controller) {
-          nodeStream.on("data", (chunk) => controller.enqueue(chunk));
-          nodeStream.on("end", () => controller.close());
-          nodeStream.on("error", (err) => controller.error(err));
-        },
-        cancel() {
-          nodeStream.destroy();
-        }
-      });
-    };
-    return {
-      path: key,
-      name: path.basename(name),
-      type: type2,
-      async exists() {
-        const stats = await fsp.stat(full).catch(() => null);
-        return !!stats?.isFile();
-      },
-      async info() {
-        const stats = await fsp.stat(full).catch(() => null);
-        if (!stats?.isFile()) return null;
-        const size = win ? Math.max(0, Math.min(win.end, stats.size) - win.start) : stats.size;
-        return { size, type: type2 ?? null, modified: stats.mtime };
-      },
-      // Read-only view of [start, end), composed relative to the current window.
-      slice(start, end) {
-        const base2 = win?.start ?? 0;
-        const cap = win?.end ?? Number.POSITIVE_INFINITY;
-        const s = Math.min(cap, base2 + Math.max(0, start));
-        const e = end === void 0 ? cap : Math.min(cap, base2 + end);
-        return file2(name, { start: s, end: e });
-      },
-      async write(content) {
-        await fsp.mkdir(path.dirname(full), { recursive: true });
-        if (content instanceof ReadableStream) {
-          const writable = fs.createWriteStream(full);
-          for await (const chunk of content) {
-            writable.write(chunk);
-          }
-          await new Promise((resolve2, reject) => {
-            writable.on("error", reject);
-            writable.end(() => resolve2());
-          });
-          return;
-        }
-        await fsp.writeFile(full, content);
-      },
-      stream() {
-        return read();
-      },
-      async bytes() {
-        if (win) return new Uint8Array(await new Response(read()).arrayBuffer());
-        return new Uint8Array(await fsp.readFile(full));
-      },
-      async remove() {
-        await fsp.unlink(full).catch(() => {
-        });
-      }
-    };
-  };
-  return {
-    file: file2,
-    folder: (sub) => localBucket(path.join(base, sub), `${prefix}${sub.replace(/^\/+|\/+$/g, "")}/`)
-  };
-}
+import FileSystem from "bucket/fs";
 function bucket(root) {
   if (!root) return null;
-  if (typeof root === "string") return localBucket(root);
+  if (typeof root === "string") return FileSystem(root);
   if (typeof root.file === "function") return root;
   throw new Error(
     "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
@@ -1638,14 +1568,14 @@ function createLogger(level) {
   const request = (ctx, res) => {
     if (!enabled) return;
     const method = ctx.method.toUpperCase();
-    const path2 = ctx.url.pathname;
+    const path = ctx.url.pathname;
     const reqLen = Number(ctx.headers["content-length"]) || 0;
     const resLen = Number(res.headers.get("content-length")) || 0;
     const status2 = res.status;
     const text = STATUS_TEXT[status2] || "";
     const reqSize = reqLen ? ` ${formatBytes(reqLen)}` : "";
     const resSize = resLen ? ` ${formatBytes(resLen)}` : "";
-    let line = `${method} ${path2}${reqSize} \u2192 ${status2}${text ? ` ${text}` : ""}${resSize}`;
+    let line = `${method} ${path}${reqSize} \u2192 ${status2}${text ? ` ${text}` : ""}${resSize}`;
     const location = res.headers.get("location");
     if (location) line += ` \u2192 ${location}`;
     message("api", line);
@@ -1772,22 +1702,22 @@ function config(options = {}) {
   if (!up) {
     settings.uploads = null;
   } else if (typeof up === "object" && "bucket" in up) {
-    const { bucket: bucket2, maxSize, minSize, fileType } = up;
+    const { bucket: bucket2, maxSize, minSize, fileType: fileType2 } = up;
     if (maxSize != null) parseBytes(maxSize);
     if (minSize != null) parseBytes(minSize);
-    settings.uploads = { bucket: bucket(bucket2), maxSize, minSize, fileType };
+    settings.uploads = { bucket: bucket(bucket2), maxSize, minSize, fileType: fileType2 };
   } else {
     settings.uploads = { bucket: bucket(up) };
   }
   const favicon2 = options.favicon || env2.FAVICON;
   if (favicon2) settings.favicon = favicon2;
-  settings.store = options.store ?? null;
-  settings.cookies = options.cookies ?? null;
+  settings.store = options.store ? toStore(options.store) : null;
   if (options.session) {
-    settings.session = "store" in options.session ? options.session : { store: options.session };
+    const store = typeof options.session === "object" && "store" in options.session ? options.session.store : options.session;
+    settings.session = { store: toStore(store) };
   }
-  if (options.store && !options.session) {
-    settings.session = { store: options.store.prefix("session:") };
+  if (settings.store && !options.session) {
+    settings.session = { store: settings.store.prefix("session:") };
   }
   if (options.auth || env2.AUTH) {
     settings.auth = parseAuthOptions(options.auth || env2.AUTH || null, options);
@@ -1940,9 +1870,10 @@ async function parseResponse(out, ctx) {
     if (!await out.exists()) {
       out = new Response(null, { status: 404 });
     } else {
+      const type2 = fileType(out);
       out = new Response(
         out.stream(),
-        out.type ? { headers: { "content-type": out.type } } : void 0
+        type2 ? { headers: { "content-type": type2 } } : void 0
       );
     }
   }
@@ -2011,13 +1942,6 @@ async function parseResponse(out, ctx) {
     }
     ctx.options.session.store.set(id, ctx.session);
   }
-  if (ctx.options.cookies) {
-    if (Object.keys(ctx.res?.cookies || {}).length) {
-      for (const cookie of Object.values(ctx.res.cookies)) {
-        ctx.res.headers.append("set-cookie", cookie);
-      }
-    }
-  }
   if (ctx?.res?.headers) {
     for (const key in ctx.res.headers) {
       out.headers[key] = ctx.res.headers[key];
@@ -2027,14 +1951,14 @@ async function parseResponse(out, ctx) {
 }
 
 // src/pathPattern.ts
-function pathPattern(pattern, path2) {
-  if (pattern === "*" && path2 === "/") return {};
+function pathPattern(pattern, path) {
+  if (pattern === "*" && path === "/") return {};
   pattern = `/${pattern.replace(/^\//, "")}`;
   pattern = pattern.replace(/\/$/, "") || "/";
-  path2 = path2.replace(/\/$/, "") || "/";
-  if (pattern === path2) return {};
+  path = path.replace(/\/$/, "") || "/";
+  if (pattern === path) return {};
   const params = {};
-  const pathParts = path2.split("/").slice(1).map((u) => decodeURIComponent(u));
+  const pathParts = path.split("/").slice(1).map((u) => decodeURIComponent(u));
   const pattParts = pattern.split("/").slice(1);
   let allSame = true;
   for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {
@@ -2093,7 +2017,7 @@ function validate(ctx, schema) {
   } catch (error) {
     if (error.name === "ZodError" || error.constructor.name === "ZodError") {
       const message = error.issues.map(
-        ({ path: path2, message: message2 }) => `[${base}.${path2.join(".")}]: ${message2}`
+        ({ path, message: message2 }) => `[${base}.${path.join(".")}]: ${message2}`
       ).sort().join("\n");
       throw new StatusError(message, 422);
     }
@@ -2289,7 +2213,7 @@ async function verify(password, hash3) {
   const [, variant, , memory, passes, parallelism, saltB64, hashB64] = match;
   const nonce = Buffer.from(saltB64, "base64");
   const expected = Buffer.from(hashB64, "base64");
-  return new Promise((resolve2, reject) => {
+  return new Promise((resolve, reject) => {
     crypto3.argon2(
       `argon2${variant}`,
       {
@@ -2303,9 +2227,9 @@ async function verify(password, hash3) {
       (err, derivedKey) => {
         if (err) return reject(err);
         if (derivedKey.length === expected.length && timingSafeEqual(derivedKey, expected)) {
-          resolve2(true);
+          resolve(true);
         } else {
-          resolve2(false);
+          resolve(false);
         }
       }
     );
@@ -2500,8 +2424,8 @@ async function assets(ctx) {
     const info = file2.info?.bind(file2);
     const meta = info ? await info() : null;
     if (info ? !meta : !await file2.exists()) return;
-    const ext2 = ctx.url.pathname.split(".").pop();
-    const ctype = meta?.type || ext2;
+    const ext2 = ctx.url.pathname.split(".").pop()?.toLowerCase();
+    const ctype = ext2 && mimes_default[ext2] || meta?.type || ext2;
     const headers2 = { "cache-control": CACHE_CONTROL };
     let tag;
     if (meta) {
@@ -2564,7 +2488,7 @@ async function favicon(ctx) {
 }
 
 // src/middle/openapi.ts
-import * as fsp2 from "fs/promises";
+import * as fsp from "fs/promises";
 var entities = {
   "&": "&amp;",
   "<": "&lt;",
@@ -2610,7 +2534,7 @@ function zodToSchema(schema) {
   }
   return { type: type2 };
 }
-var pkgProm = fsp2.readFile("package.json", "utf-8").then((data) => JSON.parse(data)).catch(() => ({}));
+var pkgProm = fsp.readFile("package.json", "utf-8").then((data) => JSON.parse(data)).catch(() => ({}));
 var getTag = (name, fn) => {
   const found = fn.toString().split("\n").filter((l) => /\s+\/\/\s/.test(l)).map((l) => l.trim().replace("// ", "")).find((l) => l.startsWith(name));
   if (!found) return "";
@@ -2622,14 +2546,14 @@ var generateOpenApiPaths = (handlers) => {
   const paths = {};
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
-      const path2 = route.path;
+      const path = route.path;
       const fn = route.fns.find((p) => typeof p === "function");
       const meta = route.fns.find((p) => typeof p === "object");
       const config2 = getConfig(route.options);
-      if (typeof path2 !== "string" || path2 === "*" || path2 === "/docs" || !fn) {
+      if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
         continue;
       }
-      const normalizedPath = path2.replace(/\(\w+\)/gi, "").replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
+      const normalizedPath = path.replace(/\(\w+\)/gi, "").replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
       if (!paths[normalizedPath]) {
         paths[normalizedPath] = {};
       }
@@ -2656,7 +2580,7 @@ var generateOpenApiPaths = (handlers) => {
         };
       }
       const parameters = [];
-      const matched = Array.from(path2.matchAll(/:[\w()]+/gi));
+      const matched = Array.from(path.matchAll(/:[\w()]+/gi));
       matched.forEach((match) => {
         const [name, type2 = "string"] = match[0].slice(1).replace(/\)/, "").split("(");
         parameters.push({
@@ -2995,18 +2919,18 @@ async function createNode(req, app) {
   const cookies2 = parseCookies(headers2.cookie);
   const scheme = req.socket instanceof TLSSocket ? "https" : "http";
   const host = headers2.host || `localhost:${app.settings.port}`;
-  const path2 = (req.url || "/").replace(/\/$/, "") || "/";
+  const path = (req.url || "/").replace(/\/$/, "") || "/";
   const baseUrl = `${scheme}://${host}`;
-  const url = new URL(path2, baseUrl);
+  const url = new URL(path, baseUrl);
   define(
     url,
     "query",
     (url2) => Object.fromEntries(url2.searchParams.entries())
   );
   const source = {
-    getBuffer: () => new Promise((resolve2, reject) => {
+    getBuffer: () => new Promise((resolve, reject) => {
       const chunks2 = [];
-      req.on("data", (chunk) => chunks2.push(chunk)).on("end", () => resolve2(Buffer.concat(chunks2))).on("error", reject);
+      req.on("data", (chunk) => chunks2.push(chunk)).on("end", () => resolve(Buffer.concat(chunks2))).on("error", reject);
     }),
     getStream: () => toWeb(req)
   };
@@ -3158,9 +3082,9 @@ var Router = class _Router {
   // functions into a single flat `fns` list. A plain options object may sit
   // between the path and the handlers, and it's pulled out here.
   handle(method, pathOrFn, ...rest) {
-    let path2 = "*";
+    let path = "*";
     if (typeof pathOrFn === "string") {
-      path2 = pathOrFn;
+      path = pathOrFn;
     } else if (pathOrFn != null) {
       rest.unshift(pathOrFn);
     }
@@ -3170,7 +3094,7 @@ var Router = class _Router {
     }
     const base = method === "socket" ? [] : this.middleware;
     const fns = [...base, ...rest].filter((fn) => fn != null);
-    this.handlers[method].push({ path: path2, options, fns });
+    this.handlers[method].push({ path, options, fns });
     return this.self();
   }
   socket(pathOrMid, optionsOrMid, ...middleware) {
@@ -3235,31 +3159,33 @@ function isSerializable(body) {
 }
 function ServerTest(app) {
   const port = app.settings.port;
-  const fetch2 = async (method, path2, options = {}) => {
+  const fetch2 = async (method, path, options = {}) => {
     if (!options.headers) options.headers = {};
     if (isSerializable(options.body)) {
       options.headers["content-type"] = "application/json";
       options.body = JSON.stringify(options.body);
     }
     return await app.fetch(
-      new Request(`http://localhost:${port}${path2}`, {
+      new Request(`http://localhost:${port}${path}`, {
         method,
         ...options
       })
     );
   };
   return {
-    get: (path2, options) => fetch2("get", path2, options),
-    head: (path2, options) => fetch2("head", path2, options),
-    post: (path2, body, options) => fetch2("post", path2, { body, ...options }),
-    put: (path2, body, options) => fetch2("put", path2, { body, ...options }),
-    patch: (path2, body, options) => fetch2("patch", path2, { body, ...options }),
-    delete: (path2, options) => fetch2("delete", path2, options),
-    options: (path2, options) => fetch2("options", path2, options)
+    get: (path, options) => fetch2("get", path, options),
+    head: (path, options) => fetch2("head", path, options),
+    post: (path, body, options) => fetch2("post", path, { body, ...options }),
+    put: (path, body, options) => fetch2("put", path, { body, ...options }),
+    patch: (path, body, options) => fetch2("patch", path, { body, ...options }),
+    delete: (path, options) => fetch2("delete", path, options),
+    options: (path, options) => fetch2("options", path, options)
   };
 }
 
 // src/index.ts
+import { default as default2 } from "polystore";
+import { default as default3 } from "bucket";
 var Server = class extends Router {
   settings;
   platform;
@@ -3327,6 +3253,7 @@ function server(options) {
 export {
   Server,
   ServerError_default as ServerError,
+  default3 as bucket,
   cache,
   cookies,
   server as default,
@@ -3334,6 +3261,7 @@ export {
   file,
   headers,
   json,
+  default2 as kv,
   redirect,
   router,
   send,

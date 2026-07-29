@@ -8,6 +8,7 @@ import {
   iteratorToReadable,
   mimes,
 } from "./helpers";
+import fileType from "./helpers/fileType";
 import isHtml from "./helpers/isHtml";
 import { json } from "./reply";
 import ServerError from "./ServerError";
@@ -49,9 +50,10 @@ export default async function parseResponse(
     if (!(await out.exists())) {
       out = new Response(null, { status: 404 });
     } else {
+      const type = fileType(out);
       out = new Response(
         out.stream(),
-        out.type ? { headers: { "content-type": out.type } } : undefined,
+        type ? { headers: { "content-type": type } } : undefined,
       );
     }
   }
@@ -163,15 +165,6 @@ export default async function parseResponse(
     // Saves the session in the session store
     // Note that this is async but we are totally fine deferring it
     ctx.options.session.store.set(id, ctx.session);
-  }
-
-  // Cookies to headers
-  if (ctx.options.cookies) {
-    if (Object.keys(ctx.res?.cookies || {}).length) {
-      for (const cookie of Object.values(ctx.res.cookies)) {
-        ctx.res.headers.append("set-cookie", cookie);
-      }
-    }
   }
 
   // Add the headers that are needed

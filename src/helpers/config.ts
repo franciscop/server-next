@@ -3,6 +3,7 @@ import Bucket from "./bucket";
 import createId from "./createId";
 import createLogger from "./logger";
 import { resolveSecurity } from "./security";
+import toStore from "./store";
 import { parseBytes } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
@@ -108,15 +109,19 @@ export default function config(options: Options = {}): Settings {
   const favicon = options.favicon || env.FAVICON;
   if (favicon) settings.favicon = favicon;
 
-  // Stores
-  settings.store = options.store ?? null;
-  settings.cookies = options.cookies ?? null;
+  // Stores: anything polystore accepts (a Map, a Redis client, ...) is built
+  // into a store here, so routes always get the same KV interface. An
+  // already-built store is kept as-is, prefix and expiry included.
+  settings.store = options.store ? toStore(options.store) : null;
   if (options.session) {
-    settings.session =
-      "store" in options.session ? options.session : { store: options.session };
+    const store =
+      typeof options.session === "object" && "store" in options.session
+        ? options.session.store
+        : options.session;
+    settings.session = { store: toStore(store) };
   }
-  if (options.store && !options.session) {
-    settings.session = { store: options.store.prefix("session:") };
+  if (settings.store && !options.session) {
+    settings.session = { store: settings.store.prefix("session:") };
   }
 
   if (options.auth || env.AUTH) {

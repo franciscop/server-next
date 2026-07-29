@@ -146,3 +146,35 @@ describe("serving files stays inside the folder", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// A stored file must carry its Content-Type whichever bucket it came from. The
+// `bucket` library exposes the type only through the async info(), so it's
+// derived from the file's extension instead.
+describe("content-type of served files", () => {
+  const cases: [string, string][] = [
+    ["photo.jpg", "image/jpeg"],
+    ["notes.md", "text/markdown; charset=utf-8"],
+    ["data.json", "application/json"],
+  ];
+
+  for (const [name, expected] of cases) {
+    it(`serves ${name} as ${expected}`, async () => {
+      const bucket = await seed(name, "DATA");
+      const res = await server()
+        .get("/f", () => bucket.file(name))
+        .test()
+        .get("/f");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(expected);
+    });
+
+    it(`file() serves ${name} as ${expected}`, async () => {
+      const bucket = await seed(name, "DATA");
+      const res = await server()
+        .get("/f", () => file(bucket.file(name)))
+        .test()
+        .get("/f");
+      expect(res.headers.get("content-type")).toBe(expected);
+    });
+  }
+});

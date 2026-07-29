@@ -1,5 +1,6 @@
 import { createCookies, mimes, resolveCache, toWeb } from "./helpers";
 import disposition from "./helpers/disposition";
+import fileType from "./helpers/fileType";
 import isHtml from "./helpers/isHtml";
 import isReadableStream from "./helpers/isReadableStream";
 import type { BucketFile, CacheOption, Cookie } from "./types";
@@ -125,7 +126,7 @@ class Reply {
     // 404 when it's missing — the same contract as a disk path below.
     if (typeof path !== "string") {
       if (!(await path.exists())) return this.status(404).send();
-      return this.type(path.type).send(path.stream());
+      return this.type(fileType(path)).send(path.stream());
     }
     // A '..' segment means the path was built from input that climbed out of
     // where it was meant to stay; `send` (Express) refuses these too. Normal

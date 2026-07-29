@@ -16,7 +16,7 @@ Examples show the patterns we want users to copy:
 
   ```js
   // Yes
-  const uploads = FileSystem('./uploads');
+  const uploads = bucket.FS('./uploads');
   export default server({ uploads })
     .get('/file/:id', (ctx) => uploads.file(ctx.url.params.id));
 

@@ -5,7 +5,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022", "ES2021", "DOM"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,

@@ -1,3 +1,4 @@
+import toStore from "../helpers/store";
 import type { Options, Provider, Settings, Strategy } from "../types";
 import providers from "./providers";
 
@@ -68,15 +69,22 @@ export default function parseAuthOptions(
   if (!auth.session && !all.store) {
     throw new Error("Need a sessionStore store for Auth");
   }
-  const store = auth.store || all.store.prefix("user:");
-  const session = auth.session || all.store.prefix("auth:");
+  // Same handling as the top-level `store`: a raw Map/client is accepted here
+  // too. The guards above ensure `store` is non-null whenever it's needed
+  // (auth.store/auth.session falsy implies all.store is set), which TS can't
+  // see through the ternary, hence the `!`.
+  const store = all.store ? toStore(all.store) : null;
+  const authStore = auth.store ? toStore(auth.store) : store!.prefix("user:");
+  const sessionStore = auth.session
+    ? toStore(auth.session)
+    : store!.prefix("auth:");
 
   return {
     strategy,
     providers: list,
     redirect,
     cleanUser,
-    store,
-    session,
+    store: authStore,
+    session: sessionStore,
   };
 }

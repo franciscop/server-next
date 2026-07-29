@@ -71,13 +71,26 @@ describe("parseAuthOptions", () => {
     }).toThrow("Need a userStore store for Auth");
   });
 
-  it("uses auth.session when provided", () => {
-    const sessionStore = kv(new Map());
+  it("uses auth.session when provided", async () => {
+    const sessionMap = new Map();
     const result = parseAuthOptions(
-      { strategy: "cookie", providers: "email", session: sessionStore },
+      { strategy: "cookie", providers: "email", session: kv(sessionMap) },
       { store },
     );
-    expect(result?.session).toBe(sessionStore);
+    // Writes land in the given store, unprefixed, not in the shared one
+    await result?.session.set("token", "x");
+    expect([...sessionMap.keys()]).toContain("token");
+    expect([...map.keys()]).not.toContain("auth:token");
+  });
+
+  it("accepts a raw Map as auth.session", async () => {
+    const sessionMap = new Map();
+    const result = parseAuthOptions(
+      { strategy: "cookie", providers: "email", session: sessionMap },
+      { store },
+    );
+    await result?.session.set("token", "x");
+    expect([...sessionMap.keys()]).toContain("token");
   });
 
   it("creates session store from all.store with 'auth:' prefix", async () => {
@@ -86,13 +99,15 @@ describe("parseAuthOptions", () => {
     expect([...map.keys()]).toContain("auth:token");
   });
 
-  it("uses auth.store when provided", () => {
-    const userStore = kv(new Map());
+  it("uses auth.store when provided", async () => {
+    const userMap = new Map();
     const result = parseAuthOptions(
-      { strategy: "cookie", providers: "email", store: userStore },
+      { strategy: "cookie", providers: "email", store: kv(userMap) },
       { store },
     );
-    expect(result?.store).toBe(userStore);
+    await result?.store.set("alice", { id: 1 });
+    expect([...userMap.keys()]).toContain("alice");
+    expect([...map.keys()]).not.toContain("user:alice");
   });
 
   it("creates user store from all.store with 'user:' prefix", async () => {

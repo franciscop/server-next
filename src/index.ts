@@ -112,3 +112,9 @@ export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./ServerError";
 export type * from "./types";
+
+// The two storage libraries, re-exported so there's nothing extra to install:
+// `kv()` builds a store from a Map, Redis, ... and `bucket` holds the storage
+// providers (`bucket.FS`, `bucket.S3`, `bucket.R2`, ...).
+export { default as kv } from "polystore";
+export { default as bucket } from "bucket";

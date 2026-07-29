@@ -1,4 +1,6 @@
 import * as http from 'http';
+export { default as kv } from 'polystore';
+export { default as bucket } from 'bucket';
 
 type LimitOptions = {
     maxSize?: number | string;
@@ -128,6 +130,7 @@ type BasicValue = string | number | boolean | null;
 type SerializableValue = BasicValue | {
     [key: string]: SerializableValue;
 } | Array<SerializableValue>;
+type StoreSource = KVStore | Map<string, any> | string | Record<string, any>;
 type KVStore = {
     name?: string;
     prefix: (prefix?: string) => KVStore;
@@ -157,8 +160,8 @@ type AuthOption = `${Strategy}:${Provider}` | "key" | {
     strategy: Strategy;
     providers?: Provider | Provider[];
     key?: string;
-    session?: KVStore;
-    store?: KVStore;
+    session?: StoreSource;
+    store?: StoreSource;
     redirect?: string;
     cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
 };
@@ -204,10 +207,9 @@ type Options = {
     secret?: string;
     public?: string | Bucket;
     uploads?: string | Bucket | UploadOptions;
-    store?: KVStore;
-    cookies?: KVStore;
-    session?: KVStore | {
-        store: KVStore;
+    store?: StoreSource;
+    session?: StoreSource | {
+        store: StoreSource;
     };
     cors?: CorsOptions;
     auth?: AuthOption;
@@ -228,7 +230,6 @@ type Settings = {
         bucket: Bucket;
     } & LimitOptions) | null;
     store?: KVStore;
-    cookies?: KVStore;
     session?: {
         store: KVStore;
     };
@@ -500,4 +501,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

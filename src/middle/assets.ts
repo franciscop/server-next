@@ -1,3 +1,4 @@
+import mimes from "../helpers/mimes";
 import parseRange from "../helpers/parseRange";
 import { status, type } from "../reply";
 import type { Context } from "../types";
@@ -23,8 +24,10 @@ export default async function assets(ctx: Context) {
     const meta = info ? await info() : null;
     if (info ? !meta : !(await file.exists())) return;
 
-    const ext = ctx.url.pathname.split(".").pop();
-    const ctype = meta?.type || ext;
+    // Our own MIME table wins over the bucket's, since it carries the charset
+    // for text types; the bucket's type covers extensions we don't know.
+    const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
+    const ctype = (ext && mimes[ext]) || meta?.type || ext;
     const headers: Record<string, string> = { "cache-control": CACHE_CONTROL };
 
     let tag: string | undefined;
