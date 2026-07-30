@@ -1,8 +1,9 @@
+import { describe, expect, it, mock } from "bun:test";
 import server, { ServerError } from "..";
 
 describe("handleRequest onError", () => {
   it("calls onError when an error is thrown", async () => {
-    const onError = jest.fn(
+    const onError = mock(
       () => new Response("Custom error", { status: 418 }),
     );
 
@@ -19,7 +20,7 @@ describe("handleRequest onError", () => {
   });
 
   it("calls onError with ServerError for 404", async () => {
-    const onError = jest.fn(() => new Response("Not found!", { status: 404 }));
+    const onError = mock(() => new Response("Not found!", { status: 404 }));
 
     const res = await server({ onError })
       .get("/other", () => 200)
@@ -54,7 +55,7 @@ describe("handleRequest onError", () => {
   });
 
   it("calls onError with correct error status", async () => {
-    const onError = jest.fn((error) => {
+    const onError = mock((error) => {
       return new Response(`Error ${error.status}: ${error.message}`, {
         status: error.status || 500,
       });
@@ -73,7 +74,7 @@ describe("handleRequest onError", () => {
   });
 
   it("allows onError to return different status than original error", async () => {
-    const onError = jest.fn(
+    const onError = mock(
       () => new Response("Logged and sanitized", { status: 200 }),
     );
 
@@ -90,7 +91,7 @@ describe("handleRequest onError", () => {
   });
 
   it("allows onError to return JSON error response", async () => {
-    const onError = jest.fn((error) => {
+    const onError = mock((error) => {
       return new Response(
         JSON.stringify({
           error: {

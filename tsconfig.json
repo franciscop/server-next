@@ -12,7 +12,7 @@
     "strict": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["jest", "bun", "node"],
+    "types": ["bun", "node"],
     "typeRoots": ["./node_modules/@types", "./src/test"]
   },
   "include": ["src/**/*"]

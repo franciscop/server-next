@@ -145,7 +145,8 @@ describe("parseAuthOptions", () => {
       email: "test@test.com",
       password: "secret",
     });
-    expect(cleanedUser).toEqual({ id: 1, email: "test@test.com" });
+    // cleanUser is typed as returning the user as-is, but it strips the password
+    expect(cleanedUser as unknown).toEqual({ id: 1, email: "test@test.com" });
     expect(cleanedUser).not.toHaveProperty("password");
   });
 });
