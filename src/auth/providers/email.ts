@@ -18,13 +18,11 @@ async function emailLogin(ctx: Context) {
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
-  // The user is already stored; store:false avoids re-saving without a password
   return finishLogin(ctx, {
     provider: "email",
     key: user.email,
     email: user.email,
     user,
-    store: false,
   });
 }
 
@@ -51,14 +49,14 @@ async function emailRegister(ctx: Context) {
     time,
     ...data,
   };
-  await store.set(email, user);
 
+  // finishLogin persists it (after onLogin), so a denied registration
+  // leaves no account behind
   return finishLogin(ctx, {
     provider: "email",
     key: email,
     email,
     user,
-    store: false,
   });
 }
 

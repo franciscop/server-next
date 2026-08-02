@@ -1,31 +1,27 @@
-import type { Context } from "..";
+import type { AuthUser, Context } from "..";
 import { createId } from "../helpers";
 import { signJwt } from "../helpers/jwt";
 import { cookies, status } from "../reply";
+import assertUser from "./assertUser";
 
 type LoginInput = {
   // Provider name stored on the session ("email", "google", ...)
   provider: string;
-  // Stable identifier used as the store key and session subject: a provider's
-  // user id for OAuth, or the email for the email provider.
+  // Stable identifier used as the store key and session subject: the mapped
+  // user's id for OAuth, or the email for the email provider.
   key: string | number;
   email?: string;
-  // The user fields to persist/return. For an upsert (the default) they are
-  // merged over the existing record before cleaning.
+  // The user fields from this login, to reconcile with the stored record
   user: Record<string, any>;
-  // Whether to write the user to the store. OAuth providers upsert; the email
-  // provider stores at registration and passes `false` so a later login doesn't
-  // overwrite the record with a password-stripped version.
-  store?: boolean;
 };
 
 // The single place every provider funnels through after authenticating: it
 // persists the user + session and responds according to the chosen strategy.
-// Consolidating it here keeps cookies, the session shape, and (soon) extra
-// strategies consistent across email/github/google/microsoft/discord/etc.
+// Consolidating it here keeps cookies, the session shape, the callbacks, and
+// the strategies consistent across email/github/google/microsoft/discord/etc.
 export default async function finishLogin(ctx: Context, input: LoginInput) {
   const settings = ctx.options.auth;
-  const { strategy, cleanUser } = settings;
+  const { strategy, onLogin, onUser } = settings;
   const key = String(input.key);
 
   const auth = {
@@ -37,14 +33,25 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
     time: new Date().toISOString().replace(/\.[0-9]*/, ""),
   };
 
-  let user = input.user;
-  if (input.store !== false) {
-    const existing = await settings.store.get(key);
-    user = { ...((existing as object) ?? {}), ...input.user };
-  }
-  user = await cleanUser(user);
+  // Every record knows its own provider and strategy; the stamp wins over any
+  // stale values so it always reflects the login actually happening.
+  const loginUser = {
+    ...input.user,
+    provider: input.provider,
+    strategy,
+  } as AuthUser;
+  const existingUser = ((await settings.store.get(key)) ??
+    null) as AuthUser | null;
 
-  if (input.store !== false) await settings.store.set(key, user);
+  // `onLogin` owns the record that is persisted (and can deny by throwing);
+  // the default is an upsert where the fresh login data wins over the stored
+  // fields. It runs before the write, so a denied first login stores nothing.
+  const user = onLogin
+    ? await onLogin(loginUser, existingUser, ctx)
+    : { ...(existingUser ?? {}), ...loginUser };
+  assertUser(user, "onLogin");
+
+  await settings.store.set(key, user);
   // `jwt` is stateless (the signed token carries the session), so only the
   // opaque strategies persist the auth record in the session store.
   if (!strategy.includes("jwt")) {
@@ -53,10 +60,14 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
 
   if (strategy.includes("jwt")) {
     const token = await signJwt(auth, ctx.options.secret, 7 * 24 * 60 * 60);
-    return status(201).json({ ...user, token });
+    const exposed = await onUser(user, ctx);
+    assertUser(exposed, "onUser");
+    return status(201).json({ ...exposed, token });
   }
   if (strategy.includes("token")) {
-    return status(201).json({ ...user, token: auth.id });
+    const exposed = await onUser(user, ctx);
+    assertUser(exposed, "onUser");
+    return status(201).json({ ...exposed, token: auth.id });
   }
   if (strategy.includes("cookie")) {
     return cookies("authentication", {
@@ -67,6 +78,5 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
       sameSite: "Lax",
     }).redirect(settings.redirect);
   }
-  if (strategy.includes("key")) throw new Error("Key auth not supported yet");
   throw new Error("Unknown auth type");
 }

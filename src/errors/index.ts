@@ -33,6 +33,10 @@ ServerError.extend({
     status: 401,
     message: "Credentials do not correspond to a user",
   },
+  AUTH_INVALID_USER: {
+    status: 500,
+    message: "{callback} must return a user with an 'id' and an 'email'",
+  },
   LOGIN_NO_EMAIL: "The email is required to log in",
   LOGIN_INVALID_EMAIL: "The email you wrote is not correct",
   LOGIN_NO_PASSWORD: "The email is required to log in",

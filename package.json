@@ -64,8 +64,8 @@
     "tutorials": "docs/tutorials"
   },
   "dependencies": {
-    "bucket": "^0.6.0",
-    "polystore": "^0.23.2"
+    "bucket": "^0.7.1",
+    "polystore": "^0.23.3"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",

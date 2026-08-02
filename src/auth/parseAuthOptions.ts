@@ -4,7 +4,8 @@ import providers from "./providers";
 
 const defaultRedirect = "/user";
 
-function defaultCleanUser(fullUser: any) {
+// The default `onUser`: never expose a stored credential
+function defaultOnUser(fullUser: any) {
   const { password: _password, ...user } = fullUser;
   return user;
 }
@@ -29,22 +30,6 @@ export default function parseAuthOptions(
   }
   const strategy = auth.strategy;
 
-  // `key` auth is a single shared secret (M2M / API key): no users, store,
-  // session or provider. The secret comes from the option or the AUTH_KEY env.
-  if (strategy === "key") {
-    const key = auth.key || env.AUTH_KEY;
-    if (!key) {
-      throw new Error("`key` auth needs the AUTH_KEY env var (or auth.key)");
-    }
-    return {
-      strategy,
-      providers: [],
-      key,
-      redirect: auth.redirect || defaultRedirect,
-      cleanUser: auth.cleanUser || defaultCleanUser,
-    } as Settings["auth"];
-  }
-
   const list = Array.isArray(auth.providers)
     ? auth.providers
     : auth.providers
@@ -61,7 +46,8 @@ export default function parseAuthOptions(
   }
 
   const redirect = auth.redirect || defaultRedirect;
-  const cleanUser = auth.cleanUser || defaultCleanUser;
+  const { onProfile, onLogin, onLogout } = auth;
+  const onUser = auth.onUser || defaultOnUser;
 
   if (!auth.store && !all.store) {
     throw new Error("Need a userStore store for Auth");
@@ -83,7 +69,10 @@ export default function parseAuthOptions(
     strategy,
     providers: list,
     redirect,
-    cleanUser,
+    onProfile,
+    onLogin,
+    onUser,
+    onLogout,
     store: authStore,
     session: sessionStore,
   };

@@ -1,5 +1,6 @@
 import type { Context } from "../..";
 import { cookies } from "../../reply";
+import assertUser from "../assertUser";
 import finishLogin from "../finishLogin";
 import { checkState, clearState, startState } from "../state";
 
@@ -105,11 +106,19 @@ const callback = async (ctx: Context) => {
     if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
   }
 
+  // The raw payload is the id_token claims, plus that first-login name
+  const raw = { ...claims, name };
+  const { onProfile } = ctx.options.auth;
+  const profile = onProfile
+    ? await onProfile(raw, "apple")
+    : { id: raw.sub, name: raw.name, email: raw.email };
+  assertUser(profile, "onProfile");
+
   const res = await finishLogin(ctx, {
     provider: "apple",
-    key: claims.sub,
-    email: claims.email,
-    user: { id: claims.sub, name, email: claims.email },
+    key: profile.id,
+    email: profile.email,
+    user: profile,
   });
   res.headers.append("set-cookie", clearState());
   return res;

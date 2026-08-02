@@ -129,24 +129,23 @@ describe("parseAuthOptions", () => {
     expect(result?.redirect).toBe("/user");
   });
 
-  it("uses custom cleanUser function when provided", () => {
-    const customClean = <T>(user: T) => user;
+  it("uses a custom onUser when provided", () => {
+    const custom = <T>(user: T) => user;
     const result = parseAuthOptions(
-      { strategy: "cookie", providers: "email", cleanUser: customClean },
+      { strategy: "cookie", providers: "email", onUser: custom },
       { store },
     );
-    expect(result?.cleanUser).toBe(customClean);
+    expect(result?.onUser).toBe(custom);
   });
 
-  it("uses default cleanUser function that removes password", () => {
+  it("the default onUser removes the password", () => {
     const result = parseAuthOptions("cookie:email", { store });
-    const cleanedUser = result?.cleanUser({
-      id: 1,
-      email: "test@test.com",
-      password: "secret",
-    });
-    // cleanUser is typed as returning the user as-is, but it strips the password
-    expect(cleanedUser as unknown).toEqual({ id: 1, email: "test@test.com" });
-    expect(cleanedUser).not.toHaveProperty("password");
+    const exposed = result?.onUser(
+      { id: 1, email: "test@test.com", password: "secret" } as any,
+      {} as any,
+    );
+    // onUser is typed as returning the user as-is, but it strips the password
+    expect(exposed as unknown).toEqual({ id: 1, email: "test@test.com" });
+    expect(exposed).not.toHaveProperty("password");
   });
 });

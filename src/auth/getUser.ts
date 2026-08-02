@@ -1,24 +1,8 @@
 import type { AuthSession, AuthUser, Context } from "..";
 import { ServerError } from "..";
 import { verifyJwt } from "../helpers/jwt";
-import safeEqual from "../helpers/safeEqual";
+import assertUser from "./assertUser";
 import findSessionId from "./findSessionId";
-
-// `key` auth: a single shared secret sent as `Authorization: Bearer <key>`.
-// There's no user, so a match just yields a fixed "authenticated" marker.
-function getKeyUser(ctx: Context): AuthUser | undefined {
-  const expected = ctx.options.auth.key;
-  const header = ctx.headers.authorization as string | undefined;
-  if (!header) return; // no key sent -> anonymous
-  const [type, provided] = header.trim().split(" ");
-  if (type?.toLowerCase() !== "bearer" || !provided) {
-    throw ServerError.AUTH_INVALID_HEADER({ type });
-  }
-  if (!expected || !safeEqual(provided, expected)) {
-    throw ServerError.AUTH_INVALID_TOKEN();
-  }
-  return { id: "key", strategy: "key", provider: "key" } as unknown as AuthUser;
-}
 
 // Resolve the auth session record for the request. The `jwt` strategy carries it
 // inside a signed Bearer token (stateless); the others store an opaque id.
@@ -46,9 +30,6 @@ export default async function getUser(ctx: Context): Promise<AuthUser> {
   if (!ctx.options.auth) return; // NO AUTH AT ALL; nothing to do here
   const options = ctx.options.auth;
 
-  // Shared-secret auth is a simple key check, with no users/store/session.
-  if (options.strategy === "key") return getKeyUser(ctx);
-
   const auth = await getAuthSession(ctx);
   if (!auth) return; // NO SESSION FOUND; no auth
   if (options.strategy !== auth.strategy) {
@@ -70,5 +51,8 @@ export default async function getUser(ctx: Context): Promise<AuthUser> {
   user.strategy = auth.strategy;
   user.provider = auth.provider;
 
-  return ctx.options.auth.cleanUser(user);
+  // `onUser` shapes what handlers see; the default strips `password`
+  const exposed = await ctx.options.auth.onUser(user, ctx);
+  assertUser(exposed, "onUser");
+  return exposed;
 }

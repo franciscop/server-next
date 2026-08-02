@@ -68,6 +68,10 @@ ServerError_default.extend({
     status: 401,
     message: "Credentials do not correspond to a user"
   },
+  AUTH_INVALID_USER: {
+    status: 500,
+    message: "{callback} must return a user with an 'id' and an 'email'"
+  },
   LOGIN_NO_EMAIL: "The email is required to log in",
   LOGIN_INVALID_EMAIL: "The email you wrote is not correct",
   LOGIN_NO_PASSWORD: "The email is required to log in",
@@ -912,6 +916,13 @@ var json = (...args) => r().json(...args);
 var file = (...args) => r().file(...args);
 var redirect = (...args) => r().redirect(...args);
 
+// src/auth/assertUser.ts
+function assertUser(user, callback3) {
+  if (!user || typeof user !== "object" || user.id == null || !user.email) {
+    throw ServerError_default.AUTH_INVALID_USER({ callback: callback3 });
+  }
+}
+
 // src/helpers/jwt.ts
 var enc = new TextEncoder();
 var dec = new TextDecoder();
@@ -982,7 +993,7 @@ async function verifyJwt(token, secret) {
 // src/auth/finishLogin.ts
 async function finishLogin(ctx, input) {
   const settings = ctx.options.auth;
-  const { strategy, cleanUser } = settings;
+  const { strategy, onLogin, onUser } = settings;
   const key = String(input.key);
   const auth2 = {
     id: createId(),
@@ -992,22 +1003,28 @@ async function finishLogin(ctx, input) {
     email: input.email,
     time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
   };
-  let user = input.user;
-  if (input.store !== false) {
-    const existing = await settings.store.get(key);
-    user = { ...existing ?? {}, ...input.user };
-  }
-  user = await cleanUser(user);
-  if (input.store !== false) await settings.store.set(key, user);
+  const loginUser = {
+    ...input.user,
+    provider: input.provider,
+    strategy
+  };
+  const existingUser = await settings.store.get(key) ?? null;
+  const user = onLogin ? await onLogin(loginUser, existingUser, ctx) : { ...existingUser ?? {}, ...loginUser };
+  assertUser(user, "onLogin");
+  await settings.store.set(key, user);
   if (!strategy.includes("jwt")) {
     await settings.session.set(auth2.id, auth2, { expires: "1w" });
   }
   if (strategy.includes("jwt")) {
     const token = await signJwt(auth2, ctx.options.secret, 7 * 24 * 60 * 60);
-    return status(201).json({ ...user, token });
+    const exposed = await onUser(user, ctx);
+    assertUser(exposed, "onUser");
+    return status(201).json({ ...exposed, token });
   }
   if (strategy.includes("token")) {
-    return status(201).json({ ...user, token: auth2.id });
+    const exposed = await onUser(user, ctx);
+    assertUser(exposed, "onUser");
+    return status(201).json({ ...exposed, token: auth2.id });
   }
   if (strategy.includes("cookie")) {
     return cookies("authentication", {
@@ -1018,7 +1035,6 @@ async function finishLogin(ctx, input) {
       sameSite: "Lax"
     }).redirect(settings.redirect);
   }
-  if (strategy.includes("key")) throw new Error("Key auth not supported yet");
   throw new Error("Unknown auth type");
 }
 
@@ -1128,11 +1144,15 @@ var callback = async (ctx) => {
     const parsed = JSON.parse(body.user).name;
     if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
   }
+  const raw = { ...claims, name };
+  const { onProfile } = ctx.options.auth;
+  const profile = onProfile ? await onProfile(raw, "apple") : { id: raw.sub, name: raw.name, email: raw.email };
+  assertUser(profile, "onProfile");
   const res = await finishLogin(ctx, {
     provider: "apple",
-    key: claims.sub,
-    email: claims.email,
-    user: { id: claims.sub, name, email: claims.email }
+    key: profile.id,
+    email: profile.email,
+    user: profile
   });
   res.headers.append("set-cookie", clearState());
   return res;
@@ -1181,17 +1201,15 @@ function oauthProvider(config2) {
       }
     });
     if (!profileRes.ok) throw new Error(`${config2.name}: profile fetch failed`);
-    const profile = config2.profile(await profileRes.json());
+    const raw = await profileRes.json();
+    const { onProfile } = ctx.options.auth;
+    const profile = onProfile ? await onProfile(raw, config2.name) : config2.profile(raw);
+    assertUser(profile, "onProfile");
     const res = await finishLogin(ctx, {
       provider: config2.name,
       key: profile.id,
       email: profile.email,
-      user: {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        picture: profile.picture
-      }
+      user: profile
     });
     res.headers.append("set-cookie", clearState());
     return res;
@@ -1237,8 +1255,7 @@ async function emailLogin(ctx) {
     provider: "email",
     key: user.email,
     email: user.email,
-    user,
-    store: false
+    user
   });
 }
 async function emailRegister(ctx) {
@@ -1259,13 +1276,11 @@ async function emailRegister(ctx) {
     time,
     ...data
   };
-  await store.set(email, user);
   return finishLogin(ctx, {
     provider: "email",
     key: email,
     email,
-    user,
-    store: false
+    user
   });
 }
 async function emailResetPassword() {
@@ -1345,21 +1360,25 @@ var getUserProfile = async (code) => {
   const email = emails.sort((a) => a.primary ? -1 : 1)[0]?.email;
   return { ...profile, email };
 };
+var defaultProfile = (raw) => ({
+  id: raw.id,
+  name: raw.name,
+  email: raw.email,
+  picture: raw.avatar_url,
+  location: raw.location,
+  created: raw.created_at
+});
 var callback2 = async (ctx) => {
   checkState(ctx, ctx.url.query.state);
-  const profile = await getUserProfile(ctx.url.query.code);
+  const raw = await getUserProfile(ctx.url.query.code);
+  const { onProfile } = ctx.options.auth;
+  const profile = onProfile ? await onProfile(raw, "github") : defaultProfile(raw);
+  assertUser(profile, "onProfile");
   const res = await finishLogin(ctx, {
     provider: "github",
     key: profile.id,
     email: profile.email,
-    user: {
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      picture: profile.avatar_url,
-      location: profile.location,
-      created: profile.created_at
-    }
+    user: profile
   });
   res.headers.append("set-cookie", clearState());
   return res;
@@ -1409,7 +1428,7 @@ var providers_default = {
 
 // src/auth/parseAuthOptions.ts
 var defaultRedirect = "/user";
-function defaultCleanUser(fullUser) {
+function defaultOnUser(fullUser) {
   const { password: _password, ...user } = fullUser;
   return user;
 }
@@ -1424,19 +1443,6 @@ function parseAuthOptions(auth2, all) {
     throw new Error("Auth options needs a strategy");
   }
   const strategy = auth2.strategy;
-  if (strategy === "key") {
-    const key = auth2.key || env.AUTH_KEY;
-    if (!key) {
-      throw new Error("`key` auth needs the AUTH_KEY env var (or auth.key)");
-    }
-    return {
-      strategy,
-      providers: [],
-      key,
-      redirect: auth2.redirect || defaultRedirect,
-      cleanUser: auth2.cleanUser || defaultCleanUser
-    };
-  }
   const list = Array.isArray(auth2.providers) ? auth2.providers : auth2.providers ? [auth2.providers] : [];
   if (!list.length) {
     throw new Error("Auth options needs a provider");
@@ -1448,7 +1454,8 @@ function parseAuthOptions(auth2, all) {
     );
   }
   const redirect2 = auth2.redirect || defaultRedirect;
-  const cleanUser = auth2.cleanUser || defaultCleanUser;
+  const { onProfile, onLogin, onLogout } = auth2;
+  const onUser = auth2.onUser || defaultOnUser;
   if (!auth2.store && !all.store) {
     throw new Error("Need a userStore store for Auth");
   }
@@ -1462,7 +1469,10 @@ function parseAuthOptions(auth2, all) {
     strategy,
     providers: list,
     redirect: redirect2,
-    cleanUser,
+    onProfile,
+    onLogin,
+    onUser,
+    onLogout,
     store: authStore,
     session: sessionStore
   };
@@ -2236,14 +2246,6 @@ async function verify(password, hash3) {
   });
 }
 
-// src/helpers/safeEqual.ts
-function safeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 // src/auth/findSessionId.ts
 var validateToken = (authorization) => {
   const [type2, id] = authorization.trim().split(" ");
@@ -2276,19 +2278,6 @@ function findSessionId(ctx) {
 }
 
 // src/auth/getUser.ts
-function getKeyUser(ctx) {
-  const expected = ctx.options.auth.key;
-  const header = ctx.headers.authorization;
-  if (!header) return;
-  const [type2, provided] = header.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer" || !provided) {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
-  if (!expected || !safeEqual(provided, expected)) {
-    throw ServerError_default.AUTH_INVALID_TOKEN();
-  }
-  return { id: "key", strategy: "key", provider: "key" };
-}
 async function getAuthSession(ctx) {
   const strategy = ctx.options.auth.strategy;
   if (strategy.includes("jwt")) {
@@ -2309,7 +2298,6 @@ async function getAuthSession(ctx) {
 async function getUser(ctx) {
   if (!ctx.options.auth) return;
   const options = ctx.options.auth;
-  if (options.strategy === "key") return getKeyUser(ctx);
   const auth2 = await getAuthSession(ctx);
   if (!auth2) return;
   if (options.strategy !== auth2.strategy) {
@@ -2328,7 +2316,9 @@ async function getUser(ctx) {
   if (!user) throw ServerError_default.AUTH_NO_USER();
   user.strategy = auth2.strategy;
   user.provider = auth2.provider;
-  return ctx.options.auth.cleanUser(user);
+  const exposed = await ctx.options.auth.onUser(user, ctx);
+  assertUser(exposed, "onUser");
+  return exposed;
 }
 
 // src/auth/logout.ts
@@ -2338,14 +2328,12 @@ async function logout(ctx) {
   if (!strategy.includes("jwt")) {
     await ctx.options.auth.session.del(findSessionId(ctx));
   }
+  if (ctx.options.auth.onLogout) await ctx.options.auth.onLogout(ctx);
   if (strategy.includes("token") || strategy.includes("jwt")) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
     return cookies({ authentication: null }).redirect("/");
-  }
-  if (strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");
 }
@@ -2362,7 +2350,6 @@ function auth(app) {
   app.use(async function middle(ctx) {
     ctx.user = await getUser(ctx);
   });
-  if (app.settings.auth.strategy === "key") return;
   app.post("/auth/logout", logout);
   const enabled = app.settings.auth.providers;
   for (const name of oauth2) {

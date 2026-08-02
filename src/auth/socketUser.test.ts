@@ -20,7 +20,9 @@ describe("socketUser (websocket auth)", () => {
 	}
 
 	async function seed(store: any, id: string, strategy: string) {
-		await store.prefix("user:").set(EMAIL, { email: EMAIL, name: "Abc" });
+		await store
+			.prefix("user:")
+			.set(EMAIL, { id: "u1", email: EMAIL, name: "Abc" });
 		await store
 			.prefix("auth:")
 			.set(id, { id, strategy, provider: "email", user: EMAIL });

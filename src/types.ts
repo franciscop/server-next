@@ -191,7 +191,7 @@ export type Provider =
   | "discord"
   | "facebook"
   | "apple";
-export type Strategy = "cookie" | "jwt" | "token" | "key";
+export type Strategy = "cookie" | "jwt" | "token";
 
 export type AuthSession = {
   id: string;
@@ -207,20 +207,40 @@ export type AuthUser<T = Record<string, any>> = T & {
   email: string;
 };
 
+// The minimum every auth callback must return: the `id` keys the user in the
+// store, and the `email` is guaranteed on every user auth hands you.
+export type ProfileUser = { id: string | number; email: string } & Record<
+  string,
+  any
+>;
+
 // The string form takes a single provider (`<strategy>:<provider>`). For several
 // providers, use the object form with a `providers` array.
 export type AuthOption =
   | `${Strategy}:${Provider}`
-  | "key" // shared-secret auth (reads AUTH_KEY), no provider needed
   | {
       strategy: Strategy;
       providers?: Provider | Provider[];
-      // Shared secret for the `key` strategy (defaults to the AUTH_KEY env var).
-      key?: string;
       session?: StoreSource;
       store?: StoreSource;
       redirect?: string;
-      cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
+      // Callbacks over the login lifecycle. Each one fully replaces the
+      // built-in step (they never run "on top of" the default), and the user
+      // they return must carry an `id` and an `email`. Deny by throwing.
+      // Maps a provider's raw OAuth payload into your user (OAuth logins only)
+      onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+      // Builds the record to persist from the fresh login + the stored user
+      // (`null` on a first login); the default is an upsert where fresh wins
+      onLogin?: (
+        loginUser: AuthUser,
+        existingUser: AuthUser | null,
+        ctx: Context,
+      ) => ProfileUser | Promise<ProfileUser>;
+      // Shapes the user exposed on ctx.user and login responses; the default
+      // strips `password`. Runs on every authenticated request
+      onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+      // Event fired when a session is revoked through POST /auth/logout
+      onLogout?: (ctx: Context) => unknown;
     };
 
 export type AuthSettings = {
@@ -233,10 +253,14 @@ export type AuthSettings = {
   // The temporal information of active sessions/devices
   session: KVStore;
 
-  // The shared secret for the `key` strategy (no users/store/session)
-  key?: string;
-
-  cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
+  onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+  onLogin?: (
+    loginUser: AuthUser,
+    existingUser: AuthUser | null,
+    ctx: Context,
+  ) => ProfileUser | Promise<ProfileUser>;
+  onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+  onLogout?: (ctx: Context) => unknown;
   redirect: string;
 };
 

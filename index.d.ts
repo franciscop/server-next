@@ -143,7 +143,7 @@ type KVStore = {
     keys: () => Promise<string[]>;
 };
 type Provider = "email" | "github" | "google" | "microsoft" | "discord" | "facebook" | "apple";
-type Strategy = "cookie" | "jwt" | "token" | "key";
+type Strategy = "cookie" | "jwt" | "token";
 type AuthSession = {
     id: string;
     provider: Provider;
@@ -156,22 +156,30 @@ type AuthUser<T = Record<string, any>> = T & {
     strategy: Strategy;
     email: string;
 };
-type AuthOption = `${Strategy}:${Provider}` | "key" | {
+type ProfileUser = {
+    id: string | number;
+    email: string;
+} & Record<string, any>;
+type AuthOption = `${Strategy}:${Provider}` | {
     strategy: Strategy;
     providers?: Provider | Provider[];
-    key?: string;
     session?: StoreSource;
     store?: StoreSource;
     redirect?: string;
-    cleanUser?: <T = AuthUser>(user: T) => T | Promise<T>;
+    onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+    onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
+    onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+    onLogout?: (ctx: Context) => unknown;
 };
 type AuthSettings = {
     providers: Provider[];
     strategy: Strategy;
     store: KVStore;
     session: KVStore;
-    key?: string;
-    cleanUser: <T = AuthUser>(user: T) => T | Promise<T>;
+    onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+    onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
+    onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+    onLogout?: (ctx: Context) => unknown;
     redirect: string;
 };
 type LogLevel = "info";
@@ -501,4 +509,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProfileUser, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

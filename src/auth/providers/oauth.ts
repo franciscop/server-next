@@ -1,5 +1,6 @@
-import type { Context } from "../..";
+import type { Context, Provider } from "../..";
 import { cookies } from "../../reply";
+import assertUser from "../assertUser";
 import finishLogin from "../finishLogin";
 import { checkState, clearState, startState } from "../state";
 
@@ -11,7 +12,7 @@ export type OAuthProfile = {
 };
 
 export type OAuthConfig = {
-  name: string;
+  name: Provider;
   authorizeUrl: string;
   tokenUrl: string;
   profileUrl: string;
@@ -71,19 +72,22 @@ export default function oauthProvider(config: OAuthConfig) {
       },
     });
     if (!profileRes.ok) throw new Error(`${config.name}: profile fetch failed`);
-    const profile = config.profile(await profileRes.json());
+    const raw = await profileRes.json();
 
-    // 3. Persist the user + session and respond per strategy
+    // 3. Map the raw payload into the user: a custom `onProfile` fully
+    // replaces this provider's built-in mapper
+    const { onProfile } = ctx.options.auth;
+    const profile = onProfile
+      ? await onProfile(raw, config.name)
+      : config.profile(raw);
+    assertUser(profile, "onProfile");
+
+    // 4. Persist the user + session and respond per strategy
     const res = await finishLogin(ctx, {
       provider: config.name,
       key: profile.id,
       email: profile.email,
-      user: {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        picture: profile.picture,
-      },
+      user: profile,
     });
     res.headers.append("set-cookie", clearState());
     return res;

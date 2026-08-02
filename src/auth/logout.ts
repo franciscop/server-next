@@ -12,14 +12,14 @@ export default async function logout(ctx: Context): Promise<Body> {
     await ctx.options.auth.session.del(findSessionId(ctx));
   }
 
+  // Event only; `ctx.user` is still set for this last request
+  if (ctx.options.auth.onLogout) await ctx.options.auth.onLogout(ctx);
+
   if (strategy.includes("token") || strategy.includes("jwt")) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
     return cookies({ authentication: null }).redirect("/");
-  }
-  if (strategy.includes("key")) {
-    throw new Error("Key auth not supported yet");
   }
   throw new Error("Unknown auth type");
 }

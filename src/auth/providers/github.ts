@@ -1,5 +1,6 @@
 import type { Context } from "../..";
 import { cookies } from "../../reply";
+import assertUser from "../assertUser";
 import finishLogin from "../finishLogin";
 import { checkState, clearState, startState } from "../state";
 
@@ -52,23 +53,32 @@ const getUserProfile = async (code: string) => {
   return { ...profile, email };
 };
 
+// The built-in mapper, replaced wholesale by a custom `onProfile`
+const defaultProfile = (raw: any) => ({
+  id: raw.id,
+  name: raw.name,
+  email: raw.email,
+  picture: raw.avatar_url,
+  location: raw.location,
+  created: raw.created_at,
+});
+
 const callback = async (ctx: Context) => {
   checkState(ctx, ctx.url.query.state);
 
-  const profile = await getUserProfile(ctx.url.query.code);
+  // The `/user` payload, with `email` already resolved from `/user/emails`
+  const raw = await getUserProfile(ctx.url.query.code);
+  const { onProfile } = ctx.options.auth;
+  const profile = onProfile
+    ? await onProfile(raw, "github")
+    : defaultProfile(raw);
+  assertUser(profile, "onProfile");
 
   const res = await finishLogin(ctx, {
     provider: "github",
     key: profile.id,
     email: profile.email,
-    user: {
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      picture: profile.avatar_url,
-      location: profile.location,
-      created: profile.created_at,
-    },
+    user: profile,
   });
   res.headers.append("set-cookie", clearState());
   return res;
