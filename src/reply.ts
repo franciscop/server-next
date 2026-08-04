@@ -161,6 +161,19 @@ class Reply {
     // fall through to the JSON default and send the string "null"
     if (body === null) body = "";
 
+    // A JSX element is a thunk: call it for the HTML, the same as returning it
+    // from a route does. The string branch below then types it as `text/html`.
+    if (typeof body === "function") body = body();
+
+    // send() is synchronous, so it can't wait on a promise (an async component
+    // being the usual source). Say so instead of serializing the promise.
+    if (typeof body?.then === "function") {
+      throw new Error(
+        "send() received a promise, likely an async component. Await it first, " +
+          "or return it from the route, which resolves it for you.",
+      );
+    }
+
     if (typeof body === "string") {
       if (!headers.get("content-type")) {
         headers.set("content-type", isHtml(body) ? mimes.html : mimes.text);

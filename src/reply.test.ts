@@ -42,6 +42,28 @@ describe("Reply", () => {
       expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     });
 
+    it("renders a JSX element as html", async () => {
+      // JSX elements are thunks, the same ones a route can return directly
+      const element = () => "<div>Hi</div>";
+      const res = send(element);
+      expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(await res.text()).toBe("<div>Hi</div>");
+    });
+
+    it("keeps the status and headers set before a JSX body", async () => {
+      const res = status(201).headers("x-a", "1").send(() => "<p>ok</p>");
+      expect(res.status).toBe(201);
+      expect(res.headers.get("x-a")).toBe("1");
+      expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(await res.text()).toBe("<p>ok</p>");
+    });
+
+    it("refuses a promise instead of serializing it", () => {
+      // send() is sync; an async component has to be awaited or returned
+      expect(() => send(async () => "<p>hi</p>")).toThrow(/async component/);
+      expect(() => send(Promise.resolve("x"))).toThrow(/async component/);
+    });
+
     it("send(null) sends an empty body, like new Response(null)", async () => {
       const res = send(null);
       expect(await res.text()).toBe("");

@@ -869,6 +869,12 @@ var Reply = class {
       return new Response(null, { status: status2, headers: headers2 });
     }
     if (body === null) body = "";
+    if (typeof body === "function") body = body();
+    if (typeof body?.then === "function") {
+      throw new Error(
+        "send() received a promise, likely an async component. Await it first, or return it from the route, which resolves it for you."
+      );
+    }
     if (typeof body === "string") {
       if (!headers2.get("content-type")) {
         headers2.set("content-type", isHtml(body) ? mimes_default.html : mimes_default.text);
