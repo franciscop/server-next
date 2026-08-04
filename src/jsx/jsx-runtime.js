@@ -38,14 +38,30 @@ const encode = (str = "") => {
 const isValidChild = (child) =>
   child != null && child !== false && child !== true;
 
-const minifyCss = (str) =>
-  str
+// A `</style>` inside the CSS would close the element early and let whatever
+// follows run as HTML. The content is never encoded, so this runs on every
+// <style>, minified or not.
+const escapeCss = (str) => str.replace(/<\/style>/gi, "<\\/style>");
+
+const minifyCss = (str) => {
+  // Quoted values are content, not formatting: the spaces and delimiters in
+  // `content: ", "` have to survive. They're set aside while the rest is
+  // squeezed, then put back. Comments go first and unconditionally, so one
+  // written inside a string is stripped along with the rest.
+  const quoted = [];
+  return str
     .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(
+      /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
+      (match) => `\0${quoted.push(match) - 1}\0`,
+    )
     .replace(/\s+/g, " ")
-    .replace(/\s*([{}:;,>~+])\s*/g, "$1")
+    // `+` is left out on purpose for `calc(100% + 10px)`
+    .replace(/\s*([{}:;,>~])\s*/g, "$1")
     .replace(/;}/g, "}")
-    .replace(/<\/style>/gi, "<\\/style>")
+    .replace(/\0(\d+)\0/g, (_, i) => quoted[i])
     .trim();
+};
 
 // React element detection (safe for custom objects too)
 const isReactElement = (val) =>
@@ -115,9 +131,9 @@ const jsx = (tag, { children, ...props } = {}) => {
     children = raw(content);
   }
 
-  // style: minified raw content
+  // style: raw content, minified only when asked for with <style minify>
   if (tag === "style" && typeof children === "string") {
-    children = raw(minifyCss(children));
+    children = raw(escapeCss(props?.minify ? minifyCss(children) : children));
   }
 
   // dangerouslySetInnerHTML
@@ -139,6 +155,8 @@ const jsx = (tag, { children, ...props } = {}) => {
   // attributes
   let attrStr = Object.entries(props || {})
     .filter(([k]) => k !== "dangerouslySetInnerHTML")
+    // `minify` drives <style>, it isn't an HTML attribute
+    .filter(([k]) => !(tag === "style" && k === "minify"))
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
     .filter(([, v]) => v !== false)
     .map(([k, v]) => {

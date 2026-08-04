@@ -299,52 +299,115 @@ describe("script tag", () => {
 });
 
 describe("style tag", () => {
-  it("renders style content", () => {
+  it("renders the CSS as written", () => {
     expect(<style>{"body { color: red; }"}</style>).toRender(
-      "<style>body{color:red}</style>",
+      "<style>body { color: red; }</style>",
     );
   });
 
-  it("minifies whitespace in style content", () => {
-    expect(
-      <style>{"body {\n  color:   red;\n  margin: 0;\n}"}</style>,
-    ).toRender("<style>body{color:red;margin:0}</style>");
-  });
-
-  it("strips CSS comments", () => {
-    expect(
-      <style>{"/* reset */ body { margin: 0; } /* end */"}</style>,
-    ).toRender("<style>body{margin:0}</style>");
-  });
-
-  it("preserves child combinator in selectors", () => {
-    expect(<style>{":not(pre) > code { background: none; }"}</style>).toRender(
-      "<style>:not(pre)>code{background:none}</style>",
+  it("keeps comments and whitespace without `minify`", () => {
+    expect(<style>{"/* reset */ body {\n  margin: 0;\n}"}</style>).toRender(
+      "<style>/* reset */ body {\n  margin: 0;\n}</style>",
     );
   });
 
-  it("preserves sibling combinators in selectors", () => {
-    expect(
-      <style>{"h2 + p { margin: 0; } h2 ~ p { color: red; }"}</style>,
-    ).toRender("<style>h2+p{margin:0}h2~p{color:red}</style>");
-  });
-
-  it("removes spaces around braces, colons, and semicolons", () => {
-    expect(<style>{"a { color : red ; font-size : 1em ; }"}</style>).toRender(
-      "<style>a{color:red;font-size:1em}</style>",
+  it("sends the content raw, like <script>", () => {
+    // Encoding it would break the CSS, so user input must never reach here
+    expect(<style>{"a::after { content: '>'; }"}</style>).toRender(
+      "<style>a::after { content: '>'; }</style>",
     );
   });
 
-  it("removes trailing semicolon before closing brace", () => {
-    expect(<style>{"p { margin: 0; padding: 0; }"}</style>).toRender(
-      "<style>p{margin:0;padding:0}</style>",
-    );
-  });
-
-  it("does not break </style> injection", () => {
+  it("escapes </style> either way, so it can't close the tag early", () => {
     expect(<style>{"a { content: '</style>'; }"}</style>).toRender(
+      "<style>a { content: '<\\/style>'; }</style>",
+    );
+    expect(<style minify>{"a { content: '</style>'; }"}</style>).toRender(
       "<style>a{content:'<\\/style>'}</style>",
     );
+  });
+
+  it("never renders `minify` as an attribute", () => {
+    expect(<style minify>{"a { color: red; }"}</style>).toRender(
+      "<style>a{color:red}</style>",
+    );
+  });
+
+  describe("with `minify`", () => {
+    it("minifies whitespace in style content", () => {
+      expect(
+        <style minify>{"body {\n  color:   red;\n  margin: 0;\n}"}</style>,
+      ).toRender("<style>body{color:red;margin:0}</style>");
+    });
+
+    it("strips CSS comments", () => {
+      expect(
+        <style minify>{"/* reset */ body { margin: 0; } /* end */"}</style>,
+      ).toRender("<style>body{margin:0}</style>");
+    });
+
+    it("preserves child combinator in selectors", () => {
+      expect(
+        <style minify>{":not(pre) > code { background: none; }"}</style>,
+      ).toRender("<style>:not(pre)>code{background:none}</style>");
+    });
+
+    it("preserves sibling combinators in selectors", () => {
+      // `+` keeps a single space, since removing it breaks calc() below
+      expect(
+        <style minify>
+          {"h2  +  p { margin: 0; } h2 ~ p { color: red; }"}
+        </style>,
+      ).toRender("<style>h2 + p{margin:0}h2~p{color:red}</style>");
+    });
+
+    it("keeps the spaces calc() needs around + and -", () => {
+      // `calc(100%+10px)` is invalid CSS: the operators need their whitespace
+      expect(<style minify>{"a { top: calc(100% + 10px); }"}</style>).toRender(
+        "<style>a{top:calc(100% + 10px)}</style>",
+      );
+      expect(<style minify>{"a { top: calc(100% - 10px); }"}</style>).toRender(
+        "<style>a{top:calc(100% - 10px)}</style>",
+      );
+    });
+
+    it("removes spaces around braces, colons, and semicolons", () => {
+      expect(
+        <style minify>{"a { color : red ; font-size : 1em ; }"}</style>,
+      ).toRender("<style>a{color:red;font-size:1em}</style>");
+    });
+
+    it("removes trailing semicolon before closing brace", () => {
+      expect(<style minify>{"p { margin: 0; padding: 0; }"}</style>).toRender(
+        "<style>p{margin:0;padding:0}</style>",
+      );
+    });
+
+    it("leaves quoted values alone", () => {
+      // The spaces and delimiters in here are content, not formatting
+      expect(<style minify>{'a::after { content: ", "; }'}</style>).toRender(
+        '<style>a::after{content:", "}</style>',
+      );
+      expect(
+        <style minify>{'a::after { content: "a; b: c"; }'}</style>,
+      ).toRender('<style>a::after{content:"a; b: c"}</style>');
+      expect(
+        <style minify>{"a::after { content: 'x  y'; }"}</style>,
+      ).toRender("<style>a::after{content:'x  y'}</style>");
+    });
+
+    it("handles an escaped quote inside a value", () => {
+      expect(
+        <style minify>{'a::after { content: "say \\" hi"; }'}</style>,
+      ).toRender('<style>a::after{content:"say \\" hi"}</style>');
+    });
+
+    it("still strips a comment written inside a value", () => {
+      // Comments are stripped first, unconditionally
+      expect(
+        <style minify>{'a::after { content: "/* hi */"; }'}</style>,
+      ).toRender('<style>a::after{content:""}</style>');
+    });
   });
 });
 
