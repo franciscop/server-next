@@ -33,8 +33,21 @@ export default function ServerTest(app: Server) {
       options.headers["content-type"] = "application/json";
       options.body = JSON.stringify(options.body);
     }
+    // A full http(s) URL is used as-is, so a test can exercise the host it
+    // runs on (`ctx.url.origin`, subdomains, ...); anything else is a path
+    // served from localhost. Another scheme is neither, and concatenating it
+    // onto the host would fail confusingly further down.
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path) && !/^https?:\/\//i.test(path)) {
+      throw new Error(
+        `Only http(s) URLs can be tested, received "${path}". Pass a path, ` +
+          "or the full URL of the host the request should hit.",
+      );
+    }
+    const url = /^https?:\/\//i.test(path)
+      ? path
+      : `http://localhost:${port}${path}`;
     return await app.fetch(
-      new Request(`http://localhost:${port}${path}`, {
+      new Request(url, {
         method,
         ...(options as RequestInit),
       }),

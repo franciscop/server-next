@@ -3158,8 +3158,14 @@ function ServerTest(app) {
       options.headers["content-type"] = "application/json";
       options.body = JSON.stringify(options.body);
     }
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path) && !/^https?:\/\//i.test(path)) {
+      throw new Error(
+        `Only http(s) URLs can be tested, received "${path}". Pass a path, or the full URL of the host the request should hit.`
+      );
+    }
+    const url = /^https?:\/\//i.test(path) ? path : `http://localhost:${port}${path}`;
     return await app.fetch(
-      new Request(`http://localhost:${port}${path}`, {
+      new Request(url, {
         method,
         ...options
       })
