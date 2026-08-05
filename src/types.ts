@@ -418,6 +418,19 @@ export type BunEnv = Record<string, string> & {
   upgrade?: (req: Request, options?: { data?: any }) => boolean;
 };
 
+// Augment this to type the fields your own middleware puts on `ctx`:
+//
+//   declare module "@server/next" {
+//     interface ContextExtension { project?: Project }
+//   }
+//
+// It's a separate, non-generic interface because only interfaces can be
+// augmented, and repeating `Context`'s type parameters in every app would
+// freeze them forever. Keep the fields optional: the augmentation applies to
+// every `ctx`, including requests that never ran the middleware.
+// biome-ignore lint/suspicious/noEmptyInterface: a type alias can't be augmented
+export interface ContextExtension {}
+
 export type Context<
   Params extends Record<string, string | undefined> = Record<string, string>,
   O extends ServerConfig = object,
@@ -452,7 +465,7 @@ export type Context<
   req?: Request;
   res?: Response & { cookies?: Record<string, string> };
   app: Server;
-};
+} & ContextExtension;
 
 export type InlineReply =
   | Response

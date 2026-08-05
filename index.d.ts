@@ -278,6 +278,8 @@ type BunEnv = Record<string, string> & {
         data?: any;
     }) => boolean;
 };
+interface ContextExtension {
+}
 type Context<Params extends Record<string, string | undefined> = Record<string, string>, O extends ServerConfig = object> = {
     method: Method;
     ip: string;
@@ -305,7 +307,7 @@ type Context<Params extends Record<string, string | undefined> = Record<string, 
         cookies?: Record<string, string>;
     };
     app: Server;
-};
+} & ContextExtension;
 type InlineReply = Response | Reply | BucketFile | {
     body: string;
     headers?: Headers;
@@ -509,4 +511,4 @@ declare class Server<O extends ServerConfig = {}> extends Router<O> {
 }
 declare function server<Session extends Record<string, any> = {}, User extends Record<string, any> = {}>(options?: Options): Server<ServerConfig<Session, User>>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProfileUser, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type BodyOption, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProfileUser, type Provider, type Route, type RouteOptions, type RouterMethod, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, type ServerConfig, TypedServerError as ServerError, type Settings, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
