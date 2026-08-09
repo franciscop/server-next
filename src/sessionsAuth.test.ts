@@ -120,6 +120,30 @@ describe("login and the session record", () => {
     expect((await session.json()).user).toBe(CREDENTIALS.email);
   });
 
+  it("onLogin can stamp per-device details onto the session", async () => {
+    const sessions = kv(new Map());
+    const api = server({
+      sessions,
+      auth: {
+        strategy: "token",
+        providers: ["email"],
+        users: new Map(),
+        onLogin: (user: any, existing: any, ctx: any) => {
+          ctx.session.agent = ctx.headers["user-agent"];
+          return { ...(existing ?? {}), ...user };
+        },
+      },
+    }).test();
+
+    const login = await api.post("/auth/register/email", CREDENTIALS, {
+      headers: { "user-agent": "test-browser" },
+    });
+    const { token } = await login.json();
+    const record = await sessions.get<any>(token);
+    expect(record.agent).toBe("test-browser");
+    expect(record.user).toBe(CREDENTIALS.email); // auth fields still stamped
+  });
+
   it("logout deletes the whole record, app data included", async () => {
     const sessions = kv(new Map());
     const api = server({
