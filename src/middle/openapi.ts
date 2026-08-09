@@ -85,9 +85,9 @@ const generateOpenApiPaths = (
     for (const route of routes) {
       const path = route.path;
       const fn = route.fns.find((p: any) => typeof p === "function");
-      const meta = route.fns.find((p: any) => typeof p === "object");
-
-      const config = getConfig(route.options);
+      // Validation schemas live in the route options; `schema` is spec metadata
+      const meta = route.options ?? {};
+      const config = getConfig(route.options?.schema);
 
       if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
         continue;
@@ -173,7 +173,7 @@ const generateOpenApiPaths = (
           config.title ||
           getTag("@title", fn) ||
           `${method.toUpperCase()} ${normalizedPath}`,
-        description: getTitle(fn) || getDescription(fn),
+        description: config.description || getTitle(fn) || getDescription(fn),
         requestBody,
         parameters,
         responses,

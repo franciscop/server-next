@@ -1,0 +1,13 @@
+{
+  "name": "schema-zod",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Route validation with zod through Standard Schema",
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

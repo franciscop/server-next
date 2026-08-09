@@ -30,6 +30,6 @@ function human(bytes: number): string {
 export const tooLarge = (max: number): StatusError =>
   new StatusError(
     `Request body exceeds the ${human(max)} limit. Raise it with ` +
-      `body: { max: '10mb' } on the route or server, or set max: false to disable.`,
+      `security: { maxBody: '10mb' }, or maxBody: false to disable it.`,
     413,
   );

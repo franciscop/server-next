@@ -52,9 +52,8 @@ describe("types", () => {
   const store = kv(new Map());
 
   type User = AuthUser<{ firstName: string; lastName: string; age: number }>;
-  type ServerTypes = { User: User };
 
-  server<ServerTypes>({ store, auth: "token:email" })
+  server<{ user: User }>({ store, auth: "token:email" })
     .get("/", (ctx) => ctx.user.lastName)
     .test();
 });

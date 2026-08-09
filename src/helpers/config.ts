@@ -11,6 +11,23 @@ import type { CorsSettings, LogLevel, Options, Settings } from "..";
 export default function config(options: Options = {}): Settings {
   const env = globalThis.env;
 
+  // Schemas are per-route only, and the old root `body` mode is now `parser`;
+  // both mistakes fail loudly here instead of being silently ignored.
+  const opts = options as Record<string, unknown>;
+  if (typeof opts.body === "string") {
+    throw new Error(
+      `The root \`body: '${opts.body}'\` option is now \`parser: '${opts.body}'\`.`,
+    );
+  }
+  for (const key of ["body", "query", "params", "response"]) {
+    if (opts[key] !== undefined) {
+      throw new Error(
+        `\`${key}\` is a route option, not a root one; pass it per route, ` +
+          `like .post('/', { ${key} }, handler).`,
+      );
+    }
+  }
+
   // Logging: off by default (undefined); `info` (or the LOG_LEVEL env var) turns
   // on the startup + request logs.
   const raw = options.log ?? env.LOG_LEVEL;
@@ -24,7 +41,7 @@ export default function config(options: Options = {}): Settings {
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
-    body: options.body ?? "parse",
+    parser: options.parser ?? "parse",
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
     security: resolveSecurity(options.security),

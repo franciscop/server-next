@@ -1,4 +1,4 @@
-import type { BodyOption, Context } from "../types";
+import type { BodyMode, Context } from "../types";
 import { INF, resolveMax, tooLarge } from "./bodyLimit";
 import parseBody from "./parseBody";
 
@@ -16,30 +16,29 @@ export function setBodySource(ctx: Context, source: BodySource): void {
   sources.set(ctx, source);
 }
 
-// Read the body the way the resolved `body` mode asks for it:
+// Read the body the way the resolved `parser` mode asks for it:
 // - stream: hand over the unread web ReadableStream (nothing buffered, no limit)
 // - raw:    the full bytes as a Buffer (buffered, so limited)
 // - parse:  parsed into fields/files (the default)
 //
-// The size limit (`max`, default 1mb) caps only the bytes that enter memory:
-// full-body buffers and multipart *text* fields. File bytes stream through to
-// `uploads` and are exempt — they're bounded by upload().limit(). The counter
-// therefore lives at the buffering choke points inside parseBody, not here.
+// The size limit (`security.maxBody`, default 1mb) caps only the bytes that
+// enter memory: full-body buffers and multipart *text* fields. File bytes
+// stream through to `uploads` and are exempt, since they're bounded by
+// upload().limit(). The counter therefore lives at the buffering choke points
+// inside parseBody, not here.
 //
 // This runs at dispatch (after routing) so a per-route mode can take effect and
 // a `stream` route never buffers. Both builders normalize getStream() to a web
 // ReadableStream, so ctx.body is the same shape on Node and the web runtimes.
 export async function resolveBody(
   ctx: Context,
-  body: BodyOption,
+  mode: BodyMode = "parse",
+  max: number = resolveMax(undefined),
 ): Promise<any> {
   const source = sources.get(ctx);
   if (!source) return undefined;
 
-  const mode = typeof body === "string" ? body : (body?.mode ?? "parse");
-  const max = resolveMax(typeof body === "object" ? body?.max : undefined);
-
-  // Fast-fail on a declared-too-large body before reading it — but only when
+  // Fast-fail on a declared-too-large body before reading it, but only when
   // Content-Length reflects the bytes we'll actually buffer. Multipart bodies
   // and any upload-enabled request inflate Content-Length with file bytes that
   // stream straight to `uploads`, so we skip the pre-check there and let the

@@ -220,7 +220,7 @@ function human(bytes) {
   return `${rounded}${UNITS[i]}`;
 }
 var tooLarge = (max) => new StatusError(
-  `Request body exceeds the ${human(max)} limit. Raise it with body: { max: '10mb' } on the route or server, or set max: false to disable.`,
+  `Request body exceeds the ${human(max)} limit. Raise it with security: { maxBody: '10mb' }, or maxBody: false to disable it.`,
   413
 );
 
@@ -577,11 +577,9 @@ var sources = /* @__PURE__ */ new WeakMap();
 function setBodySource(ctx, source) {
   sources.set(ctx, source);
 }
-async function resolveBody(ctx, body) {
+async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
   const source = sources.get(ctx);
   if (!source) return void 0;
-  const mode = typeof body === "string" ? body : body?.mode ?? "parse";
-  const max = resolveMax(typeof body === "object" ? body?.max : void 0);
   const contentType = String(ctx.headers["content-type"] || "");
   const isMultipart = /multipart\/form-data/i.test(contentType);
   const declared = Number(ctx.headers["content-length"]);
@@ -1631,6 +1629,9 @@ function resolveSecurity(security) {
   return {
     trustProxy: o.trustProxy ?? true,
     traversalProtection: off ? false : o.traversalProtection !== false,
+    // Cap on the bytes buffered per request (see bodyLimit). `false` (or
+    // turning security off entirely) resolves to Infinity, meaning no limit.
+    maxBody: off ? INF : resolveMax(o.maxBody),
     headers: headers2,
     hsts: off ? null : val(o.hsts, "max-age=15552000; includeSubDomains")
   };
@@ -1661,6 +1662,19 @@ function applySecurity(res, ctx) {
 // src/helpers/config.ts
 function config(options = {}) {
   const env2 = globalThis.env;
+  const opts = options;
+  if (typeof opts.body === "string") {
+    throw new Error(
+      `The root \`body: '${opts.body}'\` option is now \`parser: '${opts.body}'\`.`
+    );
+  }
+  for (const key of ["body", "query", "params", "response"]) {
+    if (opts[key] !== void 0) {
+      throw new Error(
+        `\`${key}\` is a route option, not a root one; pass it per route, like .post('/', { ${key} }, handler).`
+      );
+    }
+  }
   const raw = options.log ?? env2.LOG_LEVEL;
   const level = raw === true ? "info" : raw === false ? void 0 : raw;
   const log = createLogger(level);
@@ -1670,7 +1684,7 @@ function config(options = {}) {
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
-    body: options.body ?? "parse",
+    parser: options.parser ?? "parse",
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
     security: resolveSecurity(options.security)
@@ -1808,7 +1822,7 @@ function applyCors(res, ctx) {
 
 // src/helpers/createWebsocket.ts
 function createWebsocket(sockets, handlers) {
-  const run = (event, socket, body) => {
+  const run2 = (event, socket, body) => {
     const routes = handlers.socket?.filter((r2) => r2.path === event) ?? [];
     const user = socket.user ?? socket.data?.user;
     for (const route of routes) {
@@ -1818,14 +1832,14 @@ function createWebsocket(sockets, handlers) {
     }
   };
   return {
-    message: (socket, body) => run("message", socket, body),
+    message: (socket, body) => run2("message", socket, body),
     open: (socket) => {
       sockets.push(socket);
-      run("open", socket);
+      run2("open", socket);
     },
     close: (socket) => {
       sockets.splice(sockets.indexOf(socket), 1);
-      run("close", socket);
+      run2("close", socket);
     }
   };
 }
@@ -2009,36 +2023,48 @@ function pathPattern(pattern, path) {
   return null;
 }
 
-// src/helpers/validate.ts
-function validate(ctx, schema) {
-  if (!schema || typeof schema !== "object") return;
-  let base;
-  try {
-    if (typeof schema?.body === "function") {
-      base = "body";
-      schema.body(ctx.body || {});
+// src/errors/ValidationError.ts
+var ValidationError = class extends StatusError {
+  source;
+  issues;
+  constructor(source, issues) {
+    if (source === "response") {
+      super("Server Error", 500);
+    } else {
+      super(`Invalid request ${source}`, 422);
     }
-    if (typeof schema?.body?.parse === "function") {
-      base = "body";
-      schema.body.parse(ctx.body || {});
-    }
-    if (typeof schema?.query === "function") {
-      base = "query";
-      schema.query(ctx.url.query || {});
-    }
-    if (typeof schema?.query?.parse === "function") {
-      base = "query";
-      schema.query.parse(ctx.url.query || {});
-    }
-  } catch (error) {
-    if (error.name === "ZodError" || error.constructor.name === "ZodError") {
-      const message = error.issues.map(
-        ({ path, message: message2 }) => `[${base}.${path.join(".")}]: ${message2}`
-      ).sort().join("\n");
-      throw new StatusError(message, 422);
-    }
-    throw error;
+    this.source = source;
+    this.issues = issues;
   }
+};
+
+// src/helpers/validate.ts
+async function run(schema, value, source) {
+  const result = await schema["~standard"].validate(value);
+  if (result.issues) throw new ValidationError(source, result.issues);
+  return result.value;
+}
+async function validateRequest(ctx, options) {
+  if (options.body) {
+    ctx.body = await run(options.body, ctx.body ?? {}, "body");
+  }
+  if (options.query) {
+    const query = await run(options.query, ctx.url.query || {}, "query");
+    replace2(ctx.url.query, query);
+  }
+  if (options.params) {
+    const params = await run(options.params, ctx.url.params || {}, "params");
+    replace2(ctx.url.params, params);
+  }
+}
+async function validateResponse(out, options) {
+  if (!options.response) return out;
+  if (out?.constructor !== Object && !Array.isArray(out)) return out;
+  return await run(options.response, out, "response");
+}
+function replace2(target, values) {
+  for (const key of Object.keys(target)) delete target[key];
+  Object.assign(target, values);
 }
 
 // src/helpers/handleRequest.ts
@@ -2063,20 +2089,28 @@ async function getResponse(app, ctx) {
         ctx.options = { ...app.settings, ...route.options };
       }
       checkTraversal(params, ctx);
-      ctx.body = await resolveBody(ctx, ctx.options.body);
+      ctx.body = await resolveBody(
+        ctx,
+        ctx.options.parser,
+        ctx.options.security.maxBody
+      );
+      await validateRequest(ctx, route.options);
       for (const cb of route.fns) {
-        if (typeof cb === "function") {
-          const res = await cb(ctx);
-          const out = await parseResponse(res, ctx);
-          if (out) return out;
-        } else {
-          validate(ctx, cb);
-        }
+        const res = await cb(ctx);
+        const out = await parseResponse(
+          await validateResponse(res, route.options),
+          ctx
+        );
+        if (out) return out;
       }
       break;
     }
     if (!matched) {
-      ctx.body = await resolveBody(ctx, ctx.options.body);
+      ctx.body = await resolveBody(
+        ctx,
+        ctx.options.parser,
+        ctx.options.security.maxBody
+      );
       for (const mw of app.middleware) {
         const out = await parseResponse(await mw(ctx), ctx);
         if (out) return out;
@@ -2541,8 +2575,8 @@ var generateOpenApiPaths = (handlers) => {
     for (const route of routes) {
       const path = route.path;
       const fn = route.fns.find((p) => typeof p === "function");
-      const meta = route.fns.find((p) => typeof p === "object");
-      const config2 = getConfig(route.options);
+      const meta = route.options ?? {};
+      const config2 = getConfig(route.options?.schema);
       if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
         continue;
       }
@@ -2595,7 +2629,7 @@ var generateOpenApiPaths = (handlers) => {
       paths[normalizedPath][method] = {
         tags: config2.tags,
         summary: config2.title || getTag("@title", fn) || `${method.toUpperCase()} ${normalizedPath}`,
-        description: getTitle(fn) || getDescription(fn),
+        description: config2.description || getTitle(fn) || getDescription(fn),
         requestBody,
         parameters,
         responses
@@ -3052,6 +3086,14 @@ var Netlify = async (app, request, context) => {
 };
 
 // src/router.ts
+function checkParserConflict(options, globalParser) {
+  const parser = options.parser ?? globalParser ?? "parse";
+  if (options.body && parser !== "parse") {
+    throw new Error(
+      `A \`parser: '${parser}'\` route never parses the body, so its \`body\` schema cannot run. Remove one, or set \`parser: 'parse'\` on the route.`
+    );
+  }
+}
 var Router = class _Router {
   // Cross-cutting middleware added with .use(); they run on every request
   middleware = [];
@@ -3085,6 +3127,7 @@ var Router = class _Router {
     if (rest[0] != null && typeof rest[0] !== "function") {
       options = rest.shift();
     }
+    checkParserConflict(options, this.settings?.parser);
     const base = method === "socket" ? [] : this.middleware;
     const fns = [...base, ...rest].filter((fn) => fn != null);
     this.handlers[method].push({ path, options, fns });
@@ -3119,6 +3162,7 @@ var Router = class _Router {
       if (arg instanceof _Router) {
         for (const m of Object.keys(arg.handlers)) {
           for (const route of arg.handlers[m]) {
+            checkParserConflict(route.options, this.settings?.parser);
             const base = m === "socket" ? [] : this.middleware;
             this.handlers[m].push({
               path: route.path,
@@ -3208,16 +3252,17 @@ var Server = class extends Router {
     } else if (this.platform.runtime === "bun") {
       this.settings.log.start(`http://localhost:${this.settings.port}/`);
     }
-    this.use(timer);
-    if (this.settings.cors) this.use(preflight);
-    this.use(assets);
-    if (this.settings.favicon) this.get("/favicon.ico", favicon);
-    this.use(session);
+    const app = this;
+    app.use(timer);
+    if (this.settings.cors) app.use(preflight);
+    app.use(assets);
+    if (this.settings.favicon) app.get("/favicon.ico", favicon);
+    app.use(session);
     if (this.settings.auth) {
-      auth(this);
+      auth(app);
     }
     if (this.settings.openapi) {
-      this.get(this.settings.openapi.path || "/docs", openapi_default);
+      app.get(this.settings.openapi.path || "/docs", openapi_default);
     }
   }
   self() {
@@ -3252,6 +3297,7 @@ function server(options) {
 export {
   Server,
   ServerError_default as ServerError,
+  ValidationError,
   default3 as bucket,
   cache,
   cookies,

@@ -1,4 +1,5 @@
 import ServerError from "../errors";
+import { INF, resolveMax } from "./bodyLimit";
 import type { Context, Options, SecuritySettings } from "..";
 
 // Resolves the `security` option into the static headers to set on every
@@ -41,6 +42,9 @@ export function resolveSecurity(
   return {
     trustProxy: o.trustProxy ?? true,
     traversalProtection: off ? false : o.traversalProtection !== false,
+    // Cap on the bytes buffered per request (see bodyLimit). `false` (or
+    // turning security off entirely) resolves to Infinity, meaning no limit.
+    maxBody: off ? INF : resolveMax(o.maxBody),
     headers,
     hsts: off ? null : val(o.hsts, "max-age=15552000; includeSubDomains"),
   };

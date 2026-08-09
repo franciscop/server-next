@@ -1,56 +1,36 @@
 # OpenAPI
 
-We support openapi for different type validations: zod, joi, yup. Example:
+> This is part of the "Ideas", early thoughts not yet, or only partially, implemented to explore different ideas to see what works best.
+
+Routes already carry validation schemas (`body`, `query`, `params`, `response`,
+any Standard Schema library) plus `tags`, `title` and `description`, and the
+`openapi` option serves a spec built from them. What's left here is making that
+spec richer.
+
+## Non-zod spec generation
+
+Validation is universal (Standard Schema), but spec generation still reads zod
+internals (`zodToSchema` in `src/middle/openapi.ts`); other vendors degrade to
+`type: "string"`. Standard Schema has no introspection API, so this needs
+per-vendor adapters (valibot and arktype expose their own metadata) or a
+schema-to-JSON-Schema effort from the spec side, if one lands.
+
+## Growing the `schema` route option
+
+`schema` already carries `tags`, `title` and `description` (implemented).
+Anything else that's spec-only belongs under the same key, instead of growing
+more top-level options:
 
 ```js
-import server from "@server/next";
-import z from "zod";
-
-const UserSchema = z
-  .object({
-    id: z.string().openapi({ example: "123" }),
-    name: z.string().openapi({ example: "John Doe" }),
-    age: z.number().openapi({ example: 42 }),
-  })
-  .openapi("User");
-
-const getUserSchema = {
-  body: null,
-  200: {
-    description: "Retrieve the user",
-    content: { "application/json": { schema: UserSchema } },
-  },
-  404: {
-    description: "User not found",
-    content: { "application/json": { schema: ErrorSchema } },
-  },
-  500: {
-    description: "Server error",
-    content: { "application/json": { schema: ErrorSchema } },
-  },
-};
-
-const createUserSchema = {
+.post('/users', {
   body: UserSchema,
-  201: {
-    description: "User created successfully",
-    content: { "application/json": { schema: UserSchema } },
+  response: UserSchema,
+  schema: {
+    title: 'Create new user',
+    // examples, component names, per-status descriptions, ...
   },
-  500: {
-    description: "Server error",
-    content: { "application/json": { schema: ErrorSchema } },
-  },
-};
-
-export default server()
-  .get("/users/:id", getUserSchema, async (ctx) => {
-    const id = ctx.url.parms.id;
-    const user = await store.get(id);
-    if (!user) return status(404).json({ error: "User not found" });
-    return json(user);
-  })
-  .post("/users", createUserSchema, async (ctx) => {
-    ...
-  })
-  .error(ctx => status(500).json({ error: "Server error" }));
+}, handler)
 ```
+
+Validation keys stay top-level (they affect the request); `schema` is inert
+metadata that only the spec reads.

@@ -19,10 +19,21 @@ export type Method =
   | "options"
   | "socket";
 
-export type ServerConfig<Session = {}, User = {}> = {
-  Session?: Session; // drives ctx.session typing
-  User?: User; // drives ctx.user typing
+// The typed slices of `ctx` an app declares, e.g. `server<{ user: User }>()`;
+// keys take plain types or Standard Schemas. See "Typing ctx" in the docs.
+export type ContextTypes = {
+  session?: any;
+  user?: any;
+  params?: any;
+  query?: any;
+  body?: any;
 };
+
+// A declared field's type (schemas resolve to their output); undeclared ones
+// use open fallbacks so functions declaring different slices compose
+type Field<C, K extends keyof ContextTypes, Fallback> = K extends keyof C
+  ? SchemaOutput<C[K], C[K]>
+  : Fallback;
 
 declare namespace JSX {
   // The shape of what JSX emits in your system.
@@ -42,21 +53,63 @@ declare namespace JSX {
 // bytes as a Buffer, or the unread stream itself (a web ReadableStream).
 export type BodyMode = "parse" | "raw" | "stream";
 
-// How the request body is read, plus per-body constraints. The string form is a
-// shorthand for `{ mode }`. `max` limits the total request size (413 if larger).
-export type BodyOption =
-  | BodyMode
-  | { mode?: BodyMode; max?: number | string | false };
+// The Standard Schema protocol (https://standardschema.dev), vendored since
+// it's a types-only spec: any library implementing `~standard` (zod, valibot,
+// arktype, ...) can be a route schema. `validate` returns the validated value
+// or the issues; it never throws, and it may be async.
+export type StandardIssue = {
+  readonly message: string;
+  readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[];
+};
+
+export interface StandardSchemaV1<Input = unknown, Output = Input> {
+  readonly "~standard": {
+    readonly version: 1;
+    readonly vendor: string;
+    readonly validate: (
+      value: unknown,
+    ) =>
+      | { value: Output; issues?: undefined }
+      | { issues: readonly StandardIssue[] }
+      | Promise<
+          | { value: Output; issues?: undefined }
+          | { issues: readonly StandardIssue[] }
+        >;
+    readonly types?: { readonly input: Input; readonly output: Output };
+  };
+}
+
+// The validated type a schema produces, or the fallback without one. The
+// brackets keep the conditional from distributing: an absent schema is
+// `StandardSchemaV1 | undefined`, which must resolve to the fallback whole.
+export type SchemaOutput<S, Fallback> = [S] extends [
+  StandardSchemaV1<any, infer Output>,
+]
+  ? Output
+  : Fallback;
 
 // How responses are cached: a duration ('1h'), a number of seconds, or `false`
 // (`0`) for no-store. Sets `Cache-Control`; for anything fancier, use headers().
 export type CacheOption = string | number | false;
 
-export type RouteOptions = {
+// Spec-only metadata for the OpenAPI docs; inert at request time
+export type RouteSchema = {
   tags?: string | string[];
   title?: string;
   description?: string;
-  body?: BodyOption;
+};
+
+export type RouteOptions = {
+  schema?: RouteSchema;
+  // How this route reads its body, overriding the root `parser`
+  parser?: BodyMode;
+  // Standard Schemas validating each part of the request, and the response.
+  // A `body` schema needs `parser: 'parse'` (the default); combining it with
+  // `raw`/`stream` throws at boot.
+  body?: StandardSchemaV1<any, any>;
+  query?: StandardSchemaV1<any, any>;
+  params?: StandardSchemaV1<any, any>;
+  response?: StandardSchemaV1<any, any>;
   cache?: CacheOption;
   // [key: string]: any;
 };
@@ -288,6 +341,9 @@ export type SecurityOptions = {
   xssProtection?: boolean; // X-XSS-Protection: 0, default on
   // Reject route params that climb the path ('../'), default on
   traversalProtection?: boolean;
+  // Cap on the request bytes buffered in memory (default '1mb'; false = none).
+  // Files are exempt: they stream to `uploads` and follow its own maxSize.
+  maxBody?: number | string | false;
   // Opt-in (off unless set):
   csp?: boolean | string; // Content-Security-Policy
   coop?: boolean | string; // Cross-Origin-Opener-Policy
@@ -299,6 +355,8 @@ export type SecuritySettings = {
   trustProxy: boolean;
   // Reject route params containing a '..' path segment
   traversalProtection: boolean;
+  // Resolved byte cap for buffered request bytes (Infinity when disabled)
+  maxBody: number;
   // Resolved static headers applied to every response
   headers: Record<string, string>;
   // Resolved HSTS value, applied only on production (HTTPS) responses
@@ -329,7 +387,8 @@ export type Options = {
   log?: LogLevel | boolean;
   favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
-  body?: BodyOption;
+  // How request bodies are read into ctx.body (default 'parse')
+  parser?: BodyMode;
   cache?: CacheOption;
 };
 
@@ -348,7 +407,7 @@ export type Settings = {
   log: Logger;
   favicon?: string | BucketFile;
   security: SecuritySettings;
-  body: BodyOption;
+  parser: BodyMode;
   cache?: CacheOption;
 };
 
@@ -431,36 +490,23 @@ export type BunEnv = Record<string, string> & {
 // biome-ignore lint/suspicious/noEmptyInterface: a type alias can't be augmented
 export interface ContextExtension {}
 
-export type Context<
-  Params extends Record<string, string | undefined> = Record<string, string>,
-  O extends ServerConfig = object,
-> = {
+export type Context<C extends ContextTypes = {}> = {
   method: Method;
   ip: string;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: SerializableValue | Buffer | ReadableStream;
+  body?: Field<C, "body", SerializableValue | Buffer | ReadableStream>;
   url: URL & {
-    params: Params;
-    query: Record<string, string>;
+    params: Field<C, "params", Record<string, any>>;
+    query: Field<C, "query", Record<string, any>>;
   };
   options: Settings;
   platform: Platform;
   time?: Time;
   socket?: WebSocket;
   sockets?: WebSocket[];
-  session: O extends { Session?: infer S }
-    ? S extends Record<"Session", infer Inner>
-      ? Inner
-      : Record<string, any>
-    : Record<string, any>;
-
-  user?: O extends { User?: infer U }
-    ? U extends Record<"User", infer Inner>
-      ? Inner
-      : AuthUser
-    : AuthUser;
-  // user?: O extends { User: infer U } ? U & AuthUser : AuthUser;
+  session: Field<C, "session", Record<string, any>>;
+  user?: Field<C, "user", Record<string, any>>;
   init: number;
   req?: Request;
   res?: Response & { cookies?: Record<string, string> };
@@ -479,9 +525,6 @@ export type InlineReply =
 
 export type Body = InlineReply;
 
-export type Middleware<
-  O extends ServerConfig = object,
-  Params extends Record<string, string | undefined> = Record<string, string>,
-> = (
-  ctx: Context<Params, O>,
+export type Middleware<C extends ContextTypes = {}> = (
+  ctx: Context<C>,
 ) => InlineReply | Promise<InlineReply> | void | Promise<void>;

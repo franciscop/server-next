@@ -139,19 +139,17 @@ describe("global middleware as a fallthrough", () => {
 describe("per-route options", () => {
   it("merges route options over the global settings (local wins)", async () => {
     const api = server({ secret: "g" })
-      .get("/a", { tags: "x", title: "T" }, (ctx) => ({
-        tags: (ctx.options as any).tags,
-        title: (ctx.options as any).title,
+      .get("/a", { schema: { tags: "x", title: "T" } }, (ctx) => ({
+        schema: (ctx.options as any).schema,
         secret: ctx.options.secret,
       }))
-      .get("/b", (ctx) => ({ tags: (ctx.options as any).tags ?? null }))
+      .get("/b", (ctx) => ({ schema: (ctx.options as any).schema ?? null }))
       .test();
 
     expect(await (await api.get("/a")).json()).toEqual({
-      tags: "x",
-      title: "T",
+      schema: { tags: "x", title: "T" },
       secret: "g",
     });
-    expect(await (await api.get("/b")).json()).toEqual({ tags: null });
+    expect(await (await api.get("/b")).json()).toEqual({ schema: null });
   });
 });

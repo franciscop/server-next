@@ -20,9 +20,9 @@ describe("body mode resolution", () => {
   });
 
   it("per-route body overrides the global default", async () => {
-    const api = server({ body: "raw" })
+    const api = server({ parser: "raw" })
       .post("/raw", (ctx) => ({ isBuffer: Buffer.isBuffer(ctx.body) }))
-      .post("/parsed", { body: "parse" }, (ctx) => ctx.body)
+      .post("/parsed", { parser: "parse" }, (ctx) => ctx.body)
       .test();
 
     const raw = await api.post("/raw", JSON.stringify({ a: 1 }), {
@@ -39,7 +39,7 @@ describe("body mode resolution", () => {
 
 describe("body: raw", () => {
   it("gives the handler the unparsed Buffer", async () => {
-    const api = server({ body: "raw" })
+    const api = server({ parser: "raw" })
       .post("/", (ctx) => ({
         isBuffer: Buffer.isBuffer(ctx.body),
         text: (ctx.body as Buffer).toString(),
@@ -54,7 +54,7 @@ describe("body: raw", () => {
 describe("body: stream", () => {
   it("hands the handler a web ReadableStream", async () => {
     const api = server()
-      .post("/echo", { body: "stream" }, async (ctx) => {
+      .post("/echo", { parser: "stream" }, async (ctx) => {
         const isStream = ctx.body instanceof ReadableStream;
         const text = await new Response(ctx.body as ReadableStream).text();
         return { isStream, text };
@@ -67,7 +67,7 @@ describe("body: stream", () => {
 
   it("streams the body straight into a bucket folder", async () => {
     const api = server({ uploads: "./src/tests/uploads" })
-      .post("/uploads/:id", { body: "stream" }, async (ctx) => {
+      .post("/uploads/:id", { parser: "stream" }, async (ctx) => {
         const uploads = ctx.options.uploads!.bucket;
         const file = uploads.folder!(ctx.url.params.id).file("movie.txt");
         await file.write(ctx.body as ReadableStream);
@@ -89,7 +89,7 @@ describe("body: stream", () => {
   it("streams into a real bucket's folder() (bucket lib)", async () => {
     const uploads = realBucket();
     const api = server({ uploads })
-      .post("/uploads/:id", { body: "stream" }, async (ctx) => {
+      .post("/uploads/:id", { parser: "stream" }, async (ctx) => {
         const up = ctx.options.uploads!.bucket;
         const file = up.folder!(ctx.url.params.id).file("movie.txt");
         await file.write(ctx.body as ReadableStream);
@@ -109,7 +109,7 @@ describe("body: stream", () => {
     const api = server()
       .post(
         "/guarded",
-        { body: "stream" },
+        { parser: "stream" },
         (ctx) => {
           if (!ctx.headers["x-key"]) return status(401).send("no key");
         },

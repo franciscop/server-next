@@ -274,7 +274,7 @@ describe("ctx.body parse: raw single file (Case B)", () => {
 
 describe("ctx.body raw mode", () => {
   it("never parses, even valid JSON", async () => {
-    const api = server({ body: "raw" })
+    const api = server({ parser: "raw" })
       .post("/", (ctx) => ({
         isBuffer: Buffer.isBuffer(ctx.body),
         text: (ctx.body as Buffer).toString(),
@@ -288,7 +288,7 @@ describe("ctx.body raw mode", () => {
 describe("ctx.body stream mode", () => {
   it("is a ReadableStream that yields the exact bytes", async () => {
     const api = server()
-      .post("/", { body: "stream" }, async (ctx) => {
+      .post("/", { parser: "stream" }, async (ctx) => {
         const buf = Buffer.from(await new Response(ctx.body as ReadableStream).arrayBuffer());
         return { isStream: ctx.body instanceof ReadableStream, hex: buf.toString("hex") };
       })

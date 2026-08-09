@@ -1,0 +1,13 @@
+{
+  "name": "schema-valibot",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Route validation with valibot through Standard Schema",
+  "dependencies": {
+    "valibot": "^1.4.2"
+  }
+}

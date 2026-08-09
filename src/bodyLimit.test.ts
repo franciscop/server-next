@@ -5,9 +5,9 @@ import server from ".";
 const UPLOADS = new URL("./tests/uploads/_bodylimit/", import.meta.url).pathname;
 afterAll(() => rm(UPLOADS, { recursive: true, force: true }));
 
-describe("body.max (request size limit)", () => {
+describe("security.maxBody (request size limit)", () => {
   it("413s when Content-Length exceeds the limit", async () => {
-    const api = server({ body: { max: "10b" } })
+    const api = server({ security: { maxBody: "10b" } })
       .post("/", (ctx) => ctx.body)
       .test();
     const res = await api.post("/", "x".repeat(50)); // 50 > 10
@@ -15,7 +15,7 @@ describe("body.max (request size limit)", () => {
   });
 
   it("allows a body under the limit", async () => {
-    const api = server({ body: { max: "100b" } })
+    const api = server({ security: { maxBody: "100b" } })
       .post("/", (ctx) => ctx.body)
       .test();
     const res = await api.post("/", { a: 1 });
@@ -23,17 +23,25 @@ describe("body.max (request size limit)", () => {
     expect(await res.json()).toEqual({ a: 1 });
   });
 
-  it("per-route max overrides the server default", async () => {
-    const api = server({ body: { max: "1kb" } })
-      .post("/small", { body: { max: "5b" } }, (ctx) => ctx.body)
-      .post("/big", (ctx) => ctx.body) // inherits the 1kb default
+  it("applies to every route (the limit is root-only)", async () => {
+    const api = server({ security: { maxBody: "5b" } })
+      .post("/a", (ctx) => ctx.body)
+      .post("/b", (ctx) => ctx.body)
       .test();
-    expect((await api.post("/small", "0123456789")).status).toBe(413); // 10 > 5
-    expect((await api.post("/big", "0123456789")).status).toBe(200); // 10 < 1kb
+    expect((await api.post("/a", "0123456789")).status).toBe(413); // 10 > 5
+    expect((await api.post("/b", "0123456789")).status).toBe(413);
+  });
+
+  it("defaults to 1mb", async () => {
+    const api = server()
+      .post("/", () => "ok")
+      .test();
+    expect((await api.post("/", "x".repeat(2_000_000))).status).toBe(413);
+    expect((await api.post("/", "x".repeat(500_000))).status).toBe(200);
   });
 
   it("counts a streamed body with no Content-Length", async () => {
-    const api = server({ body: { max: "8b" } })
+    const api = server({ security: { maxBody: "8b" } })
       .post("/", (ctx) => ctx.body)
       .test();
     // A ReadableStream body is chunked (no Content-Length), so the pre-check is
@@ -60,8 +68,8 @@ describe("body.max (request size limit)", () => {
     expect(big.status).toBe(413);
   });
 
-  it("max: false disables the limit", async () => {
-    const api = server({ body: { max: false } })
+  it("maxBody: false disables the limit", async () => {
+    const api = server({ security: { maxBody: false } })
       .post("/", () => "ok")
       .test();
     expect((await api.post("/", "x".repeat(2_000_000))).status).toBe(200);
@@ -78,7 +86,7 @@ describe("body.max (request size limit)", () => {
       `Content-Type: application/octet-stream\r\n\r\n` +
       `${file}\r\n` +
       `--${boundary}--\r\n`;
-    const api = server({ uploads: UPLOADS, body: { max: "10kb" } })
+    const api = server({ uploads: UPLOADS, security: { maxBody: "10kb" } })
       .post("/", (ctx) => ({ size: (ctx.body as any).avatar.size }))
       .test();
     const res = await api.post("/", raw, {
@@ -95,7 +103,7 @@ describe("body.max (request size limit)", () => {
       `Content-Disposition: form-data; name="bio"\r\n\r\n` +
       `${"b".repeat(50_000)}\r\n` +
       `--${boundary}--\r\n`;
-    const api = server({ uploads: UPLOADS, body: { max: "10kb" } })
+    const api = server({ uploads: UPLOADS, security: { maxBody: "10kb" } })
       .post("/", (ctx) => ctx.body)
       .test();
     const res = await api.post("/", raw, {
@@ -104,15 +112,15 @@ describe("body.max (request size limit)", () => {
     expect(res.status).toBe(413);
   });
 
-  it("the string shorthand still selects the mode", async () => {
-    const api = server({ body: "raw" })
+  it("the parser option selects the mode", async () => {
+    const api = server({ parser: "raw" })
       .post("/", (ctx) => (Buffer.isBuffer(ctx.body) ? "raw" : "other"))
       .test();
     expect(await (await api.post("/", "hi")).text()).toBe("raw");
   });
 
   it("does not cap `stream` mode (its bytes are never buffered)", async () => {
-    const api = server({ body: { mode: "stream", max: "8b" } })
+    const api = server({ parser: "stream", security: { maxBody: "8b" } })
       .post("/", async (ctx) =>
         String((await new Response(ctx.body as ReadableStream).text()).length),
       )

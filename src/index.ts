@@ -17,13 +17,13 @@ import { Router } from "./router";
 import ServerTest from "./ServerTest";
 import type {
   BunEnv,
+  ContextTypes,
   Options,
   Platform,
-  ServerConfig,
   Settings,
 } from "./types";
 
-export class Server<O extends ServerConfig = {}> extends Router<O> {
+export class Server<C extends ContextTypes = {}> extends Router<C> {
   settings: Settings;
   platform: Platform;
 
@@ -57,18 +57,21 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
       this.settings.log.start(`http://localhost:${this.settings.port}/`);
     }
 
-    this.use(timer);
-    if (this.settings.cors) this.use(preflight);
-    this.use(assets);
-    if (this.settings.favicon) this.get("/favicon.ico", favicon);
-    this.use(session);
+    // Framework middleware is written against the untyped `Server`; `C` is
+    // only known at the app's call site, so the wiring goes through this view.
+    const app = this as unknown as Server;
+    app.use(timer);
+    if (this.settings.cors) app.use(preflight);
+    app.use(assets);
+    if (this.settings.favicon) app.get("/favicon.ico", favicon);
+    app.use(session);
 
     if (this.settings.auth) {
-      auth(this);
+      auth(app);
     }
 
     if (this.settings.openapi) {
-      this.get(this.settings.openapi.path || "/docs", openapi as any);
+      app.get(this.settings.openapi.path || "/docs", openapi as any);
     }
   }
 
@@ -87,30 +90,28 @@ export class Server<O extends ServerConfig = {}> extends Router<O> {
   }
 
   node() {
-    return handlers.Node(this);
+    return handlers.Node(this as unknown as Server);
   }
   fetch(request: Request, env?: BunEnv) {
-    return handlers.Winter(this, request, env);
+    return handlers.Winter(this as unknown as Server, request, env);
   }
   callback(request: Request, context: unknown) {
-    return handlers.Netlify(this, request, context);
+    return handlers.Netlify(this as unknown as Server, request, context);
   }
 
   test() {
-    return ServerTest(this);
+    return ServerTest(this as unknown as Server);
   }
 }
 
-export default function server<
-  Session extends Record<string, any> = {},
-  User extends Record<string, any> = {},
->(options?: Options) {
-  return new Server<ServerConfig<Session, User>>(options).self();
+export default function server<C extends ContextTypes = {}>(options?: Options) {
+  return new Server<C>(options).self();
 }
 
 export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./ServerError";
+export { default as ValidationError } from "./errors/ValidationError";
 export type * from "./types";
 
 // The two storage libraries, re-exported so there's nothing extra to install:

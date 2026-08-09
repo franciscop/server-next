@@ -1,0 +1,13 @@
+{
+  "name": "schema-arktype",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Route validation with arktype through Standard Schema",
+  "dependencies": {
+    "arktype": "^2.2.3"
+  }
+}
