@@ -27,11 +27,26 @@ describe("jwt auth flow", () => {
     expect(await users()).toEqual([EMAIL]);
     expect(await sessions()).toEqual([]); // stateless: nothing in the session store
 
+    // The payload IS the user (onToken-shaped): claims in, password out
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1], "base64url").toString(),
+    );
+    expect(payload.email).toBe(EMAIL);
+    expect(payload.provider).toBe("email");
+    expect(payload.password).toBeUndefined();
+
     // Authenticate with the Bearer JWT.
     const auth = { authorization: `Bearer ${token}` };
     const me = await api.get("/me", { headers: auth });
     expect(me.status).toBe(200);
     expect((await me.json()).email).toBe(EMAIL);
+
+    // Truly stateless: the user resolves even with the users store wiped
+    await userStore.clear();
+    const still = await api.get("/me", { headers: auth });
+    expect(still.status).toBe(200);
+    expect((await still.json()).email).toBe(EMAIL);
+    await api.post("/auth/register/email", CREDENTIALS); // restore for later tests
 
     // No token -> anonymous.
     const anon = await api.get("/me");
@@ -81,5 +96,98 @@ describe("jwt auth flow", () => {
       password: "99999999",
     });
     expect(wrong.status).toBe(500);
+  });
+
+  it("onToken trims what the token carries", async () => {
+    const app = server({
+      secret: "app-secret",
+      auth: {
+        strategy: "jwt",
+        providers: ["email"],
+        onToken: ({ id, email }: any) => ({ id, email }),
+      },
+    })
+      .get("/me", (ctx) => ctx.user || "No data")
+      .test();
+
+    const reg = await app.post("/auth/register/email", {
+      ...CREDENTIALS,
+      nickname: "abc",
+    });
+    const { token } = await reg.json();
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1], "base64url").toString(),
+    );
+    expect(payload.nickname).toBeUndefined(); // trimmed by onToken
+    expect(payload.email).toBe(EMAIL);
+    expect(payload.provider).toBe("email"); // re-stamped after the hook
+
+    const me = await app.get("/me", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((await me.json()).nickname).toBeUndefined();
+  });
+
+  it("onUser extends ctx.user per request, without touching the token", async () => {
+    const app = server({
+      secret: "app-secret",
+      auth: {
+        strategy: "jwt",
+        providers: ["email"],
+        onUser: ({ password, ...user }: any) => ({ ...user, role: "admin" }),
+      },
+    })
+      .get("/me", (ctx) => ctx.user || "No data")
+      .test();
+
+    const reg = await app.post("/auth/register/email", CREDENTIALS);
+    const { token, role } = await reg.json();
+    expect(role).toBe("admin"); // the login body matches next-request ctx.user
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1], "base64url").toString(),
+    );
+    expect(payload.role).toBeUndefined(); // enrichment never enters the token
+
+    const me = await app.get("/me", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((await me.json()).role).toBe("admin");
+  });
+
+  it("rejects tokens whose claims carry no id/email with a 401", async () => {
+    const { signJwt } = await import("../helpers/jwt");
+    // An old-shape (pre-claims) payload: a pointer, not a user
+    const legacy = await signJwt(
+      { user: EMAIL, provider: "email", created: "2024-01-01" },
+      "app-secret",
+      3600,
+    );
+    const res = await api.get("/me", {
+      headers: { authorization: `Bearer ${legacy}` },
+    });
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid Authorization token");
+  });
+
+  it("has no ctx.session: any access throws", async () => {
+    const app = server({ secret: "app-secret", auth: "jwt:email" })
+      .get("/read", (ctx) => `got ${ctx.session.cart}`)
+      .get("/write", (ctx) => {
+        ctx.session.cart = ["x"];
+        return 200;
+      })
+      .get("/ok", () => "no session touched")
+      .test();
+
+    const read = await app.get("/read");
+    expect(read.status).toBe(500);
+    expect(await read.text()).toContain("jwt");
+    const write = await app.get("/write");
+    expect(write.status).toBe(500);
+
+    // Routes that leave ctx.session alone are unaffected, and cookie-free
+    const ok = await app.get("/ok");
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("set-cookie")).toBeNull();
   });
 });

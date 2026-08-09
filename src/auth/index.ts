@@ -32,6 +32,8 @@ export default function auth(app: Server) {
     if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
     app.get(`/auth/login/${name}`, providers[name].login);
     app.get(`/auth/callback/${name}`, providers[name].callback);
+    // Client-owned flow: the SPA/native app exchanges the code itself
+    app.post(`/auth/verify/${name}`, providers[name].verify);
   }
 
   // Apple uses a signed-JWT client secret and POSTs the result back (form_post)
@@ -42,6 +44,7 @@ export default function auth(app: Server) {
     }
     app.get("/auth/login/apple", providers.apple.login);
     app.post("/auth/callback/apple", providers.apple.callback);
+    app.post("/auth/verify/apple", providers.apple.verify);
   }
 
   if (enabled.includes("email")) {

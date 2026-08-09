@@ -149,10 +149,12 @@ export default async function parseResponse(
   }
 
   // Persist the session only when it changed since it was loaded (the
-  // snapshot in `loaded`); an untouched session costs no store write.
+  // snapshot in `loaded`); an untouched session costs no store write. Under
+  // `jwt` there is no session at all (see middle/session), so nothing runs.
   const prev = loaded.get(ctx);
-  const data = JSON.stringify(ctx.session ?? {});
-  if (data !== (prev?.data ?? "{}")) {
+  const jwt = ctx.options.auth?.strategy.includes("jwt");
+  const data = jwt ? "{}" : JSON.stringify(ctx.session ?? {});
+  if (!jwt && data !== (prev?.data ?? "{}")) {
     if (ctx.options.sessionsDefault && ctx.platform.production) {
       warnDefault();
     }

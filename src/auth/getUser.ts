@@ -4,25 +4,37 @@ import { verifyJwt } from "../helpers/jwt";
 import assertUser from "./assertUser";
 import findSessionId from "./findSessionId";
 
-// Resolve the auth fields for the request: the `jwt` strategy carries them
-// inside a signed Bearer token (stateless); the others read the session.
-async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
-  const strategy = ctx.options.auth.strategy;
+// `jwt` carries the user itself as signed claims: verify the signature and
+// the claims become ctx.user (through onUser), with no store reads at all.
+async function getJwtUser(ctx: Context): Promise<AuthUser | undefined> {
+  const header = ctx.headers.authorization as string | undefined;
+  if (!header) return;
+  const [type, token] = header.trim().split(" ");
+  if (type?.toLowerCase() !== "bearer" || !token) {
+    throw ServerError.AUTH_INVALID_HEADER({ type });
+  }
+  const payload = await verifyJwt(token, ctx.options.secret);
+  if (!payload) throw ServerError.AUTH_INVALID_TOKEN();
 
-  if (strategy.includes("jwt")) {
-    const header = ctx.headers.authorization as string | undefined;
-    if (!header) return;
-    const [type, token] = header.trim().split(" ");
-    if (type?.toLowerCase() !== "bearer" || !token) {
-      throw ServerError.AUTH_INVALID_HEADER({ type });
-    }
-    const payload = await verifyJwt(token, ctx.options.secret);
-    if (!payload) throw ServerError.AUTH_INVALID_TOKEN();
-    return payload as AuthSession;
+  const { iat, exp, ...claims } = payload as Record<string, any>;
+  // Tokens from other payload shapes (or pre-claims versions) are invalid
+  if (!claims.id || !claims.email) throw ServerError.AUTH_INVALID_TOKEN();
+  if (!ctx.options.auth.providers.includes(claims.provider)) {
+    throw ServerError.AUTH_INVALID_PROVIDER({
+      provider: claims.provider,
+      valid: ctx.options.auth.providers,
+    });
   }
 
-  // HTTP requests carry the already-loaded session; a socket upgrade builds a
-  // partial ctx with no session, so resolve it from the store here
+  const exposed = await ctx.options.auth.onUser(claims as AuthUser, ctx);
+  assertUser(exposed, "onUser");
+  return exposed;
+}
+
+// The other strategies store the auth fields on the device's session record.
+// HTTP requests carry the already-loaded session; a socket upgrade builds a
+// partial ctx with no session, so resolve it from the store here.
+async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
   let session = ctx.session as AuthSession | undefined;
   if (!session) {
     const id = findSessionId(ctx);
@@ -36,6 +48,8 @@ async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
 export default async function getUser(ctx: Context): Promise<AuthUser> {
   if (!ctx.options.auth) return; // NO AUTH AT ALL; nothing to do here
   const options = ctx.options.auth;
+
+  if (options.strategy.includes("jwt")) return getJwtUser(ctx);
 
   const auth = await getAuthSession(ctx);
   if (!auth) return; // NO SESSION FOUND; no auth

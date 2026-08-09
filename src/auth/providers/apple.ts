@@ -1,4 +1,5 @@
 import type { Context } from "../..";
+import { ServerError } from "../..";
 import { cookies } from "../../reply";
 import assertUser from "../assertUser";
 import finishLogin from "../finishLogin";
@@ -72,6 +73,55 @@ const login = (ctx: Context) => {
   return cookies("oauth_state", cookie).redirect(`${AUTHORIZE}?${params}`);
 };
 
+// Exchange the code; identity lives in the returned id_token (a JWT). Apple
+// only sends the name on the very first authorization, in the `user` field.
+const exchange = async (code?: string, redirectUri?: string, user?: string) => {
+  const params = new URLSearchParams({
+    client_id: env.APPLE_ID,
+    client_secret: await clientSecret(),
+    code: code ?? "",
+    grant_type: "authorization_code",
+  });
+  if (redirectUri) params.set("redirect_uri", redirectUri);
+  const tokenRes = await fetch(TOKEN, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: params,
+  });
+  if (!tokenRes.ok) throw new Error("apple: token exchange failed");
+  const token = await tokenRes.json();
+
+  const claims = b64urlJson(token.id_token.split(".")[1]);
+  let name: string | undefined;
+  if (user) {
+    const parsed = JSON.parse(user).name;
+    if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
+  }
+  return { ...claims, name };
+};
+
+const finish = async (ctx: Context, raw: any, opts?: { json?: boolean }) => {
+  const { onProfile } = ctx.options.auth;
+  const profile = onProfile
+    ? await onProfile(raw, "apple")
+    : { id: raw.sub, name: raw.name, email: raw.email };
+  assertUser(profile, "onProfile");
+
+  return finishLogin(
+    ctx,
+    {
+      provider: "apple",
+      key: profile.id,
+      email: profile.email,
+      user: profile,
+    },
+    opts,
+  );
+};
+
 const callback = async (ctx: Context) => {
   const body = (ctx.body || {}) as {
     code?: string;
@@ -80,48 +130,20 @@ const callback = async (ctx: Context) => {
   };
   checkState(ctx, body.state);
 
-  const tokenRes = await fetch(TOKEN, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      client_id: env.APPLE_ID,
-      client_secret: await clientSecret(),
-      code: body.code,
-      grant_type: "authorization_code",
-      redirect_uri: `${ctx.url.origin}/auth/callback/apple`,
-    }),
-  });
-  if (!tokenRes.ok) throw new Error("apple: token exchange failed");
-  const token = await tokenRes.json();
-
-  // Identity lives in the id_token (a JWT); Apple only sends the name on the
-  // very first authorization, inside the form-posted `user` field.
-  const claims = b64urlJson(token.id_token.split(".")[1]);
-  let name: string | undefined;
-  if (body.user) {
-    const parsed = JSON.parse(body.user).name;
-    if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
-  }
-
-  // The raw payload is the id_token claims, plus that first-login name
-  const raw = { ...claims, name };
-  const { onProfile } = ctx.options.auth;
-  const profile = onProfile
-    ? await onProfile(raw, "apple")
-    : { id: raw.sub, name: raw.name, email: raw.email };
-  assertUser(profile, "onProfile");
-
-  const res = await finishLogin(ctx, {
-    provider: "apple",
-    key: profile.id,
-    email: profile.email,
-    user: profile,
-  });
+  const url = `${ctx.url.origin}/auth/callback/apple`;
+  const raw = await exchange(body.code, url, body.user);
+  const res = await finish(ctx, raw);
   res.headers.append("set-cookie", clearState());
   return res;
 };
 
-export default { login, callback };
+// Client-owned flow: a native/JS Sign in with Apple hands the app a code, the
+// app posts it here (the signed client secret stays server-side)
+const verify = async (ctx: Context) => {
+  const { code, redirect_uri, user } = (ctx.body ?? {}) as any;
+  if (!code) throw ServerError.AUTH_NO_CODE();
+  const raw = await exchange(code, redirect_uri, user);
+  return finish(ctx, raw, { json: true });
+};
+
+export default { login, callback, verify };

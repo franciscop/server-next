@@ -49,6 +49,8 @@ export default function parseAuthOptions(
   const redirect = auth.redirect || defaultRedirect;
   const { onProfile, onLogin, onLogout } = auth;
   const onUser = auth.onUser || defaultOnUser;
+  // The jwt payload builder; the default keeps the hash out of the token
+  const onToken = auth.onToken || defaultOnUser;
 
   // A raw Map/client is accepted here too. No default: config fills it with an
   // in-memory Map in development, and refuses to boot in production.
@@ -61,6 +63,7 @@ export default function parseAuthOptions(
     onProfile,
     onLogin,
     onUser,
+    onToken,
     onLogout,
     users,
   } as AuthSettings;

@@ -1,10 +1,14 @@
 import type { Context } from "../..";
-import { cookies } from "../../reply";
+import { ServerError } from "../..";
+import { cookies, json } from "../../reply";
 import assertUser from "../assertUser";
 import finishLogin from "../finishLogin";
 import { checkState, clearState, startState } from "../state";
+import { clientParams, wantsJson } from "./oauth";
 
-const oauth = async (code: string) => {
+const AUTHORIZE = "https://github.com/login/oauth/authorize";
+
+const oauth = async (code: string, extra: Record<string, string | undefined>) => {
   const fch = async (
     url: string,
     { body, headers = {}, ...rest }: any = {},
@@ -16,13 +20,17 @@ const oauth = async (code: string) => {
     return res.json();
   };
 
+  const params: Record<string, string> = {
+    client_id: env.GITHUB_ID,
+    client_secret: env.GITHUB_SECRET,
+    code,
+  };
+  for (const [key, value] of Object.entries(extra)) {
+    if (value) params[key] = value;
+  }
   const res = await fch("https://github.com/login/oauth/access_token", {
     method: "post",
-    body: JSON.stringify({
-      client_id: env.GITHUB_ID,
-      client_secret: env.GITHUB_SECRET,
-      code,
-    }),
+    body: JSON.stringify(params),
   });
   return (path: string) => {
     return fch(`https://api.github.com${path}`, {
@@ -31,20 +39,31 @@ const oauth = async (code: string) => {
   };
 };
 
-const login = (ctx: Context) => {
-  const { state, cookie } = startState(ctx);
-  const params = new URLSearchParams({
+const authorizeUrl = (params: Record<string, string | undefined>) => {
+  const search = new URLSearchParams({
     client_id: env.GITHUB_ID,
     scope: "user:email",
-    state,
   });
-  return cookies("oauth_state", cookie).redirect(
-    `https://github.com/login/oauth/authorize?${params}`,
-  );
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+  return `${AUTHORIZE}?${search}`;
 };
 
-const getUserProfile = async (code: string) => {
-  const api = await oauth(code);
+const login = (ctx: Context) => {
+  // Client-owned: hand the SPA its authorize URL, no cookie involved
+  if (wantsJson(ctx)) {
+    return json({ url: authorizeUrl(clientParams(ctx.url.query)) });
+  }
+  const { state, cookie } = startState(ctx);
+  return cookies("oauth_state", cookie).redirect(authorizeUrl({ state }));
+};
+
+const getUserProfile = async (
+  code: string,
+  extra: Record<string, string | undefined> = {},
+) => {
+  const api = await oauth(code, extra);
   const [profile, emails] = await Promise.all([
     api("/user"),
     api("/user/emails"),
@@ -63,25 +82,40 @@ const defaultProfile = (raw: any) => ({
   created: raw.created_at,
 });
 
-const callback = async (ctx: Context) => {
-  checkState(ctx, ctx.url.query.state);
-
-  // The `/user` payload, with `email` already resolved from `/user/emails`
-  const raw = await getUserProfile(ctx.url.query.code);
+const finish = async (ctx: Context, raw: any, opts?: { json?: boolean }) => {
   const { onProfile } = ctx.options.auth;
   const profile = onProfile
     ? await onProfile(raw, "github")
     : defaultProfile(raw);
   assertUser(profile, "onProfile");
 
-  const res = await finishLogin(ctx, {
-    provider: "github",
-    key: profile.id,
-    email: profile.email,
-    user: profile,
-  });
+  return finishLogin(
+    ctx,
+    {
+      provider: "github",
+      key: profile.id,
+      email: profile.email,
+      user: profile,
+    },
+    opts,
+  );
+};
+
+const callback = async (ctx: Context) => {
+  checkState(ctx, ctx.url.query.state);
+
+  // The `/user` payload, with `email` already resolved from `/user/emails`
+  const raw = await getUserProfile(ctx.url.query.code);
+  const res = await finish(ctx, raw);
   res.headers.append("set-cookie", clearState());
   return res;
 };
 
-export default { login, callback };
+const verify = async (ctx: Context) => {
+  const { code, redirect_uri, code_verifier } = (ctx.body ?? {}) as any;
+  if (!code) throw ServerError.AUTH_NO_CODE();
+  const raw = await getUserProfile(code, { redirect_uri, code_verifier });
+  return finish(ctx, raw, { json: true });
+};
+
+export default { login, callback, verify };

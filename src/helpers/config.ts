@@ -140,7 +140,10 @@ export default function config(options: Options = {}): Settings {
   }
 
   // The in-memory defaults lose everything on restart and aren't shared across
-  // instances, so a production app with auth must configure real stores.
+  // instances, so a production app with auth must configure real stores. Every
+  // strategy needs `users` (each login reads it for the existing-user upsert
+  // and persists the record); only `sessions` is skipped by the stateless
+  // `jwt`, which has no ctx.session at all.
   if (settings.auth) {
     if (!settings.auth.users) {
       if (production) {

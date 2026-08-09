@@ -20,9 +20,15 @@ type LoginInput = {
 // persists the user, stamps the auth fields on the session, and responds
 // according to the chosen strategy. Consolidating it here keeps cookies, the
 // session shape, the callbacks, and the strategies consistent across providers.
-export default async function finishLogin(ctx: Context, input: LoginInput) {
+export default async function finishLogin(
+  ctx: Context,
+  input: LoginInput,
+  // `json: true` is the client-owned OAuth flow (POST /auth/verify): every
+  // strategy responds JSON, the `cookie` one with its Set-Cookie attached
+  opts: { json?: boolean } = {},
+) {
   const settings = ctx.options.auth;
-  const { strategy, onLogin, onUser } = settings;
+  const { strategy, onLogin, onUser, onToken } = settings;
   const key = String(input.key);
 
   const auth: AuthSession = {
@@ -51,11 +57,18 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
 
   await settings.users.set(key, user);
 
-  // `jwt` is stateless: the signed token carries the auth fields and nothing
-  // is stored, so the guest session (if any) is left untouched.
+  // `jwt` is stateless: the signed token carries the user itself (the
+  // `onToken`-shaped record, client-readable) and nothing is stored.
   if (strategy.includes("jwt")) {
-    const token = await signJwt(auth, ctx.options.secret, 7 * 24 * 60 * 60);
-    const exposed = await onUser(user, ctx);
+    // `provider` is re-stamped so the per-request check survives the hook
+    const payload = {
+      ...(await onToken(user as AuthUser, ctx)),
+      provider: input.provider,
+    };
+    assertUser(payload, "onToken");
+    const token = await signJwt(payload, ctx.options.secret, 7 * 24 * 60 * 60);
+    // The body matches what ctx.user will be on the next request
+    const exposed = await onUser(payload, ctx);
     assertUser(exposed, "onUser");
     return status(201).json({ ...exposed, token });
   }
@@ -78,13 +91,19 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
     return status(201).json({ ...exposed, token: id });
   }
   if (strategy.includes("cookie")) {
-    return cookies("session", {
+    const reply = cookies("session", {
       value: id,
       path: "/",
       httpOnly: true,
       secure: ctx.platform.production,
       sameSite: "Lax",
-    }).redirect(settings.redirect);
+    });
+    if (opts.json) {
+      const exposed = await onUser(user, ctx);
+      assertUser(exposed, "onUser");
+      return reply.status(201).json(exposed);
+    }
+    return reply.redirect(settings.redirect);
   }
   throw new Error("Unknown auth type");
 }

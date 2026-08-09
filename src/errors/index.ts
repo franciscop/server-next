@@ -9,6 +9,12 @@ ServerError.extend({
   AUTH_ARGON_NEEDED:
     "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
   AUTH_INVALID_TOKEN: { status: 401, message: "Invalid Authorization token" },
+  AUTH_NO_CODE: {
+    status: 400,
+    message: "Missing the OAuth 'code' in the request body",
+  },
+  SESSION_JWT:
+    "The `jwt` strategy is stateless, so there is no `ctx.session` (tried '{key}'). Use the `token` strategy for server-side sessions, or `cookie` for browsers",
   AUTH_INVALID_HEADER: {
     status: 401,
     message:

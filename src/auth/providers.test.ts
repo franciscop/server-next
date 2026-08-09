@@ -269,3 +269,108 @@ describe("apple", () => {
     }
   });
 });
+
+describe("client-owned flow (SPA)", () => {
+  const jsonHeaders = { accept: "application/json" };
+
+  it("login returns { url } as JSON with the client's params, and no cookie", async () => {
+    const api = server({ auth: "cookie:google" }).test();
+    const res = await api.get(
+      "/auth/login/google?redirect_uri=https://app.test/cb&state=spa-state&code_challenge=ch4ll",
+      { headers: jsonHeaders },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toBeNull();
+
+    const { url } = await res.json();
+    const parsed = new URL(url);
+    expect(parsed.host).toContain("accounts.google.com");
+    expect(parsed.searchParams.get("redirect_uri")).toBe("https://app.test/cb");
+    expect(parsed.searchParams.get("state")).toBe("spa-state");
+    expect(parsed.searchParams.get("code_challenge")).toBe("ch4ll");
+    expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("plain login still redirects with the state cookie", async () => {
+    const api = server({ auth: "cookie:google" }).test();
+    const res = await api.get("/auth/login/google");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("set-cookie")).toContain("oauth_state=");
+  });
+
+  it("verify exchanges the code, passing redirect_uri and code_verifier through", async () => {
+    const users = kv(new Map());
+    let tokenBody = "";
+    const restore = mockFetch((url, opts) => {
+      if (url.includes("oauth2.googleapis.com/token")) {
+        tokenBody = String(opts.body);
+        return { access_token: "tok" };
+      }
+      if (url.includes("userinfo")) {
+        return { sub: "g-9", email: "spa@x.com", name: "Spa" };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    try {
+      const api = server({
+        auth: { strategy: "token", providers: ["google"], users },
+      }).test();
+      const res = await api.post("/auth/verify/google", {
+        code: "abc",
+        redirect_uri: "https://app.test/cb",
+        code_verifier: "v3rifier",
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.email).toBe("spa@x.com");
+      expect(body.token).toHaveLength(16); // an opaque session id
+
+      const sent = new URLSearchParams(tokenBody);
+      expect(sent.get("redirect_uri")).toBe("https://app.test/cb");
+      expect(sent.get("code_verifier")).toBe("v3rifier");
+    } finally {
+      restore();
+    }
+  });
+
+  it("verify under the cookie strategy sets the cookie and returns the user", async () => {
+    const restore = mockFetch((url) => {
+      if (url.includes("oauth2.googleapis.com/token")) return { access_token: "t" };
+      if (url.includes("userinfo")) return { sub: "g-9", email: "spa@x.com" };
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    try {
+      const api = server({ auth: "cookie:google" }).test();
+      const res = await api.post("/auth/verify/google", { code: "abc" });
+      expect(res.status).toBe(201);
+      expect(res.headers.get("set-cookie")).toContain("session=");
+      expect((await res.json()).email).toBe("spa@x.com");
+    } finally {
+      restore();
+    }
+  });
+
+  it("verify under jwt returns signed claims, no cookies, no state", async () => {
+    const restore = mockFetch((url) => {
+      if (url.includes("oauth2.googleapis.com/token")) return { access_token: "t" };
+      if (url.includes("userinfo")) return { sub: "g-9", email: "spa@x.com" };
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    try {
+      const api = server({ secret: "s3cret", auth: "jwt:google" }).test();
+      const res = await api.post("/auth/verify/google", { code: "abc" });
+      expect(res.status).toBe(201);
+      expect(res.headers.get("set-cookie")).toBeNull();
+      const { token } = await res.json();
+      expect(token.split(".")).toHaveLength(3);
+    } finally {
+      restore();
+    }
+  });
+
+  it("verify without a code is a 400", async () => {
+    const api = server({ auth: "cookie:google" }).test();
+    const res = await api.post("/auth/verify/google", {});
+    expect(res.status).toBe(400);
+  });
+});

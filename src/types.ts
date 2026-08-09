@@ -246,7 +246,7 @@ export type Provider =
   | "apple";
 export type Strategy = "cookie" | "jwt" | "token";
 
-// The reserved auth fields on ctx.session (also the `jwt` token payload):
+// The reserved auth fields on ctx.session (`cookie`/`token` strategies):
 // `user` keys into `auth.users`, and present means signed in.
 export type AuthSession = {
   user: string;
@@ -294,6 +294,9 @@ export type AuthOption =
       // Shapes the user exposed on ctx.user and login responses; the default
       // strips `password`. Runs on every authenticated request
       onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+      // Builds the `jwt` token payload from the stored record, once per login;
+      // the default strips `password`. The payload is client-readable.
+      onToken?: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
       // Event fired when a session is revoked through POST /auth/logout
       onLogout?: (ctx: Context) => unknown;
     };
@@ -312,6 +315,7 @@ export type AuthSettings = {
     ctx: Context,
   ) => ProfileUser | Promise<ProfileUser>;
   onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+  onToken: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
   onLogout?: (ctx: Context) => unknown;
   redirect: string;
 };

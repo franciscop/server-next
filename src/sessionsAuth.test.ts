@@ -41,13 +41,20 @@ describe("production boot guard", () => {
     });
   });
 
-  it("jwt is stateless, so only users is required", () => {
+  it("jwt still requires users (logins read and write it), not sessions", () => {
     inProduction(() => {
+      // No `sessions` needed: jwt has no ctx.session
       const app = server({
         secret: "s3cret",
         auth: { strategy: "jwt", providers: "email", users: new Map() },
       });
       expect(app).toBeDefined();
+      // But `users` always is: every login does the existing-user upsert
+      globalThis.env.GITHUB_ID = "id";
+      globalThis.env.GITHUB_SECRET = "secret";
+      expect(() => server({ secret: "s3cret", auth: "jwt:github" })).toThrow(
+        /users/,
+      );
     });
   });
 

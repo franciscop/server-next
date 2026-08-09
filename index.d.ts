@@ -204,6 +204,7 @@ type AuthOption = `${Strategy}:${Provider}` | {
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+    onToken?: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onLogout?: (ctx: Context) => unknown;
 };
 type AuthSettings = {
@@ -213,6 +214,7 @@ type AuthSettings = {
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
+    onToken: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onLogout?: (ctx: Context) => unknown;
     redirect: string;
 };
