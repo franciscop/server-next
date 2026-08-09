@@ -8,10 +8,14 @@ describe("user creation flow", () => {
   const PASS = "11111111";
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
-  const store = kv(new Map());
-  const sessions = () => store.prefix("auth:").keys();
-  const users = () => store.prefix("user:").keys();
-  const api = server({ store, auth: "token:email" })
+  const sessionStore = kv(new Map());
+  const userStore = kv(new Map());
+  const sessions = () => sessionStore.keys();
+  const users = () => userStore.keys();
+  const api = server({
+    sessions: sessionStore,
+    auth: { strategy: "token", providers: ["email"], users: userStore },
+  })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 

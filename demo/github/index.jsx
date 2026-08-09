@@ -1,9 +1,12 @@
 import server, { redirect } from "../../";
 import kv from "polystore";
 
-const store = kv(`file://${process.cwd()}/session/`);
+const disk = kv(`file://${process.cwd()}/session/`);
 
-export default server({ store, auth: "cookie:github" })
+export default server({
+  sessions: disk.prefix("session:"),
+  auth: { strategy: "cookie", providers: ["github"], users: disk.prefix("users:") },
+})
   .get("/", (ctx) => redirect(ctx.user ? "/user" : "/login"))
   .get("/login", () => (
     <p>

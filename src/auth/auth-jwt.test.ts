@@ -6,10 +6,15 @@ describe("jwt auth flow", () => {
   const PASS = "11111111";
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
-  const store = kv(new Map());
-  const sessions = () => store.prefix("auth:").keys();
-  const users = () => store.prefix("user:").keys();
-  const api = server({ secret: "app-secret", store, auth: "jwt:email" })
+  const sessionStore = kv(new Map());
+  const userStore = kv(new Map());
+  const sessions = () => sessionStore.keys();
+  const users = () => userStore.keys();
+  const api = server({
+    secret: "app-secret",
+    sessions: sessionStore,
+    auth: { strategy: "jwt", providers: ["email"], users: userStore },
+  })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 
@@ -50,12 +55,12 @@ describe("jwt auth flow", () => {
     console.warn = (msg: string) => warnings.push(msg);
     try {
       // No secret + jwt -> the per-process `unsafe-` secret would break tokens.
-      server({ store: kv(new Map()), auth: "jwt:email" });
+      server({ auth: "jwt:email" });
       expect(warnings.some((w) => w.includes("SECRET"))).toBe(true);
 
       // A set secret -> no warning.
       warnings.length = 0;
-      server({ secret: "stable", store: kv(new Map()), auth: "jwt:email" });
+      server({ secret: "stable", auth: "jwt:email" });
       expect(warnings.some((w) => w.includes("SECRET"))).toBe(false);
     } finally {
       console.warn = original;

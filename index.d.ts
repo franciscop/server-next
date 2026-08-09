@@ -182,10 +182,9 @@ type KVStore = {
 type Provider = "email" | "github" | "google" | "microsoft" | "discord" | "facebook" | "apple";
 type Strategy = "cookie" | "jwt" | "token";
 type AuthSession = {
-    id: string;
-    provider: Provider;
-    strategy: Strategy;
     user: string;
+    provider: Provider;
+    created: string;
 };
 type AuthUser<T = Record<string, any>> = T & {
     id: string | number;
@@ -200,8 +199,7 @@ type ProfileUser = {
 type AuthOption = `${Strategy}:${Provider}` | {
     strategy: Strategy;
     providers?: Provider | Provider[];
-    session?: StoreSource;
-    store?: StoreSource;
+    users?: StoreSource;
     redirect?: string;
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
@@ -211,8 +209,7 @@ type AuthOption = `${Strategy}:${Provider}` | {
 type AuthSettings = {
     providers: Provider[];
     strategy: Strategy;
-    store: KVStore;
-    session: KVStore;
+    users: KVStore;
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
@@ -254,10 +251,7 @@ type Options = {
     secret?: string;
     public?: string | Bucket;
     uploads?: string | Bucket | UploadOptions;
-    store?: StoreSource;
-    session?: StoreSource | {
-        store: StoreSource;
-    };
+    sessions?: StoreSource;
     cors?: CorsOptions;
     auth?: AuthOption;
     openapi?: any;
@@ -276,10 +270,8 @@ type Settings = {
     uploads?: ({
         bucket: Bucket;
     } & LimitOptions) | null;
-    store?: KVStore;
-    session?: {
-        store: KVStore;
-    };
+    sessions: KVStore;
+    sessionsDefault?: boolean;
     cors?: CorsSettings;
     auth?: AuthSettings;
     openapi?: any;

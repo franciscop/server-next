@@ -25,17 +25,16 @@ describe("auth", () => {
   });
 
   it("provider must belong", async () => {
-    const store = kv(new Map());
+    const sessions = kv(new Map());
 
-    store.set<AuthSession>(`auth:${ID}`, {
-      id: ID,
-      strategy: "token",
+    sessions.set<AuthSession>(ID, {
+      user: "QypOn5SQApyOPdUp",
       // @ts-expect-error
       provider: "wrong",
-      user: "QypOn5SQApyOPdUp",
+      created: "2024-07-01T03:21:40Z",
     });
 
-    const api = server({ store, auth: "token:email" })
+    const api = server({ sessions, auth: "token:email" })
       .get("/", (ctx) => ctx.user)
       .test();
 
@@ -49,24 +48,26 @@ describe("auth", () => {
 });
 
 describe("types", () => {
-  const store = kv(new Map());
-
   type User = AuthUser<{ firstName: string; lastName: string; age: number }>;
 
-  server<{ user: User }>({ store, auth: "token:email" })
+  server<{ user: User }>({ auth: "token:email" })
     .get("/", (ctx) => ctx.user.lastName)
     .test();
 });
 
 describe("token", () => {
-  const store = kv(new Map());
-  const api = server({ store, auth: "token:email" })
+  const sessions = kv(new Map());
+  const users = kv(new Map());
+  const api = server({
+    sessions,
+    auth: { strategy: "token", providers: ["email"], users },
+  })
     .get("/", (ctx) => ctx.user)
     .test();
 
   afterEach(async () => {
-    await store.del(`auth:${ID}`);
-    await store.del(`user:QypOn5SQApyOPdUp`);
+    await sessions.del(ID);
+    await users.del("QypOn5SQApyOPdUp");
   });
 
   it("should be Bearer", async () => {
@@ -92,13 +93,10 @@ describe("token", () => {
   });
 
   it("cannot get the user", async () => {
-    store.set(`auth:${ID}`, {
-      id: ID,
-      strategy: "token",
-      provider: "email",
+    sessions.set(ID, {
       user: "QypOn5SQApyOPdUp",
-      email: "abc@test.com",
-      time: "2024-07-01T03:21:40Z",
+      provider: "email",
+      created: "2024-07-01T03:21:40Z",
     });
     const authorization = `Bearer ${ID}`;
     const res = await api.get("/", { headers: { authorization } });
@@ -107,13 +105,12 @@ describe("token", () => {
   });
 
   it("can get the user", async () => {
-    store.set(`auth:${ID}`, {
-      id: ID,
-      strategy: "token",
-      provider: "email",
+    sessions.set(ID, {
       user: "QypOn5SQApyOPdUp",
+      provider: "email",
+      created: "2024-07-01T03:21:40Z",
     });
-    store.set("user:QypOn5SQApyOPdUp", {
+    users.set("QypOn5SQApyOPdUp", {
       id: "QypOn5SQApyOPdUp",
       provider: "email",
       email: "abc@test.com",
@@ -125,27 +122,35 @@ describe("token", () => {
 });
 
 describe("cookie", () => {
-  const store = kv(new Map());
-  const api = server({ store, auth: "cookie:email" })
+  const sessions = kv(new Map());
+  const users = kv(new Map());
+  const api = server({
+    sessions,
+    auth: { strategy: "cookie", providers: ["email"], users },
+  })
     .get("/", (ctx) => ctx.user)
     .test();
 
-  it("should have the proper token in email", async () => {
-    const cookie = "authentication=hello";
+  it("treats an unknown session cookie as a guest", async () => {
+    const cookie = "session=hello";
     const res = await api.get("/", { headers: { cookie } });
-    expect(res.status).toBe(401);
-    expect(await res.text()).toBe("Invalid Authorization cookie");
+    expect(res.status).toBe(404); // no user, the handler returns nothing
   });
 
-  it("can get the proper session", async () => {
-    const cookie = "authentication=REqA2l022l8Q0tuI";
+  it("resolves the user from the session cookie", async () => {
+    await sessions.set(ID, {
+      user: "QypOn5SQApyOPdUp",
+      provider: "email",
+      created: "2024-07-01T03:21:40Z",
+    });
+    await users.set("QypOn5SQApyOPdUp", {
+      id: "QypOn5SQApyOPdUp",
+      provider: "email",
+      email: "abc@test.com",
+    });
+    const cookie = `session=${ID}`;
     const res = await api.get("/", { headers: { cookie } });
-    expect(res.status).toBe(404);
-  });
-
-  it("can get the proper session", async () => {
-    const cookie = "authentication=REqA2l022l8Q0tuI";
-    const res = await api.get("/", { headers: { cookie } });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect((await res.json()).email).toBe("abc@test.com");
   });
 });

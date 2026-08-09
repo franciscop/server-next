@@ -12,31 +12,13 @@ const validateToken = (authorization: string): string => {
   return id;
 };
 
-const validateCookie = (authorization: string): string => {
-  if (authorization.length !== 16) {
-    throw ServerError.AUTH_INVALID_COOKIE();
-  }
-  return authorization;
-};
-
+// The session id for this request: an explicit Bearer credential wins (the
+// `token` strategy; malformed ones throw), then the plain `session` cookie,
+// which carries both guest sessions and the `cookie` strategy's login.
 export default function findSessionId(ctx: Context): string | undefined {
-  const strategy = ctx.options.auth.strategy;
-
-  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
-    // If the user is not authenticated, there's no auth to retrieve
-    if (!ctx.headers.authorization) return;
-
-    // Check the authentication header
+  const strategy = ctx.options.auth?.strategy;
+  if (strategy?.includes("token") && ctx.headers.authorization) {
     return validateToken(ctx.headers.authorization as string);
   }
-
-  if (strategy.includes("cookie")) {
-    // If the user is not authenticated, there's no auth to retrieve
-    if (!ctx.cookies.authentication) return;
-
-    return validateCookie(ctx.cookies.authentication);
-  }
-
-  throw new Error(`Invalid auth type "${strategy}"`);
+  return ctx.cookies.session || undefined;
 }

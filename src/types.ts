@@ -246,11 +246,12 @@ export type Provider =
   | "apple";
 export type Strategy = "cookie" | "jwt" | "token";
 
+// The reserved auth fields on ctx.session (also the `jwt` token payload):
+// `user` keys into `auth.users`, and present means signed in.
 export type AuthSession = {
-  id: string;
-  provider: Provider;
-  strategy: Strategy;
   user: string;
+  provider: Provider;
+  created: string;
 };
 
 export type AuthUser<T = Record<string, any>> = T & {
@@ -274,8 +275,9 @@ export type AuthOption =
   | {
       strategy: Strategy;
       providers?: Provider | Provider[];
-      session?: StoreSource;
-      store?: StoreSource;
+      // One record per person, keyed by ctx.session.user. Defaults to an
+      // in-memory Map; production requires an explicit store.
+      users?: StoreSource;
       redirect?: string;
       // Callbacks over the login lifecycle. Each one fully replaces the
       // built-in step (they never run "on top of" the default), and the user
@@ -300,11 +302,8 @@ export type AuthSettings = {
   providers: Provider[];
   strategy: Strategy;
 
-  // The store with the original source of users
-  store: KVStore;
-
-  // The temporal information of active sessions/devices
-  session: KVStore;
+  // One record per person; sessions point into it via their `user` field
+  users: KVStore;
 
   onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
   onLogin?: (
@@ -377,8 +376,10 @@ export type Options = {
   secret?: string;
   public?: string | Bucket;
   uploads?: string | Bucket | UploadOptions;
-  store?: StoreSource;
-  session?: StoreSource | { store: StoreSource };
+  // One record per device, exposed as ctx.session. Defaults to an in-memory
+  // Map; raw sources (a Map, a Redis client) get a 1w expiry, a built store
+  // (`kv(redis).expires('2w')`) is honored as-is.
+  sessions?: StoreSource;
   cors?: CorsOptions;
   auth?: AuthOption;
   openapi?: any;
@@ -397,8 +398,10 @@ export type Settings = {
   secret: string;
   public?: Bucket;
   uploads?: ({ bucket: Bucket } & LimitOptions) | null;
-  store?: KVStore;
-  session?: { store: KVStore };
+  sessions: KVStore;
+  // Internal: `sessions` came from the in-memory default (drives a one-time
+  // warning on the first session write in production)
+  sessionsDefault?: boolean;
   cors?: CorsSettings;
   auth?: AuthSettings;
   openapi?: any;

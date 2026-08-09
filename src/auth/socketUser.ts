@@ -3,10 +3,10 @@ import getUser from "./getUser";
 
 // Resolve the authenticated user for a WebSocket connection from the upgrade
 // request's headers and cookies. It reuses the exact same `getUser` logic as
-// HTTP, so every strategy works: a browser sends the `authentication` cookie
+// HTTP, so every strategy works: a browser sends the `session` cookie
 // automatically on a same-origin upgrade (the `cookie` strategy), and a
 // non-browser client can still send an `Authorization: Bearer` header
-// (`token` / `jwt` / `key`).
+// (`token` / `jwt`).
 //
 // A browser `WebSocket` can't set request headers, so `cookie` is the only
 // strategy that authenticates browser sockets.

@@ -2,7 +2,8 @@ import server, { Context, Provider, redirect } from "@server/next";
 import kv from "polystore";
 import { AccountPage, LoginPage } from "./App";
 
-const store = kv(new Map());
+const sessions = kv(new Map());
+const users = kv(new Map());
 
 // Every provider this demo supports, in display order
 const ALL: Provider[] = [
@@ -19,14 +20,14 @@ const ALL: Provider[] = [
 const providers = ALL.filter((p) => process.env[`${p.toUpperCase()}_ID`]);
 
 const auth = providers.length
-  ? { strategy: "cookie" as const, providers, redirect: "/" }
+  ? { strategy: "cookie" as const, providers, users, redirect: "/" }
   : undefined;
 
 const requireUser = (ctx: Context) => {
   if (!ctx.user) return redirect("/login");
 };
 
-export default server({ public: "public", store, auth })
+export default server({ public: "public", sessions, auth })
   .head("/", () => 200)
   .get("/login", () => <LoginPage providers={providers} />)
   .get("/", requireUser, (ctx) => <AccountPage user={ctx.user} />);

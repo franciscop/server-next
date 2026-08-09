@@ -37,14 +37,14 @@ const REGISTER = { email: "a@b.com", password: "password123" };
 
 describe("onProfile", () => {
   it("replaces the built-in mapper", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const restore = mockGoogle({ sub: "g1", email: "g@x.com", login: "gee" });
     try {
       const api = server({
-        store,
         auth: {
           strategy: "cookie",
           providers: "google",
+          users,
           onProfile: (raw, provider) => ({
             id: raw.sub,
             email: raw.email,
@@ -58,7 +58,7 @@ describe("onProfile", () => {
       });
       expect(res.status).toBe(302);
 
-      const user = await store.get<any>("user:g1");
+      const user = await users.get<any>("g1");
       expect(user.username).toBe("gee");
       expect(user.via).toBe("google");
       // The default mapper did not run on top: it would have set `name`
@@ -69,14 +69,14 @@ describe("onProfile", () => {
   });
 
   it("rejects a mapped user with no id", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const restore = mockGoogle({ sub: "g1", email: "g@x.com" });
     try {
       const api = server({
-        store,
         auth: {
           strategy: "cookie",
           providers: "google",
+          users,
           onProfile: (raw) => ({ email: raw.email }) as any,
         },
       }).test();
@@ -85,17 +85,17 @@ describe("onProfile", () => {
       });
       expect(res.status).toBe(500);
       expect(await res.text()).toContain("onProfile");
-      expect(await store.get("user:g1")).toBeNull(); // nothing stored
+      expect(await users.get("g1")).toBeNull(); // nothing stored
     } finally {
       restore();
     }
   });
 
   it("rejects a provider payload with no email through the default mapper", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const restore = mockGoogle({ sub: "g1", name: "NoMail" });
     try {
-      const api = server({ store, auth: "cookie:google" }).test();
+      const api = server({ auth: "cookie:google" }).test();
       const res = await api.get("/auth/callback/google?code=abc&state=st", {
         headers: { cookie: "oauth_state=st" },
       });
@@ -109,13 +109,13 @@ describe("onProfile", () => {
 describe("onLogin", () => {
   it("receives null on a first login and the stored user afterwards", async () => {
     const seen: any[] = [];
-    const store = kv(new Map());
+    const users = kv(new Map());
     const api = server({
-      store,
       secret: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
+        users,
         onLogin: (loginUser, existingUser) => {
           seen.push(existingUser);
           return { ...(existingUser ?? {}), ...loginUser };
@@ -132,13 +132,13 @@ describe("onLogin", () => {
   });
 
   it("owns the stored record", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const api = server({
-      store,
       secret: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
+        users,
         onLogin: (loginUser, existingUser) => ({
           ...loginUser,
           role: existingUser ? existingUser.role : "member",
@@ -147,17 +147,17 @@ describe("onLogin", () => {
     }).test();
 
     await api.post("/auth/register/email", REGISTER);
-    expect((await store.get<any>("user:a@b.com")).role).toBe("member");
+    expect((await users.get<any>("a@b.com")).role).toBe("member");
   });
 
   it("denies by throwing, storing nothing", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const api = server({
-      store,
       secret: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
+        users,
         onLogin: (loginUser) => {
           if (!loginUser.email.endsWith("@company.com")) {
             throw new ServerError("NOT_ALLOWED", 403, "Company accounts only");
@@ -170,17 +170,17 @@ describe("onLogin", () => {
     const res = await api.post("/auth/register/email", REGISTER);
     expect(res.status).toBe(403);
     // A denied first registration leaves no account behind
-    expect(await store.get("user:a@b.com")).toBeNull();
+    expect(await users.get("a@b.com")).toBeNull();
   });
 
   it("rejects a non-object return instead of storing it", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const api = server({
-      store,
       secret: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
+        users,
         // The mistake this guards: returning a status instead of throwing
         onLogin: (() => 401) as any,
       },
@@ -189,14 +189,13 @@ describe("onLogin", () => {
     const res = await api.post("/auth/register/email", REGISTER);
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("onLogin");
-    expect(await store.get("user:a@b.com")).toBeNull();
+    expect(await users.get("a@b.com")).toBeNull();
   });
 });
 
 describe("onUser", () => {
   const app = (onUser?: any) =>
     server({
-      store: kv(new Map()),
       secret: "s3cret-s3cret",
       auth: { strategy: "token", providers: "email", onUser },
     })
@@ -246,7 +245,6 @@ describe("onLogout", () => {
   it("fires on POST /auth/logout with ctx.user still set", async () => {
     let logged: any;
     const api = server({
-      store: kv(new Map()),
       secret: "s3cret-s3cret",
       auth: {
         strategy: "token",

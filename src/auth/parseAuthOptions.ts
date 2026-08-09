@@ -2,6 +2,8 @@ import toStore from "../helpers/store";
 import type { Options, Provider, Settings, Strategy } from "../types";
 import providers from "./providers";
 
+type AuthSettings = NonNullable<Settings["auth"]>;
+
 const defaultRedirect = "/user";
 
 // The default `onUser`: never expose a stored credential
@@ -14,7 +16,6 @@ const available = Object.keys(providers);
 
 export default function parseAuthOptions(
   auth: Options["auth"],
-  all: Options,
 ): Settings["auth"] {
   if (!auth) return null;
 
@@ -49,21 +50,9 @@ export default function parseAuthOptions(
   const { onProfile, onLogin, onLogout } = auth;
   const onUser = auth.onUser || defaultOnUser;
 
-  if (!auth.store && !all.store) {
-    throw new Error("Need a userStore store for Auth");
-  }
-  if (!auth.session && !all.store) {
-    throw new Error("Need a sessionStore store for Auth");
-  }
-  // Same handling as the top-level `store`: a raw Map/client is accepted here
-  // too. The guards above ensure `store` is non-null whenever it's needed
-  // (auth.store/auth.session falsy implies all.store is set), which TS can't
-  // see through the ternary, hence the `!`.
-  const store = all.store ? toStore(all.store) : null;
-  const authStore = auth.store ? toStore(auth.store) : store!.prefix("user:");
-  const sessionStore = auth.session
-    ? toStore(auth.session)
-    : store!.prefix("auth:");
+  // A raw Map/client is accepted here too. No default: config fills it with an
+  // in-memory Map in development, and refuses to boot in production.
+  const users = auth.users ? toStore(auth.users) : null;
 
   return {
     strategy,
@@ -73,7 +62,6 @@ export default function parseAuthOptions(
     onLogin,
     onUser,
     onLogout,
-    store: authStore,
-    session: sessionStore,
-  };
+    users,
+  } as AuthSettings;
 }

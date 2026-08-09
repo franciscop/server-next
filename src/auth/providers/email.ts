@@ -11,10 +11,10 @@ async function emailLogin(ctx: Context) {
   if (!password) throw ServerError.LOGIN_NO_PASSWORD();
   if (password.length < 8) throw ServerError.LOGIN_INVALID_PASSWORD();
 
-  const store = ctx.options.auth.store;
-  if (!(await store.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
+  const users = ctx.options.auth.users;
+  if (!(await users.has(email))) throw ServerError.LOGIN_WRONG_EMAIL();
 
-  const user = await store.get<AuthUser & { password: string }>(email);
+  const user = await users.get<AuthUser & { password: string }>(email);
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
@@ -36,8 +36,8 @@ async function emailRegister(ctx: Context) {
   if (!password) throw ServerError.REGISTER_NO_PASSWORD();
   if (password.length < 8) throw ServerError.REGISTER_INVALID_PASSWORD();
 
-  const store = ctx.options.auth.store;
-  if (await store.has(email)) throw ServerError.REGISTER_EMAIL_EXISTS();
+  const users = ctx.options.auth.users;
+  if (await users.has(email)) throw ServerError.REGISTER_EMAIL_EXISTS();
 
   const time = new Date().toISOString().replace(/\.[0-9]*/, "");
   const user = {
@@ -61,7 +61,7 @@ async function emailRegister(ctx: Context) {
 }
 
 async function emailResetPassword() {
-  // const reset = ctx.options.store.prefix("reset:");
+  // const reset = ctx.options.sessions.prefix("reset:");
   // // Already resetting
   // if (ctx.body.token) {
   //   const { token, password } = ctx.body;
@@ -85,7 +85,7 @@ async function emailResetPassword() {
 async function emailUpdatePassword(ctx: Context) {
   const passwords = ctx.body as { previous: string; updated: string };
 
-  const fullUser = (await ctx.options.auth.store.get(ctx.user.email)) as {
+  const fullUser = (await ctx.options.auth.users.get(ctx.user.email)) as {
     email: string;
     password: string;
   };
@@ -95,7 +95,7 @@ async function emailUpdatePassword(ctx: Context) {
   if (!isValid) throw ServerError.LOGIN_WRONG_PASSWORD();
 
   fullUser.password = await hash(passwords.updated);
-  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
+  await updateUser(fullUser, ctx.user, ctx.options.auth.users);
 
   return 200;
 }

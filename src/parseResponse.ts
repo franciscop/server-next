@@ -10,10 +10,23 @@ import {
 } from "./helpers";
 import fileType from "./helpers/fileType";
 import isHtml from "./helpers/isHtml";
+import { loaded } from "./middle/session";
 import { json } from "./reply";
-import ServerError from "./ServerError";
 
 import type { Context } from ".";
+
+// In-memory sessions vanish on restart and aren't shared across instances;
+// warned once, and only when a production app actually writes one
+let warned = false;
+const warnDefault = () => {
+  if (warned) return;
+  warned = true;
+  console.warn(
+    "[server:sessions] Using the default in-memory session store in " +
+      "production: sessions are lost on restart and not shared across " +
+      "instances. Configure one with sessions: kv(redis).prefix('session:').",
+  );
+};
 
 export default async function parseResponse(
   out: any,
@@ -135,17 +148,19 @@ export default async function parseResponse(
     out.headers.set("Server-Timing", ctx.time.headers());
   }
 
-  // If we have a session, we need to persist it into a cookie
-  if (Object.keys(ctx.session || {}).length) {
-    // TODO: remove, not the right layer
-    if (!ctx.options.session?.store) {
-      throw ServerError.NO_STORE();
+  // Persist the session only when it changed since it was loaded (the
+  // snapshot in `loaded`); an untouched session costs no store write.
+  const prev = loaded.get(ctx);
+  const data = JSON.stringify(ctx.session ?? {});
+  if (data !== (prev?.data ?? "{}")) {
+    if (ctx.options.sessionsDefault && ctx.platform.production) {
+      warnDefault();
     }
-
-    // Reuse the incoming session cookie, or mint a new id. The SAME id must be
-    // used both for the Set-Cookie and the store key, or a fresh session is
-    // saved under a key the next request can never look up.
-    let id = ctx.cookies.session;
+    // Reuse the id the session was loaded under (login rotates it), or mint a
+    // new one. The SAME id must be used both for the Set-Cookie and the store
+    // key, or a fresh session is saved under a key the next request can never
+    // look up.
+    let id = prev?.id;
     if (!id) {
       id = createId();
       // Harden the session cookie: JS can't read it (HttpOnly), it isn't sent
@@ -162,9 +177,8 @@ export default async function parseResponse(
       );
     }
 
-    // Saves the session in the session store
     // Note that this is async but we are totally fine deferring it
-    ctx.options.session.store.set(id, ctx.session);
+    ctx.options.sessions.set(id, ctx.session);
   }
 
   // Add the headers that are needed

@@ -43,19 +43,11 @@ ServerError_default.extend({
     status: 400,
     message: "The route param '{param}' tries to climb the path ('{value}'). If this route legitimately receives paths, set security: { traversalProtection: false }"
   },
-  NO_STORE: "You need a 'store' to write 'ctx.session'",
-  NO_STORE_WRITE: "You need a 'store' to write 'ctx.session.{key}'",
-  NO_STORE_READ: "You need a 'store' to read 'ctx.session.{key}'",
   AUTH_ARGON_NEEDED: "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
   AUTH_INVALID_TOKEN: { status: 401, message: "Invalid Authorization token" },
-  AUTH_INVALID_COOKIE: { status: 401, message: "Invalid Authorization cookie" },
   AUTH_INVALID_HEADER: {
     status: 401,
     message: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)"
-  },
-  AUTH_INVALID_STRATEGY: {
-    status: 401,
-    message: "Invalid Authorization type '{strategy}', valid one is '{valid}'"
   },
   AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" },
   AUTH_NO_PROVIDER: "No provider passed to the option 'auth.providers'",
@@ -729,12 +721,19 @@ function clientIp(headers2, opts = {}) {
 
 // src/helpers/store.ts
 import kv from "polystore";
-function toStore(source) {
+function isStore(source) {
   const store = source;
-  if (store && typeof store.prefix === "function" && typeof store.get === "function" && typeof store.set === "function") {
-    return store;
-  }
+  return Boolean(
+    store && typeof store.prefix === "function" && typeof store.get === "function" && typeof store.set === "function"
+  );
+}
+function toStore(source) {
+  if (isStore(source)) return source;
   return kv(source);
+}
+function toStoreExpiring(source, expires) {
+  if (isStore(source)) return source;
+  return kv(source).expires(expires);
 }
 
 // src/helpers/disposition.ts
@@ -994,45 +993,72 @@ async function verifyJwt(token, secret) {
   return payload;
 }
 
+// src/auth/findSessionId.ts
+var validateToken = (authorization) => {
+  const [type2, id] = authorization.trim().split(" ");
+  if (type2?.toLowerCase() !== "bearer") {
+    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+  }
+  if (id?.length !== 16) {
+    throw ServerError_default.AUTH_INVALID_TOKEN();
+  }
+  return id;
+};
+function findSessionId(ctx) {
+  const strategy = ctx.options.auth?.strategy;
+  if (strategy?.includes("token") && ctx.headers.authorization) {
+    return validateToken(ctx.headers.authorization);
+  }
+  return ctx.cookies.session || void 0;
+}
+
+// src/middle/session.ts
+var loaded = /* @__PURE__ */ new WeakMap();
+async function session(ctx) {
+  const id = findSessionId(ctx);
+  ctx.session = id && await ctx.options.sessions.get(id) || {};
+  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
+}
+
 // src/auth/finishLogin.ts
 async function finishLogin(ctx, input) {
   const settings = ctx.options.auth;
   const { strategy, onLogin, onUser } = settings;
   const key = String(input.key);
   const auth2 = {
-    id: createId(),
-    strategy,
-    provider: input.provider,
     user: key,
-    email: input.email,
-    time: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
+    provider: input.provider,
+    created: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
   };
   const loginUser = {
     ...input.user,
     provider: input.provider,
     strategy
   };
-  const existingUser = await settings.store.get(key) ?? null;
+  const existingUser = await settings.users.get(key) ?? null;
   const user = onLogin ? await onLogin(loginUser, existingUser, ctx) : { ...existingUser ?? {}, ...loginUser };
   assertUser(user, "onLogin");
-  await settings.store.set(key, user);
-  if (!strategy.includes("jwt")) {
-    await settings.session.set(auth2.id, auth2, { expires: "1w" });
-  }
+  await settings.users.set(key, user);
   if (strategy.includes("jwt")) {
     const token = await signJwt(auth2, ctx.options.secret, 7 * 24 * 60 * 60);
     const exposed = await onUser(user, ctx);
     assertUser(exposed, "onUser");
     return status(201).json({ ...exposed, token });
   }
+  const prev = loaded.get(ctx);
+  if (prev?.id) await ctx.options.sessions.del(prev.id);
+  const id = createId();
+  Object.assign(ctx.session, auth2);
+  await ctx.options.sessions.set(id, ctx.session);
+  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
   if (strategy.includes("token")) {
     const exposed = await onUser(user, ctx);
     assertUser(exposed, "onUser");
-    return status(201).json({ ...exposed, token: auth2.id });
+    return status(201).json({ ...exposed, token: id });
   }
   if (strategy.includes("cookie")) {
-    return cookies("authentication", {
-      value: auth2.id,
+    return cookies("session", {
+      value: id,
       path: "/",
       httpOnly: true,
       secure: ctx.platform.production,
@@ -1250,9 +1276,9 @@ async function emailLogin(ctx) {
   if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
   if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
   if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (!await store.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
-  const user = await store.get(email);
+  const users = ctx.options.auth.users;
+  if (!await users.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
+  const user = await users.get(email);
   const isValid = await verify(password, user.password);
   if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
   return finishLogin(ctx, {
@@ -1268,8 +1294,8 @@ async function emailRegister(ctx) {
   if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
   if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
   if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
-  const store = ctx.options.auth.store;
-  if (await store.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
+  const users = ctx.options.auth.users;
+  if (await users.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
   const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
   const user = {
     id: createId(email),
@@ -1291,12 +1317,12 @@ async function emailResetPassword() {
 }
 async function emailUpdatePassword(ctx) {
   const passwords = ctx.body;
-  const fullUser = await ctx.options.auth.store.get(ctx.user.email);
+  const fullUser = await ctx.options.auth.users.get(ctx.user.email);
   if (!fullUser) throw ServerError_default.AUTH_NO_USER();
   const isValid = await verify(passwords.previous, fullUser.password);
   if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
   fullUser.password = await hash2(passwords.updated);
-  await updateUser(fullUser, ctx.user, ctx.options.auth.store);
+  await updateUser(fullUser, ctx.user, ctx.options.auth.users);
   return 200;
 }
 var email_default = {
@@ -1437,7 +1463,7 @@ function defaultOnUser(fullUser) {
   return user;
 }
 var available = Object.keys(providers_default);
-function parseAuthOptions(auth2, all) {
+function parseAuthOptions(auth2) {
   if (!auth2) return null;
   if (typeof auth2 === "string") {
     const [strategy2, provider] = auth2.split(":");
@@ -1460,15 +1486,7 @@ function parseAuthOptions(auth2, all) {
   const redirect2 = auth2.redirect || defaultRedirect;
   const { onProfile, onLogin, onLogout } = auth2;
   const onUser = auth2.onUser || defaultOnUser;
-  if (!auth2.store && !all.store) {
-    throw new Error("Need a userStore store for Auth");
-  }
-  if (!auth2.session && !all.store) {
-    throw new Error("Need a sessionStore store for Auth");
-  }
-  const store = all.store ? toStore(all.store) : null;
-  const authStore = auth2.store ? toStore(auth2.store) : store.prefix("user:");
-  const sessionStore = auth2.session ? toStore(auth2.session) : store.prefix("auth:");
+  const users = auth2.users ? toStore(auth2.users) : null;
   return {
     strategy,
     providers: list,
@@ -1477,8 +1495,7 @@ function parseAuthOptions(auth2, all) {
     onLogin,
     onUser,
     onLogout,
-    store: authStore,
-    session: sessionStore
+    users
   };
 }
 
@@ -1687,7 +1704,11 @@ function config(options = {}) {
     parser: options.parser ?? "parse",
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
-    security: resolveSecurity(options.security)
+    security: resolveSecurity(options.security),
+    // Sessions: one record per device, exposed as ctx.session. Anything
+    // polystore accepts works; raw sources (a Map, a Redis client) get a 1w
+    // expiry, a built store is honored as-is, prefix and expiry included.
+    sessions: toStoreExpiring(options.sessions ?? /* @__PURE__ */ new Map(), "1w")
   };
   if (options.cache !== void 0) settings.cache = options.cache;
   options.cors = options.cors || env2.CORS || null;
@@ -1741,16 +1762,26 @@ function config(options = {}) {
   }
   const favicon2 = options.favicon || env2.FAVICON;
   if (favicon2) settings.favicon = favicon2;
-  settings.store = options.store ? toStore(options.store) : null;
-  if (options.session) {
-    const store = typeof options.session === "object" && "store" in options.session ? options.session.store : options.session;
-    settings.session = { store: toStore(store) };
-  }
-  if (settings.store && !options.session) {
-    settings.session = { store: settings.store.prefix("session:") };
-  }
+  const production = env2.NODE_ENV === "production";
+  const defaulted = options.sessions == null;
+  settings.sessionsDefault = defaulted;
   if (options.auth || env2.AUTH) {
-    settings.auth = parseAuthOptions(options.auth || env2.AUTH || null, options);
+    settings.auth = parseAuthOptions(options.auth || env2.AUTH || null);
+  }
+  if (settings.auth) {
+    if (!settings.auth.users) {
+      if (production) {
+        throw new Error(
+          "Auth in production needs a persistent `users` store, like auth: { ..., users: kv(redis).prefix('users:') }."
+        );
+      }
+      settings.auth.users = toStore(/* @__PURE__ */ new Map());
+    }
+    if (production && defaulted && !settings.auth.strategy.includes("jwt")) {
+      throw new Error(
+        "Auth in production needs a persistent `sessions` store, like sessions: kv(redis).prefix('session:')."
+      );
+    }
   }
   if (settings.auth?.strategy.includes("jwt") && settings.secret.startsWith("unsafe-")) {
     console.warn(
@@ -1774,7 +1805,7 @@ function config(options = {}) {
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
-  if (settings.session) log.message("session", "enabled");
+  if (options.sessions) log.message("sessions", "enabled");
   if (settings.cors) {
     const origin = settings.cors.origin === true ? "*" : String(settings.cors.origin);
     log.message("cors", origin);
@@ -1885,6 +1916,14 @@ function getMachine() {
 }
 
 // src/parseResponse.ts
+var warned = false;
+var warnDefault = () => {
+  if (warned) return;
+  warned = true;
+  console.warn(
+    "[server:sessions] Using the default in-memory session store in production: sessions are lost on restart and not shared across instances. Configure one with sessions: kv(redis).prefix('session:')."
+  );
+};
 async function parseResponse(out, ctx) {
   if (!out && typeof out !== "string") return null;
   if (typeof out === "function") {
@@ -1952,11 +1991,13 @@ async function parseResponse(out, ctx) {
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
-  if (Object.keys(ctx.session || {}).length) {
-    if (!ctx.options.session?.store) {
-      throw ServerError_default.NO_STORE();
+  const prev = loaded.get(ctx);
+  const data = JSON.stringify(ctx.session ?? {});
+  if (data !== (prev?.data ?? "{}")) {
+    if (ctx.options.sessionsDefault && ctx.platform.production) {
+      warnDefault();
     }
-    let id = ctx.cookies.session;
+    let id = prev?.id;
     if (!id) {
       id = createId();
       out.headers.append(
@@ -1970,7 +2011,7 @@ async function parseResponse(out, ctx) {
         })
       );
     }
-    ctx.options.session.store.set(id, ctx.session);
+    ctx.options.sessions.set(id, ctx.session);
   }
   if (ctx?.res?.headers) {
     for (const key in ctx.res.headers) {
@@ -2286,37 +2327,6 @@ async function verify(password, hash3) {
   });
 }
 
-// src/auth/findSessionId.ts
-var validateToken = (authorization) => {
-  const [type2, id] = authorization.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer") {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
-  if (id?.length !== 16) {
-    throw ServerError_default.AUTH_INVALID_TOKEN();
-  }
-  return id;
-};
-var validateCookie = (authorization) => {
-  if (authorization.length !== 16) {
-    throw ServerError_default.AUTH_INVALID_COOKIE();
-  }
-  return authorization;
-};
-function findSessionId(ctx) {
-  const strategy = ctx.options.auth.strategy;
-  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
-  if (strategy.includes("token")) {
-    if (!ctx.headers.authorization) return;
-    return validateToken(ctx.headers.authorization);
-  }
-  if (strategy.includes("cookie")) {
-    if (!ctx.cookies.authentication) return;
-    return validateCookie(ctx.cookies.authentication);
-  }
-  throw new Error(`Invalid auth type "${strategy}"`);
-}
-
 // src/auth/getUser.ts
 async function getAuthSession(ctx) {
   const strategy = ctx.options.auth.strategy;
@@ -2331,49 +2341,48 @@ async function getAuthSession(ctx) {
     if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
     return payload;
   }
-  const id = findSessionId(ctx);
-  if (!id) return;
-  return ctx.options.auth.session.get(id);
+  let session2 = ctx.session;
+  if (!session2) {
+    const id = findSessionId(ctx);
+    if (!id) return;
+    session2 = await ctx.options.sessions.get(id) ?? void 0;
+  }
+  if (!session2?.user) return;
+  return session2;
 }
 async function getUser(ctx) {
   if (!ctx.options.auth) return;
   const options = ctx.options.auth;
   const auth2 = await getAuthSession(ctx);
   if (!auth2) return;
-  if (options.strategy !== auth2.strategy) {
-    throw ServerError_default.AUTH_INVALID_STRATEGY({
-      strategy: auth2.strategy || "undefined",
-      valid: options.strategy
-    });
-  }
   if (!options.providers.includes(auth2.provider)) {
     throw ServerError_default.AUTH_INVALID_PROVIDER({
       provider: auth2.provider,
       valid: options.providers
     });
   }
-  const user = await ctx.options.auth.store.get(auth2.user);
+  const user = await options.users.get(auth2.user);
   if (!user) throw ServerError_default.AUTH_NO_USER();
-  user.strategy = auth2.strategy;
-  user.provider = auth2.provider;
-  const exposed = await ctx.options.auth.onUser(user, ctx);
+  const exposed = await options.onUser(user, ctx);
   assertUser(exposed, "onUser");
   return exposed;
 }
 
 // src/auth/logout.ts
 async function logout(ctx) {
-  const { strategy } = ctx.user;
-  if (!strategy) throw new Error(`Invalid strategy "${strategy}"`);
+  const { strategy } = ctx.options.auth;
   if (!strategy.includes("jwt")) {
-    await ctx.options.auth.session.del(findSessionId(ctx));
+    const prev = loaded.get(ctx);
+    if (prev?.id) await ctx.options.sessions.del(prev.id);
+    ctx.session = {};
+    loaded.set(ctx, { id: void 0, data: "{}" });
   }
   if (ctx.options.auth.onLogout) await ctx.options.auth.onLogout(ctx);
   if (strategy.includes("token") || strategy.includes("jwt")) {
     return { token: null };
   }
   if (strategy.includes("cookie")) {
-    return cookies({ authentication: null }).redirect("/");
+    return cookies({ session: null }).redirect("/");
   }
   throw new Error("Unknown auth type");
 }
@@ -2679,39 +2688,6 @@ function preflight(ctx) {
   );
   if (handled) return;
   return 204;
-}
-
-// src/middle/NoSession.ts
-var NoSession = class {
-};
-function createNoSession() {
-  return new Proxy(NoSession, {
-    get(target, key) {
-      if (target[key]) return target[key];
-      if (key === "then") return target[key];
-      if (typeof key === "symbol") return target[key];
-      throw ServerError_default.NO_STORE_READ({ key: String(key) });
-    },
-    set(target, key, value) {
-      if (target[key] || key === "then" || typeof key === "symbol") {
-        target[key] = value;
-        return true;
-      }
-      throw ServerError_default.NO_STORE_WRITE({ key: String(key) });
-    }
-  });
-}
-
-// src/middle/session.ts
-async function session(ctx) {
-  const store = ctx.options.session?.store;
-  if (!store) {
-    ctx.session = createNoSession();
-    return;
-  }
-  if (ctx.cookies.session) {
-    ctx.session = await store.get(ctx.cookies.session) || {};
-  }
 }
 
 // src/middle/timer.ts

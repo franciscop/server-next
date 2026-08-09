@@ -1,6 +1,7 @@
-import type { AuthUser, Context } from "..";
+import type { AuthSession, AuthUser, Context } from "..";
 import { createId } from "../helpers";
 import { signJwt } from "../helpers/jwt";
+import { loaded } from "../middle/session";
 import { cookies, status } from "../reply";
 import assertUser from "./assertUser";
 
@@ -16,21 +17,18 @@ type LoginInput = {
 };
 
 // The single place every provider funnels through after authenticating: it
-// persists the user + session and responds according to the chosen strategy.
-// Consolidating it here keeps cookies, the session shape, the callbacks, and
-// the strategies consistent across email/github/google/microsoft/discord/etc.
+// persists the user, stamps the auth fields on the session, and responds
+// according to the chosen strategy. Consolidating it here keeps cookies, the
+// session shape, the callbacks, and the strategies consistent across providers.
 export default async function finishLogin(ctx: Context, input: LoginInput) {
   const settings = ctx.options.auth;
   const { strategy, onLogin, onUser } = settings;
   const key = String(input.key);
 
-  const auth = {
-    id: createId(),
-    strategy,
-    provider: input.provider,
+  const auth: AuthSession = {
     user: key,
-    email: input.email,
-    time: new Date().toISOString().replace(/\.[0-9]*/, ""),
+    provider: input.provider as AuthSession["provider"],
+    created: new Date().toISOString().replace(/\.[0-9]*/, ""),
   };
 
   // Every record knows its own provider and strategy; the stamp wins over any
@@ -40,7 +38,7 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
     provider: input.provider,
     strategy,
   } as AuthUser;
-  const existingUser = ((await settings.store.get(key)) ??
+  const existingUser = ((await settings.users.get(key)) ??
     null) as AuthUser | null;
 
   // `onLogin` owns the record that is persisted (and can deny by throwing);
@@ -51,27 +49,37 @@ export default async function finishLogin(ctx: Context, input: LoginInput) {
     : { ...(existingUser ?? {}), ...loginUser };
   assertUser(user, "onLogin");
 
-  await settings.store.set(key, user);
-  // `jwt` is stateless (the signed token carries the session), so only the
-  // opaque strategies persist the auth record in the session store.
-  if (!strategy.includes("jwt")) {
-    await settings.session.set(auth.id, auth, { expires: "1w" });
-  }
+  await settings.users.set(key, user);
 
+  // `jwt` is stateless: the signed token carries the auth fields and nothing
+  // is stored, so the guest session (if any) is left untouched.
   if (strategy.includes("jwt")) {
     const token = await signJwt(auth, ctx.options.secret, 7 * 24 * 60 * 60);
     const exposed = await onUser(user, ctx);
     assertUser(exposed, "onUser");
     return status(201).json({ ...exposed, token });
   }
+
+  // Rotate the session id on login: keeping a guest's id would let an attacker
+  // plant one and inherit the session once the victim signs in (fixation).
+  // The guest data carries over under the new id.
+  const prev = loaded.get(ctx);
+  if (prev?.id) await ctx.options.sessions.del(prev.id);
+  const id = createId();
+  Object.assign(ctx.session, auth);
+  // Persist right away, so the credential works the moment the client has it;
+  // the fresh snapshot keeps parseResponse from writing the same data again
+  await ctx.options.sessions.set(id, ctx.session);
+  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
+
   if (strategy.includes("token")) {
     const exposed = await onUser(user, ctx);
     assertUser(exposed, "onUser");
-    return status(201).json({ ...exposed, token: auth.id });
+    return status(201).json({ ...exposed, token: id });
   }
   if (strategy.includes("cookie")) {
-    return cookies("authentication", {
-      value: auth.id,
+    return cookies("session", {
+      value: id,
       path: "/",
       httpOnly: true,
       secure: ctx.platform.production,

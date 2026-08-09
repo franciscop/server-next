@@ -30,7 +30,7 @@ function mockFetch(handler: (url: string, opts: any) => any) {
 }
 
 describe("oauth login redirects", () => {
-  const store = kv(new Map());
+  const users = kv(new Map());
   const cases = [
     { name: "google", id: "gid", host: "accounts.google.com", scope: "openid" },
     {
@@ -45,7 +45,7 @@ describe("oauth login redirects", () => {
 
   for (const p of cases) {
     it(`${p.name} redirects to its authorize URL`, async () => {
-      const api = server({ store, auth: `cookie:${p.name}` as any }).test();
+      const api = server({ auth: `cookie:${p.name}` as any }).test();
       const res = await api.get(`/auth/login/${p.name}`);
       expect(res.status).toBe(302);
 
@@ -123,7 +123,7 @@ describe("oauth callbacks map profiles and create sessions", () => {
 
   for (const c of CALLBACKS) {
     it(`${c.name} stores the normalized user and sets a cookie`, async () => {
-      const store = kv(new Map());
+      const users = kv(new Map());
       const restore = mockFetch((url) => {
         if (url.includes(c.tokenUrl)) return { access_token: "tok" };
         if (url.includes(c.profileUrl)) return c.profile;
@@ -131,16 +131,15 @@ describe("oauth callbacks map profiles and create sessions", () => {
       });
       try {
         const api = server({
-          store,
-          auth: `cookie:${c.name}` as any,
+          auth: { strategy: "cookie", providers: [c.name] as any, users },
         }).test();
         const res = await api.get(`/auth/callback/${c.name}?code=abc&state=st`, {
           headers: { cookie: "oauth_state=st" },
         });
         expect(res.status).toBe(302);
-        expect(res.headers.get("set-cookie")).toContain("authentication=");
+        expect(res.headers.get("set-cookie")).toContain("session=");
 
-        const user = await store.get<any>(`user:${c.expect.id}`);
+        const user = await users.get<any>(c.expect.id);
         expect(user.email).toBe(c.expect.email);
         expect(user.name).toBe(c.expect.name);
         if (c.expect.picture) expect(user.picture).toContain(c.expect.picture);
@@ -153,7 +152,7 @@ describe("oauth callbacks map profiles and create sessions", () => {
 
 describe("oauth callback (token strategy)", () => {
   it("returns a token in the body instead of a cookie", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const restore = mockFetch((url) => {
       if (url.includes("oauth2.googleapis.com/token")) {
         return { access_token: "tok" };
@@ -164,7 +163,7 @@ describe("oauth callback (token strategy)", () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
     try {
-      const api = server({ store, auth: "token:google" }).test();
+      const api = server({ auth: { strategy: "token", providers: ["google"], users } }).test();
       const res = await api.get("/auth/callback/google?code=abc&state=st", {
         headers: { cookie: "oauth_state=st" },
       });
@@ -181,8 +180,8 @@ describe("oauth callback (token strategy)", () => {
 
 describe("oauth state (CSRF)", () => {
   it("rejects a callback whose state doesn't match the cookie", async () => {
-    const store = kv(new Map());
-    const api = server({ store, auth: "cookie:google" }).test();
+    const users = kv(new Map());
+    const api = server({ auth: { strategy: "cookie", providers: ["google"], users } }).test();
     const res = await api.get("/auth/callback/google?code=abc&state=st", {
       headers: { cookie: "oauth_state=different" },
     });
@@ -190,8 +189,8 @@ describe("oauth state (CSRF)", () => {
   });
 
   it("rejects a callback with no state at all", async () => {
-    const store = kv(new Map());
-    const api = server({ store, auth: "cookie:google" }).test();
+    const users = kv(new Map());
+    const api = server({ auth: { strategy: "cookie", providers: ["google"], users } }).test();
     const res = await api.get("/auth/callback/google?code=abc");
     expect(res.status).toBe(403);
   });
@@ -222,8 +221,8 @@ describe("apple", () => {
   });
 
   it("login redirects with form_post and the name+email scope", async () => {
-    const store = kv(new Map());
-    const api = server({ store, auth: "cookie:apple" }).test();
+    const users = kv(new Map());
+    const api = server({ auth: { strategy: "cookie", providers: ["apple"], users } }).test();
     const res = await api.get("/auth/login/apple");
     expect(res.status).toBe(302);
 
@@ -237,7 +236,7 @@ describe("apple", () => {
   });
 
   it("callback signs the secret, decodes the id_token, stores the user", async () => {
-    const store = kv(new Map());
+    const users = kv(new Map());
     const idToken = `${b64url({ alg: "RS256" })}.${b64url({
       sub: "a-1",
       email: "tim@icloud.com",
@@ -249,7 +248,7 @@ describe("apple", () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
     try {
-      const api = server({ store, auth: "cookie:apple" }).test();
+      const api = server({ auth: { strategy: "cookie", providers: ["apple"], users } }).test();
       const res = await api.post(
         "/auth/callback/apple",
         {
@@ -260,9 +259,9 @@ describe("apple", () => {
         { headers: { cookie: "oauth_state=st" } },
       );
       expect(res.status).toBe(302);
-      expect(res.headers.get("set-cookie")).toContain("authentication=");
+      expect(res.headers.get("set-cookie")).toContain("session=");
 
-      const user = await store.get<any>("user:a-1");
+      const user = await users.get<any>("a-1");
       expect(user.email).toBe("tim@icloud.com");
       expect(user.name).toBe("Tim A");
     } finally {

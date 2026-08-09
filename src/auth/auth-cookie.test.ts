@@ -8,18 +8,21 @@ describe("user creation flow", () => {
   const PASS = "11111111";
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
-  const store = kv(new Map());
-  const api = server({ store, auth: "cookie:email" })
+  const sessionStore = kv(new Map());
+  const userStore = kv(new Map());
+  const api = server({
+    sessions: sessionStore,
+    auth: { strategy: "cookie", providers: ["email"], users: userStore },
+  })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();
 
   it.skip("can create a new user", async () => {
     const register = await api.post("/auth/register/email", CREDENTIALS);
     expect(register.status).toBe(200);
-    expect(await store.keys()).toEqual([
-      "user:abc@test.com",
-      `auth:${register.headers["set-cookie"].split(";")[0].split("=")[1]}`,
-    ]);
+    const id = register.headers["set-cookie"].split(";")[0].split("=")[1];
+    expect(await userStore.keys()).toEqual([EMAIL]);
+    expect(await sessionStore.keys()).toEqual([id]);
 
     const me = await api.get("/me");
     expect(me.status).toBe(200);
@@ -28,13 +31,11 @@ describe("user creation flow", () => {
 
     const logout = await api.post("/auth/logout");
     expect(logout.status).toBe(200);
-    expect(await store.keys()).toEqual(["user:abc@test.com"]);
+    expect(await sessionStore.keys()).toEqual([]);
 
     const login = await api.post("/auth/login/email", CREDENTIALS);
     expect(login.status).toBe(200);
-    expect(await store.keys()).toEqual([
-      "user:abc@test.com",
-      `auth:${login.headers["set-cookie"].split(";")[0].split("=")[1]}`,
-    ]);
+    const next = login.headers["set-cookie"].split(";")[0].split("=")[1];
+    expect(await sessionStore.keys()).toEqual([next]);
   });
 });

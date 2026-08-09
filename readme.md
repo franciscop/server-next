@@ -9,21 +9,22 @@ npm install @server/next
 ```js
 import server from '@server/next';
 
-export default server({ store: new Map(), uploads: './uploads' })
+export default server({ uploads: './uploads' })
   .get('/', () => 'Hello world')
   .get('/users/:id', (ctx) => db.users.find(ctx.url.params.id))
   .post('/avatar', (ctx) => ctx.body.avatar.path);
 ```
 
-Key-value stores and file storage come included, so `store` takes a plain `Map` and `uploads` takes a folder path. For Redis, S3 and the rest, `kv` and `bucket` are exported too:
+Key-value stores and file storage come included, so `sessions` work out of the box and `uploads` takes a folder path. For Redis, S3 and the rest, pass the client straight in:
 
 ```js
-import server, { kv, bucket } from '@server/next';
+import server, { bucket } from '@server/next';
+import { createClient } from 'redis';
 
-const store = kv(createClient({ url }).connect());
+const sessions = createClient({ url });
 const uploads = bucket.S3('my-bucket', { id, key });
 
-export default server({ store, uploads });
+export default server({ sessions, uploads });
 ```
 
 See the [full documentation](https://serverjs.io/documentation).

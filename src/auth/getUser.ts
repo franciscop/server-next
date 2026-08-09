@@ -4,8 +4,8 @@ import { verifyJwt } from "../helpers/jwt";
 import assertUser from "./assertUser";
 import findSessionId from "./findSessionId";
 
-// Resolve the auth session record for the request. The `jwt` strategy carries it
-// inside a signed Bearer token (stateless); the others store an opaque id.
+// Resolve the auth fields for the request: the `jwt` strategy carries them
+// inside a signed Bearer token (stateless); the others read the session.
 async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
   const strategy = ctx.options.auth.strategy;
 
@@ -21,9 +21,16 @@ async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
     return payload as AuthSession;
   }
 
-  const id = findSessionId(ctx);
-  if (!id) return;
-  return ctx.options.auth.session.get<AuthSession>(id);
+  // HTTP requests carry the already-loaded session; a socket upgrade builds a
+  // partial ctx with no session, so resolve it from the store here
+  let session = ctx.session as AuthSession | undefined;
+  if (!session) {
+    const id = findSessionId(ctx);
+    if (!id) return;
+    session = (await ctx.options.sessions.get<AuthSession>(id)) ?? undefined;
+  }
+  if (!session?.user) return; // a guest session; not signed in
+  return session;
 }
 
 export default async function getUser(ctx: Context): Promise<AuthUser> {
@@ -32,27 +39,20 @@ export default async function getUser(ctx: Context): Promise<AuthUser> {
 
   const auth = await getAuthSession(ctx);
   if (!auth) return; // NO SESSION FOUND; no auth
-  if (options.strategy !== auth.strategy) {
-    throw ServerError.AUTH_INVALID_STRATEGY({
-      strategy: auth.strategy || "undefined",
-      valid: options.strategy,
-    });
-  }
+  // Sessions outlive config changes: one signed in through a provider that
+  // was since removed is no longer valid
   if (!options.providers.includes(auth.provider)) {
     throw ServerError.AUTH_INVALID_PROVIDER({
       provider: auth.provider,
       valid: options.providers,
     });
   }
-  // if (!auth) throw ServerError.AUTH_NO_SESSION();
 
-  const user = await ctx.options.auth.store.get<AuthUser>(auth.user);
+  const user = await options.users.get<AuthUser>(auth.user);
   if (!user) throw ServerError.AUTH_NO_USER();
-  user.strategy = auth.strategy;
-  user.provider = auth.provider;
 
   // `onUser` shapes what handlers see; the default strips `password`
-  const exposed = await ctx.options.auth.onUser(user, ctx);
+  const exposed = await options.onUser(user, ctx);
   assertUser(exposed, "onUser");
   return exposed;
 }

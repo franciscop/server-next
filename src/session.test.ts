@@ -3,7 +3,7 @@ import server from ".";
 
 describe("session", () => {
   const store = kv(new Map());
-  const api = server({ store })
+  const api = server({ sessions: store })
     .get("/hello", async (ctx) => {
       return `Hello ${ctx.session.a}`;
     })
@@ -19,7 +19,7 @@ describe("session", () => {
     const cookie = "session=REqA2l022l8Q0tuIRtqLOPUy";
     const options = { headers: { cookie } };
 
-    await store.set("session:REqA2l022l8Q0tuIRtqLOPUy", { a: 0 });
+    await store.set("REqA2l022l8Q0tuIRtqLOPUy", { a: 0 });
 
     const res = await api.get("/hello", options);
     expect(await res.text()).toBe("Hello 0");
@@ -29,7 +29,7 @@ describe("session", () => {
 
     const res3 = await api.get("/hello", options);
     expect(await res3.text()).toBe("Hello 1");
-    expect(await store.get("session:REqA2l022l8Q0tuIRtqLOPUy")).toEqual({
+    expect(await store.get("REqA2l022l8Q0tuIRtqLOPUy")).toEqual({
       a: 1,
     });
 
@@ -38,7 +38,7 @@ describe("session", () => {
 
     const res5 = await api.get("/hello", options);
     expect(await res5.text()).toBe("Hello 2");
-    expect(await store.get("session:REqA2l022l8Q0tuIRtqLOPUy")).toEqual({
+    expect(await store.get("REqA2l022l8Q0tuIRtqLOPUy")).toEqual({
       a: 2,
     });
   });
@@ -47,9 +47,9 @@ describe("session", () => {
 describe("new session (no incoming cookie)", () => {
   // Regression for the bug where a freshly-issued session is stored under the
   // OLD cookie id (undefined) instead of the new id sent in Set-Cookie, so it
-  // can never be read back. Expected to FAIL until parseResponse is fixed.
+  // can never be read back.
   const store = kv(new Map());
-  const api = server({ store })
+  const api = server({ sessions: store })
     .post("/inc", (ctx) => {
       ctx.session.count = Number(ctx.session.count || 0) + 1;
       return { count: ctx.session.count };
@@ -77,26 +77,28 @@ describe("new session (no incoming cookie)", () => {
   });
 });
 
-describe("missing store", () => {
-  const api = server({ store: null })
-    .get("/read", (ctx) => `Bye ${ctx.session.a}`)
+describe("default store (no config)", () => {
+  // Sessions default to an in-memory Map, so they work with zero setup
+  const api = server()
+    .get("/read", (ctx) => `Bye ${ctx.session.a ?? "nothing"}`)
     .get("/write", (ctx) => {
       ctx.session.a = "hello";
       return "All good";
     })
     .test();
 
-  it("cannot read a session without a store", async () => {
-    const res = await api.get("/read");
-    expect(res.status).toBe(500);
-    expect(await res.text()).toBe("You need a 'store' to read 'ctx.session.a'");
+  it("reads and writes with no store configured", async () => {
+    const res = await api.get("/write");
+    expect(res.status).toBe(200);
+    const cookie = String(res.headers.get("set-cookie")).split(";")[0];
+
+    const read = await api.get("/read", { headers: { cookie } });
+    expect(await read.text()).toBe("Bye hello");
   });
 
-  it("cannot write a session without a store", async () => {
-    const res = await api.get("/write");
-    expect(res.status).toBe(500);
-    expect(await res.text()).toBe(
-      "You need a 'store' to write 'ctx.session.a'",
-    );
+  it("an untouched session mints no cookie and stores nothing", async () => {
+    const res = await api.get("/read");
+    expect(await res.text()).toBe("Bye nothing");
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 });

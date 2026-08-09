@@ -3,7 +3,7 @@ import Bucket from "./bucket";
 import createId from "./createId";
 import createLogger from "./logger";
 import { resolveSecurity } from "./security";
-import toStore from "./store";
+import toStore, { toStoreExpiring } from "./store";
 import { parseBytes } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
@@ -45,6 +45,10 @@ export default function config(options: Options = {}): Settings {
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
     security: resolveSecurity(options.security),
+    // Sessions: one record per device, exposed as ctx.session. Anything
+    // polystore accepts works; raw sources (a Map, a Redis client) get a 1w
+    // expiry, a built store is honored as-is, prefix and expiry included.
+    sessions: toStoreExpiring(options.sessions ?? new Map(), "1w"),
   };
 
   // Response caching: a default Cache-Control for GET responses, plus auto-ETag.
@@ -126,23 +130,33 @@ export default function config(options: Options = {}): Settings {
   const favicon = options.favicon || env.FAVICON;
   if (favicon) settings.favicon = favicon;
 
-  // Stores: anything polystore accepts (a Map, a Redis client, ...) is built
-  // into a store here, so routes always get the same KV interface. An
-  // already-built store is kept as-is, prefix and expiry included.
-  settings.store = options.store ? toStore(options.store) : null;
-  if (options.session) {
-    const store =
-      typeof options.session === "object" && "store" in options.session
-        ? options.session.store
-        : options.session;
-    settings.session = { store: toStore(store) };
-  }
-  if (settings.store && !options.session) {
-    settings.session = { store: settings.store.prefix("session:") };
-  }
+  const production = env.NODE_ENV === "production";
+  const defaulted = options.sessions == null;
+  // Drives a one-time warning on the first session write in production
+  settings.sessionsDefault = defaulted;
 
   if (options.auth || env.AUTH) {
-    settings.auth = parseAuthOptions(options.auth || env.AUTH || null, options);
+    settings.auth = parseAuthOptions(options.auth || env.AUTH || null);
+  }
+
+  // The in-memory defaults lose everything on restart and aren't shared across
+  // instances, so a production app with auth must configure real stores.
+  if (settings.auth) {
+    if (!settings.auth.users) {
+      if (production) {
+        throw new Error(
+          "Auth in production needs a persistent `users` store, like " +
+            "auth: { ..., users: kv(redis).prefix('users:') }.",
+        );
+      }
+      settings.auth.users = toStore(new Map());
+    }
+    if (production && defaulted && !settings.auth.strategy.includes("jwt")) {
+      throw new Error(
+        "Auth in production needs a persistent `sessions` store, like " +
+          "sessions: kv(redis).prefix('session:').",
+      );
+    }
   }
 
   // The `jwt` strategy signs tokens with `secret`. With no secret set, config
@@ -186,7 +200,7 @@ export default function config(options: Options = {}): Settings {
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
-  if (settings.session) log.message("session", "enabled");
+  if (options.sessions) log.message("sessions", "enabled");
   if (settings.cors) {
     const origin =
       settings.cors.origin === true ? "*" : String(settings.cors.origin);
