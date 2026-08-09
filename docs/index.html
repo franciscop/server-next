@@ -253,9 +253,9 @@ export default server()
     <p>
       <a href="/documentation/router">Routing</a>,
       <a href="/documentation/options#optionssession">sessions</a>,
-      <a href="/documentation/guides#file-handling">uploads</a>,
-      <a href="/documentation/guides#validation">validation</a>,
-      <a href="/documentation/guides#websockets">websockets</a>,
+      <a href="/documentation#file-handling">uploads</a>,
+      <a href="/documentation#validation">validation</a>,
+      <a href="/documentation#websockets">websockets</a>,
       <a href="/documentation/authentication">auth</a> and
       <a href="/documentation">many more</a>.
     </p>
@@ -270,7 +270,8 @@ export default server()
       <h3>Authentication</h3>
     </header>
     <p>
-      Supports <a href="/documentation/authentication#oauth-providers">Google</a>,
+      Supports
+      <a href="/documentation/authentication#oauth-providers">Google</a>,
       <a href="/documentation/authentication#oauth-providers">Github</a>,
       <a href="/documentation/authentication#oauth-providers">Facebook</a>,
       <a href="/documentation/authentication#email-and-password">email</a>,
@@ -365,7 +366,9 @@ export default server()
       Sessions, signed cookies and CSRF-protected flows are handled for you, and
       the signed-in user is available on <code>ctx.user</code>.
     </p>
-    <a class="button ghost" href="/documentation/authentication">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation/authentication"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
@@ -390,7 +393,9 @@ export default server({ store, auth })
       Point <code>uploads</code> at a local folder or an S3-compatible bucket,
       and each stored file shows up on <code>ctx.body</code>.
     </p>
-    <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#file-handling"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">export default server({ uploads: "./uploads" })
@@ -418,7 +423,7 @@ export default server({ store, auth })
       This is the primary recommended templating engine, but it is NOT React,
       just JSX. Interpolation is escaped and safe from XSS.
     </p>
-    <a class="button ghost" href="/documentation/guides#jsx">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#jsx">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">export default server()
@@ -440,10 +445,10 @@ export default server({ store, auth })
       swap them in.
     </p>
     <p>
-      It blends especially well with JSX, whose escaped interpolation keeps those
-      fragments safe from XSS.
+      It blends especially well with JSX, whose escaped interpolation keeps
+      those fragments safe from XSS.
     </p>
-    <a class="button ghost" href="/documentation/guides#htmx">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#htmx">Read more &rarr;</a>
   </div>
   <div>
     <pre><code class="language-js">import server, { file } from "@server/next";
@@ -467,7 +472,9 @@ export default server()
       Add a format like <code>:id(number)</code> and the value arrives as a
       <code>number</code>, and mark optional segments with <code>?</code>.
     </p>
-    <a class="button ghost" href="/documentation/router#parameters">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation/router#parameters"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">server()
@@ -491,7 +498,9 @@ export default server()
       Each stored file gets a random, unguessable id, so nothing is overwritten
       or predictable.
     </p>
-    <a class="button ghost" href="/documentation/guides#file-handling">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#file-handling"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">export default server({
@@ -515,7 +524,9 @@ export default server()
       That is all you need for a backend-for-frontend, an API gateway, or hiding
       an upstream key from the browser.
     </p>
-    <a class="button ghost" href="/documentation/guides#proxying-requests">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#proxying-requests"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">export default server()
@@ -533,7 +544,9 @@ export default server()
       client with <code>ctx.socket</code>, or broadcast to every connection with
       <code>ctx.sockets</code>.
     </p>
-    <a class="button ghost" href="/documentation/guides#websockets">Read more &rarr;</a>
+    <a class="button ghost" href="/documentation#websockets"
+      >Read more &rarr;</a
+    >
   </div>
   <div>
     <pre><code class="language-js">server()
