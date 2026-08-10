@@ -1,0 +1,13 @@
+{
+  "name": "websocket",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  }
+}

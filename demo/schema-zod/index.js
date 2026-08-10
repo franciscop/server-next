@@ -1,23 +1,29 @@
-import server, { ValidationError } from "../..";
+import server, { status, ValidationError } from "../..";
 import { z } from "zod";
 
-// Route validation with zod (any Standard Schema library works the same).
-// Run it with `node index.js` (or `bun index.js`) and try the curls below.
+// A note-taking API validated with zod (any Standard Schema library works the
+// same). Run `npm run dev` and try the curls below.
 
-const User = z.object({
-  name: z.string().min(1),
-  // Coercion applies: the validated value replaces ctx.body, so age is a number
-  age: z.coerce.number().int().min(0),
+const Note = z.object({
+  title: z.string().min(1),
+  body: z.string().default(""),
+  // Coercion applies: the validated value replaces ctx.body, so pins arrive
+  // as booleans even from forms
+  pinned: z.coerce.boolean().default(false),
 });
-
 const Pagination = z.object({
   page: z.coerce.number().int().min(1).default(1),
+  search: z.string().optional(),
 });
+const Id = z.object({ id: z.uuid() });
+
+const notes = new Map();
+const list = (map) => [...map.entries()].map(([id, data]) => ({ id, ...data }));
 
 export default server({
   // By default a failing schema responds 422 with a generic message. To shape
-  // the response yourself (say, an API returning the issues as JSON), catch the
-  // ValidationError in onError; `issues` has each failure's message and path.
+  // the response yourself (say, an API returning the issues as JSON), catch
+  // the ValidationError in onError; `issues` has each failure's message/path.
   onError: (error) => {
     if (error instanceof ValidationError && error.source !== "response") {
       const body = { error: `Invalid ${error.source}`, issues: error.issues };
@@ -28,20 +34,35 @@ export default server({
     });
   },
 })
-  // The body is validated (and coerced) before the handler runs
-  //   curl -X POST localhost:3000/users -H content-type:application/json -d '{"name":"Ada","age":"36"}'
-  //   curl -X POST localhost:3000/users -H content-type:application/json -d '{"age":-1}'
-  .post("/users", { body: User }, (ctx) => ctx.body)
+  // The query string is validated and coerced: page arrives as a number
+  //   curl "localhost:3000/notes?page=2"
+  //   curl "localhost:3000/notes?page=zero"
+  .get("/notes", { query: Pagination }, (ctx) => {
+    const { page, search } = ctx.url.query;
+    const all = list(notes).filter((n) => !search || n.title.includes(search));
+    return all.slice((page - 1) * 10, page * 10);
+  })
 
-  // The query string too: page arrives as a string, the schema makes it a number
-  //   curl "localhost:3000/users?page=2"
-  //   curl "localhost:3000/users?page=zero"
-  .get("/users", { query: Pagination }, (ctx) => ({
-    page: ctx.url.query.page,
-    users: [],
-  }))
+  // The body is validated before the handler runs
+  //   curl -X POST localhost:3000/notes -H content-type:application/json -d '{"title":"Groceries","pinned":"true"}'
+  //   curl -X POST localhost:3000/notes -H content-type:application/json -d '{"body":"no title"}'
+  .post("/notes", { body: Note }, (ctx) => {
+    const id = crypto.randomUUID();
+    notes.set(id, ctx.body);
+    return status(201).json({ id, ...ctx.body });
+  })
 
-  // A `response` schema guards what you send out; a mismatch is a 500, and the
-  // client only ever sees "Server Error" (the issues stay in onError)
-  //   curl -i localhost:3000/leaky
-  .get("/leaky", { response: User }, () => ({ password: "hunter2" }));
+  // Params too: a malformed id is a 422 before the handler ever runs
+  //   curl localhost:3000/notes/not-a-uuid
+  .get("/notes/:id", { params: Id }, (ctx) => {
+    return notes.get(ctx.url.params.id) ?? 404;
+  })
+  .put("/notes/:id", { params: Id, body: Note }, (ctx) => {
+    if (!notes.has(ctx.url.params.id)) return 404;
+    notes.set(ctx.url.params.id, ctx.body);
+    return { id: ctx.url.params.id, ...ctx.body };
+  })
+  .delete("/notes/:id", { params: Id }, (ctx) => {
+    notes.delete(ctx.url.params.id);
+    return 204;
+  });

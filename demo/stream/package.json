@@ -1,0 +1,13 @@
+{
+  "name": "stream",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  }
+}

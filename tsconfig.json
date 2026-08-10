@@ -6,6 +6,8 @@
     "module": "ESNext",
     "lib": ["ES2022", "ES2021", "DOM"],
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@server/next",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,

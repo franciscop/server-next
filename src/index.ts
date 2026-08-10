@@ -71,7 +71,7 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     }
 
     if (this.settings.openapi) {
-      app.get(this.settings.openapi.path || "/docs", openapi as any);
+      app.get(this.settings.openapi.path, openapi as any);
     }
   }
 

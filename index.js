@@ -770,12 +770,12 @@ var encodeExt = (name) => encodeURIComponent(name).replace(
 );
 function disposition(name) {
   if (!name) return "attachment";
-  const clean = name.replace(/[\r\n]/g, "").split(/[\\/]/).pop() || "";
-  if (!clean) return "attachment";
-  const ascii = clean.replace(/[^\x20-\x7e]/g, "?");
+  const clean2 = name.replace(/[\r\n]/g, "").split(/[\\/]/).pop() || "";
+  if (!clean2) return "attachment";
+  const ascii = clean2.replace(/[^\x20-\x7e]/g, "?");
   const value = `attachment; filename="${ascii.replace(/["\\]/g, "\\$&")}"`;
-  if (clean === ascii) return value;
-  return `${value}; filename*=UTF-8''${encodeExt(clean)}`;
+  if (clean2 === ascii) return value;
+  return `${value}; filename*=UTF-8''${encodeExt(clean2)}`;
 }
 
 // src/helpers/fileType.ts
@@ -1913,9 +1913,10 @@ function config(options = {}) {
     );
   }
   if (options.openapi) {
-    if (options.openapi === true) {
-      settings.openapi = {};
-    }
+    const o = options.openapi;
+    if (o === true) settings.openapi = { path: "/openapi.json" };
+    else if (typeof o === "string") settings.openapi = { path: o };
+    else settings.openapi = { path: "/openapi.json", ...o };
   }
   settings.onError = options.onError || ((error) => {
     return new Response(error.message || "Server Error", {
@@ -1936,7 +1937,7 @@ function config(options = {}) {
   }
   if (settings.favicon) log.message("favicon", loc(settings.favicon));
   if (settings.cache !== void 0) log.message("cache", loc(options.cache));
-  if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
+  if (settings.openapi) log.message("openapi", settings.openapi.path);
   return settings;
 }
 
@@ -2660,17 +2661,6 @@ async function favicon(ctx) {
 
 // src/middle/openapi.ts
 import * as fsp from "fs/promises";
-var entities = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;"
-};
-var encode = (str = "") => {
-  if (typeof str === "number") str = String(str);
-  if (typeof str !== "string") return "";
-  return str.replace(/[&<>"]/g, (tag) => entities[tag]);
-};
 var getConfig = (options = {}) => {
   const config2 = { ...options };
   if (config2.tags) {
@@ -2684,6 +2674,25 @@ var getConfig = (options = {}) => {
   }
   return config2;
 };
+var clean = ({ $schema, ...schema }) => schema;
+async function toJsonSchema(schema) {
+  try {
+    if (typeof schema?.toJsonSchema === "function") {
+      return clean(schema.toJsonSchema());
+    }
+    const vendor = schema?.["~standard"]?.vendor;
+    if (vendor === "zod") {
+      const mod = await import("zod");
+      return clean((mod.toJSONSchema ?? mod.z.toJSONSchema)(schema));
+    }
+    if (vendor === "valibot") {
+      const mod = await import("@valibot/to-json-schema");
+      return clean(mod.toJsonSchema(schema));
+    }
+  } catch {
+  }
+  return zodToSchema(schema);
+}
 function zodToSchema(schema) {
   const type2 = schema?.def?.type || "string";
   if (type2 === "object") {
@@ -2709,19 +2718,19 @@ var pkgProm = fsp.readFile("package.json", "utf-8").then((data) => JSON.parse(da
 var getTag = (name, fn) => {
   const found = fn.toString().split("\n").filter((l) => /\s+\/\/\s/.test(l)).map((l) => l.trim().replace("// ", "")).find((l) => l.startsWith(name));
   if (!found) return "";
-  return encode(found.replace(name, "").trim());
+  return found.replace(name, "").trim();
 };
 var getDescription = (fn) => getTag("@description", fn) || "";
 var getReturn = (fn) => getTag("@returns", fn) || "OK";
-var generateOpenApiPaths = (handlers) => {
+var generateOpenApiPaths = async (handlers, specPath) => {
   const paths = {};
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
       const path = route.path;
-      const fn = route.fns.find((p) => typeof p === "function");
+      const fn = [...route.fns].reverse().find((p) => typeof p === "function");
       const meta = route.options ?? {};
       const config2 = getConfig(route.options?.schema);
-      if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
+      if (typeof path !== "string" || path === "*" || path === specPath || !fn) {
         continue;
       }
       const normalizedPath = path.replace(/\(\w+\)/gi, "").replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
@@ -2739,12 +2748,12 @@ var generateOpenApiPaths = (handlers) => {
       };
       let requestBody;
       if (meta?.body) {
-        const schema = zodToSchema(meta.body);
+        const schema = await toJsonSchema(meta.body);
         requestBody = { content: { "application/json": { schema } } };
       }
       let responses;
       if (meta?.response) {
-        const schema = zodToSchema(meta.response);
+        const schema = await toJsonSchema(meta.response);
         const description = getReturn(fn);
         responses = {
           200: { description, content: { "application/json": { schema } } }
@@ -2762,13 +2771,15 @@ var generateOpenApiPaths = (handlers) => {
         });
       });
       if (meta?.query) {
-        Object.entries(meta.query).map(([key, value]) => ({
-          name: key,
-          in: "query",
-          required: false,
-          schema: { type: typeof value },
-          example: value
-        }));
+        const schema = await toJsonSchema(meta.query);
+        for (const [name, prop] of Object.entries(schema.properties ?? {})) {
+          parameters.push({
+            name,
+            in: "query",
+            required: schema.required?.includes(name) ?? false,
+            schema: prop
+          });
+        }
       }
       paths[normalizedPath][method] = {
         tags: config2.tags,
@@ -2784,34 +2795,21 @@ var generateOpenApiPaths = (handlers) => {
 };
 var openapi_default = async (ctx) => {
   const pkg = await pkgProm;
+  const { title, description, version } = ctx.options.openapi ?? {};
   const domain = pkg.homepage || ctx.url.origin;
-  const openApi = {
+  return {
     openapi: "3.0.0",
     info: {
-      title: pkg.name || "API Documentation",
-      version: pkg.version || "1.0.0",
-      description: pkg.description || ""
+      title: title || pkg.name || "API Documentation",
+      version: version || pkg.version || "1.0.0",
+      description: description ?? (pkg.description || "")
     },
     servers: domain ? [{ url: domain }] : [],
-    paths: generateOpenApiPaths(ctx.app.handlers)
+    paths: await generateOpenApiPaths(
+      ctx.app.handlers,
+      ctx.options.openapi?.path ?? ""
+    )
   };
-  const configuration = ctx.options.openapi?.scalar || {};
-  return `
-<!doctype html>
-<html>
-  <head>
-    <title>API Reference</title>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1" />
-    <style>.open-api-client-button {display: none!important;}</style>
-  </head>
-  <body>
-    <script id="api-reference" type="application/json" data-configuration="${encode(JSON.stringify(configuration))}">${JSON.stringify(openApi, null, 2)}</script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-  </body>
-</html> `;
 };
 
 // src/middle/preflight.ts
@@ -3376,7 +3374,7 @@ var Server = class extends Router {
       auth(app);
     }
     if (this.settings.openapi) {
-      app.get(this.settings.openapi.path || "/docs", openapi_default);
+      app.get(this.settings.openapi.path, openapi_default);
     }
   }
   self() {

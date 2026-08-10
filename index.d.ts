@@ -259,7 +259,12 @@ type Options = {
     sessions?: StoreSource;
     cors?: CorsOptions;
     auth?: AuthOption;
-    openapi?: any;
+    openapi?: boolean | string | {
+        path?: string;
+        title?: string;
+        description?: string;
+        version?: string;
+    };
     onError?: OnError;
     onResponse?: OnResponse;
     log?: LogLevel | boolean;
@@ -279,7 +284,12 @@ type Settings = {
     sessionsDefault?: boolean;
     cors?: CorsSettings;
     auth?: AuthSettings;
-    openapi?: any;
+    openapi?: {
+        path: string;
+        title?: string;
+        description?: string;
+        version?: string;
+    };
     onError?: OnError;
     onResponse?: OnResponse;
     log: Logger;

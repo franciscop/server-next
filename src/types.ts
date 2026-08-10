@@ -224,7 +224,11 @@ export type SerializableValue =
 // Anything the `store` / `session` options accept: a plain `Map`, a Redis or
 // DynamoDB client, a `file://` path, or an already-wrapped store. It's passed
 // through polystore's `kv()` at boot, so routes always see a `KVStore`.
-export type StoreSource = KVStore | Map<string, any> | string | Record<string, any>;
+export type StoreSource =
+  | KVStore
+  | Map<string, any>
+  | string
+  | Record<string, any>;
 
 export type KVStore = {
   name?: string;
@@ -287,7 +291,10 @@ export type AuthOption =
       // built-in step (they never run "on top of" the default), and the user
       // they return must carry an `id` and an `email`. Deny by throwing.
       // Maps a provider's raw OAuth payload into your user (OAuth logins only)
-      onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+      onProfile?: (
+        raw: any,
+        provider: Provider,
+      ) => ProfileUser | Promise<ProfileUser>;
       // Builds the record to persist from the fresh login + the stored user
       // (`null` on a first login); the default is an upsert where fresh wins
       onLogin?: (
@@ -300,7 +307,10 @@ export type AuthOption =
       onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
       // Builds the `jwt` token payload from the stored record, once per login;
       // the default strips `password`. The payload is client-readable.
-      onToken?: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
+      onToken?: (
+        user: AuthUser,
+        ctx: Context,
+      ) => ProfileUser | Promise<ProfileUser>;
       // Event fired when a session is revoked through POST /auth/logout
       onLogout?: (ctx: Context) => unknown;
     };
@@ -312,7 +322,10 @@ export type AuthSettings = {
   // One record per person; sessions point into it via their `user` field
   users: KVStore;
 
-  onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
+  onProfile?: (
+    raw: any,
+    provider: Provider,
+  ) => ProfileUser | Promise<ProfileUser>;
   onLogin?: (
     loginUser: AuthUser,
     existingUser: AuthUser | null,
@@ -390,7 +403,12 @@ export type Options = {
   sessions?: StoreSource;
   cors?: CorsOptions;
   auth?: AuthOption;
-  openapi?: any;
+  // Serve the generated OpenAPI spec: `true` for /openapi.json, a string for
+  // another path, or an object also overriding the package.json-derived info
+  openapi?:
+    | boolean
+    | string
+    | { path?: string; title?: string; description?: string; version?: string };
   onError?: OnError;
   onResponse?: OnResponse;
   log?: LogLevel | boolean;
@@ -412,7 +430,12 @@ export type Settings = {
   sessionsDefault?: boolean;
   cors?: CorsSettings;
   auth?: AuthSettings;
-  openapi?: any;
+  openapi?: {
+    path: string;
+    title?: string;
+    description?: string;
+    version?: string;
+  };
   onError?: OnError;
   onResponse?: OnResponse;
   log: Logger;

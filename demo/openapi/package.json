@@ -5,13 +5,17 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "bun --hot .",
+    "start": "bun ."
   },
   "keywords": [],
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "MIT",
-  "description": "",
+  "description": "The OpenAPI spec generated from routes and their schemas",
   "dependencies": {
-    "zod": "^4.0.17"
+    "@valibot/to-json-schema": "^1.7.1",
+    "arktype": "^2.2.3",
+    "valibot": "^1.4.2",
+    "zod": "^4.4.3"
   }
 }

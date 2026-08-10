@@ -9,5 +9,9 @@
   "description": "Route validation with arktype through Standard Schema",
   "dependencies": {
     "arktype": "^2.2.3"
+  },
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
   }
 }

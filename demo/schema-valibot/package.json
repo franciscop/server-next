@@ -9,5 +9,9 @@
   "description": "Route validation with valibot through Standard Schema",
   "dependencies": {
     "valibot": "^1.4.2"
+  },
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
   }
 }

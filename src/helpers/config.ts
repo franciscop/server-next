@@ -166,12 +166,13 @@ export default function config(options: Options = {}): Settings {
     );
   }
 
-  // OpenAPI
+  // OpenAPI: the generated spec, served at its conventional path by default.
+  // There's no built-in viewer; the docs show the copy-paste shell for one.
   if (options.openapi) {
-    if (options.openapi === true) {
-      settings.openapi = {};
-    }
-    // TODO
+    const o = options.openapi;
+    if (o === true) settings.openapi = { path: "/openapi.json" };
+    else if (typeof o === "string") settings.openapi = { path: o };
+    else settings.openapi = { path: "/openapi.json", ...o };
   }
 
   settings.onError =
@@ -200,7 +201,7 @@ export default function config(options: Options = {}): Settings {
   }
   if (settings.favicon) log.message("favicon", loc(settings.favicon));
   if (settings.cache !== undefined) log.message("cache", loc(options.cache));
-  if (settings.openapi) log.message("openapi", settings.openapi.path || "/docs");
+  if (settings.openapi) log.message("openapi", settings.openapi.path);
 
   return settings;
 }

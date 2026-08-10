@@ -1,18 +1,6 @@
 import * as fsp from "node:fs/promises";
 import type { Context } from "../types";
 
-const entities: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-};
-const encode = (str: string | number = ""): string => {
-  if (typeof str === "number") str = String(str);
-  if (typeof str !== "string") return ""; // nullify not-strings
-  return str.replace(/[&<>"]/g, (tag) => entities[tag]);
-};
-
 const getConfig = (options: any = {}): any => {
   const config = { ...options };
   if (config.tags) {
@@ -26,6 +14,35 @@ const getConfig = (options: any = {}): any => {
   }
   return config;
 };
+
+// A JSON Schema draft marker doesn't belong inside an OpenAPI document
+const clean = ({ $schema, ...schema }: any) => schema;
+
+// Any Standard Schema becomes JSON Schema through its own vendor: arktype
+// exposes it on the instance, zod and valibot on their modules, imported
+// dynamically so the framework stays dependency-free and reuses the library
+// the app built the schema with. Valibot needs its `@valibot/to-json-schema`
+// companion installed. Anything else (or a schema the vendor can't express)
+// falls back to the zod-internals reader below, then to a plain string.
+async function toJsonSchema(schema: any): Promise<any> {
+  try {
+    if (typeof schema?.toJsonSchema === "function") {
+      return clean(schema.toJsonSchema());
+    }
+    const vendor = schema?.["~standard"]?.vendor;
+    if (vendor === "zod") {
+      const mod: any = await import("zod");
+      return clean((mod.toJSONSchema ?? mod.z.toJSONSchema)(schema));
+    }
+    if (vendor === "valibot") {
+      const mod: any = await import("@valibot/to-json-schema");
+      return clean(mod.toJsonSchema(schema));
+    }
+  } catch {
+    // fall through to the introspection fallback
+  }
+  return zodToSchema(schema);
+}
 
 // Convert Zod to OpenAPI requestBody without external libraries
 function zodToSchema(schema: any): any {
@@ -69,27 +86,31 @@ const getTag = (name: string, fn: () => void): string => {
     .map((l) => l.trim().replace("// ", ""))
     .find((l) => l.startsWith(name));
   if (!found) return "";
-  return encode(found.replace(name, "").trim());
+  return found.replace(name, "").trim();
 };
 
 const getDescription = (fn: () => string): string =>
   getTag("@description", fn) || "";
 const getReturn = (fn: () => string): string => getTag("@returns", fn) || "OK";
 
-const generateOpenApiPaths = (
+const generateOpenApiPaths = async (
   handlers: Record<string, any[]>,
-): Record<string, any> => {
+  specPath: string,
+): Promise<Record<string, any>> => {
   const paths: Record<string, any> = {};
 
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
       const path = route.path;
-      const fn = route.fns.find((p: any) => typeof p === "function");
+      // The handler is the LAST function: the chain starts with the global
+      // middleware (timer, assets, ...), whose names must not become docs
+      const fn = [...route.fns].reverse().find((p: any) => typeof p === "function");
       // Validation schemas live in the route options; `schema` is spec metadata
       const meta = route.options ?? {};
       const config = getConfig(route.options?.schema);
 
-      if (typeof path !== "string" || path === "*" || path === "/docs" || !fn) {
+      // The spec doesn't document itself
+      if (typeof path !== "string" || path === "*" || path === specPath || !fn) {
         continue;
       }
 
@@ -120,7 +141,7 @@ const generateOpenApiPaths = (
         | { content: { "application/json": { schema: any } } }
         | undefined;
       if (meta?.body) {
-        const schema = zodToSchema(meta.body);
+        const schema = await toJsonSchema(meta.body);
         requestBody = { content: { "application/json": { schema } } };
       }
 
@@ -133,7 +154,7 @@ const generateOpenApiPaths = (
           }
         | undefined;
       if (meta?.response) {
-        const schema = zodToSchema(meta.response);
+        const schema = await toJsonSchema(meta.response);
         const description = getReturn(fn);
         responses = {
           200: { description, content: { "application/json": { schema } } },
@@ -157,14 +178,17 @@ const generateOpenApiPaths = (
         });
       });
 
+      // A `query` schema's properties become the query parameters
       if (meta?.query) {
-        Object.entries(meta.query).map(([key, value]) => ({
-          name: key,
-          in: "query",
-          required: false,
-          schema: { type: typeof value },
-          example: value,
-        }));
+        const schema = await toJsonSchema(meta.query);
+        for (const [name, prop] of Object.entries(schema.properties ?? {})) {
+          parameters.push({
+            name,
+            in: "query",
+            required: schema.required?.includes(name) ?? false,
+            schema: prop,
+          });
+        }
       }
 
       paths[normalizedPath][method] = {
@@ -184,36 +208,24 @@ const generateOpenApiPaths = (
   return paths;
 };
 
-export default async (ctx: Context): Promise<string> => {
+// The spec itself, as JSON. There's no built-in viewer: every docs UI is a
+// static shell pointing at this route, so it stays a copy-paste in the docs.
+export default async (ctx: Context): Promise<Record<string, any>> => {
   const pkg = await pkgProm;
+  // The root option wins; the app's own package.json fills the rest
+  const { title, description, version } = ctx.options.openapi ?? {};
   const domain = (pkg as any).homepage || ctx.url.origin;
-  const openApi = {
+  return {
     openapi: "3.0.0",
     info: {
-      title: (pkg as any).name || "API Documentation",
-      version: (pkg as any).version || "1.0.0",
-      description: (pkg as any).description || "",
+      title: title || (pkg as any).name || "API Documentation",
+      version: version || (pkg as any).version || "1.0.0",
+      description: description ?? ((pkg as any).description || ""),
     },
     servers: domain ? [{ url: domain }] : [],
-    paths: generateOpenApiPaths((ctx as any).app.handlers),
+    paths: await generateOpenApiPaths(
+      (ctx as any).app.handlers,
+      ctx.options.openapi?.path ?? "",
+    ),
   };
-
-  const configuration = ctx.options.openapi?.scalar || {};
-
-  return `
-<!doctype html>
-<html>
-  <head>
-    <title>API Reference</title>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1" />
-    <style>.open-api-client-button {display: none!important;}</style>
-  </head>
-  <body>
-    <script id="api-reference" type="application/json" data-configuration="${encode(JSON.stringify(configuration))}">${JSON.stringify(openApi, null, 2)}</script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-  </body>
-</html> `;
 };

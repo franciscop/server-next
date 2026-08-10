@@ -1,0 +1,17 @@
+{
+  "name": "openapi-scalar",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "type": "module",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "The OpenAPI spec with a Scalar docs UI as a plain route",
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  }
+}
