@@ -50,6 +50,7 @@ ServerError_default.extend({
     message: "Missing the OAuth 'code' in the request body"
   },
   SESSION_JWT: "The `jwt` strategy is stateless, so there is no `ctx.session` (tried '{key}'). Use the `token` strategy for server-side sessions, or `cookie` for browsers",
+  SESSION_GUEST: "No `ctx.session` for this request (tried '{key}'): the `token` strategy carries the session in the Authorization header, and this request has none. Sign in first, or use the `cookie` strategy for guest sessions",
   AUTH_INVALID_HEADER: {
     status: 401,
     message: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)"
@@ -104,6 +105,17 @@ var StatusError = class extends Error {
   }
 };
 
+// src/helpers/bucket.ts
+import FileSystem from "bucket/fs";
+function bucket(root) {
+  if (!root) return null;
+  if (typeof root === "string") return FileSystem(root);
+  if (typeof root.file === "function") return root;
+  throw new Error(
+    "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
+  );
+}
+
 // src/helpers/createId.ts
 var alphabet = "useandom26T198340PX75pxJACKVERYMINDBUSHWOLFGQZbfghjklqvwyzrict";
 var random = (bytes) => crypto.getRandomValues(new Uint8Array(bytes));
@@ -146,6 +158,16 @@ function createId(source, size = 16) {
 }
 
 // src/helpers/upload.ts
+function resolveUploads(up) {
+  if (!up) return null;
+  if (typeof up === "object" && "bucket" in up) {
+    const { bucket: bucket2, maxSize, minSize, fileType: fileType2 } = up;
+    if (maxSize != null) parseBytes(maxSize);
+    if (minSize != null) parseBytes(minSize);
+    return { bucket: bucket(bucket2), maxSize, minSize, fileType: fileType2 };
+  }
+  return { bucket: bucket(up) };
+}
 function parseBytes(value) {
   if (typeof value === "number") return value;
   const units = {
@@ -1010,8 +1032,8 @@ var validateToken = (authorization) => {
   return id;
 };
 function findSessionId(ctx) {
-  const strategy = ctx.options.auth?.strategy;
-  if (strategy?.includes("token") && ctx.headers.authorization) {
+  if (ctx.options.auth?.strategy.includes("token")) {
+    if (!ctx.headers.authorization) return;
     return validateToken(ctx.headers.authorization);
   }
   return ctx.cookies.session || void 0;
@@ -1019,28 +1041,33 @@ function findSessionId(ctx) {
 
 // src/middle/session.ts
 var loaded = /* @__PURE__ */ new WeakMap();
-function jwtSession() {
+function noSession(error) {
   const target = {};
   return new Proxy(target, {
     get(target2, key) {
       if (typeof key === "symbol" || key === "then") return target2[key];
-      throw ServerError_default.SESSION_JWT({ key: String(key) });
+      throw error(String(key));
     },
     set(target2, key, value) {
       if (typeof key === "symbol") {
         target2[key] = value;
         return true;
       }
-      throw ServerError_default.SESSION_JWT({ key: String(key) });
+      throw error(String(key));
     }
   });
 }
 async function session(ctx) {
-  if (ctx.options.auth?.strategy.includes("jwt")) {
-    ctx.session = jwtSession();
+  const strategy = ctx.options.auth?.strategy;
+  if (strategy?.includes("jwt")) {
+    ctx.session = noSession((key) => ServerError_default.SESSION_JWT({ key }));
     return;
   }
   const id = findSessionId(ctx);
+  if (!id && strategy?.includes("token")) {
+    ctx.session = noSession((key) => ServerError_default.SESSION_GUEST({ key }));
+    return;
+  }
   ctx.session = id && await ctx.options.sessions.get(id) || {};
   loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
 }
@@ -1050,6 +1077,10 @@ async function finishLogin(ctx, input, opts = {}) {
   const settings = ctx.options.auth;
   const { strategy, onLogin, onUser, onToken } = settings;
   const key = String(input.key);
+  if (!strategy.includes("jwt") && !loaded.has(ctx)) {
+    ctx.session = {};
+    loaded.set(ctx, { id: void 0, data: "{}" });
+  }
   const auth2 = {
     user: key,
     provider: input.provider,
@@ -1613,17 +1644,6 @@ function parseAuthOptions(auth2) {
   };
 }
 
-// src/helpers/bucket.ts
-import FileSystem from "bucket/fs";
-function bucket(root) {
-  if (!root) return null;
-  if (typeof root === "string") return FileSystem(root);
-  if (typeof root.file === "function") return root;
-  throw new Error(
-    "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
-  );
-}
-
 // src/helpers/color.ts
 var map = {
   reset: 0,
@@ -1863,17 +1883,7 @@ function config(options = {}) {
   }
   const publicDir = options.public || env2.PUBLIC;
   settings.public = publicDir ? bucket(publicDir) : null;
-  const up = options.uploads;
-  if (!up) {
-    settings.uploads = null;
-  } else if (typeof up === "object" && "bucket" in up) {
-    const { bucket: bucket2, maxSize, minSize, fileType: fileType2 } = up;
-    if (maxSize != null) parseBytes(maxSize);
-    if (minSize != null) parseBytes(minSize);
-    settings.uploads = { bucket: bucket(bucket2), maxSize, minSize, fileType: fileType2 };
-  } else {
-    settings.uploads = { bucket: bucket(up) };
-  }
+  settings.uploads = resolveUploads(options.uploads);
   const favicon2 = options.favicon || env2.FAVICON;
   if (favicon2) settings.favicon = favicon2;
   const production = env2.NODE_ENV === "production";
@@ -1886,7 +1896,7 @@ function config(options = {}) {
     if (!settings.auth.users) {
       if (production) {
         throw new Error(
-          "Auth in production needs a persistent `users` store, like auth: { ..., users: kv(redis).prefix('users:') }."
+          "Auth in production needs a persistent `users` store, like auth: { ..., users: kv(redis).prefix('user:') }."
         );
       }
       settings.auth.users = toStore(/* @__PURE__ */ new Map());
@@ -2106,13 +2116,11 @@ async function parseResponse(out, ctx) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
   const prev = loaded.get(ctx);
-  const jwt = ctx.options.auth?.strategy.includes("jwt");
-  const data = jwt ? "{}" : JSON.stringify(ctx.session ?? {});
-  if (!jwt && data !== (prev?.data ?? "{}")) {
+  if (prev && JSON.stringify(ctx.session ?? {}) !== prev.data) {
     if (ctx.options.sessionsDefault && ctx.platform.production) {
       warnDefault();
     }
-    let id = prev?.id;
+    let id = prev.id;
     if (!id) {
       id = createId();
       out.headers.append(
@@ -2465,14 +2473,14 @@ async function getJwtUser(ctx) {
   return exposed;
 }
 async function getAuthSession(ctx) {
-  let session2 = ctx.session;
-  if (!session2) {
-    const id = findSessionId(ctx);
-    if (!id) return;
-    session2 = await ctx.options.sessions.get(id) ?? void 0;
+  if (loaded.has(ctx)) {
+    const session3 = ctx.session;
+    return session3?.user ? session3 : void 0;
   }
-  if (!session2?.user) return;
-  return session2;
+  const id = findSessionId(ctx);
+  if (!id) return;
+  const session2 = await ctx.options.sessions.get(id);
+  return session2?.user ? session2 : void 0;
 }
 async function getUser(ctx) {
   if (!ctx.options.auth) return;
@@ -3231,6 +3239,9 @@ var Router = class _Router {
       options = rest.shift();
     }
     checkParserConflict(options, this.settings?.parser);
+    if (options.uploads !== void 0) {
+      options.uploads = resolveUploads(options.uploads);
+    }
     const base = method === "socket" ? [] : this.middleware;
     const fns = [...base, ...rest].filter((fn) => fn != null);
     this.handlers[method].push({ path, options, fns });

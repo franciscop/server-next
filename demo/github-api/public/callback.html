@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signing in…</title>
+  </head>
+  <body>
+    <pre id="out">Signing in…</pre>
+
+    <script type="module">
+      const out = document.querySelector("#out");
+      const params = new URLSearchParams(location.search);
+
+      // We issued the `state`, so we check it: the server never saw it
+      if (params.get("state") !== sessionStorage.state) {
+        out.textContent = "State mismatch, aborting.";
+      } else {
+        const res = await fetch("/auth/verify/github", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            code: params.get("code"),
+            redirect_uri: `${location.origin}/callback`,
+          }),
+        });
+        if (!res.ok) {
+          out.textContent = `Login failed: ${await res.text()}`;
+        } else {
+          const { token, ...user } = await res.json();
+          localStorage.token = token;
+          out.textContent = `Signed in as ${user.name || user.email}`;
+          location.href = "/";
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -5,7 +5,7 @@ const disk = kv(`file://${process.cwd()}/session/`);
 
 export default server({
   sessions: disk.prefix("session:"),
-  auth: { strategy: "cookie", providers: ["github"], users: disk.prefix("users:") },
+  auth: { strategy: "cookie", providers: ["github"], users: disk.prefix("user:") },
 })
   .get("/", (ctx) => redirect(ctx.user ? "/user" : "/login"))
   .get("/login", () => (

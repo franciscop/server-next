@@ -31,6 +31,14 @@ export default async function finishLogin(
   const { strategy, onLogin, onUser, onToken } = settings;
   const key = String(input.key);
 
+  // A login always ends with a session (except stateless `jwt`), so give this
+  // request a writable one now: a `token` guest arrives without one, and
+  // `onLogin` may stamp per-device data onto it.
+  if (!strategy.includes("jwt") && !loaded.has(ctx)) {
+    ctx.session = {};
+    loaded.set(ctx, { id: undefined, data: "{}" });
+  }
+
   const auth: AuthSession = {
     user: key,
     provider: input.provider as AuthSession["provider"],

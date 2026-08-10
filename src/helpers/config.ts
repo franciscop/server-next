@@ -4,7 +4,7 @@ import createId from "./createId";
 import createLogger from "./logger";
 import { resolveSecurity } from "./security";
 import toStore, { toStoreExpiring } from "./store";
-import { parseBytes } from "./upload";
+import { resolveUploads } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
 
@@ -113,18 +113,7 @@ export default function config(options: Options = {}): Settings {
   // minSize, fileType }`, with the bucket resolved and undefined leaves meaning
   // "no limit". Limits make parseBody buffer each file to check it before
   // writing; without them files stream straight through.
-  const up = options.uploads;
-  if (!up) {
-    settings.uploads = null;
-  } else if (typeof up === "object" && "bucket" in up) {
-    const { bucket, maxSize, minSize, fileType } = up;
-    // A bad size string ('5megs') fails here at boot, not on the first upload
-    if (maxSize != null) parseBytes(maxSize);
-    if (minSize != null) parseBytes(minSize);
-    settings.uploads = { bucket: Bucket(bucket), maxSize, minSize, fileType };
-  } else {
-    settings.uploads = { bucket: Bucket(up) };
-  }
+  settings.uploads = resolveUploads(options.uploads);
 
   // Favicon served at /favicon.ico (path or Bucket)
   const favicon = options.favicon || env.FAVICON;
@@ -149,7 +138,7 @@ export default function config(options: Options = {}): Settings {
       if (production) {
         throw new Error(
           "Auth in production needs a persistent `users` store, like " +
-            "auth: { ..., users: kv(redis).prefix('users:') }.",
+            "auth: { ..., users: kv(redis).prefix('user:') }.",
         );
       }
       settings.auth.users = toStore(new Map());

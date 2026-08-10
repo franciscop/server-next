@@ -1,4 +1,5 @@
-import type { Bucket, UploadedFile } from "../types";
+import type { Bucket, Settings, UploadOptions, UploadedFile } from "../types";
+import Bucket_ from "./bucket";
 import createId from "./createId";
 
 export type LimitOptions = {
@@ -6,6 +7,24 @@ export type LimitOptions = {
   minSize?: number | string;
   fileType?: string[];
 };
+
+// Normalize an `uploads` option (root or per-route) into the resolved shape
+// the request path consumes: every form becomes `{ bucket, maxSize, minSize,
+// fileType }` with the bucket built, or null when off. Idempotent, so a route
+// merged twice (a `router()` into a server) resolves cleanly. Bad size
+// strings ('5megs') fail here, at boot, not on the first upload.
+export function resolveUploads(
+  up: string | Bucket | UploadOptions | false | undefined,
+): Settings["uploads"] {
+  if (!up) return null;
+  if (typeof up === "object" && "bucket" in up) {
+    const { bucket, maxSize, minSize, fileType } = up as UploadOptions;
+    if (maxSize != null) parseBytes(maxSize);
+    if (minSize != null) parseBytes(minSize);
+    return { bucket: Bucket_(bucket)!, maxSize, minSize, fileType };
+  }
+  return { bucket: Bucket_(up)! };
+}
 
 export function parseBytes(value: number | string): number {
   if (typeof value === "number") return value;

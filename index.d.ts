@@ -103,10 +103,13 @@ type RouteOptions = {
     params?: StandardSchemaV1<any, any>;
     response?: StandardSchemaV1<any, any>;
     cache?: CacheOption;
+    uploads?: string | Bucket | UploadOptions | false;
 };
 type Route = {
     path: string;
-    options: RouteOptions;
+    options: Omit<RouteOptions, "uploads"> & {
+        uploads?: Settings["uploads"];
+    };
     fns: Middleware[];
 };
 type Cookie = {

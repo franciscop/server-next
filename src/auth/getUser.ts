@@ -1,6 +1,7 @@
 import type { AuthSession, AuthUser, Context } from "..";
 import { ServerError } from "..";
 import { verifyJwt } from "../helpers/jwt";
+import { loaded } from "../middle/session";
 import assertUser from "./assertUser";
 import findSessionId from "./findSessionId";
 
@@ -32,17 +33,18 @@ async function getJwtUser(ctx: Context): Promise<AuthUser | undefined> {
 }
 
 // The other strategies store the auth fields on the device's session record.
-// HTTP requests carry the already-loaded session; a socket upgrade builds a
-// partial ctx with no session, so resolve it from the store here.
 async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
-  let session = ctx.session as AuthSession | undefined;
-  if (!session) {
-    const id = findSessionId(ctx);
-    if (!id) return;
-    session = (await ctx.options.sessions.get<AuthSession>(id)) ?? undefined;
+  // An HTTP request carries its already-loaded session (`loaded` marks it).
+  // Without one there's nothing to read: a `token` guest has no credential,
+  // and a socket upgrade builds a partial ctx, so that one hits the store.
+  if (loaded.has(ctx)) {
+    const session = ctx.session as AuthSession;
+    return session?.user ? session : undefined;
   }
-  if (!session?.user) return; // a guest session; not signed in
-  return session;
+  const id = findSessionId(ctx);
+  if (!id) return;
+  const session = await ctx.options.sessions.get<AuthSession>(id);
+  return session?.user ? session : undefined;
 }
 
 export default async function getUser(ctx: Context): Promise<AuthUser> {

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign in with GitHub (SPA)</title>
+  </head>
+  <body>
+    <h1>Sign in with GitHub</h1>
+    <p><button id="login">Sign in</button></p>
+    <pre id="out">Not signed in.</pre>
+
+    <script type="module">
+      const out = document.querySelector("#out");
+
+      // Already signed in? The token is ours to keep and send.
+      const token = localStorage.token;
+      if (token) {
+        const res = await fetch("/api/me", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        out.textContent = res.ok
+          ? JSON.stringify(await res.json(), null, 2)
+          : "Token rejected, sign in again.";
+      }
+
+      // Ask the server where to send the visitor, with our own CSRF state
+      document.querySelector("#login").onclick = async () => {
+        const state = crypto.randomUUID();
+        sessionStorage.state = state;
+        const params = new URLSearchParams({
+          redirect_uri: `${location.origin}/callback`,
+          state,
+        });
+        const res = await fetch(`/auth/login/github?${params}`, {
+          headers: { accept: "application/json" },
+        });
+        const { url } = await res.json();
+        location.href = url;
+      };
+    </script>
+  </body>
+</html>

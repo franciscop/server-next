@@ -3,26 +3,31 @@ import server from ".";
 
 const CREDENTIALS = { email: "abc@test.com", password: "11111111" };
 
-// Run a block with NODE_ENV=production (config reads it at construction)
-const inProduction = (fn: () => void) => {
+// Run a block with NODE_ENV=production. `globalThis.env` is the snapshot the
+// boot guards read; `process.env` is what ctx.platform.production reads live.
+const inProduction = async (fn: () => unknown) => {
   const before = globalThis.env.NODE_ENV;
+  const processBefore = process.env.NODE_ENV;
   globalThis.env.NODE_ENV = "production";
+  process.env.NODE_ENV = "production";
   try {
-    fn();
+    await fn();
   } finally {
     globalThis.env.NODE_ENV = before;
+    if (processBefore === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = processBefore;
   }
 };
 
 describe("production boot guard", () => {
-  it("requires an explicit users store with auth", () => {
-    inProduction(() => {
+  it("requires an explicit users store with auth", async () => {
+    await inProduction(() => {
       expect(() => server({ auth: "cookie:email" })).toThrow(/users/);
     });
   });
 
-  it("requires an explicit sessions store with auth", () => {
-    inProduction(() => {
+  it("requires an explicit sessions store with auth", async () => {
+    await inProduction(() => {
       expect(() =>
         server({
           auth: { strategy: "cookie", providers: "email", users: new Map() },
@@ -31,8 +36,8 @@ describe("production boot guard", () => {
     });
   });
 
-  it("boots with both stores set (even explicit Maps)", () => {
-    inProduction(() => {
+  it("boots with both stores set (even explicit Maps)", async () => {
+    await inProduction(() => {
       const app = server({
         sessions: new Map(),
         auth: { strategy: "cookie", providers: "email", users: new Map() },
@@ -41,8 +46,8 @@ describe("production boot guard", () => {
     });
   });
 
-  it("jwt still requires users (logins read and write it), not sessions", () => {
-    inProduction(() => {
+  it("jwt still requires users (logins read and write it), not sessions", async () => {
+    await inProduction(() => {
       // No `sessions` needed: jwt has no ctx.session
       const app = server({
         secret: "s3cret",
@@ -58,14 +63,43 @@ describe("production boot guard", () => {
     });
   });
 
-  it("without auth the defaults boot fine in production", () => {
-    inProduction(() => {
+  it("without auth the defaults boot fine in production", async () => {
+    await inProduction(() => {
       expect(server()).toBeDefined();
     });
   });
 
   it("in development everything defaults", () => {
     expect(server({ auth: "cookie:email" })).toBeDefined();
+  });
+
+  it("warns once, on the first write, when sessions default in production", async () => {
+    await inProduction(async () => {
+      const warns: string[] = [];
+      const real = console.warn;
+      console.warn = (msg: string) => warns.push(msg);
+      try {
+        const api = server()
+          .get("/idle", () => "ok")
+          .post("/hit", (ctx) => {
+            ctx.session.n = Number(ctx.session.n ?? 0) + 1;
+            return 200;
+          })
+          .test();
+
+        // A request that never touches the session says nothing
+        await api.get("/idle");
+        expect(warns).toHaveLength(0);
+
+        // The first write warns, later ones stay quiet
+        await api.post("/hit", {});
+        await api.post("/hit", {});
+        expect(warns).toHaveLength(1);
+        expect(warns[0]).toContain("in-memory session store");
+      } finally {
+        console.warn = real;
+      }
+    });
   });
 });
 
@@ -178,7 +212,9 @@ describe("login and the session record", () => {
       .test();
 
     // The same person signs in on two "devices"
-    const one = await (await api.post("/auth/register/email", CREDENTIALS)).json();
+    const one = await (
+      await api.post("/auth/register/email", CREDENTIALS)
+    ).json();
     const two = await (await api.post("/auth/login/email", CREDENTIALS)).json();
     expect((await sessions.keys()).length).toBe(2);
 
@@ -194,6 +230,55 @@ describe("login and the session record", () => {
       });
       expect(res.status).toBe(401); // the route's own 401: anonymous again
     }
+  });
+});
+
+describe("the token strategy is cookie-free", () => {
+  const app = () =>
+    server({
+      auth: { strategy: "token", providers: ["email"], users: new Map() },
+    })
+      .get("/read", (ctx) => `got ${ctx.session.cart}`)
+      .post("/write", (ctx) => {
+        ctx.session.cart = ["x"];
+        return 200;
+      })
+      .get("/ok", () => "no session touched")
+      .test();
+
+  it("a guest has no session at all: any access throws", async () => {
+    const api = app();
+    const read = await api.get("/read");
+    expect(read.status).toBe(500);
+    expect(await read.text()).toContain("Authorization header");
+
+    const write = await api.post("/write", {});
+    expect(write.status).toBe(500);
+
+    // Routes that leave ctx.session alone are unaffected, and cookie-free
+    const ok = await api.get("/ok");
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("never mints a cookie, and ignores one it is sent", async () => {
+    const api = app();
+    const login = await api.post("/auth/register/email", CREDENTIALS);
+    expect(login.headers.get("set-cookie")).toBeNull();
+    const { token } = await login.json();
+
+    // The bearer carries the session; writes persist with no Set-Cookie
+    const headers = { authorization: `Bearer ${token}` };
+    const write = await api.post("/write", {}, { headers });
+    expect(write.headers.get("set-cookie")).toBeNull();
+    const read = await api.get("/read", { headers });
+    expect(await read.text()).toBe("got x");
+
+    // A stray cookie is not a credential here: still a session-less guest
+    const cookied = await api.get("/read", {
+      headers: { cookie: `session=${token}` },
+    });
+    expect(cookied.status).toBe(500);
   });
 });
 

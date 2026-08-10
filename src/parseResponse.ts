@@ -149,12 +149,11 @@ export default async function parseResponse(
   }
 
   // Persist the session only when it changed since it was loaded (the
-  // snapshot in `loaded`); an untouched session costs no store write. Under
-  // `jwt` there is no session at all (see middle/session), so nothing runs.
+  // snapshot in `loaded`); an untouched session costs no store write. No entry
+  // means this request has no session at all (see middle/session), so nothing
+  // is written or minted for it.
   const prev = loaded.get(ctx);
-  const jwt = ctx.options.auth?.strategy.includes("jwt");
-  const data = jwt ? "{}" : JSON.stringify(ctx.session ?? {});
-  if (!jwt && data !== (prev?.data ?? "{}")) {
+  if (prev && JSON.stringify(ctx.session ?? {}) !== prev.data) {
     if (ctx.options.sessionsDefault && ctx.platform.production) {
       warnDefault();
     }
@@ -162,7 +161,7 @@ export default async function parseResponse(
     // new one. The SAME id must be used both for the Set-Cookie and the store
     // key, or a fresh session is saved under a key the next request can never
     // look up.
-    let id = prev?.id;
+    let id = prev.id;
     if (!id) {
       id = createId();
       // Harden the session cookie: JS can't read it (HttpOnly), it isn't sent

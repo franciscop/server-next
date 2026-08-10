@@ -8,6 +8,7 @@ import type {
   Route,
   StandardSchemaV1,
 } from "./types";
+import { resolveUploads } from "./helpers/upload";
 
 // Middleware spelled out structurally: comparing Middleware<A> to
 // Middleware<B> uses alias variance (invariant here), rejecting smaller slices
@@ -86,12 +87,18 @@ export class Router<C extends ContextTypes = {}> {
       options = rest.shift();
     }
     checkParserConflict(options, (this as any).settings?.parser);
+    // Resolved here (once, at boot) so ctx.options.uploads is always the
+    // final `{ bucket, ...limits }` shape no matter where it came from
+    if (options.uploads !== undefined) {
+      options.uploads = resolveUploads(options.uploads) as any;
+    }
 
     // Sockets are dispatched on their own and don't run the HTTP middleware
     const base = method === "socket" ? [] : this.middleware;
     const fns = [...base, ...rest].filter((fn) => fn != null);
 
-    this.handlers[method].push({ path, options, fns });
+    // `uploads` was just resolved above, hence the stored-route shape
+    this.handlers[method].push({ path, options: options as Route["options"], fns });
     return this.self();
   }
 

@@ -111,13 +111,17 @@ export type RouteOptions = {
   params?: StandardSchemaV1<any, any>;
   response?: StandardSchemaV1<any, any>;
   cache?: CacheOption;
+  // Where this route's files go, replacing the root `uploads` wholesale
+  // (limits included); `false` skips file fields for this route
+  uploads?: string | Bucket | UploadOptions | false;
   // [key: string]: any;
 };
 
-// A single registered route with its middleware chain already flattened in
+// A single registered route with its middleware chain already flattened in,
+// and `uploads` already resolved to its final shape (see Router.handle)
 export type Route = {
   path: string;
-  options: RouteOptions;
+  options: Omit<RouteOptions, "uploads"> & { uploads?: Settings["uploads"] };
   fns: Middleware[];
 };
 
