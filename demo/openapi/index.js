@@ -16,25 +16,45 @@ const Pagination = v.object({
 const Tag = type({ label: "string", "color?": "string" });
 
 export default server({ openapi: true })
-  // zod: query parameters + response
-  .get("/users", { query: Pagination, response: z.array(User) }, () => [])
-  // zod body + response, valibot pagination above, path param below
-  .post("/users", { body: User, response: User }, function createNewUser() {
-    return 201;
-  })
+  // valibot: query parameters; zod: the response
+  .get(
+    "/users",
+    {
+      query: Pagination,
+      response: z.array(User),
+      schema: { tags: "users", title: "List the users" },
+    },
+    () => [],
+  )
+  // zod: body + response; `schema` carries the spec metadata
+  .post(
+    "/users",
+    {
+      body: User,
+      response: User,
+      schema: { tags: "users", title: "Create a user" },
+    },
+    () => 201,
+  )
   .put(
     "/users/:id(number)",
-    { body: User, response: User },
-    function updateExistingUser(ctx) {
+    {
+      body: User,
+      response: User,
+      schema: { tags: "users", title: "Replace a user" },
+    },
+    (ctx) => {
       console.log(ctx.url.params.id, ctx.body);
       return 200;
     },
   )
   // arktype
-  .post("/tags", { body: Tag, response: Tag }, function createTag(ctx) {
-    return ctx.body;
-  })
-  .delete("/users/:id(number)", (ctx) => {
+  .post(
+    "/tags",
+    { body: Tag, response: Tag, schema: { tags: "tags", title: "Create a tag" } },
+    (ctx) => ctx.body,
+  )
+  .delete("/users/:id(number)", { schema: { tags: "users" } }, (ctx) => {
     console.log(ctx.url.params.id);
     return 200;
   });

@@ -78,21 +78,6 @@ const pkgProm = fsp
   .then((data) => JSON.parse(data))
   .catch(() => ({}));
 
-const getTag = (name: string, fn: () => void): string => {
-  const found = fn
-    .toString()
-    .split("\n")
-    .filter((l) => /\s+\/\/\s/.test(l))
-    .map((l) => l.trim().replace("// ", ""))
-    .find((l) => l.startsWith(name));
-  if (!found) return "";
-  return found.replace(name, "").trim();
-};
-
-const getDescription = (fn: () => string): string =>
-  getTag("@description", fn) || "";
-const getReturn = (fn: () => string): string => getTag("@returns", fn) || "OK";
-
 const generateOpenApiPaths = async (
   handlers: Record<string, any[]>,
   specPath: string,
@@ -102,15 +87,12 @@ const generateOpenApiPaths = async (
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
       const path = route.path;
-      // The handler is the LAST function: the chain starts with the global
-      // middleware (timer, assets, ...), whose names must not become docs
-      const fn = [...route.fns].reverse().find((p: any) => typeof p === "function");
       // Validation schemas live in the route options; `schema` is spec metadata
       const meta = route.options ?? {};
       const config = getConfig(route.options?.schema);
 
       // The spec doesn't document itself
-      if (typeof path !== "string" || path === "*" || path === specPath || !fn) {
+      if (typeof path !== "string" || path === "*" || path === specPath) {
         continue;
       }
 
@@ -122,20 +104,6 @@ const generateOpenApiPaths = async (
       if (!paths[normalizedPath]) {
         paths[normalizedPath] = {};
       }
-
-      const getTitle = (fn: () => string): string | null => {
-        if (!fn.name) return null;
-        // Well, we shouldn't really rely on these, e.g. automatic names from export default
-        const wrongNames = ["default"];
-        if (wrongNames.includes(fn.name)) return null;
-        if (fn.name.length <= 3) return null;
-        if (fn.name.includes("_")) return fn.name.replace(/_/g, " ");
-        const name = fn.name
-          .split(/(?=[A-Z])/)
-          .join(" ")
-          .toLowerCase();
-        return name[0].toUpperCase() + name.slice(1);
-      };
 
       let requestBody:
         | { content: { "application/json": { schema: any } } }
@@ -155,9 +123,8 @@ const generateOpenApiPaths = async (
         | undefined;
       if (meta?.response) {
         const schema = await toJsonSchema(meta.response);
-        const description = getReturn(fn);
         responses = {
-          200: { description, content: { "application/json": { schema } } },
+          200: { description: "OK", content: { "application/json": { schema } } },
         };
       }
 
@@ -191,13 +158,12 @@ const generateOpenApiPaths = async (
         }
       }
 
+      // Everything reader-facing comes from the route's `schema` metadata;
+      // handler names and comments never leak into the spec
       paths[normalizedPath][method] = {
         tags: config.tags,
-        summary:
-          config.title ||
-          getTag("@title", fn) ||
-          `${method.toUpperCase()} ${normalizedPath}`,
-        description: config.description || getTitle(fn) || getDescription(fn),
+        summary: config.title || `${method.toUpperCase()} ${normalizedPath}`,
+        description: config.description || "",
         requestBody,
         parameters,
         responses,

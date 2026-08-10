@@ -76,7 +76,7 @@ async function getResponse(
     }
 
     // 2. No route matched: run the global middleware (this is how static files
-    //    via `assets`, `favicon`, etc. answer requests that aren't routes).
+    //    via `assets` answer requests that are not routes).
     if (!matched) {
       ctx.body = await resolveBody(
         ctx,

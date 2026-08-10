@@ -5,7 +5,6 @@ import { config, createWebsocket, getMachine } from "./helpers";
 import {
   assets,
   auth,
-  favicon,
   openapi,
   preflight,
   session,
@@ -29,10 +28,6 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
 
   sockets: any[];
   websocket: any;
-
-  // Lazily-loaded favicon bytes, cached per server until restart (see favicon
-  // middleware). `undefined` = not loaded yet; `null` = configured but missing.
-  faviconCache?: { bytes: Buffer; type: string; etag: string } | null;
 
   port?: number;
 
@@ -63,7 +58,6 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     app.use(timer);
     if (this.settings.cors) app.use(preflight);
     app.use(assets);
-    if (this.settings.favicon) app.get("/favicon.ico", favicon);
     app.use(session);
 
     if (this.settings.auth) {

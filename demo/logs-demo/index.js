@@ -15,7 +15,6 @@ import server, { redirect } from "../..";
 //   curl -X POST -d 'hi there' localhost:3000/echo  POST /echo 8b → 200 OK 8b
 //   curl -i localhost:3000/old                      GET  /old → 302 Found → /
 //   curl localhost:3000/missing                     GET  /missing → 404 Not Found
-//   curl localhost:3000/favicon.ico                 GET  /favicon.ico → 204 No Content
 
 export default server({ log: "info", uploads: "./uploads" })
   .get("/", () => "Hello! Watch the [server:api] logs in your console.\n")

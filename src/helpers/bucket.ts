@@ -1,7 +1,7 @@
 import FileSystem from "bucket/fs";
 import type { Bucket } from "..";
 
-// Normalize the `public` / `uploads` / `favicon` option into a canonical Bucket:
+// Normalize the `public` / `uploads` option into a canonical Bucket:
 // a string path becomes a local-filesystem bucket, and any object exposing
 // `file()` (a `bucket` instance, or your own adapter) is used as-is.
 //

@@ -186,8 +186,8 @@ function getExt(filename) {
   return filename.slice(i).toLowerCase();
 }
 async function saveFileToBucket(originalName, data, bucket2, contentType) {
-  const ext2 = getExt(originalName);
-  const id = `${createId()}${ext2}`;
+  const ext = getExt(originalName);
+  const id = `${createId()}${ext}`;
   const file2 = bucket2.file(id);
   await file2.write(data, { type: contentType });
   return {
@@ -210,10 +210,10 @@ function validateFile(originalName, data, contentType, limits) {
     );
   }
   if (fileType2 && fileType2.length > 0) {
-    const ext2 = getExt(originalName);
+    const ext = getExt(originalName);
     const mime = contentType.toLowerCase();
     const allowed = fileType2.some(
-      (t) => t.toLowerCase() === mime || t.toLowerCase() === ext2
+      (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
     );
     if (!allowed) {
       throw new Error(
@@ -353,11 +353,11 @@ function isProbablyText(buffer) {
   return true;
 }
 var extByMime = {};
-for (const ext2 in mimes_default) extByMime[mimes_default[ext2]] = ext2;
+for (const ext in mimes_default) extByMime[mimes_default[ext]] = ext;
 function extFromType(type2) {
   const base = (type2 || "").split(";")[0].trim().toLowerCase();
-  const ext2 = extByMime[base];
-  if (ext2) return `.${ext2}`;
+  const ext = extByMime[base];
+  if (ext) return `.${ext}`;
   const sub = base.split("/")[1];
   return sub && /^[a-z0-9]+$/.test(sub) ? `.${sub}` : ".bin";
 }
@@ -782,8 +782,8 @@ function disposition(name) {
 function fileType(file2) {
   if (file2.type) return file2.type;
   const name = file2.path || file2.name || "";
-  const ext2 = name.split(".").pop()?.toLowerCase();
-  return ext2 ? mimes_default[ext2] : void 0;
+  const ext = name.split(".").pop()?.toLowerCase();
+  return ext ? mimes_default[ext] : void 0;
 }
 
 // src/helpers/isHtml.ts
@@ -817,8 +817,8 @@ var Reply = class {
     return this;
   }
   download(name) {
-    const ext2 = name?.split(".").pop();
-    if (ext2 && !this.res.headers.get("content-type")) this.type(ext2);
+    const ext = name?.split(".").pop();
+    if (ext && !this.res.headers.get("content-type")) this.type(ext);
     return this.headers("content-disposition", disposition(name));
   }
   headers(key, value) {
@@ -876,10 +876,10 @@ var Reply = class {
     if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) return this.status(404).send();
     try {
       const fs = await import("fs");
-      const ext2 = path.split(".").pop();
+      const ext = path.split(".").pop();
       await fs.promises.access(path);
       const stream = fs.createReadStream(path);
-      return this.type(ext2).send(stream);
+      return this.type(ext).send(stream);
     } catch (error) {
       if (error.code === "ENOENT" || error.code === "EISDIR") {
         return this.status(404).send();
@@ -1884,8 +1884,6 @@ function config(options = {}) {
   const publicDir = options.public || env2.PUBLIC;
   settings.public = publicDir ? bucket(publicDir) : null;
   settings.uploads = resolveUploads(options.uploads);
-  const favicon2 = options.favicon || env2.FAVICON;
-  if (favicon2) settings.favicon = favicon2;
   const production = env2.NODE_ENV === "production";
   const defaulted = options.sessions == null;
   settings.sessionsDefault = defaulted;
@@ -1935,7 +1933,6 @@ function config(options = {}) {
     const origin = settings.cors.origin === true ? "*" : String(settings.cors.origin);
     log.message("cors", origin);
   }
-  if (settings.favicon) log.message("favicon", loc(settings.favicon));
   if (settings.cache !== void 0) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path);
   return settings;
@@ -2596,8 +2593,8 @@ async function assets(ctx) {
     const info = file2.info?.bind(file2);
     const meta = info ? await info() : null;
     if (info ? !meta : !await file2.exists()) return;
-    const ext2 = ctx.url.pathname.split(".").pop()?.toLowerCase();
-    const ctype = ext2 && mimes_default[ext2] || meta?.type || ext2;
+    const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
+    const ctype = ext && mimes_default[ext] || meta?.type || ext;
     const headers2 = { "cache-control": CACHE_CONTROL };
     let tag;
     if (meta) {
@@ -2630,33 +2627,6 @@ async function assets(ctx) {
     return type(ctype).headers(headers2).send(file2.stream());
   } catch {
   }
-}
-
-// src/middle/favicon.ts
-var CACHE_CONTROL2 = "public, max-age=86400";
-var ext = (name) => name.split(".").pop() || "ico";
-async function loadFavicon(fav) {
-  try {
-    const type2 = ext(typeof fav === "string" ? fav : fav?.name);
-    const bytes = typeof fav === "string" ? await (await import("fs/promises")).readFile(fav) : Buffer.from(await fav.bytes());
-    return { bytes, type: type2, etag: etag(bytes) };
-  } catch {
-    return null;
-  }
-}
-async function favicon(ctx) {
-  const fav = ctx.options.favicon;
-  if (!fav) return;
-  if (ctx.app.faviconCache === void 0) {
-    ctx.app.faviconCache = await loadFavicon(fav);
-  }
-  const entry = ctx.app.faviconCache;
-  if (!entry) return 204;
-  const headers2 = { "cache-control": CACHE_CONTROL2, etag: entry.etag };
-  if (ctx.headers["if-none-match"] === entry.etag) {
-    return status(304).headers(headers2).send();
-  }
-  return type(entry.type).headers(headers2).send(entry.bytes);
 }
 
 // src/middle/openapi.ts
@@ -2715,37 +2685,20 @@ function zodToSchema(schema) {
   return { type: type2 };
 }
 var pkgProm = fsp.readFile("package.json", "utf-8").then((data) => JSON.parse(data)).catch(() => ({}));
-var getTag = (name, fn) => {
-  const found = fn.toString().split("\n").filter((l) => /\s+\/\/\s/.test(l)).map((l) => l.trim().replace("// ", "")).find((l) => l.startsWith(name));
-  if (!found) return "";
-  return found.replace(name, "").trim();
-};
-var getDescription = (fn) => getTag("@description", fn) || "";
-var getReturn = (fn) => getTag("@returns", fn) || "OK";
 var generateOpenApiPaths = async (handlers, specPath) => {
   const paths = {};
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
       const path = route.path;
-      const fn = [...route.fns].reverse().find((p) => typeof p === "function");
       const meta = route.options ?? {};
       const config2 = getConfig(route.options?.schema);
-      if (typeof path !== "string" || path === "*" || path === specPath || !fn) {
+      if (typeof path !== "string" || path === "*" || path === specPath) {
         continue;
       }
       const normalizedPath = path.replace(/\(\w+\)/gi, "").replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
       if (!paths[normalizedPath]) {
         paths[normalizedPath] = {};
       }
-      const getTitle = (fn2) => {
-        if (!fn2.name) return null;
-        const wrongNames = ["default"];
-        if (wrongNames.includes(fn2.name)) return null;
-        if (fn2.name.length <= 3) return null;
-        if (fn2.name.includes("_")) return fn2.name.replace(/_/g, " ");
-        const name = fn2.name.split(/(?=[A-Z])/).join(" ").toLowerCase();
-        return name[0].toUpperCase() + name.slice(1);
-      };
       let requestBody;
       if (meta?.body) {
         const schema = await toJsonSchema(meta.body);
@@ -2754,9 +2707,8 @@ var generateOpenApiPaths = async (handlers, specPath) => {
       let responses;
       if (meta?.response) {
         const schema = await toJsonSchema(meta.response);
-        const description = getReturn(fn);
         responses = {
-          200: { description, content: { "application/json": { schema } } }
+          200: { description: "OK", content: { "application/json": { schema } } }
         };
       }
       const parameters = [];
@@ -2783,8 +2735,8 @@ var generateOpenApiPaths = async (handlers, specPath) => {
       }
       paths[normalizedPath][method] = {
         tags: config2.tags,
-        summary: config2.title || getTag("@title", fn) || `${method.toUpperCase()} ${normalizedPath}`,
-        description: config2.description || getTitle(fn) || getDescription(fn),
+        summary: config2.title || `${method.toUpperCase()} ${normalizedPath}`,
+        description: config2.description || "",
         requestBody,
         parameters,
         responses
@@ -3346,9 +3298,6 @@ var Server = class extends Router {
   platform;
   sockets;
   websocket;
-  // Lazily-loaded favicon bytes, cached per server until restart (see favicon
-  // middleware). `undefined` = not loaded yet; `null` = configured but missing.
-  faviconCache;
   port;
   constructor(options = {}) {
     super();
@@ -3368,7 +3317,6 @@ var Server = class extends Router {
     app.use(timer);
     if (this.settings.cors) app.use(preflight);
     app.use(assets);
-    if (this.settings.favicon) app.get("/favicon.ico", favicon);
     app.use(session);
     if (this.settings.auth) {
       auth(app);

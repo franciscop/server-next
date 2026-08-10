@@ -115,10 +115,6 @@ export default function config(options: Options = {}): Settings {
   // writing; without them files stream straight through.
   settings.uploads = resolveUploads(options.uploads);
 
-  // Favicon served at /favicon.ico (path or Bucket)
-  const favicon = options.favicon || env.FAVICON;
-  if (favicon) settings.favicon = favicon;
-
   const production = env.NODE_ENV === "production";
   const defaulted = options.sessions == null;
   // Drives a one-time warning on the first session write in production
@@ -199,7 +195,6 @@ export default function config(options: Options = {}): Settings {
       settings.cors.origin === true ? "*" : String(settings.cors.origin);
     log.message("cors", origin);
   }
-  if (settings.favicon) log.message("favicon", loc(settings.favicon));
   if (settings.cache !== undefined) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path);
 

@@ -268,7 +268,6 @@ type Options = {
     onError?: OnError;
     onResponse?: OnResponse;
     log?: LogLevel | boolean;
-    favicon?: string | BucketFile;
     security?: boolean | SecurityOptions;
     parser?: BodyMode;
     cache?: CacheOption;
@@ -293,7 +292,6 @@ type Settings = {
     onError?: OnError;
     onResponse?: OnResponse;
     log: Logger;
-    favicon?: string | BucketFile;
     security: SecuritySettings;
     parser: BodyMode;
     cache?: CacheOption;
@@ -444,11 +442,6 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
     platform: Platform;
     sockets: any[];
     websocket: any;
-    faviconCache?: {
-        bytes: Buffer;
-        type: string;
-        etag: string;
-    } | null;
     port?: number;
     constructor(options?: Options);
     self(): this;

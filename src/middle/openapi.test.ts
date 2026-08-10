@@ -42,18 +42,19 @@ describe("openapi option", () => {
     });
   });
 
-  it("reads titles and comment tags from the handler, not the middleware", async () => {
-    const guard = () => undefined;
+  it("only the schema metadata reaches the spec, never handler internals", async () => {
     const api = server({ openapi: true })
-      .get("/books", guard, function listAllBooks() {
+      .get("/books", function listAllBooks() {
         // @description Every book in the store
         return [];
       })
       .test();
     const spec = await (await api.get("/openapi.json")).json();
     const op = spec.paths["/books"].get;
-    expect(op.description).toBe("List all books"); // from the handler's name
-    expect(JSON.stringify(op)).not.toContain("guard");
+    expect(op.summary).toBe("GET /books"); // the default, not the fn name
+    expect(op.description).toBe("");
+    expect(JSON.stringify(op)).not.toContain("listAllBooks");
+    expect(JSON.stringify(op)).not.toContain("Every book");
   });
 
   it("route schemas and metadata land in the spec", async () => {

@@ -412,7 +412,6 @@ export type Options = {
   onError?: OnError;
   onResponse?: OnResponse;
   log?: LogLevel | boolean;
-  favicon?: string | BucketFile;
   security?: boolean | SecurityOptions;
   // How request bodies are read into ctx.body (default 'parse')
   parser?: BodyMode;
@@ -439,7 +438,6 @@ export type Settings = {
   onError?: OnError;
   onResponse?: OnResponse;
   log: Logger;
-  favicon?: string | BucketFile;
   security: SecuritySettings;
   parser: BodyMode;
   cache?: CacheOption;
