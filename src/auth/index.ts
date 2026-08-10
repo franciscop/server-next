@@ -19,9 +19,12 @@ export default function auth(app: Server) {
     ctx.user = await getUser(ctx);
   });
 
+  // Group all the built-in routes under one tag in the OpenAPI spec
+  const spec = { schema: { tags: "auth" } };
+
   // One logout route for every provider and strategy. POST, since it changes
   // state (clearing the session) and so shouldn't be triggered by a prefetch.
-  app.post("/auth/logout", logout);
+  app.post("/auth/logout", spec, logout);
 
   const enabled = app.settings.auth.providers;
 
@@ -30,10 +33,10 @@ export default function auth(app: Server) {
     const key = name.toUpperCase();
     if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
     if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
-    app.get(`/auth/login/${name}`, providers[name].login);
-    app.get(`/auth/callback/${name}`, providers[name].callback);
+    app.get(`/auth/login/${name}`, spec, providers[name].login);
+    app.get(`/auth/callback/${name}`, spec, providers[name].callback);
     // Client-owned flow: the SPA/native app exchanges the code itself
-    app.post(`/auth/verify/${name}`, providers[name].verify);
+    app.post(`/auth/verify/${name}`, spec, providers[name].verify);
   }
 
   // Apple uses a signed-JWT client secret and POSTs the result back (form_post)
@@ -42,15 +45,15 @@ export default function auth(app: Server) {
     for (const key of keys) {
       if (!env[key]) throw new Error(`${key} not defined`);
     }
-    app.get("/auth/login/apple", providers.apple.login);
-    app.post("/auth/callback/apple", providers.apple.callback);
-    app.post("/auth/verify/apple", providers.apple.verify);
+    app.get("/auth/login/apple", spec, providers.apple.login);
+    app.post("/auth/callback/apple", spec, providers.apple.callback);
+    app.post("/auth/verify/apple", spec, providers.apple.verify);
   }
 
   if (enabled.includes("email")) {
-    app.post("/auth/register/email", providers.email.register);
-    app.post("/auth/login/email", providers.email.login);
-    app.put("/auth/password/email", providers.email.password);
-    app.put("/auth/reset/email", providers.email.reset);
+    app.post("/auth/register/email", spec, providers.email.register);
+    app.post("/auth/login/email", spec, providers.email.login);
+    app.put("/auth/password/email", spec, providers.email.password);
+    app.put("/auth/reset/email", spec, providers.email.reset);
   }
 }

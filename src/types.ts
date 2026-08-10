@@ -100,7 +100,8 @@ export type RouteSchema = {
 };
 
 export type RouteOptions = {
-  schema?: RouteSchema;
+  // `false` hides the route from the spec
+  schema?: RouteSchema | false;
   // How this route reads its body, overriding the root `parser`
   parser?: BodyMode;
   // Standard Schemas validating each part of the request, and the response.
@@ -525,9 +526,9 @@ export interface ContextExtension {}
 export type Context<C extends ContextTypes = {}> = {
   method: Method;
   ip: string;
+  signal: AbortSignal;
   headers: Record<string, string | string[]>;
   cookies: Record<string, string>;
-  body?: Field<C, "body", SerializableValue | Buffer | ReadableStream>;
   url: URL & {
     params: Field<C, "params", Record<string, any>>;
     query: Field<C, "query", Record<string, any>>;
@@ -540,10 +541,12 @@ export type Context<C extends ContextTypes = {}> = {
   session: Field<C, "session", Record<string, any>>;
   user?: Field<C, "user", Record<string, any>>;
   init: number;
-  req?: Request;
-  res?: Response & { cookies?: Record<string, string> };
   app: Server;
-} & ContextExtension;
+} & ("body" extends keyof C
+  ? // A declared `body` is validated before any middleware runs, so it exists
+    { body: Field<C, "body", never> }
+  : { body?: SerializableValue | Buffer | ReadableStream }) &
+  ContextExtension;
 
 export type InlineReply =
   | Response

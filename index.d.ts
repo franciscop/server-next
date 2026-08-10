@@ -96,7 +96,7 @@ type RouteSchema = {
     description?: string;
 };
 type RouteOptions = {
-    schema?: RouteSchema;
+    schema?: RouteSchema | false;
     parser?: BodyMode;
     body?: StandardSchemaV1<any, any>;
     query?: StandardSchemaV1<any, any>;
@@ -327,9 +327,9 @@ interface ContextExtension {
 type Context<C extends ContextTypes = {}> = {
     method: Method;
     ip: string;
+    signal: AbortSignal;
     headers: Record<string, string | string[]>;
     cookies: Record<string, string>;
-    body?: Field<C, "body", SerializableValue | Buffer | ReadableStream>;
     url: URL & {
         params: Field<C, "params", Record<string, any>>;
         query: Field<C, "query", Record<string, any>>;
@@ -342,12 +342,12 @@ type Context<C extends ContextTypes = {}> = {
     session: Field<C, "session", Record<string, any>>;
     user?: Field<C, "user", Record<string, any>>;
     init: number;
-    req?: Request;
-    res?: Response & {
-        cookies?: Record<string, string>;
-    };
     app: Server;
-} & ContextExtension;
+} & ("body" extends keyof C ? {
+    body: Field<C, "body", never>;
+} : {
+    body?: SerializableValue | Buffer | ReadableStream;
+}) & ContextExtension;
 type InlineReply = Response | Reply | BucketFile | {
     body: string;
     headers?: Headers;
@@ -451,6 +451,7 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
     test(): {
         get: (path: string, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -461,11 +462,11 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         head: (path: string, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -476,13 +477,13 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         post: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -493,13 +494,13 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         put: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -510,13 +511,13 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -527,11 +528,11 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         delete: (path: string, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -542,11 +543,11 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         options: (path: string, options?: {
             method?: string;
+            signal?: AbortSignal | null;
             headers?: HeadersInit;
             cache?: RequestCache;
             redirect?: RequestRedirect;
@@ -557,7 +558,6 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             priority?: RequestPriority;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
-            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
     };

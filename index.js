@@ -2134,11 +2134,6 @@ async function parseResponse(out, ctx) {
     }
     ctx.options.sessions.set(id, ctx.session);
   }
-  if (ctx?.res?.headers) {
-    for (const key in ctx.res.headers) {
-      out.headers[key] = ctx.res.headers[key];
-    }
-  }
   return out;
 }
 
@@ -2530,31 +2525,32 @@ function auth(app) {
   app.use(async function middle(ctx) {
     ctx.user = await getUser(ctx);
   });
-  app.post("/auth/logout", logout);
+  const spec = { schema: { tags: "auth" } };
+  app.post("/auth/logout", spec, logout);
   const enabled = app.settings.auth.providers;
   for (const name of oauth2) {
     if (!enabled.includes(name)) continue;
     const key = name.toUpperCase();
     if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
     if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
-    app.get(`/auth/login/${name}`, providers_default[name].login);
-    app.get(`/auth/callback/${name}`, providers_default[name].callback);
-    app.post(`/auth/verify/${name}`, providers_default[name].verify);
+    app.get(`/auth/login/${name}`, spec, providers_default[name].login);
+    app.get(`/auth/callback/${name}`, spec, providers_default[name].callback);
+    app.post(`/auth/verify/${name}`, spec, providers_default[name].verify);
   }
   if (enabled.includes("apple")) {
     const keys = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"];
     for (const key of keys) {
       if (!env[key]) throw new Error(`${key} not defined`);
     }
-    app.get("/auth/login/apple", providers_default.apple.login);
-    app.post("/auth/callback/apple", providers_default.apple.callback);
-    app.post("/auth/verify/apple", providers_default.apple.verify);
+    app.get("/auth/login/apple", spec, providers_default.apple.login);
+    app.post("/auth/callback/apple", spec, providers_default.apple.callback);
+    app.post("/auth/verify/apple", spec, providers_default.apple.verify);
   }
   if (enabled.includes("email")) {
-    app.post("/auth/register/email", providers_default.email.register);
-    app.post("/auth/login/email", providers_default.email.login);
-    app.put("/auth/password/email", providers_default.email.password);
-    app.put("/auth/reset/email", providers_default.email.reset);
+    app.post("/auth/register/email", spec, providers_default.email.register);
+    app.post("/auth/login/email", spec, providers_default.email.login);
+    app.put("/auth/password/email", spec, providers_default.email.password);
+    app.put("/auth/reset/email", spec, providers_default.email.reset);
   }
 }
 
@@ -2695,6 +2691,7 @@ var generateOpenApiPaths = async (handlers, specPath) => {
       if (typeof path !== "string" || path === "*" || path === specPath) {
         continue;
       }
+      if (route.options?.schema === false) continue;
       const normalizedPath = path.replace(/\(\w+\)/gi, "").replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
       if (!paths[normalizedPath]) {
         paths[normalizedPath] = {};
@@ -2735,8 +2732,8 @@ var generateOpenApiPaths = async (handlers, specPath) => {
       }
       paths[normalizedPath][method] = {
         tags: config2.tags,
-        summary: config2.title || `${method.toUpperCase()} ${normalizedPath}`,
-        description: config2.description || "",
+        summary: config2.title,
+        description: config2.description,
         requestBody,
         parameters,
         responses
@@ -2996,7 +2993,7 @@ function isValidMethod(method) {
 
 // src/context/node.ts
 var chunkArray = (arr) => arr.length > 2 ? [[arr[0], arr[1]], ...chunkArray(arr.slice(2))] : [arr];
-async function createNode(req, app) {
+async function createNode(req, app, signal = new AbortController().signal) {
   const init = performance.now();
   const method = req.method?.toLowerCase() || "get";
   if (!isValidMethod(method)) {
@@ -3030,6 +3027,7 @@ async function createNode(req, app) {
     body: void 0,
     headers: headers2,
     cookies: cookies2,
+    signal,
     session: {},
     init,
     app,
@@ -3070,6 +3068,7 @@ async function createWinter(req, app, server2) {
     body: void 0,
     headers: headers2,
     cookies: cookies2,
+    signal: req.signal,
     session: {},
     init,
     app,
@@ -3107,7 +3106,11 @@ var Node = async (app) => {
   const http = await import("http");
   const server2 = http.createServer(
     async (request, response) => {
-      const ctx = await createNode(request, app);
+      const controller = new AbortController();
+      response.on("close", () => {
+        if (!response.writableFinished) controller.abort();
+      });
+      const ctx = await createNode(request, app, controller.signal);
       if ("error" in ctx) throw ctx.error;
       const out = await handleRequest(app, ctx);
       response.writeHead(out.status || 200, parseHeaders_default(out.headers));

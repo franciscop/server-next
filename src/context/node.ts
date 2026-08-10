@@ -21,6 +21,8 @@ const chunkArray = (arr: string[]): [string, string][] =>
 export default async function createNode(
   req: IncomingMessage,
   app: Server,
+  // Aborted by the caller on client disconnect (IncomingMessage has no signal)
+  signal: AbortSignal = new AbortController().signal,
 ): Promise<Context> {
   const init = performance.now();
 
@@ -65,6 +67,7 @@ export default async function createNode(
     body: undefined,
     headers,
     cookies,
+    signal,
     session: {},
     init,
     app,

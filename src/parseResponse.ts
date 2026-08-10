@@ -182,12 +182,5 @@ export default async function parseResponse(
     ctx.options.sessions.set(id, ctx.session);
   }
 
-  // Add the headers that are needed
-  if ((ctx as any)?.res?.headers) {
-    for (const key in ctx.res.headers) {
-      out.headers[key] = ctx.res.headers[key];
-    }
-  }
-
   return out;
 }

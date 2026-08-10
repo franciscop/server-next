@@ -20,6 +20,35 @@ describe("openapi option", () => {
     expect(spec.paths["/openapi.json"]).toBeUndefined(); // not self-documented
   });
 
+  it("tags the built-in auth routes as auth", async () => {
+    Object.assign(globalThis.env, { GITHUB_ID: "id", GITHUB_SECRET: "secret" });
+    try {
+      const api = server({
+        openapi: true,
+        auth: { strategy: "cookie", providers: ["github"] },
+      }).test();
+      const spec = await (await api.get("/openapi.json")).json();
+      expect(spec.paths["/auth/logout"].post.tags).toEqual(["auth"]);
+      expect(spec.paths["/auth/login/github"].get.tags).toEqual(["auth"]);
+      expect(spec.paths["/auth/callback/github"].get.tags).toEqual(["auth"]);
+    } finally {
+      delete globalThis.env.GITHUB_ID;
+      delete globalThis.env.GITHUB_SECRET;
+    }
+  });
+
+  it("schema: false hides a route from the spec", async () => {
+    const api = server({ openapi: true })
+      .get("/", { schema: false }, () => "<html>home</html>")
+      .get("/users", { response: User }, () => [])
+      .test();
+    const spec = await (await api.get("/openapi.json")).json();
+    expect(spec.paths["/"]).toBeUndefined();
+    expect(spec.paths["/users"]).toBeDefined();
+    // The route itself still responds
+    expect((await api.get("/")).status).toBe(200);
+  });
+
   it("a string moves the spec path", async () => {
     const api = server({ openapi: "/api.json" })
       .get("/x", () => "ok")
@@ -51,8 +80,9 @@ describe("openapi option", () => {
       .test();
     const spec = await (await api.get("/openapi.json")).json();
     const op = spec.paths["/books"].get;
-    expect(op.summary).toBe("GET /books"); // the default, not the fn name
-    expect(op.description).toBe("");
+    // No generated summary: viewers show the method + path on their own
+    expect(op.summary).toBeUndefined();
+    expect(op.description).toBeUndefined();
     expect(JSON.stringify(op)).not.toContain("listAllBooks");
     expect(JSON.stringify(op)).not.toContain("Every book");
   });

@@ -50,6 +50,15 @@ const updatePost = (
   return { id, draft };
 };
 
+// A declared body is a required field; undeclared stays optional
+const bodyRequired: {} extends Pick<
+  Context<{ body: typeof PostSchema }>,
+  "body"
+>
+  ? never
+  : true = true;
+const bodyOptional: {} extends Pick<Context, "body"> ? true : never = true;
+
 const requireAdmin: Middleware<{ user: User }> = (ctx) =>
   ctx.user?.role === "admin" ? undefined : 403;
 

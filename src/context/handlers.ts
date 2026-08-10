@@ -42,7 +42,13 @@ export const Node = async (app: Server) => {
 
 	const server = http.createServer(
 		async (request: IncomingMessage, response) => {
-			const ctx = await createNode(request, app);
+			// Abort `ctx.signal` when the client disconnects before the response is
+			// done, so handlers can cancel upstream work (fetches, streams, queries)
+			const controller = new AbortController();
+			response.on("close", () => {
+				if (!response.writableFinished) controller.abort();
+			});
+			const ctx = await createNode(request, app, controller.signal);
 			if ("error" in ctx) throw ctx.error;
 
 			const out = await handleRequest(app, ctx);

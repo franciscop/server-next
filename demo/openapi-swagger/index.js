@@ -85,7 +85,7 @@ export default server({
   })
 
   // The docs UI: Swagger UI's shell over /openapi.json
-  .get("/docs", () => `<!doctype html>
+  .get("/docs", { schema: false }, () => `<!doctype html>
 <html>
   <head>
     <title>Notes API Docs</title>

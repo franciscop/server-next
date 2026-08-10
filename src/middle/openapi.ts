@@ -91,10 +91,11 @@ const generateOpenApiPaths = async (
       const meta = route.options ?? {};
       const config = getConfig(route.options?.schema);
 
-      // The spec doesn't document itself
+      // The spec doesn't document itself, and `schema: false` opts a route out
       if (typeof path !== "string" || path === "*" || path === specPath) {
         continue;
       }
+      if (route.options?.schema === false) continue;
 
       // Normalize path (convert ":id" to "{id}" for OpenAPI)
       const normalizedPath = path
@@ -159,11 +160,12 @@ const generateOpenApiPaths = async (
       }
 
       // Everything reader-facing comes from the route's `schema` metadata;
-      // handler names and comments never leak into the spec
+      // handler names and comments never leak into the spec. No default
+      // summary: viewers already show the method + path for untitled routes
       paths[normalizedPath][method] = {
         tags: config.tags,
-        summary: config.title || `${method.toUpperCase()} ${normalizedPath}`,
-        description: config.description || "",
+        summary: config.title,
+        description: config.description,
         requestBody,
         parameters,
         responses,

@@ -2,14 +2,15 @@
   "name": "user-management",
   "private": true,
   "version": "0.0.1",
-  "main": "index.jsx",
+  "main": "src/index.tsx",
   "type": "module",
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "MIT",
   "description": "GitHub login, SQLite users and sessions, a validated management API, and its OpenAPI docs",
   "scripts": {
     "dev": "bun --hot .",
-    "start": "bun ."
+    "start": "bun .",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^4.4.3"
