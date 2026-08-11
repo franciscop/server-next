@@ -81,7 +81,10 @@
     font: 13px/1.7 var(--font-mono);
     color: var(--text);
   }
-  pre.install {
+  .install {
+    margin: 12px 0 16px;
+  }
+  .install code {
     display: inline-block;
     padding: 8px 14px;
     font-size: 14px;
@@ -206,7 +209,7 @@
       A modern JavaScript server with the essentials built in: routing,
       authentication, uploads, WebSockets and testing.
     </p>
-    <pre class="install">npm install @server/next</pre>
+    <div class="install"><code>npm install @server/next</code></div>
     <div class="buttons">
       <a class="button" href="/documentation#getting-started"
         >Getting Started</a
