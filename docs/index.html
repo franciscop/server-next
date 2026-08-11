@@ -216,13 +216,12 @@
   </div>
   <div>
     <pre><code class="language-js">import server from "@server/next";
-import db from "./db.js";
+import { Books } from "./db.js";
 
 export default server()
-  .get("/books", () =&gt; db.books.list())
-  .post("/books", ctx =&gt; db.books.create(ctx.body))
-  .patch("/books/:id", ctx =&gt; db.books.update(ctx.params.id, ctx.body))
-  .del("/books/:id", ctx =&gt; db.books.delete(ctx.params.id));</code></pre>
+  .get("/books", () =&gt; Books.list())
+  .post("/books", ctx =&gt; Books.create(ctx.body))
+  .del("/books/:id", ctx =&gt; Books.delete(ctx.params.id));</code></pre>
   </div>
 </section>
 
