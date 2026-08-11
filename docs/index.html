@@ -221,7 +221,7 @@ import { Books } from "./db.js";
 export default server()
   .get("/books", () =&gt; Books.list())
   .post("/books", ctx =&gt; Books.create(ctx.body))
-  .delete("/books/:id", ctx =&gt; Books.delete(ctx.params.id));</code></pre>
+  .delete("/books/:id", ctx =&gt; Books.remove(ctx.params.id));</code></pre>
   </div>
 </section>
 
