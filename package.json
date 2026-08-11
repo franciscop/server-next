@@ -44,6 +44,7 @@
     "home": "./docs/index.html",
     "menu": {
       "Documentation": "/documentation",
+      "Donate": "https://www.paypal.com/paypalme/franciscopresencia/19",
       "Tutorials": "/tutorials",
       "Github": "https://github.com/franciscop/server-next"
     },
