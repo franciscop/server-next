@@ -2232,12 +2232,18 @@ async function handleRequest(app, ctx) {
     if (replaced) res = replaced;
   }
   if (res) ctx.options.log.request(ctx, res);
+  if (res?.body && ctx.method === "head") {
+    res.body.cancel().catch(() => {
+    });
+    res = new Response(null, { status: res.status, headers: res.headers });
+  }
   return res;
 }
 async function getResponse(app, ctx) {
   try {
     let matched = false;
-    for (const route of app.handlers[ctx.method]) {
+    const routes = ctx.method === "head" ? [...app.handlers.head, ...app.handlers.get] : app.handlers[ctx.method];
+    for (const route of routes) {
       const params = pathPattern(route.path, ctx.url.pathname || "/");
       if (!params) continue;
       matched = true;
@@ -2581,7 +2587,7 @@ function parseRange(header, size) {
 var CACHE_CONTROL = "public, max-age=3600";
 async function assets(ctx) {
   if (!ctx.options.public) return;
-  if (ctx.method !== "get") return;
+  if (ctx.method !== "get" && ctx.method !== "head") return;
   if (ctx.url.pathname === "/") return;
   try {
     const key = ctx.url.pathname.replace(/^\/+/, "");

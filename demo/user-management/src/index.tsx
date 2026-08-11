@@ -1,5 +1,5 @@
 import server, { type AuthOption, type Context } from "../../..";
-import { countUsers, listUsers, sessions, users } from "./db.ts";
+import { sessions, users } from "./db.ts";
 import Docs from "./Docs.tsx";
 import Home from "./Home.tsx";
 import {
@@ -29,11 +29,11 @@ const auth: AuthOption = {
   providers: ["github"],
   users,
   redirect: "/",
-  // The record to persist: the very first user becomes the admin
+  // Default the role by email; the stored record (UI promotions) wins
   onLogin: (user, existing) => ({
-    ...(existing ?? {}),
+    role: user.email === env.ADMIN_EMAIL ? "admin" : "member",
+    ...existing,
     ...user,
-    role: existing?.role ?? (countUsers() === 0 ? "admin" : "member"),
   }),
 };
 
@@ -44,9 +44,9 @@ export default server<{ user: User }>({
   openapi: { title: "User management API" },
 })
   // ============ Pages ============
-  .get("/", { schema: false }, (ctx) => {
-    const users = ctx.user?.role === "admin" ? listUsers({}) : [];
-    return <Home user={ctx.user} everyone={users} />;
+  .get("/", { schema: false }, async (ctx) => {
+    const everyone = ctx.user?.role === "admin" ? await users.list({}) : [];
+    return <Home user={ctx.user} everyone={everyone} />;
   })
   .get("/docs", { schema: false }, () => <Docs />)
 
@@ -58,7 +58,7 @@ export default server<{ user: User }>({
     "/api/users",
     { query: Pagination, response: UserList },
     requireAdmin,
-    (ctx) => listUsers(ctx.url.query),
+    (ctx) => users.list(ctx.url.query),
   )
   .post(
     "/api/users",
@@ -66,7 +66,7 @@ export default server<{ user: User }>({
     requireAdmin,
     async (ctx) => {
       const id = await users.add(ctx.body);
-      return { id, ...ctx.body };
+      return users.get<User>(id);
     },
   )
   .get(
@@ -74,10 +74,8 @@ export default server<{ user: User }>({
     { response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      const id = ctx.url.params.id;
-      const user = await users.get<User>(id);
-      if (!user) return 404;
-      return { id, ...user };
+      const user = await users.get<User>(ctx.url.params.id);
+      return user ?? 404;
     },
   )
   .put(
@@ -85,12 +83,11 @@ export default server<{ user: User }>({
     { body: UserPatch, response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      const id = ctx.url.params.id;
-      const stored = await users.get<User>(id);
+      const stored = await users.get<User>(ctx.url.params.id);
       if (!stored) return 404;
       const updated = { ...stored, ...ctx.body };
-      await users.set(id, updated);
-      return { id, ...updated };
+      await users.set(ctx.url.params.id, updated);
+      return updated;
     },
   )
   .delete("/api/users/:id", requireAdmin, async (ctx) => {

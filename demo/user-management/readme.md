@@ -14,19 +14,21 @@ Create a GitHub OAuth app with the callback URL set to
 echo "GITHUB_ID=your-client-id" >> .env
 echo "GITHUB_SECRET=your-client-secret" >> .env
 echo "SECRET=a-long-random-string" >> .env
+echo "ADMIN_EMAIL=you@example.com" >> .env
 npm run dev   # bun with hot reloading; `npm start` for a plain run
 ```
 
-Sign in at http://localhost:3000/. The **first** user to sign in becomes the
-`admin` (via `onLogin`); everyone after is a `member`.
+Sign in at http://localhost:3000/. The account matching `ADMIN_EMAIL` signs in
+as the `admin` (via `onLogin`); everyone else is a `member`.
 
 ## What to look at
 
-- **`src/db.ts`**: the documented custom-store shape (`get`/`set`) over two SQLite
-  tables, wrapped once with `kv()` and shared by the server options (`sessions`,
+- **`src/db.ts`**: real SQLite tables with columns, exposed as stores through
+  polystore's `HAS_EXPIRATION` adapter tier (bare values + TTL, no envelope),
+  wrapped once with `kv()` and shared by the server options (`sessions`,
   `auth.users`) and the app's own reads/writes, so logins survive restarts.
   Management queries use plain SQL directly.
-- **Roles**: `onLogin` stamps the role onto the stored record; `requireUser` /
+- **Roles**: `onLogin` defaults the role (`admin` for `ADMIN_EMAIL`); `requireUser` /
   `requireAdmin` middleware guard the API routes.
 - **Validation** (`src/schemas.ts`): query pagination, body patches and response shapes are zod
   schemas; the same schemas drive the spec.

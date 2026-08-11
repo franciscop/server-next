@@ -209,3 +209,8 @@ button.ghost:hover {
   background: var(--bg);
   color: var(--ink);
 }
+
+button.danger:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}

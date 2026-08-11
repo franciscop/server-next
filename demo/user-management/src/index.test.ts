@@ -80,6 +80,12 @@ describe("pages", () => {
     expect(js.headers.get("content-type")).toContain("javascript");
   });
 
+  it("offers deletion of other users, never yourself", async () => {
+    const html = await (await api.get("/", as(ADMIN))).text();
+    expect(html).toContain('data-delete="g2"');
+    expect(html).not.toContain('data-delete="g1"'); // the admin's own row
+  });
+
   it("hides the table from members", async () => {
     const html = await (await api.get("/", as(MEMBER))).text();
     expect(html).toContain("Hi Bob");

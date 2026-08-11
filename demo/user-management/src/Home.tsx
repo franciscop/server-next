@@ -8,12 +8,13 @@ const Avatar = ({ user }: { user: User }) =>
     <span class="avatar">{(user.name || user.email)[0].toUpperCase()}</span>
   );
 
-const UserTable = ({ users }: { users: User[] }) => (
+const UserTable = ({ users, me }: { users: User[]; me?: string }) => (
   <table>
     <tr>
       <th>User</th>
       <th>Email</th>
       <th>Role</th>
+      <th></th>
     </tr>
     {users.map((user) => (
       <tr>
@@ -23,6 +24,13 @@ const UserTable = ({ users }: { users: User[] }) => (
         <td>{user.email}</td>
         <td>
           <span class={`badge ${user.role}`}>{user.role}</span>
+        </td>
+        <td>
+          {user.id !== me && (
+            <button class="ghost danger" data-delete={user.id}>
+              Delete
+            </button>
+          )}
         </td>
       </tr>
     ))}
@@ -65,7 +73,7 @@ export default function Home({
       </div>
       {user.role === "admin" && (
         <>
-          <UserTable users={everyone} />
+          <UserTable users={everyone} me={user.id} />
           <h2>Add a user</h2>
           <form method="POST" action="/api/users">
             <input name="name" placeholder="Name" required />

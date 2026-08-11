@@ -1,56 +1,106 @@
 import { Database } from "bun:sqlite";
 import { kv } from "../../..";
+import type { User } from "./schemas.ts";
 
-// A real SQLite file at the demo root (gitignored); tests point DB_FILE at
-// ":memory:" so they never touch it
+// Tests point DB_FILE at ":memory:" so they never touch the dev file
 export const db = new Database(
   process.env.DB_FILE || `${import.meta.dir}/../data.db`,
 );
-db.run("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, data TEXT)");
-db.run("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT)");
+db.run(`CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member',
+  picture TEXT,
+  provider TEXT,
+  strategy TEXT
+)`);
+db.run(`CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user TEXT REFERENCES users(id),
+  provider TEXT,
+  created TEXT,
+  expires_at INTEGER
+)`);
 
-// The documented custom-store shape: `get` returns the value or null and
-// `set` with null deletes; polystore builds has/del/prefix (and an
-// `{ expires, value }` envelope in the rows) on top.
-const table = (name: string) => ({
-  get: (key: string) => {
-    const row = db
-      .query(`SELECT data FROM ${name} WHERE id = ?`)
-      .get(key) as { data: string } | null;
-    return row ? JSON.parse(row.data) : null;
+type UserRow = User & { provider?: string | null; strategy?: string | null };
+
+// HAS_EXPIRATION adapters receive bare values plus a TTL, no envelope
+const usersTable = {
+  HAS_EXPIRATION: true,
+  get: (id: string) =>
+    db.query("SELECT * FROM users WHERE id = ?").get(id) as UserRow | null,
+  set: (id: string, user: UserRow | null) => {
+    if (user === null) return usersTable.del(id);
+    db.run(
+      `INSERT OR REPLACE INTO users (id, name, email, role, picture, provider, strategy)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        user.name ?? null,
+        user.email,
+        user.role ?? "member",
+        user.picture ?? null,
+        user.provider ?? null,
+        user.strategy ?? null,
+      ],
+    );
   },
-  set: (key: string, value: unknown) => {
-    if (value === null) {
-      db.run(`DELETE FROM ${name} WHERE id = ?`, [key]);
-      return;
-    }
-    db.run(`INSERT OR REPLACE INTO ${name} (id, data) VALUES (?, ?)`, [
-      key,
-      JSON.stringify(value),
-    ]);
+  del: (id: string) => {
+    db.run("DELETE FROM users WHERE id = ?", [id]);
   },
-});
-
-// One kv() store per table, shared by the server options and the app code
-// (the server returns an already-built store untouched), so the stored
-// envelopes always match. Sessions carry their expiry here, since a built
-// store keeps its own policy instead of getting the server's default.
-export const users = kv(table("users"));
-export const sessions = kv(table("sessions")).expires("1w");
-
-// Management queries go straight to SQL, unwrapping the stored envelope
-export const countUsers = () =>
-  (db.query("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n;
-
-export const listUsers = ({ page = 1, search = "" }) => {
-  const rows = db
-    .query(
-      `SELECT id, data FROM users WHERE data LIKE ?
-       ORDER BY rowid LIMIT 10 OFFSET ?`,
-    )
-    .all(`%${search}%`, (page - 1) * 10) as { id: string; data: string }[];
-  return rows.map(({ id, data }) => {
-    const { name, email, role, picture } = JSON.parse(data).value;
-    return { id, name, email, role, picture };
-  });
+  add: (prefix: string, user: UserRow) => {
+    const id = crypto.randomUUID();
+    usersTable.set(prefix + id, user);
+    return id;
+  },
 };
+
+type SessionRow = { user: string; provider: string; created: string };
+
+const sessionsTable = {
+  HAS_EXPIRATION: true,
+  get: (id: string) => {
+    const row = db
+      .query("SELECT * FROM sessions WHERE id = ?")
+      .get(id) as (SessionRow & { expires_at: number | null }) | null;
+    if (!row) return null;
+    if (row.expires_at && row.expires_at <= Date.now()) {
+      sessionsTable.del(id);
+      return null;
+    }
+    return { user: row.user, provider: row.provider, created: row.created };
+  },
+  set: (id: string, session: SessionRow | null, expires?: number | null) => {
+    if (session === null) return sessionsTable.del(id);
+    db.run(
+      `INSERT OR REPLACE INTO sessions (id, user, provider, created, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        id,
+        session.user ?? null,
+        session.provider ?? null,
+        session.created ?? null,
+        expires == null ? null : Date.now() + expires * 1000,
+      ],
+    );
+  },
+  del: (id: string) => {
+    db.run("DELETE FROM sessions WHERE id = ?", [id]);
+  },
+};
+
+const list = async ({ page = 1, search = "" }) =>
+  db
+    .query(
+      `SELECT id, name, email, role, picture FROM users
+       WHERE name LIKE ?1 OR email LIKE ?1
+       ORDER BY rowid LIMIT 10 OFFSET ?2`,
+    )
+    .all(`%${search}%`, (page - 1) * 10) as User[];
+
+// Shared with the server options; a derived store loses the extensions
+export const users = Object.assign(kv(usersTable), { list });
+
+// A built store keeps its own expiry, the server's 1w default only covers raw sources
+export const sessions = kv(sessionsTable).expires("1w");

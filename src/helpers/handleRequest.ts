@@ -21,6 +21,11 @@ export default async function handleRequest(
   }
   // Log the request once the final response is known (no-op unless `log` is on)
   if (res) ctx.options.log.request(ctx, res);
+  // HEAD keeps the headers (type, cache, ETag...) and drops the body
+  if (res?.body && ctx.method === "head") {
+    res.body.cancel().catch(() => {});
+    res = new Response(null, { status: res.status, headers: res.headers });
+  }
   return res;
 }
 
@@ -31,9 +36,17 @@ async function getResponse(
   try {
     let matched = false;
 
+    // HEAD is GET without the body (RFC 9110 requires supporting both): an
+    // explicit .head() route wins, then GET routes answer with the body
+    // stripped at the end of handleRequest
+    const routes =
+      ctx.method === "head"
+        ? [...app.handlers.head, ...app.handlers.get]
+        : app.handlers[ctx.method];
+
     // 1. Find the matching route. Its `fns` already include the middleware that
     //    were registered before it, so we just run the list in order.
-    for (const route of app.handlers[ctx.method]) {
+    for (const route of routes) {
       const params = pathPattern(route.path, ctx.url.pathname || "/");
       if (!params) continue;
       matched = true;

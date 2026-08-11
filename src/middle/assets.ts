@@ -7,7 +7,7 @@ const CACHE_CONTROL = "public, max-age=3600";
 
 export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;
-  if (ctx.method !== "get") return;
+  if (ctx.method !== "get" && ctx.method !== "head") return;
   // The homepage _cannot_ be a file by definition. We could consider sending
   // `index.html`, but that's easy with `.get('/', () => file('index.html'))
   if (ctx.url.pathname === "/") return;

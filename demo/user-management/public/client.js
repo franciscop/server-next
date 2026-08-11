@@ -11,3 +11,13 @@ form?.addEventListener("submit", async (event) => {
   if (!res.ok) return alert(`Could not add the user (${res.status})`);
   location.reload();
 });
+
+// The per-row Delete buttons, with a confirmation before calling the API
+document.addEventListener("click", async (event) => {
+  const id = event.target.dataset?.delete;
+  if (!id) return;
+  if (!confirm("Delete this user? This cannot be undone.")) return;
+  const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+  if (!res.ok) return alert(`Could not delete the user (${res.status})`);
+  location.reload();
+});
