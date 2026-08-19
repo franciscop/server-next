@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    // JSX, as in every other demo
+    "jsx": "react-jsx",
+    "jsxImportSource": "@server/next",
+
+    // The library alias: types only, the runtime one lives in package.json
+    "paths": { "react": ["./types/react.d.ts"] },
+
+    "strict": true,
+    "types": ["bun"],
+    "skipLibCheck": true
+  }
+}

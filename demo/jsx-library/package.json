@@ -1,0 +1,19 @@
+{
+  "name": "jsx-library",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.tsx",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Use a third-party JSX component library, aliasing React to Server's JSX runtime",
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  },
+  "dependencies": {
+    "fancy-ui": "file:./fancy-ui",
+    "llmrender": "^1.0.8",
+    "react": "file:../.."
+  }
+}
