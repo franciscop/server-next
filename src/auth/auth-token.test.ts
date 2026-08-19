@@ -13,8 +13,12 @@ describe("user creation flow", () => {
   const sessions = () => sessionStore.keys();
   const users = () => userStore.keys();
   const api = server({
-    sessions: sessionStore,
-    auth: { strategy: "token", providers: ["email"], users: userStore },
+    auth: {
+      strategy: "token",
+      providers: ["email"],
+      users: userStore,
+      sessions: sessionStore,
+    },
   })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();

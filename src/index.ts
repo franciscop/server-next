@@ -2,14 +2,7 @@ import "./errors/index";
 import "./polyfill";
 
 import { config, createWebsocket, getMachine } from "./helpers";
-import {
-  assets,
-  auth,
-  openapi,
-  preflight,
-  session,
-  timer,
-} from "./middle";
+import { assets, auth, openapi, preflight, timer } from "./middle";
 
 import * as handlers from "./context/handlers";
 import { Router } from "./router";
@@ -26,7 +19,7 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
   settings: Settings;
   platform: Platform;
 
-  sockets: any[];
+  sockets: WebSocket[];
   websocket: any;
 
   port?: number;
@@ -58,7 +51,6 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     app.use(timer);
     if (this.settings.cors) app.use(preflight);
     app.use(assets);
-    app.use(session);
 
     if (this.settings.auth) {
       auth(app);

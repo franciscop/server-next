@@ -47,7 +47,6 @@ export default async function createWinter(
     headers,
     cookies,
     signal: req.signal,
-    session: {},
     init,
     app,
     ip: clientIp(headers, {

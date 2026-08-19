@@ -1,11 +1,37 @@
-import { createCookies, mimes, resolveCache, toWeb } from "./helpers";
+import {
+  createCookies,
+  iteratorAsyncToReadable,
+  iteratorToReadable,
+  mimes,
+  resolveCache,
+  toWeb,
+} from "./helpers";
 import disposition from "./helpers/disposition";
 import fileType from "./helpers/fileType";
 import isHtml from "./helpers/isHtml";
 import isReadableStream from "./helpers/isReadableStream";
-import type { BucketFile, CacheOption, Cookie } from "./types";
+import type { Readable } from "node:stream";
+import type {
+  BucketFile,
+  CacheOption,
+  Cookie,
+  SerializableValue,
+} from "./types";
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
+
+// Everything `send()` accepts, which is everything a route can return,
+// promises included (they are awaited, so `send(fetch(url))` works)
+type SendBody =
+  | SerializableValue
+  | JSX.Element
+  | Uint8Array
+  | ReadableStream
+  | Readable
+  | Response
+  | Reply
+  | BucketFile
+  | Promise<SendBody>;
 const EXPIRED = new Date(0).toUTCString();
 
 interface ResponseData {
@@ -98,7 +124,7 @@ class Reply {
     return this.headers("set-cookie", createCookies(key, value));
   }
 
-  json(body: unknown): Response {
+  json(body: unknown): Promise<Response> {
     // `undefined` stringifies to undefined, which would send an empty body
     // labelled as JSON and throw on the client's res.json()
     if (body === undefined) body = null;
@@ -114,7 +140,7 @@ class Reply {
     return this.send(JSON.stringify(body));
   }
 
-  redirect(path: string): Response {
+  redirect(path: string): Promise<Response> {
     // 302 is only the default: an explicitly set status (301/307/308) wins
     this.headers("location", path);
     if (this.res.status == null) this.res.status = 302;
@@ -123,15 +149,18 @@ class Reply {
 
   async file(path: string | BucketFile): Promise<Response> {
     // A bucket file handle: stream it with a type guessed from its name, and a
-    // 404 when it's missing — the same contract as a disk path below.
+    // 404 when it is missing, the same contract as a disk path below.
     if (typeof path !== "string") {
-      if (!(await path.exists())) return this.status(404).send();
+      // A bodyless 404, the same response returning a missing file produces
+      if (!(await path.exists())) return new Response(null, { status: 404 });
       return this.type(fileType(path)).send(path.stream());
     }
     // A '..' segment means the path was built from input that climbed out of
     // where it was meant to stay; `send` (Express) refuses these too. Normal
     // paths are already resolved, since path.join() collapses the dots.
-    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) return this.status(404).send();
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) {
+      return new Response(null, { status: 404 });
+    }
     try {
       const fs = await import("node:fs");
       const ext = path.split(".").pop();
@@ -141,14 +170,20 @@ class Reply {
       return this.type(ext).send(stream);
     } catch (error: any) {
       if (error.code === "ENOENT" || error.code === "EISDIR") {
-        return this.status(404).send();
+        return new Response(null, { status: 404 });
       }
       throw error;
     }
   }
 
-  send(body: string | Buffer | ReadableStream | any = ""): Response {
+  // Accepts everything a route can return, so `send(x)` and `return x` agree.
+  // Async because a bucket file has to be read before its status is known;
+  // routes await whatever they return, so this is invisible in normal use.
+  async send(input: SendBody = ""): Promise<Response> {
     const { status = 200, headers } = this.res;
+    // The branches below identify the body by duck-typing (thenables, streams,
+    // byte views), which the parameter's union cannot express, so widen here
+    let body: any = input;
 
     // 101/204/205/304 are "null body status" codes: a Response carrying any body
     // (even "") throws in spec-compliant runtimes like Node/undici (Bun is
@@ -161,17 +196,63 @@ class Reply {
     // fall through to the JSON default and send the string "null"
     if (body === null) body = "";
 
+    // A promise resolves first, the same as returning one from a route does,
+    // so `send(fetch(url))` works without awaiting it yourself.
+    if (typeof body?.then === "function") body = await body;
+
     // A JSX element is a thunk: call it for the HTML, the same as returning it
     // from a route does. The string branch below then types it as `text/html`.
     if (typeof body === "function") body = body();
 
-    // send() is synchronous, so it can't wait on a promise (an async component
-    // being the usual source). Say so instead of serializing the promise.
+    // A thunk that returns a promise is an async component. The renderer has no
+    // async support anywhere (a nested one renders nothing), so say so.
     if (typeof body?.then === "function") {
       throw new Error(
-        "send() received a promise, likely an async component. Await it first, " +
-          "or return it from the route, which resolves it for you.",
+        "Cannot render an async component: components must be synchronous. " +
+          "Await the data before rendering and pass it in as props.",
       );
+    }
+
+    // A Reply resolves to its own Response first, then merges below
+    if (body instanceof Reply) body = await body.send();
+
+    // A Response carries its own body and status; anything set on this chain
+    // (headers, cookies, an explicit status) is applied on top of it.
+    if (body instanceof Response) {
+      const merged = new Headers(body.headers);
+      for (const [key, value] of headers) {
+        if (key === "set-cookie") continue;
+        merged.set(key, value);
+      }
+      for (const cookie of headers.getSetCookie?.() ?? []) {
+        merged.append("set-cookie", cookie);
+      }
+      // fetch() already decoded the body, so drop a stale content-encoding
+      if (body.url && /^(br|gzip)$/.test(merged.get("content-encoding") || "")) {
+        merged.delete("content-encoding");
+      }
+      return new Response(body.body, {
+        status: this.res.status ?? body.status,
+        headers: merged,
+      });
+    }
+
+    // A bucket file: same handling as returning one, including the 404
+    if (
+      body &&
+      typeof body.stream === "function" &&
+      typeof body.bytes === "function" &&
+      typeof body.exists === "function" &&
+      typeof body.name === "string"
+    ) {
+      return this.file(body);
+    }
+
+    if (body instanceof Blob) {
+      if (!headers.get("content-type") && body.type) {
+        headers.set("content-type", body.type);
+      }
+      return new Response(body, { status, headers });
     }
 
     if (typeof body === "string") {
@@ -204,6 +285,15 @@ class Reply {
 
     if (isReadableStream(body)) {
       return new Response(toWeb(body), { status, headers });
+    }
+
+    // Generators stream their chunks as they are produced. Arrays are data,
+    // not a stream, so they fall through to JSON below (as returning one does)
+    if (!Array.isArray(body) && body?.[Symbol.iterator]) {
+      return new Response(iteratorToReadable(body), { status, headers });
+    }
+    if (body?.[Symbol.asyncIterator]) {
+      return new Response(iteratorAsyncToReadable(body), { status, headers });
     }
 
     // Default sends it as json. Bare `application/json`, no charset: JSON is

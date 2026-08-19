@@ -1,18 +1,18 @@
 import server, { cache } from ".";
 
 describe("cache() reply helper", () => {
-  it("sets Cache-Control from a duration string", () => {
-    const res = cache("1h").send("hi");
+  it("sets Cache-Control from a duration string", async () => {
+    const res = await cache("1h").send("hi");
     expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
   });
 
-  it("accepts a number of seconds", () => {
-    const res = cache(3600).send("hi");
+  it("accepts a number of seconds", async () => {
+    const res = await cache(3600).send("hi");
     expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
   });
 
-  it("false becomes no-store", () => {
-    const res = cache(false).send("hi");
+  it("false becomes no-store", async () => {
+    const res = await cache(false).send("hi");
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 });

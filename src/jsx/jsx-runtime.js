@@ -21,8 +21,6 @@ const SVG_TAGS = new Set([
   "defs",
 ]);
 
-const REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
-
 const ALT_NAMES = {
   classname: "class",
   htmlfor: "for",
@@ -100,8 +98,9 @@ const renderChild = (child) => {
 };
 
 const jsx = (tag, { children, ...props } = {}) => {
-  // Fragment (Symbol-safe)
-  if (tag === REACT_FRAGMENT_TYPE || tag === Fragment) {
+  // Fragment. It is the registered React symbol, so a compiled React library
+  // matches whether it imports Fragment or inlines Symbol.for("react.fragment")
+  if (tag === Fragment) {
     return () => renderChild(children);
   }
 
@@ -158,7 +157,9 @@ const jsx = (tag, { children, ...props } = {}) => {
     // `minify` drives <style>, it isn't an HTML attribute
     .filter(([k]) => !(tag === "style" && k === "minify"))
     .filter(([k, v]) => !/on[A-Z]/.test(k) && typeof v !== "function")
-    .filter(([, v]) => v !== false)
+    // `false`, `null` and `undefined` drop the attribute (as React does),
+    // rather than rendering it empty
+    .filter(([, v]) => v !== false && v != null)
     .map(([k, v]) => {
       const preserveSvg = k === "viewBox" || k === "preserveAspectRatio";
 
@@ -180,6 +181,7 @@ const jsx = (tag, { children, ...props } = {}) => {
             return `${cssKey}:${val}`;
           })
           .join(";");
+        if (!v) return null; // an empty style object adds nothing
       }
 
       const value =
@@ -187,6 +189,7 @@ const jsx = (tag, { children, ...props } = {}) => {
 
       return `${key}="${value}"`;
     })
+    .filter((attr) => attr !== null)
     .join(" ");
 
   if (attrStr) attrStr = ` ${attrStr}`;

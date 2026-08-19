@@ -6,17 +6,13 @@ describe("jwt auth flow", () => {
   const PASS = "11111111";
   const CREDENTIALS = { email: EMAIL, password: PASS };
 
-  const sessionStore = kv(new Map());
   const userStore = kv(new Map());
-  const sessions = () => sessionStore.keys();
   const users = () => userStore.keys();
-  const api = server({
+  const app = server({
     secret: "app-secret",
-    sessions: sessionStore,
     auth: { strategy: "jwt", providers: ["email"], users: userStore },
-  })
-    .get("/me", (ctx) => ctx.user || "No data")
-    .test();
+  }).get("/me", (ctx) => ctx.user || "No data");
+  const api = app.test();
 
   it("issues a stateless JWT and authenticates with it", async () => {
     // Register -> a signed JWT, and NO server-side session is stored.
@@ -25,7 +21,8 @@ describe("jwt auth flow", () => {
     const { token } = await register.json();
     expect(token.split(".")).toHaveLength(3); // it's a JWT, not a 16-char id
     expect(await users()).toEqual([EMAIL]);
-    expect(await sessions()).toEqual([]); // stateless: nothing in the session store
+    // Stateless: the strategy configures no session store at all
+    expect(app.settings.auth.sessions).toBeNull();
 
     // The payload IS the user (onToken-shaped): claims in, password out
     const payload = JSON.parse(
@@ -61,7 +58,6 @@ describe("jwt auth flow", () => {
     // Logout is a no-op server-side (stateless); the client discards the token.
     const logout = await api.post("/auth/logout", {}, { headers: auth });
     expect(logout.status).toBe(200);
-    expect(await sessions()).toEqual([]);
   });
 
   it("warns when jwt is configured with no secret", () => {
@@ -169,23 +165,11 @@ describe("jwt auth flow", () => {
     expect(await res.text()).toBe("Invalid Authorization token");
   });
 
-  it("has no ctx.session: any access throws", async () => {
+  it("is cookie-free: nothing is stored or minted", async () => {
     const app = server({ secret: "app-secret", auth: "jwt:email" })
-      .get("/read", (ctx) => `got ${ctx.session.cart}`)
-      .get("/write", (ctx) => {
-        ctx.session.cart = ["x"];
-        return 200;
-      })
-      .get("/ok", () => "no session touched")
+      .get("/ok", () => "stateless")
       .test();
 
-    const read = await app.get("/read");
-    expect(read.status).toBe(500);
-    expect(await read.text()).toContain("jwt");
-    const write = await app.get("/write");
-    expect(write.status).toBe(500);
-
-    // Routes that leave ctx.session alone are unaffected, and cookie-free
     const ok = await app.get("/ok");
     expect(ok.status).toBe(200);
     expect(ok.headers.get("set-cookie")).toBeNull();

@@ -1,50 +1,57 @@
 import kv from "polystore";
 import server, { bucket } from ".";
 
-// `sessions` accepts anything polystore does, so the simple case needs no
+const CREDENTIALS = { email: "abc@test.com", password: "11111111" };
+
+// `auth.sessions` accepts anything polystore does, so the simple case needs no
 // wrapping and the explicit one keeps working.
 describe("sessions sources", () => {
-  const counter = (sessions: any) =>
-    server({ sessions })
-      .post("/hit", (ctx) => {
-        ctx.session.n = Number(ctx.session.n || 0) + 1;
-        return { n: ctx.session.n };
-      })
+  const login = (sessions: any) =>
+    server({
+      auth: {
+        strategy: "token",
+        providers: ["email"],
+        users: new Map(),
+        sessions,
+      },
+    })
+      .get("/me", (ctx) => ctx.user || 401)
       .test();
 
-  const hit = async (api: any) => {
-    const first = await api.post("/hit");
-    const cookie = String(first.headers.get("set-cookie")).split(";")[0];
-    const second = await api.post("/hit", null, { headers: { cookie } });
-    return (await second.json()).n;
+  // Logs in, then reads the user back through the stored record
+  const roundtrip = async (api: any) => {
+    const { token } = await (
+      await api.post("/auth/register/email", CREDENTIALS)
+    ).json();
+    const me = await api.get("/me", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return (await me.json()).email;
   };
 
   it("takes a plain Map", async () => {
-    expect(await hit(counter(new Map()))).toBe(2);
+    expect(await roundtrip(login(new Map()))).toBe(CREDENTIALS.email);
   });
 
   it("takes an already-wrapped store", async () => {
-    expect(await hit(counter(kv(new Map())))).toBe(2);
+    expect(await roundtrip(login(kv(new Map())))).toBe(CREDENTIALS.email);
   });
 
   it("keeps the prefix of a store it was given", async () => {
     // Re-wrapping a store unwraps it to its raw adapter, losing the prefix, so
     // an already-built store has to be used as-is
     const map = new Map();
-    await counter(kv(map).prefix("session:")).post("/hit");
+    await login(kv(map).prefix("session:")).post(
+      "/auth/register/email",
+      CREDENTIALS,
+    );
     expect(map.size).toBeGreaterThan(0);
     expect([...map.keys()].every((k) => k.startsWith("session:"))).toBe(true);
   });
 
   it("keeps the expiry of a store it was given", async () => {
     const store = kv(new Map(), { expires: "1h" });
-    const api = server({ sessions: store })
-      .post("/hit", (ctx) => {
-        ctx.session.n = 1;
-        return 201;
-      })
-      .test();
-    await api.post("/hit");
+    await login(store).post("/auth/register/email", CREDENTIALS);
     expect((store as any).EXPIRES).toBe(3600);
   });
 
@@ -52,13 +59,22 @@ describe("sessions sources", () => {
     // A store built from a pending source, like a client still connecting
     const map = new Map();
     const pending = kv(new Promise((r) => setTimeout(() => r(map), 10)));
-    expect(await hit(counter(pending))).toBe(2);
+    expect(await roundtrip(login(pending))).toBe(CREDENTIALS.email);
   });
 
-  it("writes sessions into the Map it was given", async () => {
+  it("writes the login into the Map it was given", async () => {
     const map = new Map();
-    await counter(map).post("/hit");
+    await login(map).post("/auth/register/email", CREDENTIALS);
     expect(map.size).toBe(1);
+  });
+
+  it("defaults to an in-memory store in development", async () => {
+    const api = server({
+      auth: { strategy: "token", providers: ["email"], users: new Map() },
+    })
+      .get("/me", (ctx) => ctx.user || 401)
+      .test();
+    expect(await roundtrip(api)).toBe(CREDENTIALS.email);
   });
 });
 

@@ -68,7 +68,6 @@ export default async function createNode(
     headers,
     cookies,
     signal,
-    session: {},
     init,
     app,
     ip: clientIp(headers, {

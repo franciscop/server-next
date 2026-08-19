@@ -22,7 +22,6 @@ export type Method =
 // The typed slices of `ctx` an app declares, e.g. `server<{ user: User }>()`;
 // keys take plain types or Standard Schemas. See "Typing ctx" in the docs.
 export type ContextTypes = {
-  session?: any;
   user?: any;
   params?: any;
   query?: any;
@@ -36,11 +35,10 @@ type Field<C, K extends keyof ContextTypes, Fallback> = K extends keyof C
   : Fallback;
 
 declare namespace JSX {
-  // The shape of what JSX emits in your system.
-  // It does NOT pull in React at all.
+  // What JSX emits here: rendering is deferred, so an element is a thunk that
+  // produces the HTML when called. It does NOT pull in React at all.
   interface Element {
-    type: any;
-    props: any;
+    (): string;
   }
 
   // Allow any intrinsic tags (<div>, <p>, etc.)
@@ -222,9 +220,9 @@ export type SerializableValue =
   | { [key: string]: SerializableValue }
   | Array<SerializableValue>;
 
-// Anything the `store` / `session` options accept: a plain `Map`, a Redis or
-// DynamoDB client, a `file://` path, or an already-wrapped store. It's passed
-// through polystore's `kv()` at boot, so routes always see a `KVStore`.
+// Anything the `auth.users` / `auth.sessions` options accept: a plain `Map`, a
+// Redis or DynamoDB client, a `file://` path, or an already-wrapped store. It's
+// passed through polystore's `kv()` at boot, so auth always sees a `KVStore`.
 export type StoreSource =
   | KVStore
   | Map<string, any>
@@ -255,8 +253,8 @@ export type Provider =
   | "apple";
 export type Strategy = "cookie" | "jwt" | "token";
 
-// The reserved auth fields on ctx.session (`cookie`/`token` strategies):
-// `user` keys into `auth.users`, and present means signed in.
+// One login record (`cookie`/`token` strategies), stored under the credential
+// the client carries; `user` keys into `auth.users`. Internal to auth.
 export type AuthSession = {
   user: string;
   provider: Provider;
@@ -284,9 +282,13 @@ export type AuthOption =
   | {
       strategy: Strategy;
       providers?: Provider | Provider[];
-      // One record per person, keyed by ctx.session.user. Defaults to an
+      // One record per person, keyed by the login's subject. Defaults to an
       // in-memory Map; production requires an explicit store.
       users?: StoreSource;
+      // One record per login, keyed by the credential the client carries.
+      // Unused by the stateless `jwt`; the others default to an in-memory Map
+      // (with a 1w expiry), and production requires an explicit store.
+      sessions?: StoreSource;
       redirect?: string;
       // Callbacks over the login lifecycle. Each one fully replaces the
       // built-in step (they never run "on top of" the default), and the user
@@ -320,8 +322,10 @@ export type AuthSettings = {
   providers: Provider[];
   strategy: Strategy;
 
-  // One record per person; sessions point into it via their `user` field
+  // One record per person; logins point into it via their `user` field
   users: KVStore;
+  // One record per login; unused by the stateless `jwt`
+  sessions: KVStore;
 
   onProfile?: (
     raw: any,
@@ -398,10 +402,6 @@ export type Options = {
   secret?: string;
   public?: string | Bucket;
   uploads?: string | Bucket | UploadOptions;
-  // One record per device, exposed as ctx.session. Defaults to an in-memory
-  // Map; raw sources (a Map, a Redis client) get a 1w expiry, a built store
-  // (`kv(redis).expires('2w')`) is honored as-is.
-  sessions?: StoreSource;
   cors?: CorsOptions;
   auth?: AuthOption;
   // Serve the generated OpenAPI spec: `true` for /openapi.json, a string for
@@ -424,10 +424,6 @@ export type Settings = {
   secret: string;
   public?: Bucket;
   uploads?: ({ bucket: Bucket } & LimitOptions) | null;
-  sessions: KVStore;
-  // Internal: `sessions` came from the in-memory default (drives a one-time
-  // warning on the first session write in production)
-  sessionsDefault?: boolean;
   cors?: CorsSettings;
   auth?: AuthSettings;
   openapi?: {
@@ -538,7 +534,6 @@ export type Context<C extends ContextTypes = {}> = {
   time?: Time;
   socket?: WebSocket;
   sockets?: WebSocket[];
-  session: Field<C, "session", Record<string, any>>;
   user?: Field<C, "user", Record<string, any>>;
   init: number;
   app: Server;

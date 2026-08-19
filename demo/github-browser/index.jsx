@@ -4,8 +4,12 @@ import kv from "polystore";
 const disk = kv(`file://${process.cwd()}/session/`);
 
 export default server({
-  sessions: disk.prefix("session:"),
-  auth: { strategy: "cookie", providers: ["github"], users: disk.prefix("user:") },
+  auth: {
+    strategy: "cookie",
+    providers: ["github"],
+    users: disk.prefix("user:"),
+    sessions: disk.prefix("session:"),
+  },
 })
   .get("/", (ctx) => redirect(ctx.user ? "/user" : "/login"))
   .get("/login", () => (

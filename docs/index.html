@@ -259,7 +259,6 @@ export default server()
     </header>
     <p>
       <a href="/documentation/router">Routing</a>,
-      <a href="/documentation/options#optionssessions">sessions</a>,
       <a href="/documentation#file-handling">uploads</a>,
       <a href="/documentation#validation">validation</a>,
       <a href="/documentation#websockets">websockets</a>,
@@ -380,10 +379,10 @@ export default server()
   <div>
     <pre><code class="language-js">import server from "@server/next";
 
-const auth = "cookie:github"; // sign in /auth/login/github
-const store = new Map(); // in-memory sessions
+// Sign in at /auth/login/github
+const auth = { strategy: "cookie", providers: ["github"] };
 
-export default server({ store, auth })
+export default server({ auth })
   .get("/me", ctx =&gt; ctx.user || 401);
 </code></pre>
   </div>

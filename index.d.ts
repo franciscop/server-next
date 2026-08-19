@@ -1,4 +1,5 @@
 import * as http from 'http';
+import { Readable } from 'node:stream';
 export { default as kv } from 'polystore';
 export { default as bucket } from 'bucket';
 
@@ -9,6 +10,7 @@ type LimitOptions = {
 };
 
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
+type SendBody = SerializableValue | JSX.Element | Uint8Array | ReadableStream | Readable | Response | Reply$1 | BucketFile | Promise<SendBody>;
 interface ResponseData {
     headers: Headers;
     status?: number;
@@ -22,10 +24,10 @@ declare class Reply$1 {
     headers(key: string | Record<string, string | string[]>, value?: string | string[]): this;
     cache(value: CacheOption): this;
     cookies(key: string | Record<string, CookieOptions>, value?: CookieOptions): this;
-    json(body: unknown): Response;
-    redirect(path: string): Response;
+    json(body: unknown): Promise<Response>;
+    redirect(path: string): Promise<Response>;
     file(path: string | BucketFile): Promise<Response>;
-    send(body?: string | Buffer | ReadableStream | any): Response;
+    send(input?: SendBody): Promise<Response>;
 }
 type Params<K extends keyof Reply$1> = Reply$1[K] extends (...args: infer A) => any ? A : never;
 declare const status: (...args: Params<"status">) => Reply$1;
@@ -34,25 +36,23 @@ declare const type: (...args: Params<"type">) => Reply$1;
 declare const cache: (...args: Params<"cache">) => Reply$1;
 declare const download: (...args: Params<"download">) => Reply$1;
 declare const cookies: (...args: Params<"cookies">) => Reply$1;
-declare const send: (...args: Params<"send">) => Response;
-declare const json: (...args: Params<"json">) => Response;
+declare const send: (...args: Params<"send">) => Promise<Response>;
+declare const json: (...args: Params<"json">) => Promise<Response>;
 declare const file: (...args: Params<"file">) => Promise<Response>;
-declare const redirect: (...args: Params<"redirect">) => Response;
+declare const redirect: (...args: Params<"redirect">) => Promise<Response>;
 
 type Reply = ReturnType<typeof status>;
 type Method = "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 type ContextTypes = {
-    session?: any;
     user?: any;
     params?: any;
     query?: any;
     body?: any;
 };
 type Field<C, K extends keyof ContextTypes, Fallback> = K extends keyof C ? SchemaOutput<C[K], C[K]> : Fallback;
-declare namespace JSX {
+declare namespace JSX$1 {
     interface Element {
-        type: any;
-        props: any;
+        (): string;
     }
     interface IntrinsicElements {
         [elem: string]: any;
@@ -203,6 +203,7 @@ type AuthOption = `${Strategy}:${Provider}` | {
     strategy: Strategy;
     providers?: Provider | Provider[];
     users?: StoreSource;
+    sessions?: StoreSource;
     redirect?: string;
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
@@ -214,6 +215,7 @@ type AuthSettings = {
     providers: Provider[];
     strategy: Strategy;
     users: KVStore;
+    sessions: KVStore;
     onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
     onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
     onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
@@ -256,7 +258,6 @@ type Options = {
     secret?: string;
     public?: string | Bucket;
     uploads?: string | Bucket | UploadOptions;
-    sessions?: StoreSource;
     cors?: CorsOptions;
     auth?: AuthOption;
     openapi?: boolean | string | {
@@ -279,8 +280,6 @@ type Settings = {
     uploads?: ({
         bucket: Bucket;
     } & LimitOptions) | null;
-    sessions: KVStore;
-    sessionsDefault?: boolean;
     cors?: CorsSettings;
     auth?: AuthSettings;
     openapi?: {
@@ -339,7 +338,6 @@ type Context<C extends ContextTypes = {}> = {
     time?: Time;
     socket?: WebSocket;
     sockets?: WebSocket[];
-    session: Field<C, "session", Record<string, any>>;
     user?: Field<C, "user", Record<string, any>>;
     init: number;
     app: Server;
@@ -351,7 +349,7 @@ type Context<C extends ContextTypes = {}> = {
 type InlineReply = Response | Reply | BucketFile | {
     body: string;
     headers?: Headers;
-} | SerializableValue | JSX.Element | Buffer | ReadableStream;
+} | SerializableValue | JSX$1.Element | Buffer | ReadableStream;
 type Body = InlineReply;
 type Middleware<C extends ContextTypes = {}> = (ctx: Context<C>) => InlineReply | Promise<InlineReply> | void | Promise<void>;
 
@@ -373,7 +371,7 @@ declare class ServerError extends Error {
 declare const TypedServerError: typeof ServerError & ServerErrorConstructor;
 
 declare global {
-    var env: Record<string, any>;
+    var env: Record<string, string | undefined>;
 }
 
 type Fn<C extends ContextTypes> = (ctx: Context<C>) => ReturnType<Middleware>;
@@ -440,7 +438,7 @@ declare class ValidationError extends StatusError {
 declare class Server<C extends ContextTypes = {}> extends Router<C> {
     settings: Settings;
     platform: Platform;
-    sockets: any[];
+    sockets: WebSocket[];
     websocket: any;
     port?: number;
     constructor(options?: Options);

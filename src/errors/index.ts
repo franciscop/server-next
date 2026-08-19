@@ -13,10 +13,6 @@ ServerError.extend({
     status: 400,
     message: "Missing the OAuth 'code' in the request body",
   },
-  SESSION_JWT:
-    "The `jwt` strategy is stateless, so there is no `ctx.session` (tried '{key}'). Use the `token` strategy for server-side sessions, or `cookie` for browsers",
-  SESSION_GUEST:
-    "No `ctx.session` for this request (tried '{key}'): the `token` strategy carries the session in the Authorization header, and this request has none. Sign in first, or use the `cookie` strategy for guest sessions",
   AUTH_INVALID_HEADER: {
     status: 401,
     message:

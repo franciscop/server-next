@@ -157,6 +157,46 @@ describe("text encoding", () => {
   });
 });
 
+describe("omitted attributes", () => {
+  it("drops undefined attributes instead of rendering them empty", () => {
+    expect(<ul start={undefined}></ul>).toRender("<ul></ul>");
+  });
+
+  it("drops null attributes", () => {
+    expect(<div title={null}></div>).toRender("<div></div>");
+  });
+
+  it("drops false attributes", () => {
+    expect(<input disabled={false} />).toRender("<input />");
+  });
+
+  it("keeps empty strings, zero and NaN, which are real values", () => {
+    expect(<div title=""></div>).toRender('<div title=""></div>');
+    expect(<div tabindex={0}></div>).toRender('<div tabindex="0"></div>');
+  });
+
+  it("keeps the other attributes of the same tag", () => {
+    expect(<a href="/x" title={undefined} id="y"></a>).toRender(
+      '<a href="/x" id="y"></a>',
+    );
+  });
+
+  it("drops a style object that resolves to nothing", () => {
+    expect(<th style={{}}></th>).toRender("<th></th>");
+    expect(<th style={{ color: undefined }}></th>).toRender("<th></th>");
+  });
+
+  it("keeps a style object with values", () => {
+    expect(<th style={{ textAlign: "left" }}></th>).toRender(
+      '<th style="text-align:left"></th>',
+    );
+  });
+
+  it("renders a true attribute bare", () => {
+    expect(<input disabled={true} />).toRender("<input disabled />");
+  });
+});
+
 describe("attribute encoding", () => {
   it("encodes < and > in attribute values", () => {
     expect(<div title="<b>hi</b>"></div>).toRender(

@@ -1,4 +1,4 @@
-import toStore from "../helpers/store";
+import toStore, { toStoreExpiring } from "../helpers/store";
 import type { Options, Provider, Settings, Strategy } from "../types";
 import providers from "./providers";
 
@@ -52,9 +52,11 @@ export default function parseAuthOptions(
   // The jwt payload builder; the default keeps the hash out of the token
   const onToken = auth.onToken || defaultOnUser;
 
-  // A raw Map/client is accepted here too. No default: config fills it with an
-  // in-memory Map in development, and refuses to boot in production.
+  // A raw Map/client is accepted here too. No defaults: config fills them with
+  // in-memory Maps in development, and refuses to boot in production.
   const users = auth.users ? toStore(auth.users) : null;
+  // Raw sources get a 1w expiry; a built store keeps its own policy
+  const sessions = auth.sessions ? toStoreExpiring(auth.sessions, "1w") : null;
 
   return {
     strategy,
@@ -66,5 +68,6 @@ export default function parseAuthOptions(
     onToken,
     onLogout,
     users,
+    sessions,
   } as AuthSettings;
 }

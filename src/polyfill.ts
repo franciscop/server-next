@@ -1,6 +1,6 @@
 // Declare global env variable
 declare global {
-  var env: Record<string, any>;
+  var env: Record<string, string | undefined>;
 }
 
 // Polyfill Netlify's environment variables

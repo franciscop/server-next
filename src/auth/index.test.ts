@@ -34,7 +34,9 @@ describe("auth", () => {
       created: "2024-07-01T03:21:40Z",
     });
 
-    const api = server({ sessions, auth: "token:email" })
+    const api = server({
+      auth: { strategy: "token", providers: ["email"], sessions },
+    })
       .get("/", (ctx) => ctx.user)
       .test();
 
@@ -59,8 +61,7 @@ describe("token", () => {
   const sessions = kv(new Map());
   const users = kv(new Map());
   const api = server({
-    sessions,
-    auth: { strategy: "token", providers: ["email"], users },
+    auth: { strategy: "token", providers: ["email"], users, sessions },
   })
     .get("/", (ctx) => ctx.user)
     .test();
@@ -125,8 +126,7 @@ describe("cookie", () => {
   const sessions = kv(new Map());
   const users = kv(new Map());
   const api = server({
-    sessions,
-    auth: { strategy: "cookie", providers: ["email"], users },
+    auth: { strategy: "cookie", providers: ["email"], users, sessions },
   })
     .get("/", (ctx) => ctx.user)
     .test();

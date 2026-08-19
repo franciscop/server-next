@@ -1,9 +1,9 @@
 import type { AuthSession, AuthUser, Context } from "..";
 import { createId } from "../helpers";
 import { signJwt } from "../helpers/jwt";
-import { loaded } from "../middle/session";
 import { cookies, status } from "../reply";
 import assertUser from "./assertUser";
+import findSessionId from "./findSessionId";
 
 type LoginInput = {
   // Provider name stored on the session ("email", "google", ...)
@@ -17,9 +17,9 @@ type LoginInput = {
 };
 
 // The single place every provider funnels through after authenticating: it
-// persists the user, stamps the auth fields on the session, and responds
-// according to the chosen strategy. Consolidating it here keeps cookies, the
-// session shape, the callbacks, and the strategies consistent across providers.
+// persists the user, writes the login record, and responds according to the
+// chosen strategy. Consolidating it here keeps cookies, the record shape, the
+// callbacks, and the strategies consistent across providers.
 export default async function finishLogin(
   ctx: Context,
   input: LoginInput,
@@ -30,14 +30,6 @@ export default async function finishLogin(
   const settings = ctx.options.auth;
   const { strategy, onLogin, onUser, onToken } = settings;
   const key = String(input.key);
-
-  // A login always ends with a session (except stateless `jwt`), so give this
-  // request a writable one now: a `token` guest arrives without one, and
-  // `onLogin` may stamp per-device data onto it.
-  if (!strategy.includes("jwt") && !loaded.has(ctx)) {
-    ctx.session = {};
-    loaded.set(ctx, { id: undefined, data: "{}" });
-  }
 
   const auth: AuthSession = {
     user: key,
@@ -81,17 +73,13 @@ export default async function finishLogin(
     return status(201).json({ ...exposed, token });
   }
 
-  // Rotate the session id on login: keeping a guest's id would let an attacker
-  // plant one and inherit the session once the victim signs in (fixation).
-  // The guest data carries over under the new id.
-  const prev = loaded.get(ctx);
-  if (prev?.id) await ctx.options.sessions.del(prev.id);
+  // Rotate the id on login: keeping the one the client arrived with would let
+  // an attacker plant it and inherit the login once the victim signs in
+  // (fixation).
+  const prev = findSessionId(ctx);
+  if (prev) await settings.sessions.del(prev);
   const id = createId();
-  Object.assign(ctx.session, auth);
-  // Persist right away, so the credential works the moment the client has it;
-  // the fresh snapshot keeps parseResponse from writing the same data again
-  await ctx.options.sessions.set(id, ctx.session);
-  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
+  await settings.sessions.set(id, auth);
 
   if (strategy.includes("token")) {
     const exposed = await onUser(user, ctx);

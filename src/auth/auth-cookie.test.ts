@@ -11,8 +11,12 @@ describe("user creation flow", () => {
   const sessionStore = kv(new Map());
   const userStore = kv(new Map());
   const api = server({
-    sessions: sessionStore,
-    auth: { strategy: "cookie", providers: ["email"], users: userStore },
+    auth: {
+      strategy: "cookie",
+      providers: ["email"],
+      users: userStore,
+      sessions: sessionStore,
+    },
   })
     .get("/me", (ctx) => ctx.user || "No data")
     .test();

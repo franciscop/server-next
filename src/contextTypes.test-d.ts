@@ -1,22 +1,20 @@
 // Compile-time only: the `ContextTypes` generic types ctx app-wide at
 // `server()`, per sub-router at `router()`, and for detached functions at
-// `Context`/`Middleware`. Its keys mirror ctx (`session`, `user`, `params`,
-// `query`, `body`), each taking a plain type or a Standard Schema. Checked by
+// `Context`/`Middleware`. Its keys mirror ctx (`user`, `params`, `query`,
+// `body`), each taking a plain type or a Standard Schema. Checked by
 // `tsc --noEmit` like the other .test-d files.
 import { z } from "zod";
 import server, { router, type Context, type Middleware } from ".";
 
 type User = { id: string; email: string; role: "admin" | "user" };
-type Session = { cart: string[]; theme?: "dark" | "light" };
 
-// The server generic types ctx.user and ctx.session in every inline handler
-server<{ user: User; session: Session }>()
+// The server generic types ctx.user in every inline handler
+server<{ user: User }>()
   .get("/me", (ctx) => {
     const role: "admin" | "user" | undefined = ctx.user?.role;
-    const cart: string[] = ctx.session.cart;
     // @ts-expect-error `plan` is not a field of User
     ctx.user?.plan;
-    return { role, cart };
+    return { role };
   })
   // Path params and route schemas layer on top of the app-level generic
   .post("/posts/:id", { body: z.object({ title: z.string() }) }, (ctx) => {
@@ -26,8 +24,8 @@ server<{ user: User; session: Session }>()
     return { id, title, email };
   });
 
-// @ts-expect-error a key outside ContextTypes (`sesion`) is rejected
-server<{ sesion: Session }>();
+// @ts-expect-error a key outside ContextTypes (`usr`) is rejected
+server<{ usr: User }>();
 
 // A sub-router carries the same generic, so router-per-file keeps ctx typed
 router<{ user: User }>().get("/admin", (ctx) => {
@@ -90,8 +88,12 @@ server<{ user: User }>().post(
 
 // A bare Context keeps open defaults
 declare const plain: Context;
-const _session: Record<string, any> = plain.session;
 const _param: string = plain.url.params.anything;
 const _email: string | undefined = plain.user?.email;
 
-export type { _session as session, _param as param, _email as email };
+export type {
+  _param as param,
+  _email as email,
+  bodyRequired,
+  bodyOptional,
+};

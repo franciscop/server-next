@@ -15,16 +15,24 @@ export default server({ uploads: './uploads' })
   .post('/avatar', (ctx) => ctx.body.avatar.path);
 ```
 
-Key-value stores and file storage come included, so `sessions` work out of the box and `uploads` takes a folder path. For Redis, S3 and the rest, pass the client straight in:
+Key-value stores and file storage come included, so logins work out of the box and `uploads` takes a folder path. For Redis, S3 and the rest, pass the client straight in:
 
 ```js
-import server, { bucket } from '@server/next';
+import server, { bucket, kv } from '@server/next';
 import { createClient } from 'redis';
 
-const sessions = createClient({ url });
+const redis = kv(createClient({ url }));
 const uploads = bucket.S3('my-bucket', { id, key });
 
-export default server({ sessions, uploads });
+export default server({
+  uploads,
+  auth: {
+    strategy: 'cookie',
+    providers: ['github'],
+    users: redis.prefix('user:'),
+    sessions: redis.prefix('session:'),
+  },
+});
 ```
 
 See the [full documentation](https://serverjs.io/documentation).

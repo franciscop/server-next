@@ -28,6 +28,7 @@ const auth: AuthOption = {
   strategy: "cookie",
   providers: ["github"],
   users,
+  sessions,
   redirect: "/",
   // Default the role by email; the stored record (UI promotions) wins
   onLogin: (user, existing) => ({
@@ -38,7 +39,6 @@ const auth: AuthOption = {
 };
 
 export default server<{ user: User }>({
-  sessions,
   auth,
   public: `./public`,
   openapi: { title: "User management API" },

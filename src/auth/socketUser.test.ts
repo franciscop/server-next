@@ -16,8 +16,7 @@ describe("socketUser (websocket auth)", () => {
 		const sessions = kv(new Map());
 		const users = kv(new Map());
 		const app = server({
-			sessions,
-			auth: { strategy, providers: ["email"], users },
+			auth: { strategy, providers: ["email"], users, sessions },
 		});
 		const id = createId(); // 16 chars, the opaque session id
 		return { app, id, sessions, users };

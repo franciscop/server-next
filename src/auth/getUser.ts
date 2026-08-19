@@ -1,7 +1,6 @@
 import type { AuthSession, AuthUser, Context } from "..";
 import { ServerError } from "..";
 import { verifyJwt } from "../helpers/jwt";
-import { loaded } from "../middle/session";
 import assertUser from "./assertUser";
 import findSessionId from "./findSessionId";
 
@@ -32,18 +31,11 @@ async function getJwtUser(ctx: Context): Promise<AuthUser | undefined> {
   return exposed;
 }
 
-// The other strategies store the auth fields on the device's session record.
+// The other strategies read the login record the credential points at
 async function getAuthSession(ctx: Context): Promise<AuthSession | undefined> {
-  // An HTTP request carries its already-loaded session (`loaded` marks it).
-  // Without one there's nothing to read: a `token` guest has no credential,
-  // and a socket upgrade builds a partial ctx, so that one hits the store.
-  if (loaded.has(ctx)) {
-    const session = ctx.session as AuthSession;
-    return session?.user ? session : undefined;
-  }
   const id = findSessionId(ctx);
   if (!id) return;
-  const session = await ctx.options.sessions.get<AuthSession>(id);
+  const session = await ctx.options.auth.sessions.get<AuthSession>(id);
   return session?.user ? session : undefined;
 }
 
@@ -54,9 +46,9 @@ export default async function getUser(ctx: Context): Promise<AuthUser> {
   if (options.strategy.includes("jwt")) return getJwtUser(ctx);
 
   const auth = await getAuthSession(ctx);
-  if (!auth) return; // NO SESSION FOUND; no auth
-  // Sessions outlive config changes: one signed in through a provider that
-  // was since removed is no longer valid
+  if (!auth) return; // NO LOGIN FOUND; no auth
+  // Logins outlive config changes: one made through a provider that was since
+  // removed is no longer valid
   if (!options.providers.includes(auth.provider)) {
     throw ServerError.AUTH_INVALID_PROVIDER({
       provider: auth.provider,

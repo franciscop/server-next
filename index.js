@@ -49,8 +49,6 @@ ServerError_default.extend({
     status: 400,
     message: "Missing the OAuth 'code' in the request body"
   },
-  SESSION_JWT: "The `jwt` strategy is stateless, so there is no `ctx.session` (tried '{key}'). Use the `token` strategy for server-side sessions, or `cookie` for browsers",
-  SESSION_GUEST: "No `ctx.session` for this request (tried '{key}'): the `token` strategy carries the session in the Authorization header, and this request has none. Sign in first, or use the `cookie` strategy for guest sessions",
   AUTH_INVALID_HEADER: {
     status: 401,
     message: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)"
@@ -799,7 +797,7 @@ function isReadableStream(obj) {
 
 // src/reply.ts
 var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
-var Reply = class {
+var Reply = class _Reply {
   res;
   constructor() {
     this.res = {
@@ -870,10 +868,12 @@ var Reply = class {
   }
   async file(path) {
     if (typeof path !== "string") {
-      if (!await path.exists()) return this.status(404).send();
+      if (!await path.exists()) return new Response(null, { status: 404 });
       return this.type(fileType(path)).send(path.stream());
     }
-    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) return this.status(404).send();
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) {
+      return new Response(null, { status: 404 });
+    }
     try {
       const fs = await import("fs");
       const ext = path.split(".").pop();
@@ -882,22 +882,54 @@ var Reply = class {
       return this.type(ext).send(stream);
     } catch (error) {
       if (error.code === "ENOENT" || error.code === "EISDIR") {
-        return this.status(404).send();
+        return new Response(null, { status: 404 });
       }
       throw error;
     }
   }
-  send(body = "") {
+  // Accepts everything a route can return, so `send(x)` and `return x` agree.
+  // Async because a bucket file has to be read before its status is known;
+  // routes await whatever they return, so this is invisible in normal use.
+  async send(input = "") {
     const { status: status2 = 200, headers: headers2 } = this.res;
+    let body = input;
     if (status2 === 101 || status2 === 204 || status2 === 205 || status2 === 304) {
       return new Response(null, { status: status2, headers: headers2 });
     }
     if (body === null) body = "";
+    if (typeof body?.then === "function") body = await body;
     if (typeof body === "function") body = body();
     if (typeof body?.then === "function") {
       throw new Error(
-        "send() received a promise, likely an async component. Await it first, or return it from the route, which resolves it for you."
+        "Cannot render an async component: components must be synchronous. Await the data before rendering and pass it in as props."
       );
+    }
+    if (body instanceof _Reply) body = await body.send();
+    if (body instanceof Response) {
+      const merged = new Headers(body.headers);
+      for (const [key, value] of headers2) {
+        if (key === "set-cookie") continue;
+        merged.set(key, value);
+      }
+      for (const cookie of headers2.getSetCookie?.() ?? []) {
+        merged.append("set-cookie", cookie);
+      }
+      if (body.url && /^(br|gzip)$/.test(merged.get("content-encoding") || "")) {
+        merged.delete("content-encoding");
+      }
+      return new Response(body.body, {
+        status: this.res.status ?? body.status,
+        headers: merged
+      });
+    }
+    if (body && typeof body.stream === "function" && typeof body.bytes === "function" && typeof body.exists === "function" && typeof body.name === "string") {
+      return this.file(body);
+    }
+    if (body instanceof Blob) {
+      if (!headers2.get("content-type") && body.type) {
+        headers2.set("content-type", body.type);
+      }
+      return new Response(body, { status: status2, headers: headers2 });
     }
     if (typeof body === "string") {
       if (!headers2.get("content-type")) {
@@ -923,6 +955,12 @@ var Reply = class {
     }
     if (isReadableStream(body)) {
       return new Response(toWeb(body), { status: status2, headers: headers2 });
+    }
+    if (!Array.isArray(body) && body?.[Symbol.iterator]) {
+      return new Response(iteratorToReadable(body), { status: status2, headers: headers2 });
+    }
+    if (body?.[Symbol.asyncIterator]) {
+      return new Response(iteratorAsyncToReadable(body), { status: status2, headers: headers2 });
     }
     if (!headers2.get("content-type")) {
       headers2.set("content-type", "application/json");
@@ -1039,48 +1077,11 @@ function findSessionId(ctx) {
   return ctx.cookies.session || void 0;
 }
 
-// src/middle/session.ts
-var loaded = /* @__PURE__ */ new WeakMap();
-function noSession(error) {
-  const target = {};
-  return new Proxy(target, {
-    get(target2, key) {
-      if (typeof key === "symbol" || key === "then") return target2[key];
-      throw error(String(key));
-    },
-    set(target2, key, value) {
-      if (typeof key === "symbol") {
-        target2[key] = value;
-        return true;
-      }
-      throw error(String(key));
-    }
-  });
-}
-async function session(ctx) {
-  const strategy = ctx.options.auth?.strategy;
-  if (strategy?.includes("jwt")) {
-    ctx.session = noSession((key) => ServerError_default.SESSION_JWT({ key }));
-    return;
-  }
-  const id = findSessionId(ctx);
-  if (!id && strategy?.includes("token")) {
-    ctx.session = noSession((key) => ServerError_default.SESSION_GUEST({ key }));
-    return;
-  }
-  ctx.session = id && await ctx.options.sessions.get(id) || {};
-  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
-}
-
 // src/auth/finishLogin.ts
 async function finishLogin(ctx, input, opts = {}) {
   const settings = ctx.options.auth;
   const { strategy, onLogin, onUser, onToken } = settings;
   const key = String(input.key);
-  if (!strategy.includes("jwt") && !loaded.has(ctx)) {
-    ctx.session = {};
-    loaded.set(ctx, { id: void 0, data: "{}" });
-  }
   const auth2 = {
     user: key,
     provider: input.provider,
@@ -1106,12 +1107,10 @@ async function finishLogin(ctx, input, opts = {}) {
     assertUser(exposed, "onUser");
     return status(201).json({ ...exposed, token });
   }
-  const prev = loaded.get(ctx);
-  if (prev?.id) await ctx.options.sessions.del(prev.id);
+  const prev = findSessionId(ctx);
+  if (prev) await settings.sessions.del(prev);
   const id = createId();
-  Object.assign(ctx.session, auth2);
-  await ctx.options.sessions.set(id, ctx.session);
-  loaded.set(ctx, { id, data: JSON.stringify(ctx.session) });
+  await settings.sessions.set(id, auth2);
   if (strategy.includes("token")) {
     const exposed = await onUser(user, ctx);
     assertUser(exposed, "onUser");
@@ -1631,6 +1630,7 @@ function parseAuthOptions(auth2) {
   const onUser = auth2.onUser || defaultOnUser;
   const onToken = auth2.onToken || defaultOnUser;
   const users = auth2.users ? toStore(auth2.users) : null;
+  const sessions = auth2.sessions ? toStoreExpiring(auth2.sessions, "1w") : null;
   return {
     strategy,
     providers: list,
@@ -1640,7 +1640,8 @@ function parseAuthOptions(auth2) {
     onUser,
     onToken,
     onLogout,
-    users
+    users,
+    sessions
   };
 }
 
@@ -1830,7 +1831,8 @@ function config(options = {}) {
   const level = raw === true ? "info" : raw === false ? void 0 : raw;
   const log = createLogger(level);
   const settings = {
-    port: options.port || env2.PORT || 3e3,
+    // `env.PORT` is a string, so coerce it: `settings.port` is a number
+    port: options.port || Number(env2.PORT) || 3e3,
     secret: options.secret || env2.SECRET || `unsafe-${createId()}`,
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
@@ -1838,11 +1840,7 @@ function config(options = {}) {
     parser: options.parser ?? "parse",
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
-    security: resolveSecurity(options.security),
-    // Sessions: one record per device, exposed as ctx.session. Anything
-    // polystore accepts works; raw sources (a Map, a Redis client) get a 1w
-    // expiry, a built store is honored as-is, prefix and expiry included.
-    sessions: toStoreExpiring(options.sessions ?? /* @__PURE__ */ new Map(), "1w")
+    security: resolveSecurity(options.security)
   };
   if (options.cache !== void 0) settings.cache = options.cache;
   options.cors = options.cors || env2.CORS || null;
@@ -1885,10 +1883,10 @@ function config(options = {}) {
   settings.public = publicDir ? bucket(publicDir) : null;
   settings.uploads = resolveUploads(options.uploads);
   const production = env2.NODE_ENV === "production";
-  const defaulted = options.sessions == null;
-  settings.sessionsDefault = defaulted;
   if (options.auth || env2.AUTH) {
-    settings.auth = parseAuthOptions(options.auth || env2.AUTH || null);
+    settings.auth = parseAuthOptions(
+      options.auth || env2.AUTH || null
+    );
   }
   if (settings.auth) {
     if (!settings.auth.users) {
@@ -1899,10 +1897,13 @@ function config(options = {}) {
       }
       settings.auth.users = toStore(/* @__PURE__ */ new Map());
     }
-    if (production && defaulted && !settings.auth.strategy.includes("jwt")) {
-      throw new Error(
-        "Auth in production needs a persistent `sessions` store, like sessions: kv(redis).prefix('session:')."
-      );
+    if (!settings.auth.sessions && !settings.auth.strategy.includes("jwt")) {
+      if (production) {
+        throw new Error(
+          "Auth in production needs a persistent `sessions` store, like auth: { ..., sessions: kv(redis).prefix('session:') }."
+        );
+      }
+      settings.auth.sessions = toStoreExpiring(/* @__PURE__ */ new Map(), "1w");
     }
   }
   if (settings.auth?.strategy.includes("jwt") && settings.secret.startsWith("unsafe-")) {
@@ -1928,7 +1929,6 @@ function config(options = {}) {
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
-  if (options.sessions) log.message("sessions", "enabled");
   if (settings.cors) {
     const origin = settings.cors.origin === true ? "*" : String(settings.cors.origin);
     log.message("cors", origin);
@@ -2038,101 +2038,23 @@ function getMachine() {
 }
 
 // src/parseResponse.ts
-var warned = false;
-var warnDefault = () => {
-  if (warned) return;
-  warned = true;
-  console.warn(
-    "[server:sessions] Using the default in-memory session store in production: sessions are lost on restart and not shared across instances. Configure one with sessions: kv(redis).prefix('session:')."
-  );
-};
 async function parseResponse(out, ctx) {
   if (!out && typeof out !== "string") return null;
   if (typeof out === "function") {
     out = await out(ctx);
-  }
-  if (out && typeof out.send === "function" && out.res?.headers instanceof Headers) {
-    out = out.send();
-  }
-  if (out instanceof Blob) {
-    out = new Response(out, { headers: { "Content-Type": out.type } });
-  }
-  if (out && typeof out.stream === "function" && typeof out.bytes === "function" && typeof out.exists === "function" && typeof out.name === "string") {
-    if (!await out.exists()) {
-      out = new Response(null, { status: 404 });
-    } else {
-      const type2 = fileType(out);
-      out = new Response(
-        out.stream(),
-        type2 ? { headers: { "content-type": type2 } } : void 0
-      );
-    }
-  }
-  if (out instanceof ReadableStream) {
-    out = new Response(out);
-  }
-  if (out instanceof Uint8Array) {
-    out = new Response(out);
+    if (!out && typeof out !== "string") return null;
   }
   if (typeof out === "number") {
-    out = new Response(void 0, { status: out });
+    out = new Response(null, { status: out });
   }
-  if (typeof out === "string") {
-    const type2 = isHtml(out) ? mimes_default.html : mimes_default.text;
-    out = new Response(out, {
-      headers: {
-        "content-type": type2,
-        "content-length": String(Buffer.byteLength(out))
-      }
-    });
-  }
-  if (out?.constructor === Object || Array.isArray(out)) {
-    out = json(out);
-  }
-  if (out[Symbol.iterator]) {
-    out = new Response(iteratorToReadable(out));
-  }
-  if (out[Symbol.asyncIterator] && !(out instanceof Response)) {
-    out = new Response(iteratorAsyncToReadable(out));
-  }
-  if (out instanceof Response && out.url && out.body) {
-    out = new Response(out.body, {
-      status: out.status,
-      headers: out.headers
-    });
-    if (/^(br|gzip)$/.test(out.headers.get("content-encoding") || "")) {
-      out.headers.delete("content-encoding");
-    }
-  }
-  if (!(out instanceof Response)) {
-    throw new Error(`Invalid response type ${out}`);
+  if (!(out instanceof Response) || out.url) {
+    out = await send(out);
   }
   applyCors(out, ctx);
   applySecurity(out, ctx);
   out = await applyCache(out, ctx);
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
-  }
-  const prev = loaded.get(ctx);
-  if (prev && JSON.stringify(ctx.session ?? {}) !== prev.data) {
-    if (ctx.options.sessionsDefault && ctx.platform.production) {
-      warnDefault();
-    }
-    let id = prev.id;
-    if (!id) {
-      id = createId();
-      out.headers.append(
-        "set-cookie",
-        createCookies("session", {
-          value: id,
-          path: "/",
-          httpOnly: true,
-          secure: ctx.platform.production,
-          sameSite: "Lax"
-        })
-      );
-    }
-    ctx.options.sessions.set(id, ctx.session);
   }
   return out;
 }
@@ -2472,14 +2394,10 @@ async function getJwtUser(ctx) {
   return exposed;
 }
 async function getAuthSession(ctx) {
-  if (loaded.has(ctx)) {
-    const session3 = ctx.session;
-    return session3?.user ? session3 : void 0;
-  }
   const id = findSessionId(ctx);
   if (!id) return;
-  const session2 = await ctx.options.sessions.get(id);
-  return session2?.user ? session2 : void 0;
+  const session = await ctx.options.auth.sessions.get(id);
+  return session?.user ? session : void 0;
 }
 async function getUser(ctx) {
   if (!ctx.options.auth) return;
@@ -2504,10 +2422,8 @@ async function getUser(ctx) {
 async function logout(ctx) {
   const { strategy } = ctx.options.auth;
   if (!strategy.includes("jwt")) {
-    const prev = loaded.get(ctx);
-    if (prev?.id) await ctx.options.sessions.del(prev.id);
-    ctx.session = {};
-    loaded.set(ctx, { id: void 0, data: "{}" });
+    const prev = findSessionId(ctx);
+    if (prev) await ctx.options.auth.sessions.del(prev);
   }
   if (ctx.options.auth.onLogout) await ctx.options.auth.onLogout(ctx);
   if (strategy.includes("token") || strategy.includes("jwt")) {
@@ -3034,7 +2950,6 @@ async function createNode(req, app, signal = new AbortController().signal) {
     headers: headers2,
     cookies: cookies2,
     signal,
-    session: {},
     init,
     app,
     ip: clientIp(headers2, {
@@ -3075,7 +2990,6 @@ async function createWinter(req, app, server2) {
     headers: headers2,
     cookies: cookies2,
     signal: req.signal,
-    session: {},
     init,
     app,
     ip: clientIp(headers2, {
@@ -3326,7 +3240,6 @@ var Server = class extends Router {
     app.use(timer);
     if (this.settings.cors) app.use(preflight);
     app.use(assets);
-    app.use(session);
     if (this.settings.auth) {
       auth(app);
     }

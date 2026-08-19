@@ -20,14 +20,14 @@ const ALL: Provider[] = [
 const providers = ALL.filter((p) => process.env[`${p.toUpperCase()}_ID`]);
 
 const auth = providers.length
-  ? { strategy: "cookie" as const, providers, users, redirect: "/" }
+  ? { strategy: "cookie" as const, providers, users, sessions, redirect: "/" }
   : undefined;
 
 const requireUser = (ctx: Context) => {
   if (!ctx.user) return redirect("/login");
 };
 
-export default server({ public: "public", sessions, auth })
+export default server({ public: "public", auth })
   .head("/", () => 200)
   .get("/login", () => <LoginPage providers={providers} />)
   .get("/", requireUser, (ctx) => <AccountPage user={ctx.user} />);

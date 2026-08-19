@@ -36,7 +36,8 @@ export default function config(options: Options = {}): Settings {
   const log = createLogger(level);
 
   const settings: Settings = {
-    port: options.port || env.PORT || 3000,
+    // `env.PORT` is a string, so coerce it: `settings.port` is a number
+    port: options.port || Number(env.PORT) || 3000,
     secret: options.secret || env.SECRET || `unsafe-${createId()}`,
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
@@ -45,10 +46,6 @@ export default function config(options: Options = {}): Settings {
     // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
     // the added headers off; see resolveSecurity for the defaults.
     security: resolveSecurity(options.security),
-    // Sessions: one record per device, exposed as ctx.session. Anything
-    // polystore accepts works; raw sources (a Map, a Redis client) get a 1w
-    // expiry, a built store is honored as-is, prefix and expiry included.
-    sessions: toStoreExpiring(options.sessions ?? new Map(), "1w"),
   };
 
   // Response caching: a default Cache-Control for GET responses, plus auto-ETag.
@@ -116,19 +113,19 @@ export default function config(options: Options = {}): Settings {
   settings.uploads = resolveUploads(options.uploads);
 
   const production = env.NODE_ENV === "production";
-  const defaulted = options.sessions == null;
-  // Drives a one-time warning on the first session write in production
-  settings.sessionsDefault = defaulted;
 
   if (options.auth || env.AUTH) {
-    settings.auth = parseAuthOptions(options.auth || env.AUTH || null);
+    // The env string is validated (and rejected) inside parseAuthOptions
+    settings.auth = parseAuthOptions(
+      options.auth || (env.AUTH as Options["auth"]) || null,
+    );
   }
 
   // The in-memory defaults lose everything on restart and aren't shared across
   // instances, so a production app with auth must configure real stores. Every
   // strategy needs `users` (each login reads it for the existing-user upsert
   // and persists the record); only `sessions` is skipped by the stateless
-  // `jwt`, which has no ctx.session at all.
+  // `jwt`, which stores no login at all.
   if (settings.auth) {
     if (!settings.auth.users) {
       if (production) {
@@ -139,11 +136,14 @@ export default function config(options: Options = {}): Settings {
       }
       settings.auth.users = toStore(new Map());
     }
-    if (production && defaulted && !settings.auth.strategy.includes("jwt")) {
-      throw new Error(
-        "Auth in production needs a persistent `sessions` store, like " +
-          "sessions: kv(redis).prefix('session:').",
-      );
+    if (!settings.auth.sessions && !settings.auth.strategy.includes("jwt")) {
+      if (production) {
+        throw new Error(
+          "Auth in production needs a persistent `sessions` store, like " +
+            "auth: { ..., sessions: kv(redis).prefix('session:') }.",
+        );
+      }
+      settings.auth.sessions = toStoreExpiring(new Map(), "1w");
     }
   }
 
@@ -189,7 +189,6 @@ export default function config(options: Options = {}): Settings {
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
-  if (options.sessions) log.message("sessions", "enabled");
   if (settings.cors) {
     const origin =
       settings.cors.origin === true ? "*" : String(settings.cors.origin);
