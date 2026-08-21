@@ -2216,6 +2216,13 @@ import * as crypto2 from "crypto";
 import { getRandomValues } from "crypto";
 import { promisify } from "util";
 async function hash2(password) {
+  if ("Bun" in globalThis) {
+    return await Bun.password.hash(password, {
+      algorithm: "argon2id",
+      memoryCost: 65536,
+      timeCost: 3
+    });
+  }
   if ("argon2" in crypto2) {
     const argon23 = promisify(crypto2.argon2);
     const buf = await argon23("argon2id", {
