@@ -90,6 +90,29 @@ packages depend on the same plugin, ordering constraints that reference other
 plugins, and an introspectable `app.plugins`. Rollup makes `name` mandatory for
 exactly the first reason; Elysia and Vue both track names for the second.
 
+### Rejected: `server.plug(plugin)`
+
+A module-level registration, `server.plug(x)` before `server()`, reads well and
+is out. `server` is a module singleton, so it would register into the process
+rather than into an app: every server created afterwards inherits it, and the
+result depends on import order. This repo alone builds 401 `server()` instances
+across a test suite that shares a process, and serverless environments reuse a
+process across requests.
+
+The ecosystem already ran this experiment. Vue 2 had exactly this API
+(`Vue.use()`, global mixins) and it was a known source of test pollution and
+SSR cross-request contamination; `createApp()` in Vue 3 exists largely to move
+it per-app. Chai's `chai.use` and `dayjs.extend` kept the global form and are
+still cited for it.
+
+It also costs the property that `server(options)` fully describes an app:
+answering "what does this app run" would mean reading the whole module graph,
+since any imported file could register at import time.
+
+If the appeal is call-site brevity, a factory keeps it without the shared
+state: `const app = server.with(metrics())` returns a new configured factory
+and mutates nothing.
+
 ### Why `install`, not `on*`
 
 Three distinct moments hide behind the word "setup":

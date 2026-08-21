@@ -1,0 +1,17 @@
+{
+  "name": "auth-jwks",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.js",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Verify hosted-auth JWTs (Supabase, Auth0, Cognito, Keycloak...) against a JWKS endpoint",
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  },
+  "dependencies": {
+    "jose": "^6.2.9"
+  }
+}

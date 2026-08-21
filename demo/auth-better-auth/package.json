@@ -1,0 +1,17 @@
+{
+  "name": "auth-better-auth",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.js",
+  "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
+  "license": "MIT",
+  "description": "Better Auth mounted on Server.js: its routes, its session, ctx.user",
+  "scripts": {
+    "dev": "bun --hot .",
+    "start": "bun ."
+  },
+  "dependencies": {
+    "better-auth": "^1.7.1"
+  }
+}
