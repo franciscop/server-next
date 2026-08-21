@@ -2223,23 +2223,23 @@ async function hash2(password) {
       timeCost: 3
     });
   }
-  if ("argon2" in crypto2) {
-    const argon23 = promisify(crypto2.argon2);
-    const buf = await argon23("argon2id", {
-      message: Buffer.from(password),
-      nonce: getRandomValues(new Uint8Array(16)),
-      parallelism: 4,
-      tagLength: 64,
-      memory: 65536,
-      passes: 3
-    });
-    return buf.toString("base64");
+  if (!("argon2" in crypto2)) {
+    throw new Error(
+      "Password hashing needs argon2: run on Bun, or on Node 24+ where node:crypto provides it."
+    );
   }
-  return await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 65536,
-    timeCost: 3
+  const nonce = getRandomValues(new Uint8Array(32));
+  const argon23 = promisify(crypto2.argon2);
+  const buf = await argon23("argon2id", {
+    message: Buffer.from(password),
+    nonce,
+    parallelism: 1,
+    tagLength: 32,
+    memory: 65536,
+    passes: 3
   });
+  const b64 = (bytes) => Buffer.from(bytes).toString("base64").replace(/=+$/, "");
+  return `$argon2id$v=19$m=65536,t=3,p=1$${b64(nonce)}$${b64(buf)}`;
 }
 
 // src/helpers/iteratorAsyncToReadable.ts
@@ -2334,16 +2334,6 @@ function toWeb(nodeStream) {
 
 // src/helpers/verify.ts
 import * as crypto3 from "crypto";
-function timingSafeEqual(a, b) {
-  const len = Math.max(a.length, b.length);
-  let mismatch = a.length ^ b.length;
-  for (let i = 0; i < len; i++) {
-    const ca = a.charCodeAt(i) || 0;
-    const cb = b.charCodeAt(i) || 0;
-    mismatch |= ca ^ cb;
-  }
-  return mismatch === 0;
-}
 async function verify2(password, hash3) {
   if ("Bun" in globalThis) {
     return Bun.password.verify(password, hash3, "argon2id");
@@ -2368,11 +2358,8 @@ async function verify2(password, hash3) {
       },
       (err, derivedKey) => {
         if (err) return reject(err);
-        if (derivedKey.length === expected.length && timingSafeEqual(derivedKey, expected)) {
-          resolve(true);
-        } else {
-          resolve(false);
-        }
+        if (derivedKey.length !== expected.length) return resolve(false);
+        resolve(crypto3.timingSafeEqual(derivedKey, expected));
       }
     );
   });

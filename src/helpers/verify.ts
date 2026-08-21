@@ -1,18 +1,5 @@
 import * as crypto from "node:crypto";
 
-function timingSafeEqual(a, b) {
-  const len = Math.max(a.length, b.length);
-  let mismatch = a.length ^ b.length;
-
-  for (let i = 0; i < len; i++) {
-    const ca = a.charCodeAt(i) || 0;
-    const cb = b.charCodeAt(i) || 0;
-    mismatch |= ca ^ cb;
-  }
-
-  return mismatch === 0;
-}
-
 export default async function verify(
   password: string,
   hash: string,
@@ -47,15 +34,9 @@ export default async function verify(
       },
       (err, derivedKey) => {
         if (err) return reject(err);
-
-        if (
-          derivedKey.length === expected.length &&
-          timingSafeEqual(derivedKey, expected)
-        ) {
-          resolve(true);
-        } else {
-          resolve(false);
-        }
+        // Both are Buffers, and timingSafeEqual throws on different lengths
+        if (derivedKey.length !== expected.length) return resolve(false);
+        resolve(crypto.timingSafeEqual(derivedKey, expected));
       },
     );
   });

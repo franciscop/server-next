@@ -15,21 +15,28 @@ export default async function hash(password: string): Promise<string> {
     });
   }
 
-  if ("argon2" in crypto) {
-    const argon2 = promisify(crypto.argon2);
-    const buf = await argon2("argon2id", {
-      message: Buffer.from(password),
-      nonce: getRandomValues(new Uint8Array(16)),
-      parallelism: 4,
-      tagLength: 64,
-      memory: 65536,
-      passes: 3,
-    });
-    return buf.toString("base64");
+  if (!("argon2" in crypto)) {
+    throw new Error(
+      "Password hashing needs argon2: run on Bun, or on Node 24+ where " +
+        "node:crypto provides it.",
+    );
   }
-  return await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 65536,
-    timeCost: 3,
+
+  // Same parameters Bun.password uses, so hashes are alike in both runtimes
+  const nonce = getRandomValues(new Uint8Array(32));
+  const argon2 = promisify(crypto.argon2);
+  const buf = await argon2("argon2id", {
+    message: Buffer.from(password),
+    nonce,
+    parallelism: 1,
+    tagLength: 32,
+    memory: 65536,
+    passes: 3,
   });
+
+  // The salt and parameters belong in the output: verify() needs them to
+  // recompute the hash, so a bare digest could never be checked again.
+  const b64 = (bytes: Uint8Array) =>
+    Buffer.from(bytes).toString("base64").replace(/=+$/, "");
+  return `$argon2id$v=19$m=65536,t=3,p=1$${b64(nonce)}$${b64(buf)}`;
 }
