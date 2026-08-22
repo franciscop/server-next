@@ -1251,12 +1251,12 @@ var CLASSES = {
   yahoo: Yahoo,
   yandex: Yandex,
   zoom: Zoom,
-  42: FortyTwo
+  fortytwo: FortyTwo
 };
 var ALIASES = {
-  microsoft: "microsoftentraid",
   cognito: "amazoncognito",
-  entra: "microsoftentraid"
+  entra: "microsoftentraid",
+  microsoft: "microsoftentraid"
 };
 var providers = Object.fromEntries(
   Object.entries(CLASSES).map(([name, Client]) => [
@@ -1265,7 +1265,7 @@ var providers = Object.fromEntries(
   ])
 );
 for (const [alias, target2] of Object.entries(ALIASES)) {
-  providers[alias] = providers[target2];
+  providers[alias] = antarcticProvider(alias, CLASSES[target2]);
 }
 var ISSUERS = {
   paypal: "https://www.paypal.com"
@@ -1421,6 +1421,12 @@ function entry(config2) {
       );
     }
   }
+  const publicProfile = ({ id, email, name, avatar }) => ({
+    id,
+    email,
+    name,
+    avatar
+  });
   const redirects = typeof config2.redirect === "object" ? config2.redirect : {};
   const loginTo = typeof config2.redirect === "object" ? redirects.login : config2.redirect;
   const finish = async (ctx, profile) => {
@@ -1432,7 +1438,7 @@ function entry(config2) {
       if (!isSigned(strategies[0])) return { sub: String(id) };
       const user2 = await getUser(String(id), ctx);
       return { user: await toPublicUser(user2) };
-    })() : { user: profile };
+    })() : { user: publicProfile(profile) };
     const signed = { ...payload, provider: profile.provider };
     const token = await issue(ctx, signed, expires);
     const user = signed.user ?? await getUser(signed.sub, ctx);
@@ -1638,6 +1644,19 @@ var VENDORS = {
     audience: "your frontend origin, like https://app.example.com",
     claim: "azp",
     docs: "https://clerk.com/docs/backend-requests/resources/session-tokens"
+  },
+  firebase: {
+    // The client SDK holds the token and sends it as a header, so no cookie.
+    // Both halves are the project id: the issuer is per-project, and it is
+    // what Firebase puts in `aud`.
+    audience: "your Firebase project id",
+    docs: "https://firebase.google.com/docs/auth/admin/verify-id-tokens"
+  },
+  // Google Cloud Identity Platform is the same service, and the same tokens,
+  // under its enterprise name
+  gcip: {
+    audience: "your Google Cloud project id",
+    docs: "https://cloud.google.com/identity-platform/docs/how-to-verify-tokens"
   },
   supabase: {
     audience: '"authenticated"',

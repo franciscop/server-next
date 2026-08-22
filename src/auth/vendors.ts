@@ -29,6 +29,19 @@ const VENDORS: Record<string, Vendor> = {
     claim: "azp",
     docs: "https://clerk.com/docs/backend-requests/resources/session-tokens",
   },
+  firebase: {
+    // The client SDK holds the token and sends it as a header, so no cookie.
+    // Both halves are the project id: the issuer is per-project, and it is
+    // what Firebase puts in `aud`.
+    audience: "your Firebase project id",
+    docs: "https://firebase.google.com/docs/auth/admin/verify-id-tokens",
+  },
+  // Google Cloud Identity Platform is the same service, and the same tokens,
+  // under its enterprise name
+  gcip: {
+    audience: "your Google Cloud project id",
+    docs: "https://cloud.google.com/identity-platform/docs/how-to-verify-tokens",
+  },
   supabase: {
     audience: '"authenticated"',
     docs: "https://supabase.com/docs/guides/auth/jwts",

@@ -1,6 +1,6 @@
 import server from "..";
 
-// `auth` takes five shapes, and all of them end in a plain `ctx.user`.
+// Every shape of `auth` ends in a plain `ctx.user`.
 // See docs/5. Authentication.md.
 describe("the shapes of `auth`", () => {
   const me = (app: any, opts?: any) => app.test().get("/me", opts);
@@ -167,5 +167,97 @@ describe("provider and vendor names do not collide", () => {
       delete env2.CLERK_ISSUER;
       delete env2.CLERK_AUDIENCE;
     }
+  });
+});
+
+// The name you type drives the environment variables, so an alias must not
+// borrow the canonical provider's.
+describe("provider aliases", () => {
+  it("reads credentials from the name you used", async () => {
+    const env2 = globalThis.env as Record<string, string | undefined>;
+    env2.ENTRA_ID = "mine";
+    env2.ENTRA_SECRET = "secret";
+    try {
+      const api = server({
+        secrets: "s",
+        auth: {
+          providers: { entra: { tenant: "common" } },
+          onLogin: (p: any) => p.id,
+          getUser: (id: string) => ({ id }),
+        },
+      }).test();
+      const res = await api.get("/auth/login/entra");
+      expect(res.headers.get("location")).toContain("client_id=mine");
+    } finally {
+      delete env2.ENTRA_ID;
+      delete env2.ENTRA_SECRET;
+    }
+  });
+});
+
+// `cognito` and `microsoft` are the names people write, so those are the
+// variables they set. The long spellings must not shadow them.
+describe("the friendly names own their environment", () => {
+  const env2 = globalThis.env as Record<string, string | undefined>;
+  afterEach(() => {
+    for (const k of ["COGNITO_ID", "COGNITO_SECRET", "COGNITO_DOMAIN"]) {
+      delete env2[k];
+    }
+  });
+
+  it("cognito reads COGNITO_ID, never AMAZONCOGNITO_ID", async () => {
+    env2.COGNITO_ID = "mine";
+    env2.COGNITO_SECRET = "secret";
+    const api = server({
+      secrets: "s",
+      auth: {
+        providers: { cognito: { domain: "acme.auth.eu-west-1.amazoncognito.com" } },
+        onLogin: (p: any) => p.id,
+        getUser: (id: string) => ({ id }),
+      },
+    }).test();
+
+    const res = await api.get("/auth/login/cognito");
+    expect(res.headers.get("location")).toContain("client_id=mine");
+    // ...and the route is named after what you typed
+    expect(res.status).toBe(302);
+  });
+});
+
+// Firebase and Google Cloud Identity Platform are the same tokens: the client
+// SDK signs people in, the server only checks what arrives.
+describe("firebase", () => {
+  const env2 = globalThis.env as Record<string, string | undefined>;
+  afterEach(() => {
+    delete env2.FIREBASE_ISSUER;
+    delete env2.FIREBASE_AUDIENCE;
+    delete env2.GCIP_ISSUER;
+    delete env2.GCIP_AUDIENCE;
+  });
+
+  it("verifies against the project's issuer", () => {
+    env2.FIREBASE_ISSUER = "https://securetoken.google.com/my-project";
+    env2.FIREBASE_AUDIENCE = "my-project";
+    const app = server({ auth: "jwt:firebase" });
+    expect(app.settings.auth[0].name).toBe(
+      "verify:https://securetoken.google.com/my-project",
+    );
+  });
+
+  it("names the missing variable, since the project id cannot be guessed", () => {
+    expect(() => server({ auth: "jwt:firebase" })).toThrow(/FIREBASE_ISSUER/);
+  });
+
+  it("has no cookie: the SDK keeps the token, so it arrives as a header", () => {
+    env2.FIREBASE_ISSUER = "https://securetoken.google.com/my-project";
+    env2.FIREBASE_AUDIENCE = "my-project";
+    expect(() => server({ auth: "cookie:firebase" })).toThrow(/cookie/i);
+  });
+
+  it("gcip is the same service under its enterprise name", () => {
+    env2.GCIP_ISSUER = "https://securetoken.google.com/my-project";
+    env2.GCIP_AUDIENCE = "my-project";
+    const app = server({ auth: "jwt:gcip" });
+    expect(app.settings.auth[0].name).toContain("securetoken.google.com");
   });
 });

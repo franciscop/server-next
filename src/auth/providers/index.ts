@@ -132,14 +132,16 @@ const CLASSES: Record<string, any> = {
   yahoo: Yahoo,
   yandex: Yandex,
   zoom: Zoom,
-  42: FortyTwo,
+  fortytwo: FortyTwo,
 };
 
-// Friendlier spellings for the ones whose class name is a mouthful
+// The product name, shortened to its distinctive word, for the two whose
+// full spelling is a mouthful: Amazon Cognito and Microsoft Entra ID.
+// `microsoft` stays as a convenience, since that is what the button says.
 const ALIASES: Record<string, string> = {
-  microsoft: "microsoftentraid",
   cognito: "amazoncognito",
   entra: "microsoftentraid",
+  microsoft: "microsoftentraid",
 };
 
 const providers: Record<string, Provider> = Object.fromEntries(
@@ -149,8 +151,11 @@ const providers: Record<string, Provider> = Object.fromEntries(
   ]),
 );
 
+// An alias gets its own instance rather than sharing the target's, so its
+// credentials come from the name you actually typed (`COGNITO_ID`, not
+// `AMAZONCOGNITO_ID`).
 for (const [alias, target] of Object.entries(ALIASES)) {
-  providers[alias] = providers[target];
+  providers[alias] = antarcticProvider(alias, CLASSES[target]);
 }
 
 // Providers that speak OIDC need no code at all: discovery finds their

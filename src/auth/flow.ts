@@ -103,6 +103,16 @@ export function entry(config: AuthConfig): AuthEntry {
     }
   }
 
+  // The default toPublicUser: what gets signed is held and readable by the
+  // client, so the access token and the raw payload never leave the server,
+  // and `provider` rides in the credential itself for ctx.auth instead.
+  const publicProfile = ({ id, email, name, avatar }: AuthProfile) => ({
+    id,
+    email,
+    name,
+    avatar,
+  });
+
   const redirects = (typeof config.redirect === "object" ? config.redirect : {}) as any;
   const loginTo = typeof config.redirect === "object" ? redirects.login : config.redirect;
 
@@ -118,7 +128,7 @@ export function entry(config: AuthConfig): AuthEntry {
           const user = await getUser(String(id), ctx);
           return { user: await toPublicUser!(user) };
         })()
-      : { user: profile };
+      : { user: publicProfile(profile) };
     // Which provider they used is part of the login, not of the person, so it
     // rides in the credential rather than in your user row
     const signed = { ...payload, provider: profile.provider };
