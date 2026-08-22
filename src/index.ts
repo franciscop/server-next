@@ -8,11 +8,18 @@ import * as handlers from "./context/handlers";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
 import type {
+  AuthConfig,
+  AuthFunction,
+  AuthOption,
+  AuthProfile,
+  AuthClaims,
+  AuthVerify,
   BunEnv,
   ContextTypes,
   Options,
   Platform,
   Settings,
+  UserOf,
 } from "./types";
 
 export class Server<C extends ContextTypes = {}> extends Router<C> {
@@ -90,9 +97,33 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
   }
 }
 
-export default function server<C extends ContextTypes = {}>(options?: Options) {
-  return new Server<C>(options).self();
+// `ctx.user` is whatever the configured `auth` produces, so an app never
+// declares a User type. Each shape has its own rule, hence the overloads: the
+// user comes from `getUser` when there is one, and otherwise from what the
+// credential carries (a profile for a login flow, the claims for `verify`).
+// Declaring the generic explicitly still wins, for router-per-file apps.
+export default function server<U = AuthProfile>(
+  options: Omit<Options, "auth"> & { auth: AuthConfig<U> },
+): Server<{ user: U }>;
+export default function server(
+  options: Omit<Options, "auth"> & { auth: string },
+): Server<{ user: AuthProfile }>;
+export default function server<U = AuthClaims>(
+  options: Omit<Options, "auth"> & { auth: AuthVerify<U> },
+): Server<{ user: U }>;
+export default function server<U>(
+  options: Omit<Options, "auth"> & { auth: AuthFunction<U> },
+): Server<{ user: NonNullable<Awaited<U>> }>;
+export default function server<A extends readonly AuthOption[]>(
+  options: Omit<Options, "auth"> & { auth: A },
+): Server<{ user: UserOf<A[number]> }>;
+export default function server<C extends ContextTypes = {}>(
+  options?: Options,
+): Server<C>;
+export default function server(options?: Options) {
+  return new Server(options).self();
 }
+
 
 export * from "./reply";
 export { default as router } from "./router";
@@ -100,8 +131,6 @@ export { default as ServerError } from "./ServerError";
 export { default as ValidationError } from "./errors/ValidationError";
 export type * from "./types";
 
-// The two storage libraries, re-exported so there's nothing extra to install:
-// `kv()` builds a store from a Map, Redis, ... and `bucket` holds the storage
-// providers (`bucket.FS`, `bucket.S3`, `bucket.R2`, ...).
-export { default as kv } from "polystore";
+// The file-storage library, re-exported so there's nothing extra to install:
+// `bucket` holds the storage providers (`bucket.FS`, `bucket.S3`, ...).
 export { default as bucket } from "bucket";

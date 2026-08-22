@@ -110,7 +110,7 @@ export const LoginPage = ({ providers }: { providers: Provider[] }) => (
 
 export const AccountPage = ({ user }: { user: any }) => (
   <Layout title="Account">
-    {user.picture && <img className="avatar" src={user.picture} alt="" />}
+    {user.avatar && <img className="avatar" src={user.avatar} alt="" />}
     <h1>Welcome {user.name}</h1>
     <pre>{JSON.stringify(user, null, 2)}</pre>
     <form method="POST" action="/auth/logout">

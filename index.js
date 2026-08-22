@@ -43,7 +43,6 @@ ServerError_default.extend({
     status: 400,
     message: "The route param '{param}' tries to climb the path ('{value}'). If this route legitimately receives paths, set security: { traversalProtection: false }"
   },
-  AUTH_ARGON_NEEDED: "Argon2 is needed for the auth module, please install it with 'npm i argon2'",
   AUTH_INVALID_TOKEN: { status: 401, message: "Invalid Authorization token" },
   AUTH_NO_CODE: {
     status: 400,
@@ -53,32 +52,7 @@ ServerError_default.extend({
     status: 401,
     message: "Invalid authorization header {type}, must send 'Bearer {TOKEN}' (with space)"
   },
-  AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" },
-  AUTH_NO_PROVIDER: "No provider passed to the option 'auth.providers'",
-  AUTH_INVALID_PROVIDER: {
-    status: 401,
-    message: "Invalid provider '{provider}', valid ones are: '{valid}'"
-  },
-  AUTH_NO_SESSION: { status: 401, message: "Invalid session" },
-  AUTH_NO_USER: {
-    status: 401,
-    message: "Credentials do not correspond to a user"
-  },
-  AUTH_INVALID_USER: {
-    status: 500,
-    message: "{callback} must return a user with an 'id' and an 'email'"
-  },
-  LOGIN_NO_EMAIL: "The email is required to log in",
-  LOGIN_INVALID_EMAIL: "The email you wrote is not correct",
-  LOGIN_NO_PASSWORD: "The email is required to log in",
-  LOGIN_INVALID_PASSWORD: "The password you wrote is not correct",
-  LOGIN_WRONG_ACCOUNT: "That email does not correspond to any account",
-  LOGIN_WRONG_PASSWORD: "That is not the valid password",
-  REGISTER_NO_EMAIL: "Email needed",
-  REGISTER_INVALID_EMAIL: "The email you wrote is not correct",
-  REGISTER_NO_PASSWORD: "Password needed",
-  REGISTER_INVALID_PASSWORD: "The password you wrote is not correct",
-  REGISTER_EMAIL_EXISTS: "Email is already registered"
+  AUTH_INVALID_STATE: { status: 403, message: "Invalid OAuth state" }
 });
 var errors_default = ServerError_default;
 
@@ -744,23 +718,6 @@ function clientIp(headers2, opts = {}) {
   return normalize(remoteAddress);
 }
 
-// src/helpers/store.ts
-import kv from "polystore";
-function isStore(source) {
-  const store = source;
-  return Boolean(
-    store && typeof store.prefix === "function" && typeof store.get === "function" && typeof store.set === "function"
-  );
-}
-function toStore(source) {
-  if (isStore(source)) return source;
-  return kv(source);
-}
-function toStoreExpiring(source, expires) {
-  if (isStore(source)) return source;
-  return kv(source).expires(expires);
-}
-
 // src/helpers/disposition.ts
 var encodeExt = (name) => encodeURIComponent(name).replace(
   /['()*]/g,
@@ -984,13 +941,6 @@ var json = (...args) => r().json(...args);
 var file = (...args) => r().file(...args);
 var redirect = (...args) => r().redirect(...args);
 
-// src/auth/assertUser.ts
-function assertUser(user, callback3) {
-  if (!user || typeof user !== "object" || user.id == null || !user.email) {
-    throw ServerError_default.AUTH_INVALID_USER({ callback: callback3 });
-  }
-}
-
 // src/helpers/jwt.ts
 var enc = new TextEncoder();
 var dec = new TextDecoder();
@@ -1017,13 +967,13 @@ var hmacKey = (secret) => crypto.subtle.importKey(
 );
 async function signJwt(payload, secret, expires) {
   const now = Math.floor(Date.now() / 1e3);
-  const claims = {
+  const claims2 = {
     iat: now,
     ...expires ? { exp: now + expires } : {},
     ...payload
   };
   const head = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = b64url(JSON.stringify(claims));
+  const body = b64url(JSON.stringify(claims2));
   const data = `${head}.${body}`;
   const key = await hmacKey(secret);
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
@@ -1062,595 +1012,727 @@ async function verifyJwt(token, secret) {
   return payload;
 }
 
-// src/auth/findSessionId.ts
-var validateToken = (authorization) => {
-  const [type2, id] = authorization.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer") {
+// src/auth/credential.ts
+var NAME = "session";
+var inCookie = (s) => s === "session" || s === "cookie";
+var isSigned = (s) => s === "cookie" || s === "jwt";
+var UNITS2 = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
+function seconds(expires) {
+  const match = /^(\d+)([smhdw])$/.exec(expires);
+  if (!match) throw new Error(`Invalid \`expires\`: "${expires}"`);
+  return Number(match[1]) * UNITS2[match[2]];
+}
+var bearer = (ctx) => {
+  const header = ctx.headers.authorization;
+  if (!header) return;
+  const [type2, token] = header.trim().split(" ");
+  if (type2?.toLowerCase() !== "bearer" || !token) {
     throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   }
-  if (id?.length !== 16) {
-    throw ServerError_default.AUTH_INVALID_TOKEN();
-  }
-  return id;
+  return token;
 };
-function findSessionId(ctx) {
-  if (ctx.options.auth?.strategy.includes("token")) {
-    if (!ctx.headers.authorization) return;
-    return validateToken(ctx.headers.authorization);
+async function read(ctx, strategies) {
+  for (const strategy of strategies) {
+    const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);
+    if (!token) continue;
+    const payload = await verifyJwt(token, ctx.options.secrets);
+    if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
+    return { payload, strategy };
   }
-  return ctx.cookies.session || void 0;
+}
+var meta = (payload, strategy) => ({
+  issuedAt: new Date(payload.iat * 1e3),
+  expiresAt: payload.exp ? new Date(payload.exp * 1e3) : void 0,
+  strategy,
+  provider: payload.provider
+});
+var issue = (ctx, payload, expires) => signJwt(payload, ctx.options.secrets[0], seconds(expires));
+
+// src/auth/providers/index.ts
+import {
+  AmazonCognito,
+  AniList,
+  Apple,
+  Atlassian,
+  Auth0,
+  Authentik,
+  Autodesk,
+  BattleNet,
+  Bitbucket,
+  Box,
+  Bungie,
+  Coinbase,
+  Discord,
+  DonationAlerts,
+  Dribbble,
+  Dropbox,
+  Etsy,
+  EpicGames,
+  Facebook,
+  Figma,
+  Gitea,
+  GitHub,
+  GitLab,
+  Google,
+  Intuit,
+  Kakao,
+  Kick,
+  KeyCloak,
+  Lichess,
+  Line,
+  Linear,
+  LinkedIn,
+  Mastodon,
+  MercadoLibre,
+  MercadoPago,
+  MicrosoftEntraId,
+  MyAnimeList,
+  Naver,
+  Notion,
+  Okta,
+  Osu,
+  Patreon,
+  Polar,
+  Reddit,
+  Roblox,
+  Salesforce,
+  Shikimori,
+  Slack,
+  Spotify,
+  StartGG,
+  Strava,
+  TikTok,
+  Tiltify,
+  Tumblr,
+  Twitch,
+  Twitter,
+  VK,
+  Withings,
+  WorkOS,
+  Yahoo,
+  Yandex,
+  Zoom,
+  FortyTwo
+} from "antarctic";
+
+// src/auth/providers/oauth.ts
+var credentials = (name, options) => ({
+  id: options.id ?? env[`${name.toUpperCase()}_ID`],
+  secret: options.secret ?? env[`${name.toUpperCase()}_SECRET`]
+});
+var passthrough = (options) => {
+  const { id, secret, scope, issuer, ...rest } = options;
+  return rest;
+};
+var scopeOf = (options, fallback) => {
+  const scope = options.scope ?? fallback;
+  return Array.isArray(scope) ? scope.join(" ") : scope;
+};
+var search = (base, params) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, String(value));
+  }
+  return `${base}?${query}`;
+};
+
+// src/auth/providers/antarctic.ts
+var nowhere = {
+  get: async () => null,
+  set: async () => {
+  },
+  del: async () => {
+  }
+};
+function antarcticProvider(name, Client) {
+  const client = (ctx, options) => {
+    const { id, secret } = credentials(name, options);
+    if (!id) throw new Error(`${name.toUpperCase()}_ID is not set`);
+    return new Client({
+      // Whatever that provider needs beyond the standard four: Auth0 takes a
+      // `domain`, Keycloak a `realm`, Gitea a `baseURL`, Mastodon an
+      // `instance`. Unknown keys go straight through.
+      ...passthrough(options),
+      clientId: id,
+      clientSecret: secret,
+      redirectURI: `${ctx.url.origin}/auth/callback/${name}`,
+      scopes: options.scope ? Array.isArray(options.scope) ? options.scope : options.scope.split(" ") : void 0,
+      store: nowhere
+    });
+  };
+  return {
+    async authorize(ctx, options) {
+      const { url, state, payload } = await client(
+        ctx,
+        options
+      ).getAuthorizationURL();
+      return { url: String(url), state, payload };
+    },
+    async exchange(ctx, options, code, pending) {
+      const user = await client(ctx, options).getUser(
+        { code, state: pending.state },
+        pending
+      );
+      return {
+        provider: name,
+        id: String(user.id),
+        email: user.email ?? "",
+        name: user.name ?? void 0,
+        avatar: user.image ?? void 0,
+        accessToken: user.accessToken,
+        refreshToken: user.refreshToken ?? void 0,
+        raw: user.raw ?? {}
+      };
+    }
+  };
 }
 
-// src/auth/finishLogin.ts
-async function finishLogin(ctx, input, opts = {}) {
-  const settings = ctx.options.auth;
-  const { strategy, onLogin, onUser, onToken } = settings;
-  const key = String(input.key);
-  const auth2 = {
-    user: key,
-    provider: input.provider,
-    created: (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "")
-  };
-  const loginUser = {
-    ...input.user,
-    provider: input.provider,
-    strategy
-  };
-  const existingUser = await settings.users.get(key) ?? null;
-  const user = onLogin ? await onLogin(loginUser, existingUser, ctx) : { ...existingUser ?? {}, ...loginUser };
-  assertUser(user, "onLogin");
-  await settings.users.set(key, user);
-  if (strategy.includes("jwt")) {
-    const payload = {
-      ...await onToken(user, ctx),
-      provider: input.provider
-    };
-    assertUser(payload, "onToken");
-    const token = await signJwt(
-      payload,
-      ctx.options.secrets[0],
-      7 * 24 * 60 * 60
-    );
-    const exposed = await onUser(payload, ctx);
-    assertUser(exposed, "onUser");
-    return status(201).json({ ...exposed, token });
-  }
-  const prev = findSessionId(ctx);
-  if (prev) await settings.sessions.del(prev);
-  const id = createId();
-  await settings.sessions.set(id, auth2);
-  if (strategy.includes("token")) {
-    const exposed = await onUser(user, ctx);
-    assertUser(exposed, "onUser");
-    return status(201).json({ ...exposed, token: id });
-  }
-  if (strategy.includes("cookie")) {
-    const reply = cookies("session", {
-      value: id,
-      path: "/",
-      httpOnly: true,
-      secure: ctx.platform.production,
-      sameSite: "Lax"
+// src/auth/providers/index.ts
+var CLASSES = {
+  amazoncognito: AmazonCognito,
+  anilist: AniList,
+  apple: Apple,
+  atlassian: Atlassian,
+  auth0: Auth0,
+  authentik: Authentik,
+  autodesk: Autodesk,
+  battlenet: BattleNet,
+  bitbucket: Bitbucket,
+  box: Box,
+  bungie: Bungie,
+  coinbase: Coinbase,
+  discord: Discord,
+  donationalerts: DonationAlerts,
+  dribbble: Dribbble,
+  dropbox: Dropbox,
+  etsy: Etsy,
+  epicgames: EpicGames,
+  facebook: Facebook,
+  figma: Figma,
+  gitea: Gitea,
+  github: GitHub,
+  gitlab: GitLab,
+  google: Google,
+  intuit: Intuit,
+  kakao: Kakao,
+  kick: Kick,
+  keycloak: KeyCloak,
+  lichess: Lichess,
+  line: Line,
+  linear: Linear,
+  linkedin: LinkedIn,
+  mastodon: Mastodon,
+  mercadolibre: MercadoLibre,
+  mercadopago: MercadoPago,
+  microsoftentraid: MicrosoftEntraId,
+  myanimelist: MyAnimeList,
+  naver: Naver,
+  notion: Notion,
+  okta: Okta,
+  osu: Osu,
+  patreon: Patreon,
+  polar: Polar,
+  reddit: Reddit,
+  roblox: Roblox,
+  salesforce: Salesforce,
+  shikimori: Shikimori,
+  slack: Slack,
+  spotify: Spotify,
+  startgg: StartGG,
+  strava: Strava,
+  tiktok: TikTok,
+  tiltify: Tiltify,
+  tumblr: Tumblr,
+  twitch: Twitch,
+  twitter: Twitter,
+  vk: VK,
+  withings: Withings,
+  workos: WorkOS,
+  yahoo: Yahoo,
+  yandex: Yandex,
+  zoom: Zoom,
+  42: FortyTwo
+};
+var ALIASES = {
+  microsoft: "microsoftentraid",
+  cognito: "amazoncognito",
+  entra: "microsoftentraid"
+};
+var providers = Object.fromEntries(
+  Object.entries(CLASSES).map(([name, Client]) => [
+    name,
+    antarcticProvider(name, Client)
+  ])
+);
+for (const [alias, target2] of Object.entries(ALIASES)) {
+  providers[alias] = providers[target2];
+}
+var ISSUERS = {
+  paypal: "https://www.paypal.com"
+};
+var providers_default = providers;
+
+// src/auth/providers/oidc.ts
+var discovered = /* @__PURE__ */ new Map();
+function discover(issuer) {
+  let doc = discovered.get(issuer);
+  if (!doc) {
+    const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
+    doc = fetch(url).then((r2) => {
+      if (!r2.ok) throw new Error(`Cannot reach the OIDC issuer at ${url}`);
+      return r2.json();
     });
-    if (opts.json) {
-      const exposed = await onUser(user, ctx);
-      assertUser(exposed, "onUser");
-      return reply.status(201).json(exposed);
-    }
-    return reply.redirect(settings.redirect);
+    doc.catch(() => discovered.delete(issuer));
+    discovered.set(issuer, doc);
   }
-  throw new Error("Unknown auth type");
+  return doc;
+}
+var claims = (token) => {
+  const body = token.split(".")[1];
+  if (!body) throw new Error("The issuer returned no usable id_token");
+  let b64 = body.replace(/-/g, "+").replace(/_/g, "/");
+  b64 += "=".repeat((4 - b64.length % 4) % 4);
+  return JSON.parse(atob(b64));
+};
+function oidcProvider(name) {
+  return {
+    async authorize(ctx, options) {
+      const doc = await discover(options.issuer);
+      const state = createId();
+      const url = search(doc.authorization_endpoint, {
+        client_id: credentials(name, options).id,
+        response_type: "code",
+        scope: scopeOf(options, "openid email profile"),
+        redirect_uri: `${ctx.url.origin}/auth/callback/${name}`,
+        state,
+        ...passthrough(options)
+      });
+      return { url, state };
+    },
+    async exchange(ctx, options, code) {
+      const doc = await discover(options.issuer);
+      const { id, secret } = credentials(name, options);
+      const body = new URLSearchParams({
+        client_id: id,
+        client_secret: secret,
+        code,
+        grant_type: "authorization_code"
+      });
+      body.set("redirect_uri", `${ctx.url.origin}/auth/callback/${name}`);
+      const res = await fetch(doc.token_endpoint, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body
+      });
+      if (!res.ok) throw new Error(`${name}: token exchange failed`);
+      const token = await res.json();
+      const raw = claims(token.id_token);
+      return {
+        provider: name,
+        id: String(raw.sub),
+        email: raw.email,
+        name: raw.name,
+        avatar: raw.picture,
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        raw
+      };
+    }
+  };
 }
 
 // src/auth/state.ts
-var NAME = "oauth_state";
-function startState(ctx, crossSite = false) {
-  const state = createId();
+var NAME2 = "oauth_state";
+var EXPIRES = "10m";
+async function startState(ctx, pending) {
+  const value = await signJwt(pending, ctx.options.secrets[0], 10 * 60);
   return {
-    state,
-    cookie: {
-      value: state,
-      path: "/",
-      expires: "10m",
-      httpOnly: true,
-      secure: crossSite || ctx.platform.production,
-      sameSite: crossSite ? "None" : "Lax"
-    }
+    value,
+    path: "/",
+    expires: EXPIRES,
+    httpOnly: true,
+    secure: ctx.platform.production,
+    sameSite: "Lax"
   };
 }
-function checkState(ctx, received) {
-  const expected = ctx.cookies[NAME];
-  if (!expected || !received || expected !== received) {
+async function readState(ctx, received) {
+  const cookie = ctx.cookies[NAME2];
+  if (!cookie || !received) throw ServerError_default.AUTH_INVALID_STATE();
+  const pending = await verifyJwt(cookie, ctx.options.secrets);
+  if (!pending || pending.state !== received) {
     throw ServerError_default.AUTH_INVALID_STATE();
   }
-}
-function clearState() {
-  return createCookies(NAME, { value: null });
+  return pending;
 }
 
-// src/auth/providers/apple.ts
-var AUTHORIZE = "https://appleid.apple.com/auth/authorize";
-var TOKEN = "https://appleid.apple.com/auth/token";
-var b64url2 = (data) => {
-  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  let bin = "";
-  for (const byte of bytes) bin += String.fromCharCode(byte);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-var b64urlJson = (segment) => {
-  let b64 = segment.replace(/-/g, "+").replace(/_/g, "/");
-  b64 += "=".repeat((4 - b64.length % 4) % 4);
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
-};
-var clientSecret = async () => {
-  const now = Math.floor(Date.now() / 1e3);
-  const header = { alg: "ES256", kid: env.APPLE_KEY_ID, typ: "JWT" };
-  const payload = {
-    iss: env.APPLE_TEAM_ID,
-    iat: now,
-    exp: now + 3600,
-    aud: "https://appleid.apple.com",
-    sub: env.APPLE_ID
-  };
-  const data = `${b64url2(JSON.stringify(header))}.${b64url2(JSON.stringify(payload))}`;
-  const pem = String(env.APPLE_PRIVATE_KEY).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    der,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    new TextEncoder().encode(data)
-  );
-  return `${data}.${b64url2(new Uint8Array(sig))}`;
-};
-var login = (ctx) => {
-  const { state, cookie } = startState(ctx, true);
-  const params = new URLSearchParams({
-    client_id: env.APPLE_ID,
-    redirect_uri: `${ctx.url.origin}/auth/callback/apple`,
-    response_type: "code",
-    scope: "name email",
-    // Requesting scopes forces Apple to POST the result back (form_post)
-    response_mode: "form_post",
-    state
-  });
-  return cookies("oauth_state", cookie).redirect(`${AUTHORIZE}?${params}`);
-};
-var exchange = async (code, redirectUri, user) => {
-  const params = new URLSearchParams({
-    client_id: env.APPLE_ID,
-    client_secret: await clientSecret(),
-    code: code ?? "",
-    grant_type: "authorization_code"
-  });
-  if (redirectUri) params.set("redirect_uri", redirectUri);
-  const tokenRes = await fetch(TOKEN, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded"
-    },
-    body: params
-  });
-  if (!tokenRes.ok) throw new Error("apple: token exchange failed");
-  const token = await tokenRes.json();
-  const claims = b64urlJson(token.id_token.split(".")[1]);
-  let name;
-  if (user) {
-    const parsed = JSON.parse(user).name;
-    if (parsed) name = `${parsed.firstName} ${parsed.lastName}`.trim();
-  }
-  return { ...claims, name };
-};
-var finish = async (ctx, raw, opts) => {
-  const { onProfile } = ctx.options.auth;
-  const profile = onProfile ? await onProfile(raw, "apple") : { id: raw.sub, name: raw.name, email: raw.email };
-  assertUser(profile, "onProfile");
-  return finishLogin(
-    ctx,
-    {
-      provider: "apple",
-      key: profile.id,
-      email: profile.email,
-      user: profile
-    },
-    opts
-  );
-};
-var callback = async (ctx) => {
-  const body = ctx.body || {};
-  checkState(ctx, body.state);
-  const url = `${ctx.url.origin}/auth/callback/apple`;
-  const raw = await exchange(body.code, url, body.user);
-  const res = await finish(ctx, raw);
-  res.headers.append("set-cookie", clearState());
-  return res;
-};
-var verify = async (ctx) => {
-  const { code, redirect_uri, user } = ctx.body ?? {};
-  if (!code) throw ServerError_default.AUTH_NO_CODE();
-  const raw = await exchange(code, redirect_uri, user);
-  return finish(ctx, raw, { json: true });
-};
-var apple_default = { login, callback, verify };
-
-// src/auth/providers/oauth.ts
+// src/auth/flow.ts
+var SPEC = { schema: { tags: "auth" } };
 var wantsJson = (ctx) => String(ctx.headers.accept || "").includes("application/json");
-var clientParams = (source) => ({
-  redirect_uri: source.redirect_uri,
-  state: source.state,
-  code_challenge: source.code_challenge,
-  code_challenge_method: source.code_challenge ? "S256" : void 0
-});
-function oauthProvider(config2) {
-  const KEY = config2.name.toUpperCase();
-  const callbackUrl = (ctx) => `${ctx.url.origin}/auth/callback/${config2.name}`;
-  const authorizeUrl2 = (params) => {
-    const search = new URLSearchParams({
-      client_id: env[`${KEY}_ID`],
-      response_type: "code",
-      scope: config2.scope
-    });
-    for (const [key, value] of Object.entries(params)) {
-      if (value) search.set(key, value);
+function parseProviders(given) {
+  const map2 = typeof given === "string" ? { [given]: {} } : Array.isArray(given) ? Object.fromEntries(given.map((name) => [name, {}])) : { ...given };
+  const out = [];
+  for (const [name, raw] of Object.entries(map2)) {
+    const options = typeof raw === "string" ? { issuer: raw } : { ...raw };
+    if (!options.issuer && !providers_default[name] && ISSUERS[name]) {
+      options.issuer = ISSUERS[name];
     }
-    return `${config2.authorizeUrl}?${search}`;
-  };
-  const login3 = (ctx) => {
-    if (wantsJson(ctx)) {
-      return json({ url: authorizeUrl2(clientParams(ctx.url.query)) });
+    if (options.issuer) {
+      out.push({ name, options, provider: oidcProvider(name) });
+    } else if (providers_default[name]) {
+      out.push({ name, options, provider: providers_default[name] });
+    } else {
+      throw new Error(
+        `Unknown provider "${name}". Give it an \`issuer\` to use any OIDC provider, or pick one of "${Object.keys(providers_default).join('", "')}".`
+      );
     }
-    const { state, cookie } = startState(ctx);
-    const url = authorizeUrl2({ redirect_uri: callbackUrl(ctx), state });
-    return cookies("oauth_state", cookie).redirect(url);
-  };
-  const exchange2 = async (ctx, code, extra) => {
-    const body = new URLSearchParams({
-      client_id: env[`${KEY}_ID`],
-      client_secret: env[`${KEY}_SECRET`],
-      code,
-      grant_type: "authorization_code"
-    });
-    for (const [key, value] of Object.entries(extra)) {
-      if (value) body.set(key, value);
+  }
+  if (!out.length) throw new Error("Auth needs at least one provider");
+  return out;
+}
+var target = async (where, fallback, user, ctx) => typeof where === "function" ? where(user, ctx) : where ?? fallback;
+function entry(config2) {
+  const list = parseProviders(config2.providers);
+  const strategies = Array.isArray(config2.strategy) ? config2.strategy : [config2.strategy ?? "session"];
+  for (const one of strategies) {
+    if (!["session", "cookie", "token", "jwt"].includes(one)) {
+      throw new Error(
+        `Unknown strategy "${one}"; it takes 'session', 'cookie', 'token' or 'jwt'.`
+      );
     }
-    const tokenRes = await fetch(config2.tokenUrl, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      body
-    });
-    if (!tokenRes.ok) throw new Error(`${config2.name}: token exchange failed`);
-    const token = await tokenRes.json();
-    const profileRes = await fetch(config2.profileUrl, {
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${token.access_token}`
+  }
+  const expires = config2.expires ?? "30d";
+  const { onLogin, getUser, toPublicUser, onLogout } = config2;
+  if (onLogin && !getUser) {
+    throw new Error("`onLogin` needs a `getUser`: something has to resolve the id it returns.");
+  }
+  for (const strategy of strategies) {
+    if (isSigned(strategy)) {
+      if (getUser && !toPublicUser) {
+        throw new Error(
+          `The \`${strategy}\` strategy signs the user into the credential, so it needs a \`toPublicUser\` to say what goes in. Signing the whole row would publish whatever else is on it.`
+        );
       }
-    });
-    if (!profileRes.ok) throw new Error(`${config2.name}: profile fetch failed`);
-    return profileRes.json();
-  };
-  const finish3 = async (ctx, raw, opts) => {
-    const { onProfile } = ctx.options.auth;
-    const profile = onProfile ? await onProfile(raw, config2.name) : config2.profile(raw);
-    assertUser(profile, "onProfile");
-    return finishLogin(
-      ctx,
-      {
-        provider: config2.name,
-        key: profile.id,
-        email: profile.email,
-        user: profile
-      },
-      opts
-    );
-  };
-  const callback3 = async (ctx) => {
-    checkState(ctx, ctx.url.query.state);
-    const raw = await exchange2(ctx, ctx.url.query.code, {
-      redirect_uri: callbackUrl(ctx)
-    });
-    const res = await finish3(ctx, raw);
-    res.headers.append("set-cookie", clearState());
-    return res;
-  };
-  const verify4 = async (ctx) => {
-    const { code, redirect_uri, code_verifier } = ctx.body ?? {};
-    if (!code) throw ServerError_default.AUTH_NO_CODE();
-    const raw = await exchange2(ctx, code, { redirect_uri, code_verifier });
-    return finish3(ctx, raw, { json: true });
-  };
-  return { login: login3, callback: callback3, verify: verify4 };
-}
-
-// src/auth/providers/discord.ts
-var discord_default = oauthProvider({
-  name: "discord",
-  authorizeUrl: "https://discord.com/oauth2/authorize",
-  tokenUrl: "https://discord.com/api/oauth2/token",
-  profileUrl: "https://discord.com/api/users/@me",
-  scope: "identify email",
-  profile: (p) => ({
-    id: p.id,
-    email: p.email,
-    name: p.global_name || p.username,
-    picture: p.avatar ? `https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png` : void 0
-  })
-});
-
-// src/auth/updateUser.ts
-async function updateUser(user, auth2, store) {
-  if (auth2.provider === "email") {
-    return await store.set(auth2.email, user);
+    } else if (!getUser) {
+      throw new Error(
+        `The \`${strategy}\` strategy puts an id in the credential, so it needs a \`getUser\` to resolve it. With no database, use \`cookie\` or \`jwt\`.`
+      );
+    }
   }
-}
-
-// src/auth/providers/email.ts
-async function emailLogin(ctx) {
-  const { email, password } = ctx.body;
-  if (!email) throw ServerError_default.LOGIN_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.LOGIN_INVALID_EMAIL();
-  if (!password) throw ServerError_default.LOGIN_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.LOGIN_INVALID_PASSWORD();
-  const users = ctx.options.auth.users;
-  if (!await users.has(email)) throw ServerError_default.LOGIN_WRONG_EMAIL();
-  const user = await users.get(email);
-  const isValid = await verify2(password, user.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  return finishLogin(ctx, {
-    provider: "email",
-    key: user.email,
-    email: user.email,
-    user
-  });
-}
-async function emailRegister(ctx) {
-  const { email, password, ...data } = ctx.body;
-  if (!email) throw ServerError_default.REGISTER_NO_EMAIL();
-  if (!/@/.test(email)) throw ServerError_default.REGISTER_INVALID_EMAIL();
-  if (!password) throw ServerError_default.REGISTER_NO_PASSWORD();
-  if (password.length < 8) throw ServerError_default.REGISTER_INVALID_PASSWORD();
-  const users = ctx.options.auth.users;
-  if (await users.has(email)) throw ServerError_default.REGISTER_EMAIL_EXISTS();
-  const time = (/* @__PURE__ */ new Date()).toISOString().replace(/\.[0-9]*/, "");
-  const user = {
-    id: createId(email),
-    strategy: ctx.options.auth.strategy,
-    provider: "email",
-    email,
-    password: await hash2(password),
-    time,
-    ...data
+  const redirects = typeof config2.redirect === "object" ? config2.redirect : {};
+  const loginTo = typeof config2.redirect === "object" ? redirects.login : config2.redirect;
+  const finish = async (ctx, profile) => {
+    const payload = getUser ? await (async () => {
+      const id = await onLogin(profile, ctx);
+      if (id === void 0 || id === null) {
+        throw new Error("`onLogin` must return the id the credential points at");
+      }
+      if (!isSigned(strategies[0])) return { sub: String(id) };
+      const user2 = await getUser(String(id), ctx);
+      return { user: await toPublicUser(user2) };
+    })() : { user: profile };
+    const signed = { ...payload, provider: profile.provider };
+    const token = await issue(ctx, signed, expires);
+    const user = signed.user ?? await getUser(signed.sub, ctx);
+    const to = await target(loginTo, "/", user, ctx);
+    if (inCookie(strategies[0])) {
+      return cookies("session", {
+        value: token,
+        path: "/",
+        expires,
+        httpOnly: true,
+        secure: ctx.platform.production,
+        sameSite: "Lax"
+      }).redirect(to);
+    }
+    return redirect(`${to}#token=${token}`);
   };
-  return finishLogin(ctx, {
-    provider: "email",
-    key: email,
-    email,
-    user
-  });
-}
-async function emailResetPassword() {
-}
-async function emailUpdatePassword(ctx) {
-  const passwords = ctx.body;
-  const fullUser = await ctx.options.auth.users.get(ctx.user.email);
-  if (!fullUser) throw ServerError_default.AUTH_NO_USER();
-  const isValid = await verify2(passwords.previous, fullUser.password);
-  if (!isValid) throw ServerError_default.LOGIN_WRONG_PASSWORD();
-  fullUser.password = await hash2(passwords.updated);
-  await updateUser(fullUser, ctx.user, ctx.options.auth.users);
-  return 200;
-}
-var email_default = {
-  login: emailLogin,
-  register: emailRegister,
-  reset: emailResetPassword,
-  password: emailUpdatePassword
-};
-
-// src/auth/providers/facebook.ts
-var facebook_default = oauthProvider({
-  name: "facebook",
-  authorizeUrl: "https://www.facebook.com/v18.0/dialog/oauth",
-  tokenUrl: "https://graph.facebook.com/v18.0/oauth/access_token",
-  profileUrl: "https://graph.facebook.com/me?fields=id,name,email,picture",
-  scope: "email public_profile",
-  profile: (p) => ({
-    id: p.id,
-    email: p.email,
-    name: p.name,
-    picture: p.picture?.data?.url
-  })
-});
-
-// src/auth/providers/github.ts
-var AUTHORIZE2 = "https://github.com/login/oauth/authorize";
-var oauth = async (code, extra) => {
-  const fch = async (url, { body, headers: headers2 = {}, ...rest } = {}) => {
-    headers2.accept = "application/json";
-    headers2["content-type"] = "application/json";
-    const res2 = await fetch(url, { ...rest, body, headers: headers2 });
-    if (!res2.ok) throw new Error("Invalid request");
-    return res2.json();
-  };
-  const params = {
-    client_id: env.GITHUB_ID,
-    client_secret: env.GITHUB_SECRET,
-    code
-  };
-  for (const [key, value] of Object.entries(extra)) {
-    if (value) params[key] = value;
-  }
-  const res = await fch("https://github.com/login/oauth/access_token", {
-    method: "post",
-    body: JSON.stringify(params)
-  });
-  return (path) => {
-    return fch(`https://api.github.com${path}`, {
-      headers: { Authorization: `Bearer ${res.access_token}` }
-    });
-  };
-};
-var authorizeUrl = (params) => {
-  const search = new URLSearchParams({
-    client_id: env.GITHUB_ID,
-    scope: "user:email"
-  });
-  for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
-  }
-  return `${AUTHORIZE2}?${search}`;
-};
-var login2 = (ctx) => {
-  if (wantsJson(ctx)) {
-    return json({ url: authorizeUrl(clientParams(ctx.url.query)) });
-  }
-  const { state, cookie } = startState(ctx);
-  return cookies("oauth_state", cookie).redirect(authorizeUrl({ state }));
-};
-var getUserProfile = async (code, extra = {}) => {
-  const api = await oauth(code, extra);
-  const [profile, emails] = await Promise.all([
-    api("/user"),
-    api("/user/emails")
-  ]);
-  const email = emails.sort((a) => a.primary ? -1 : 1)[0]?.email;
-  return { ...profile, email };
-};
-var defaultProfile = (raw) => ({
-  id: raw.id,
-  name: raw.name,
-  email: raw.email,
-  picture: raw.avatar_url,
-  location: raw.location,
-  created: raw.created_at
-});
-var finish2 = async (ctx, raw, opts) => {
-  const { onProfile } = ctx.options.auth;
-  const profile = onProfile ? await onProfile(raw, "github") : defaultProfile(raw);
-  assertUser(profile, "onProfile");
-  return finishLogin(
-    ctx,
-    {
-      provider: "github",
-      key: profile.id,
-      email: profile.email,
-      user: profile
-    },
-    opts
-  );
-};
-var callback2 = async (ctx) => {
-  checkState(ctx, ctx.url.query.state);
-  const raw = await getUserProfile(ctx.url.query.code);
-  const res = await finish2(ctx, raw);
-  res.headers.append("set-cookie", clearState());
-  return res;
-};
-var verify3 = async (ctx) => {
-  const { code, redirect_uri, code_verifier } = ctx.body ?? {};
-  if (!code) throw ServerError_default.AUTH_NO_CODE();
-  const raw = await getUserProfile(code, { redirect_uri, code_verifier });
-  return finish2(ctx, raw, { json: true });
-};
-var github_default = { login: login2, callback: callback2, verify: verify3 };
-
-// src/auth/providers/google.ts
-var google_default = oauthProvider({
-  name: "google",
-  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenUrl: "https://oauth2.googleapis.com/token",
-  profileUrl: "https://openidconnect.googleapis.com/v1/userinfo",
-  scope: "openid email profile",
-  profile: (p) => ({
-    id: p.sub,
-    email: p.email,
-    name: p.name,
-    picture: p.picture
-  })
-});
-
-// src/auth/providers/microsoft.ts
-var microsoft_default = oauthProvider({
-  name: "microsoft",
-  authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-  tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-  profileUrl: "https://graph.microsoft.com/v1.0/me",
-  scope: "openid email profile User.Read",
-  profile: (p) => ({
-    // Personal accounts expose `userPrincipalName` rather than `mail`
-    id: p.id,
-    email: p.mail || p.userPrincipalName,
-    name: p.displayName
-  })
-});
-
-// src/auth/providers/index.ts
-var providers_default = {
-  apple: apple_default,
-  discord: discord_default,
-  email: email_default,
-  facebook: facebook_default,
-  github: github_default,
-  google: google_default,
-  microsoft: microsoft_default
-};
-
-// src/auth/parseAuthOptions.ts
-var defaultRedirect = "/user";
-function defaultOnUser(fullUser) {
-  const { password: _password, ...user } = fullUser;
-  return user;
-}
-var available = Object.keys(providers_default);
-function parseAuthOptions(auth2) {
-  if (!auth2) return null;
-  if (typeof auth2 === "string") {
-    const [strategy2, provider] = auth2.split(":");
-    auth2 = { strategy: strategy2, providers: provider ? [provider] : [] };
-  }
-  if (!auth2.strategy?.length) {
-    throw new Error("Auth options needs a strategy");
-  }
-  const strategy = auth2.strategy;
-  const list = Array.isArray(auth2.providers) ? auth2.providers : auth2.providers ? [auth2.providers] : [];
-  if (!list.length) {
-    throw new Error("Auth options needs a provider");
-  }
-  const invalid = list.find((p) => !available.includes(p));
-  if (invalid) {
-    throw new Error(
-      `Provider "${invalid}" not found, available ones are "${available.join('", "')}"`
-    );
-  }
-  const redirect2 = auth2.redirect || defaultRedirect;
-  const { onProfile, onLogin, onLogout } = auth2;
-  const onUser = auth2.onUser || defaultOnUser;
-  const onToken = auth2.onToken || defaultOnUser;
-  const users = auth2.users ? toStore(auth2.users) : null;
-  const sessions = auth2.sessions ? toStoreExpiring(auth2.sessions, "1w") : null;
   return {
-    strategy,
-    providers: list,
-    redirect: redirect2,
-    onProfile,
-    onLogin,
-    onUser,
-    onToken,
-    onLogout,
-    users,
-    sessions
+    name: "flow",
+    async user(ctx) {
+      const found = await read(ctx, strategies);
+      if (!found) return;
+      const { payload, strategy } = found;
+      ctx.auth = meta(payload, strategy);
+      if (payload.user) return payload.user;
+      if (!payload.sub) return;
+      return getUser(payload.sub, ctx);
+    },
+    routes(app) {
+      for (const { name, options, provider } of list) {
+        app.get(`/auth/login/${name}`, SPEC, async (ctx) => {
+          const { url, state, payload } = await provider.authorize(ctx, options);
+          const cookie = await startState(ctx, { state, payload });
+          if (wantsJson(ctx)) {
+            return cookies(NAME2, cookie).json({ url });
+          }
+          return cookies(NAME2, cookie).redirect(url);
+        });
+        const callback = async (ctx) => {
+          const query = ctx.url.query;
+          if (query.error) {
+            const to = await target(redirects.error, "/", null, ctx);
+            return redirect(`${to}?error=${encodeURIComponent(query.error)}`);
+          }
+          const pending = await readState(ctx, query.state);
+          if (!query.code) throw ServerError_default.AUTH_NO_CODE();
+          let res;
+          try {
+            const profile = await provider.exchange(
+              ctx,
+              options,
+              query.code,
+              pending
+            );
+            res = await finish(ctx, profile);
+          } catch (error) {
+            const to = await target(redirects.error, "/", null, ctx);
+            const message = error.message;
+            res = redirect(`${to}?error=${encodeURIComponent(message)}`);
+          }
+          res.headers.append(
+            "set-cookie",
+            `${NAME2}=; Path=/; Max-Age=0; HttpOnly`
+          );
+          return res;
+        };
+        app.get(`/auth/callback/${name}`, SPEC, callback);
+      }
+      app.post("/auth/logout", SPEC, async (ctx) => {
+        const found = await read(ctx, strategies).catch(() => void 0);
+        if (onLogout && found?.payload.sub) {
+          await onLogout(found.payload.sub, ctx);
+        }
+        const to = await target(redirects.logout, "/", null, ctx);
+        if (!inCookie(strategies[0])) return status(204);
+        return cookies("session", { value: null }).redirect(to);
+      });
+    }
   };
+}
+
+// src/auth/verify.ts
+var enc2 = new TextEncoder();
+var dec2 = new TextDecoder();
+var unb64url2 = (seg) => {
+  let b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+  b64 += "=".repeat((4 - b64.length % 4) % 4);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
+var ALGS = {
+  RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+  RS384: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" },
+  RS512: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
+  ES256: { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" },
+  ES384: { name: "ECDSA", namedCurve: "P-384", hash: "SHA-384" }
+};
+var cache2 = /* @__PURE__ */ new Map();
+function keysOf(issuer, refresh = false) {
+  let entry3 = cache2.get(issuer);
+  if (!entry3 || refresh && Date.now() - entry3.at > 6e4) {
+    const keys = (async () => {
+      const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
+      const discovery = await fetch(url).then((r2) => r2.json());
+      const set = await fetch(discovery.jwks_uri).then((r2) => r2.json());
+      const out = /* @__PURE__ */ new Map();
+      for (const jwk of set.keys ?? []) {
+        const algorithm = ALGS[jwk.alg];
+        if (!algorithm) continue;
+        out.set(
+          jwk.kid,
+          await crypto.subtle.importKey("jwk", jwk, algorithm, false, ["verify"])
+        );
+      }
+      return out;
+    })();
+    keys.catch(() => cache2.delete(issuer));
+    entry3 = { at: Date.now(), keys };
+    cache2.set(issuer, entry3);
+  }
+  return entry3.keys;
+}
+var bearer2 = (ctx) => {
+  const header = ctx.headers.authorization;
+  if (!header) return;
+  const [type2, token] = header.trim().split(" ");
+  if (type2?.toLowerCase() !== "bearer" || !token) {
+    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
+  }
+  return token;
+};
+function entry2(options) {
+  const { verify: issuer, audience } = options;
+  const claimNames = options.audienceClaim ? Array.isArray(options.audienceClaim) ? options.audienceClaim : [options.audienceClaim] : ["aud"];
+  if (!audience) {
+    throw new Error(
+      "`verify` needs an `audience`: one issuer serves many applications, and without it a token minted for another one is accepted here."
+    );
+  }
+  const allowed = Array.isArray(audience) ? audience : [audience];
+  return {
+    name: `verify:${issuer}`,
+    async user(ctx) {
+      const token = options.cookie ? ctx.cookies[options.cookie] : bearer2(ctx);
+      if (!token) return;
+      const claims2 = await check(token, issuer, allowed, claimNames);
+      ctx.auth = {
+        issuedAt: new Date((claims2.iat ?? 0) * 1e3),
+        expiresAt: claims2.exp ? new Date(claims2.exp * 1e3) : void 0,
+        strategy: options.cookie ? "cookie" : "jwt",
+        provider: issuer
+      };
+      if (!options.getUser) return claims2;
+      return options.getUser(claims2.sub, ctx);
+    }
+  };
+}
+async function check(token, issuer, allowed, claimNames) {
+  const parts = token.split(".");
+  if (parts.length !== 3) throw ServerError_default.AUTH_INVALID_TOKEN();
+  const [head, body, sig] = parts;
+  let header;
+  let claims2;
+  try {
+    header = JSON.parse(dec2.decode(unb64url2(head)));
+    claims2 = JSON.parse(dec2.decode(unb64url2(body)));
+  } catch {
+    throw ServerError_default.AUTH_INVALID_TOKEN();
+  }
+  const algorithm = ALGS[header?.alg];
+  if (!algorithm) throw ServerError_default.AUTH_INVALID_TOKEN();
+  let key = (await keysOf(issuer)).get(header.kid);
+  if (!key) key = (await keysOf(issuer, true)).get(header.kid);
+  if (!key) throw ServerError_default.AUTH_INVALID_TOKEN();
+  const ok = await crypto.subtle.verify(
+    algorithm.name === "ECDSA" ? { name: "ECDSA", hash: algorithm.hash } : algorithm,
+    key,
+    unb64url2(sig),
+    enc2.encode(`${head}.${body}`)
+  );
+  if (!ok) throw ServerError_default.AUTH_INVALID_TOKEN();
+  const now = Math.floor(Date.now() / 1e3);
+  if (claims2.exp && now >= claims2.exp) throw ServerError_default.AUTH_INVALID_TOKEN();
+  if (claims2.nbf && now < claims2.nbf) throw ServerError_default.AUTH_INVALID_TOKEN();
+  if (claims2.iss !== issuer) throw ServerError_default.AUTH_INVALID_TOKEN();
+  const name = claimNames.find((one) => claims2[one] !== void 0);
+  if (!name) throw ServerError_default.AUTH_INVALID_TOKEN();
+  const value = claims2[name];
+  const aud = Array.isArray(value) ? value : [value];
+  if (!aud.some((one) => allowed.includes(one))) {
+    throw ServerError_default.AUTH_INVALID_TOKEN();
+  }
+  return claims2;
+}
+
+// src/auth/vendors.ts
+var VENDORS = {
+  clerk: {
+    cookie: "__session",
+    // Clerk session tokens carry no `aud`: the authorized party (your
+    // frontend origin) is in `azp`, which is what their own SDK checks
+    audience: "your frontend origin, like https://app.example.com",
+    claim: "azp",
+    docs: "https://clerk.com/docs/backend-requests/resources/session-tokens"
+  },
+  supabase: {
+    audience: '"authenticated"',
+    docs: "https://supabase.com/docs/guides/auth/jwts"
+  }
+};
+var vendors_default = VENDORS;
+
+// src/auth/parse.ts
+function parseAuth(auth2) {
+  if (!auth2) return null;
+  const list = Array.isArray(auth2) ? auth2 : [auth2];
+  return list.flatMap((one) => toEntry(one));
+}
+function vendorEntry(strategy, name) {
+  const vendor = vendors_default[name];
+  const KEY = name.toUpperCase();
+  if (strategy !== "jwt" && strategy !== "cookie") {
+    throw new Error(
+      `"${strategy}:${name}" is not possible: ${name} issues a signed token, and "${strategy}" means an opaque id resolved through a \`getUser\` of yours. Use "jwt:${name}", or "cookie:${name}" for a same-origin app.`
+    );
+  }
+  if (strategy === "cookie" && !vendor.cookie) {
+    throw new Error(
+      `"cookie:${name}" is not possible: ${name} does not store its token in a cookie with a fixed name. Use "jwt:${name}", or name the cookie yourself with { verify, audience, cookie }.`
+    );
+  }
+  const issuer = globalThis.env[`${KEY}_ISSUER`];
+  if (!issuer) {
+    throw new Error(
+      `${KEY}_ISSUER is not set, and it differs per account, so it cannot be guessed. See ${vendor.docs}`
+    );
+  }
+  const audience = globalThis.env[`${KEY}_AUDIENCE`];
+  if (!audience) {
+    throw new Error(
+      `${KEY}_AUDIENCE is not set. It should be ${vendor.audience}. One issuer serves many applications, all signed with the same keys, so without it a token minted for another one is accepted here.`
+    );
+  }
+  return entry2({
+    verify: issuer,
+    audience,
+    ...vendor.claim ? { audienceClaim: vendor.claim } : {},
+    ...strategy === "cookie" ? { cookie: vendor.cookie } : {}
+  });
+}
+function toEntry(auth2) {
+  if (typeof auth2 === "string") {
+    const [strategy, name] = auth2.split(":");
+    if (!name) {
+      throw new Error(
+        `Invalid auth "${auth2}": the string form is "<strategy>:<name>", like "cookie:github" to log people in, or "jwt:clerk" to check a token a vendor issued.`
+      );
+    }
+    if (vendors_default[name]) return [vendorEntry(strategy, name)];
+    return [entry({ strategy, providers: name })];
+  }
+  if (typeof auth2 === "function") {
+    return [{ name: "function", user: async (ctx) => auth2(ctx) }];
+  }
+  if (auth2 && typeof auth2 === "object") {
+    if ("verify" in auth2) return [entry2(auth2)];
+    if ("providers" in auth2) return [entry(auth2)];
+    if ("handler" in auth2) {
+      const instance = auth2;
+      const path = (instance.path ?? "/api/auth").replace(/\/$/, "");
+      const raw = { parser: "stream" };
+      const forward = (ctx) => instance.handler(
+        new Request(ctx.url.href, {
+          method: ctx.method,
+          headers: ctx.headers,
+          body: ctx.body,
+          // Required by fetch whenever a body is a stream
+          ...ctx.body ? { duplex: "half" } : {}
+        })
+      );
+      return [
+        {
+          name: `instance:${path}`,
+          user: async (ctx) => instance.user?.(ctx),
+          routes: (app) => {
+            const wildcard = `${path}/*`;
+            app.get(wildcard, raw, forward);
+            app.post(wildcard, raw, forward);
+            app.put(wildcard, raw, forward);
+            app.patch(wildcard, raw, forward);
+            app.delete(wildcard, raw, forward);
+          }
+        }
+      ];
+    }
+  }
+  throw new Error(
+    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ verify, audience }`, a library instance, or an array of those."
+  );
 }
 
 // src/helpers/color.ts
@@ -1715,16 +1797,16 @@ var STATUS_TEXT = {
   502: "Bad Gateway",
   503: "Service Unavailable"
 };
-var UNITS2 = ["b", "kb", "mb", "gb", "tb"];
+var UNITS3 = ["b", "kb", "mb", "gb", "tb"];
 function formatBytes(bytes) {
   if (!bytes || bytes < 0) return "0b";
   const i = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
-    UNITS2.length - 1
+    UNITS3.length - 1
   );
   const value = bytes / 1024 ** i;
   const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${rounded}${UNITS2[i]}`;
+  return `${rounded}${UNITS3[i]}`;
 }
 var SCOPE_COLORS = {
   start: "green",
@@ -1909,31 +1991,13 @@ function config(options = {}) {
   settings.uploads = resolveUploads(options.uploads);
   const production = env2.NODE_ENV === "production";
   if (options.auth || env2.AUTH) {
-    settings.auth = parseAuthOptions(
+    settings.auth = parseAuth(
       options.auth || env2.AUTH || null
     );
   }
-  if (settings.auth) {
-    if (!settings.auth.users) {
-      if (production) {
-        throw new Error(
-          "Auth in production needs a persistent `users` store, like auth: { ..., users: kv(redis).prefix('user:') }."
-        );
-      }
-      settings.auth.users = toStore(/* @__PURE__ */ new Map());
-    }
-    if (!settings.auth.sessions && !settings.auth.strategy.includes("jwt")) {
-      if (production) {
-        throw new Error(
-          "Auth in production needs a persistent `sessions` store, like auth: { ..., sessions: kv(redis).prefix('session:') }."
-        );
-      }
-      settings.auth.sessions = toStoreExpiring(/* @__PURE__ */ new Map(), "1w");
-    }
-  }
-  if (settings.auth?.strategy.includes("jwt") && settings.secrets[0].startsWith("unsafe-")) {
+  if (settings.auth?.some((one) => one.name === "flow") && settings.secrets[0].startsWith("unsafe-")) {
     console.warn(
-      "[server:auth] jwt strategy with no SECRETS set: tokens are signed with a random per-process secret, so they break on restart and across instances. Set the SECRETS environment variable (or the `secrets` option)."
+      "[server:auth] auth with no SECRETS set: credentials are signed with a random per-process secret, so they break on restart and across instances. Set the SECRETS environment variable (or the `secrets` option)."
     );
   }
   if (options.openapi) {
@@ -1950,7 +2014,8 @@ function config(options = {}) {
   settings.onResponse = options.onResponse;
   const loc = (v) => typeof v === "string" ? v : "enabled";
   if (settings.auth) {
-    log.message("auth", `${settings.auth.providers.join(", ")} auth enabled`);
+    const names = settings.auth.map((one) => one.name).join(", ");
+    log.message("auth", ` enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
@@ -2166,9 +2231,9 @@ async function validateResponse(out, options) {
   if (out?.constructor !== Object && !Array.isArray(out)) return out;
   return await run(options.response, out, "response");
 }
-function replace2(target, values) {
-  for (const key of Object.keys(target)) delete target[key];
-  Object.assign(target, values);
+function replace2(target2, values) {
+  for (const key of Object.keys(target2)) delete target2[key];
+  Object.assign(target2, values);
 }
 
 // src/helpers/handleRequest.ts
@@ -2234,37 +2299,6 @@ async function getResponse(app, ctx) {
     applySecurity(res, ctx);
     return res;
   }
-}
-
-// src/helpers/hash.ts
-import * as crypto2 from "crypto";
-import { getRandomValues } from "crypto";
-import { promisify } from "util";
-async function hash2(password) {
-  if ("Bun" in globalThis) {
-    return await Bun.password.hash(password, {
-      algorithm: "argon2id",
-      memoryCost: 65536,
-      timeCost: 3
-    });
-  }
-  if (!("argon2" in crypto2)) {
-    throw new Error(
-      "Password hashing needs argon2: run on Bun, or on Node 24+ where node:crypto provides it."
-    );
-  }
-  const nonce = getRandomValues(new Uint8Array(32));
-  const argon23 = promisify(crypto2.argon2);
-  const buf = await argon23("argon2id", {
-    message: Buffer.from(password),
-    nonce,
-    parallelism: 1,
-    tagLength: 32,
-    memory: 65536,
-    passes: 3
-  });
-  const b64 = (bytes) => Buffer.from(bytes).toString("base64").replace(/=+$/, "");
-  return `$argon2id$v=19$m=65536,t=3,p=1$${b64(nonce)}$${b64(buf)}`;
 }
 
 // src/helpers/iteratorAsyncToReadable.ts
@@ -2357,142 +2391,19 @@ function toWeb(nodeStream) {
   });
 }
 
-// src/helpers/verify.ts
-import * as crypto3 from "crypto";
-async function verify2(password, hash3) {
-  if ("Bun" in globalThis) {
-    return Bun.password.verify(password, hash3, "argon2id");
-  }
-  const match = /^\$argon2(id|i|d)\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)\$([^$]+)\$([^$]+)$/.exec(
-    hash3
-  );
-  if (!match) throw new Error("Invalid Argon2 hash format");
-  const [, variant, , memory, passes, parallelism, saltB64, hashB64] = match;
-  const nonce = Buffer.from(saltB64, "base64");
-  const expected = Buffer.from(hashB64, "base64");
-  return new Promise((resolve, reject) => {
-    crypto3.argon2(
-      `argon2${variant}`,
-      {
-        message: password,
-        nonce,
-        memory: parseInt(memory, 10),
-        passes: parseInt(passes, 10),
-        parallelism: parseInt(parallelism, 10),
-        tagLength: expected.length
-      },
-      (err, derivedKey) => {
-        if (err) return reject(err);
-        if (derivedKey.length !== expected.length) return resolve(false);
-        resolve(crypto3.timingSafeEqual(derivedKey, expected));
-      }
-    );
-  });
-}
-
-// src/auth/getUser.ts
-async function getJwtUser(ctx) {
-  const header = ctx.headers.authorization;
-  if (!header) return;
-  const [type2, token] = header.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer" || !token) {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
-  const payload = await verifyJwt(token, ctx.options.secrets);
-  if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
-  const { iat, exp, ...claims } = payload;
-  if (!claims.id || !claims.email) throw ServerError_default.AUTH_INVALID_TOKEN();
-  if (!ctx.options.auth.providers.includes(claims.provider)) {
-    throw ServerError_default.AUTH_INVALID_PROVIDER({
-      provider: claims.provider,
-      valid: ctx.options.auth.providers
-    });
-  }
-  const exposed = await ctx.options.auth.onUser(claims, ctx);
-  assertUser(exposed, "onUser");
-  return exposed;
-}
-async function getAuthSession(ctx) {
-  const id = findSessionId(ctx);
-  if (!id) return;
-  const session = await ctx.options.auth.sessions.get(id);
-  return session?.user ? session : void 0;
-}
-async function getUser(ctx) {
-  if (!ctx.options.auth) return;
-  const options = ctx.options.auth;
-  if (options.strategy.includes("jwt")) return getJwtUser(ctx);
-  const auth2 = await getAuthSession(ctx);
-  if (!auth2) return;
-  if (!options.providers.includes(auth2.provider)) {
-    throw ServerError_default.AUTH_INVALID_PROVIDER({
-      provider: auth2.provider,
-      valid: options.providers
-    });
-  }
-  const user = await options.users.get(auth2.user);
-  if (!user) throw ServerError_default.AUTH_NO_USER();
-  const exposed = await options.onUser(user, ctx);
-  assertUser(exposed, "onUser");
-  return exposed;
-}
-
-// src/auth/logout.ts
-async function logout(ctx) {
-  const { strategy } = ctx.options.auth;
-  if (!strategy.includes("jwt")) {
-    const prev = findSessionId(ctx);
-    if (prev) await ctx.options.auth.sessions.del(prev);
-  }
-  if (ctx.options.auth.onLogout) await ctx.options.auth.onLogout(ctx);
-  if (strategy.includes("token") || strategy.includes("jwt")) {
-    return { token: null };
-  }
-  if (strategy.includes("cookie")) {
-    return cookies({ session: null }).redirect("/");
-  }
-  throw new Error("Unknown auth type");
-}
-
 // src/auth/index.ts
-var oauth2 = [
-  "github",
-  "google",
-  "microsoft",
-  "discord",
-  "facebook"
-];
 function auth(app) {
+  const entries = app.settings.auth;
   app.use(async function middle(ctx) {
-    ctx.user = await getUser(ctx);
-  });
-  const spec = { schema: { tags: "auth" } };
-  app.post("/auth/logout", spec, logout);
-  const enabled = app.settings.auth.providers;
-  for (const name of oauth2) {
-    if (!enabled.includes(name)) continue;
-    const key = name.toUpperCase();
-    if (!env[`${key}_ID`]) throw new Error(`${key}_ID not defined`);
-    if (!env[`${key}_SECRET`]) throw new Error(`${key}_SECRET not defined`);
-    app.get(`/auth/login/${name}`, spec, providers_default[name].login);
-    app.get(`/auth/callback/${name}`, spec, providers_default[name].callback);
-    app.post(`/auth/verify/${name}`, spec, providers_default[name].verify);
-  }
-  if (enabled.includes("apple")) {
-    const keys = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"];
-    for (const key of keys) {
-      if (!env[key]) throw new Error(`${key} not defined`);
+    for (const entry3 of entries) {
+      const user = await entry3.user(ctx);
+      if (user) {
+        ctx.user = user;
+        return;
+      }
     }
-    app.get("/auth/login/apple", spec, providers_default.apple.login);
-    app.post("/auth/callback/apple", spec, providers_default.apple.callback);
-    app.post("/auth/verify/apple", spec, providers_default.apple.verify);
-  }
-  if (enabled.includes("email")) {
-    app.post("/auth/register/email", spec, providers_default.email.register);
-    app.post("/auth/login/email", spec, providers_default.email.login);
-    app.put("/auth/password/email", spec, providers_default.email.password);
-    app.put("/auth/reset/email", spec, providers_default.email.reset);
-  }
+  });
+  for (const entry3 of entries) entry3.routes?.(app);
 }
 
 // src/helpers/parseRange.ts
@@ -2528,35 +2439,35 @@ async function assets(ctx) {
     const key = ctx.url.pathname.replace(/^\/+/, "");
     const file2 = ctx.options.public.file(key);
     const info = file2.info?.bind(file2);
-    const meta = info ? await info() : null;
-    if (info ? !meta : !await file2.exists()) return;
+    const meta2 = info ? await info() : null;
+    if (info ? !meta2 : !await file2.exists()) return;
     const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
-    const ctype = ext && mimes_default[ext] || meta?.type || ext;
+    const ctype = ext && mimes_default[ext] || meta2?.type || ext;
     const headers2 = { "cache-control": CACHE_CONTROL };
     let tag;
-    if (meta) {
-      const stamp = meta.modified ? meta.modified.getTime() : 0;
-      tag = `W/"${meta.size.toString(16)}-${stamp.toString(16)}"`;
+    if (meta2) {
+      const stamp = meta2.modified ? meta2.modified.getTime() : 0;
+      tag = `W/"${meta2.size.toString(16)}-${stamp.toString(16)}"`;
       headers2.etag = tag;
-      if (meta.modified) headers2["last-modified"] = meta.modified.toUTCString();
+      if (meta2.modified) headers2["last-modified"] = meta2.modified.toUTCString();
     }
-    const canRange = !!(meta && file2.slice);
+    const canRange = !!(meta2 && file2.slice);
     if (canRange) headers2["accept-ranges"] = "bytes";
     if (tag && ctx.headers["if-none-match"] === tag) {
       return status(304).headers(headers2).send();
     }
     const rangeHeader = ctx.headers.range;
     const ifRange = ctx.headers["if-range"];
-    if (meta && file2.slice && rangeHeader && (!ifRange || ifRange === tag)) {
-      const range = parseRange(rangeHeader, meta.size);
+    if (meta2 && file2.slice && rangeHeader && (!ifRange || ifRange === tag)) {
+      const range = parseRange(rangeHeader, meta2.size);
       if (range === "unsatisfiable") {
-        return status(416).headers({ ...headers2, "content-range": `bytes */${meta.size}` }).send();
+        return status(416).headers({ ...headers2, "content-range": `bytes */${meta2.size}` }).send();
       }
       if (range) {
         const { start, end } = range;
         return type(ctype).status(206).headers({
           ...headers2,
-          "content-range": `bytes ${start}-${end}/${meta.size}`,
+          "content-range": `bytes ${start}-${end}/${meta2.size}`,
           "content-length": String(end - start + 1)
         }).send(file2.slice(start, end + 1).stream());
       }
@@ -2627,7 +2538,7 @@ var generateOpenApiPaths = async (handlers, specPath) => {
   for (const [method, routes] of Object.entries(handlers)) {
     for (const route of routes) {
       const path = route.path;
-      const meta = route.options ?? {};
+      const meta2 = route.options ?? {};
       const config2 = getConfig(route.options?.schema);
       if (typeof path !== "string" || path === "*" || path === specPath) {
         continue;
@@ -2638,13 +2549,13 @@ var generateOpenApiPaths = async (handlers, specPath) => {
         paths[normalizedPath] = {};
       }
       let requestBody;
-      if (meta?.body) {
-        const schema = await toJsonSchema(meta.body);
+      if (meta2?.body) {
+        const schema = await toJsonSchema(meta2.body);
         requestBody = { content: { "application/json": { schema } } };
       }
       let responses;
-      if (meta?.response) {
-        const schema = await toJsonSchema(meta.response);
+      if (meta2?.response) {
+        const schema = await toJsonSchema(meta2.response);
         responses = {
           200: { description: "OK", content: { "application/json": { schema } } }
         };
@@ -2660,8 +2571,8 @@ var generateOpenApiPaths = async (handlers, specPath) => {
           schema: { type: type2 }
         });
       });
-      if (meta?.query) {
-        const schema = await toJsonSchema(meta.query);
+      if (meta2?.query) {
+        const schema = await toJsonSchema(meta2.query);
         for (const [name, prop] of Object.entries(schema.properties ?? {})) {
           parameters.push({
             name,
@@ -2734,7 +2645,10 @@ function timer(ctx) {
 async function socketUser(app, headers2, cookies2) {
   if (!app.settings.auth) return void 0;
   const ctx = { options: app.settings, headers: headers2, cookies: cookies2 };
-  return getUser(ctx);
+  for (const entry3 of app.settings.auth) {
+    const user = await entry3.user(ctx);
+    if (user) return user;
+  }
 }
 
 // src/helpers/wsNode.ts
@@ -3233,8 +3147,7 @@ function ServerTest(app) {
 }
 
 // src/index.ts
-import { default as default2 } from "polystore";
-import { default as default3 } from "bucket";
+import { default as default2 } from "bucket";
 var Server = class extends Router {
   settings;
   platform;
@@ -3299,7 +3212,7 @@ export {
   Server,
   ServerError_default as ServerError,
   ValidationError,
-  default3 as bucket,
+  default2 as bucket,
   cache,
   cookies,
   server as default,
@@ -3307,7 +3220,6 @@ export {
   file,
   headers,
   json,
-  default2 as kv,
   redirect,
   router,
   send,

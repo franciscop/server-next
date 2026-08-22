@@ -1,39 +1,33 @@
-# Hosted auth via JWKS
+# Hosted auth
 
-One middleware covers Supabase, Auth0, Cognito, Keycloak, Zitadel, Logto,
-Okta, Google, Apple and every other issuer of standard JWTs: verify the bearer
-token against the issuer's public keys with [jose](https://github.com/panva/jose)
-(456KB, no dependencies, edge-safe), and put the claims on `ctx.user`.
+One option covers Supabase, Auth0, Cognito, Keycloak, Zitadel, Logto, Okta,
+Google and every other issuer of standard JWTs: point at the issuer, say who
+the token should be for, and the claims land on `ctx.user`.
+
+```js
+server({ auth: { verify: ISSUER, audience: AUDIENCE } });
+```
+
+No SDK, no dependency. The issuer's discovery document gives the key set, which
+is fetched once and cached by key id, and every request checks the signature,
+the issuer, the audience and the expiry.
 
 ```bash
-npm install
 ISSUER=https://<ref>.supabase.co/auth/v1 AUDIENCE=authenticated npm run dev
 ```
 
-```bash
-curl localhost:3000/me -H "Authorization: Bearer <a token from your issuer>"
-```
+The login itself happens in the browser, with their SDK. Nothing is mounted
+here: this app only checks what arrives.
 
-## Two things worth copying
+## Why the audience matters
 
-**Discover the keys, don't hardcode the URL.** The JWKS *format* is standard
-but the path is not: Google serves `/oauth2/v3/certs`, Apple `/auth/keys`,
-Slack `/openid/connect/keys`, Microsoft `/common/discovery/v2.0/keys`. Only
-Auth0-style issuers use `/.well-known/jwks.json`. What every issuer does serve
-is `/.well-known/openid-configuration`, which names `jwks_uri` and `issuer`.
+One issuer usually serves several applications, all signed with the same keys.
+A token minted for a different app carries a valid signature and the same
+issuer, so the audience is the only claim that separates them. It is required
+for that reason, and the tests cover it.
 
-**Pin the issuer and the audience.** Verifying only the signature accepts any
-token that issuer minted, including one for a *different application* on the
-same tenant, which is cross-app impersonation. The test covers exactly that
-case.
+## Tests
 
-## Notes
-
-- Sign-in happens on the vendor's side (their pages or client SDK); the server
-  only verifies, which is why there are no routes to mount here.
-- The test runs the whole flow with no vendor: it generates a key pair, serves
-  its own discovery document and JWKS from a second `server()` instance, and
-  checks that wrong-signature, wrong-audience and wrong-issuer tokens are all
-  rejected.
-- Verification is stateless, so revoking one session is the vendor's business
-  and takes effect when the token expires.
+`npm test` runs the whole flow against a local issuer with its own RSA key
+pair, its own discovery document and its own JWKS endpoint, so there is no
+vendor and no network involved.

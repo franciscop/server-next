@@ -1,22 +1,22 @@
-# Sign in with GitHub: client-owned flow
+# Sign in with GitHub: a SPA and a bearer token
 
-The SPA flow: the page drives the redirect and the server only exchanges the
-code, so nothing here uses cookies. The credential is a bearer token the client
-stores and sends itself.
+The page owns the credential and the server never sets a cookie for it. The
+framework still runs the handshake, so the flow is three steps:
 
 ```
 GET  /auth/login/github  (Accept: application/json)  → { url }
-the page redirects, GitHub returns to /callback?code&state
-POST /auth/verify/github { code }                    → { ...user, token }
+the page sends the visitor there; GitHub returns to /auth/callback/github,
+which redirects to /#token=<jwt>
 GET  /api/me  (Authorization: Bearer <token>)        → the user
 ```
 
-The page issues and checks its own `state`, since the server never sees it (it
-would need a cookie to remember one). PKCE works the same way: pass
-`code_challenge` to the login URL and `code_verifier` to the verify call.
+The token rides in the URL fragment, which browsers never send to a server, so
+it stays out of access logs and referrer headers. The page reads it on load and
+stores it. CSRF `state` is handled by the server through a short-lived signed
+cookie, which the login response sets even on the JSON answer.
 
 Set `GITHUB_ID` and `GITHUB_SECRET`, and point the OAuth app's callback URL at
-`http://localhost:3000/callback`, this app's own page rather than an API route.
-Then `cd` into here and run `bun .` (or `node .`).
+`http://localhost:3000/auth/callback/github`. Then `cd` into here and run
+`bun .` (or `node .`).
 
-See `../github-browser` for the same login through the server-owned flow.
+See `../github-browser` for the same login kept in a cookie by the server.

@@ -1,94 +1,42 @@
-import kv from "polystore";
-
 import server from "..";
-import { createId } from "../helpers";
+import { signJwt } from "../helpers/jwt";
 import socketUser from "./socketUser";
 
-// socketUser resolves the auth user for a WebSocket upgrade from the request's
-// headers/cookies, reusing the HTTP getUser logic. The live handshake can't run
-// under `bun test` (see wsNode.test.ts), so we drive the resolver directly with
-// stores seeded the same way finishLogin does.
-describe("socketUser (websocket auth)", () => {
-	const EMAIL = "abc@test.com";
+// The WebSocket upgrade resolves the user from the request's headers and
+// cookies through the same entries as HTTP, with a partial context.
+describe("socket auth", () => {
+  it("returns undefined with no auth configured", async () => {
+    const app = server();
+    expect(await socketUser(app as any, {}, {})).toBe(undefined);
+  });
 
-	// Build a server + stores with a single logged-in session already persisted.
-	function setup(strategy: "cookie" | "token") {
-		const sessions = kv(new Map());
-		const users = kv(new Map());
-		const app = server({
-			auth: { strategy, providers: ["email"], users, sessions },
-		});
-		const id = createId(); // 16 chars, the opaque session id
-		return { app, id, sessions, users };
-	}
+  it("resolves a signed session cookie", async () => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+    const rows = new Map([["u1", { id: "u1", email: "ada@x.com" }]]);
+    const app = server({
+      secrets: "s",
+      auth: {
+        providers: "github",
+        onLogin: (profile) => profile.id,
+        getUser: (id: string) => rows.get(id),
+      },
+    });
+    const token = await signJwt({ sub: "u1" }, "s", 3600);
 
-	async function seed(stores: any, id: string, strategy: string) {
-		await stores.users.set(EMAIL, {
-			id: "u1",
-			email: EMAIL,
-			name: "Abc",
-			provider: "email",
-			strategy,
-		});
-		await stores.sessions.set(id, {
-			user: EMAIL,
-			provider: "email",
-			created: "2024-07-01T03:21:40Z",
-		});
-	}
+    const user = await socketUser(app as any, {}, { session: token });
+    expect(user).toMatchObject({ email: "ada@x.com" });
+    expect(await socketUser(app as any, {}, {})).toBe(undefined);
+  });
 
-	it("resolves the user from the `session` cookie (browser)", async () => {
-		const { app, id, ...stores } = setup("cookie");
-		await seed(stores, id, "cookie");
-
-		const user = await socketUser(app, {}, { session: id });
-		expect(user?.email).toBe(EMAIL);
-		expect(user?.strategy).toBe("cookie");
-		expect(user?.provider).toBe("email");
-	});
-
-	it("resolves the user from a Bearer header (non-browser client)", async () => {
-		const { app, id, ...stores } = setup("token");
-		await seed(stores, id, "token");
-
-		const user = await socketUser(app, { authorization: `Bearer ${id}` }, {});
-		expect(user?.email).toBe(EMAIL);
-		expect(user?.strategy).toBe("token");
-	});
-
-	it("is anonymous with no credentials", async () => {
-		const { app, id, ...stores } = setup("cookie");
-		await seed(stores, id, "cookie");
-
-		expect(await socketUser(app, {}, {})).toBeUndefined();
-	});
-
-	it("is anonymous with an unknown session cookie", async () => {
-		const { app, id, ...stores } = setup("cookie");
-		await seed(stores, id, "cookie");
-
-		// A garbage cookie just misses the store: a guest, not an error
-		expect(await socketUser(app, {}, { session: "too-short" })).toBeUndefined();
-	});
-
-	it("rejects a malformed Bearer header (throws -> 401 handshake)", async () => {
-		const { app, id, ...stores } = setup("token");
-		await seed(stores, id, "token");
-
-		// A non-Bearer scheme is an invalid credential, not an absent one.
-		expect(
-			socketUser(app, { authorization: "Basic nope" }, {}),
-		).rejects.toThrow();
-	});
-
-	it("is anonymous for an unknown session id", async () => {
-		const { app } = setup("cookie");
-		// A well-formed id that isn't in the store.
-		expect(await socketUser(app, {}, { session: createId() })).toBeUndefined();
-	});
-
-	it("is anonymous when no auth is configured", async () => {
-		const app = server({});
-		expect(await socketUser(app, {}, { session: createId() })).toBeUndefined();
-	});
+  it("tries the entries in order, first to answer wins", async () => {
+    const app = server({
+      auth: [
+        (ctx: any) => (ctx.headers["x-a"] ? { id: "a" } : undefined),
+        (ctx: any) => (ctx.cookies.uid ? { id: ctx.cookies.uid } : undefined),
+      ],
+    });
+    expect(await socketUser(app as any, { "x-a": "1" }, {})).toMatchObject({ id: "a" });
+    expect(await socketUser(app as any, {}, { uid: "b" })).toMatchObject({ id: "b" });
+  });
 });

@@ -1,26 +1,18 @@
-import server, { Context, Provider, redirect } from "@server/next";
-import kv from "polystore";
+import server, { Context, redirect } from "@server/next";
 import { AccountPage, LoginPage } from "./App";
 
-const sessions = kv(new Map());
-const users = kv(new Map());
-
-// Every provider this demo supports, in display order
-const ALL: Provider[] = [
-  "github",
-  "google",
-  "microsoft",
-  "discord",
-  "facebook",
-  "apple",
-];
+// Every provider this demo supports, in display order. All but GitHub speak
+// OIDC, so a name is the whole integration.
+const ALL = ["github", "google", "microsoft", "discord", "slack", "twitch"];
 
 // Enable each provider that has credentials in .env, so the demo boots even if
 // you only configured a few of them (each enabled one then gets a button).
 const providers = ALL.filter((p) => process.env[`${p.toUpperCase()}_ID`]);
 
+// No callbacks, so no database: the profile is signed into the cookie, which
+// is all this demo needs. Add `onLogin`/`getUser` to keep your own rows.
 const auth = providers.length
-  ? { strategy: "cookie" as const, providers, users, sessions, redirect: "/" }
+  ? { strategy: "cookie" as const, providers, redirect: "/" }
   : undefined;
 
 const requireUser = (ctx: Context) => {

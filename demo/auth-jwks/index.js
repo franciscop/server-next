@@ -1,42 +1,31 @@
 import server from "../..";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // Hosted auth (Supabase, Auth0, Cognito, Keycloak, Zitadel, Logto, Okta,
-// Google, Apple...) all end the same way on the server: the client sends a
-// JWT and you verify it against the issuer's public keys. One middleware
-// covers every one of them, with no vendor SDK.
+// Google...) all end the same way on the server: the client signs in over
+// there, then sends a JWT on every request and you check it against the
+// issuer's published keys. One option covers every one of them, with no vendor
+// SDK and no dependency.
 //
-//   ISSUER=https://<ref>.supabase.co/auth/v1
-//   ISSUER=https://<tenant>.auth0.com
+//   ISSUER=https://<ref>.supabase.co/auth/v1   AUDIENCE=authenticated
+//   ISSUER=https://<tenant>.auth0.com          AUDIENCE=https://api.myapp.com
 
 const ISSUER = process.env.ISSUER || "http://localhost:3001";
 const AUDIENCE = process.env.AUDIENCE || "my-app";
 
-// The JWKS path is NOT standard (Google uses /oauth2/v3/certs, Apple
-// /auth/keys, Slack /openid/connect/keys...). The discovery document is, so
-// read `jwks_uri` and `issuer` from it instead of hardcoding a URL.
-const discovery = await fetch(
-  `${ISSUER}/.well-known/openid-configuration`,
-).then((res) => res.json());
+// `audience` is required, and that is the point: one issuer serves many
+// applications, all signed with the same keys, so a token minted for a
+// different app carries a valid signature and the same issuer. The audience is
+// the only claim that separates them.
+const auth = { verify: ISSUER, audience: AUDIENCE };
 
-const jwks = createRemoteJWKSet(new URL(discovery.jwks_uri));
+export default server({ auth })
+  // No token is anonymous; a broken one is a 401 before this runs
+  .get("/me", (ctx) => ctx.user ?? 401)
 
-export default server()
-  .use(async (ctx) => {
-    const header = String(ctx.headers.authorization || "");
-    if (!header.toLowerCase().startsWith("bearer ")) return;
-    try {
-      // Pinning `issuer` and `audience` is not optional: verifying only the
-      // signature accepts any token that issuer minted, including ones for a
-      // different application entirely.
-      const { payload } = await jwtVerify(header.slice(7), jwks, {
-        issuer: discovery.issuer,
-        audience: AUDIENCE,
-      });
-      ctx.user = payload; // sub, email, and whatever the issuer adds
-    } catch {
-      // Invalid, expired, or for another app: an anonymous request
-    }
-  })
-  .get("/", (ctx) => (ctx.user ? `Hi ${ctx.user.email}` : "Anonymous"))
-  .get("/me", (ctx) => ctx.user || 401);
+  .get("/admin", (ctx) => {
+    if (!ctx.user) return 401;
+    // Supabase puts app-controlled claims in `app_metadata`, Auth0 in a
+    // namespaced claim; either way it is a plain read off ctx.user
+    if (ctx.user.app_metadata?.role !== "admin") return 403;
+    return "welcome";
+  });

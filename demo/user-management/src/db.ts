@@ -1,106 +1,56 @@
 import { Database } from "bun:sqlite";
-import { kv } from "../../..";
 import type { User } from "./schemas.ts";
 
 // Tests point DB_FILE at ":memory:" so they never touch the dev file
 export const db = new Database(
   process.env.DB_FILE || `${import.meta.dir}/../data.db`,
 );
+
+// One table. Auth takes no store and defines no schema, so this is entirely
+// the app's shape: `onLogin` writes it and `getUser` reads it.
 db.run(`CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT,
-  email TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL DEFAULT 'member',
   picture TEXT,
-  provider TEXT,
-  strategy TEXT
-)`);
-db.run(`CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  user TEXT REFERENCES users(id),
-  provider TEXT,
-  created TEXT,
-  expires_at INTEGER
+  provider TEXT
 )`);
 
-type UserRow = User & { provider?: string | null; strategy?: string | null };
+export const users = {
+  find: (id: string) =>
+    db.query("SELECT * FROM users WHERE id = ?").get(id) as User | undefined,
 
-// HAS_EXPIRATION adapters receive bare values plus a TTL, no envelope
-const usersTable = {
-  HAS_EXPIRATION: true,
-  get: (id: string) =>
-    db.query("SELECT * FROM users WHERE id = ?").get(id) as UserRow | null,
-  set: (id: string, user: UserRow | null) => {
-    if (user === null) return usersTable.del(id);
+  upsert(profile: { id: string; email: string; name?: string; avatar?: string; provider: string }) {
+    // The role is defaulted on the first login only, so a promotion in the UI
+    // is never overwritten by the next sign-in
+    const role = profile.email === process.env.ADMIN_EMAIL ? "admin" : "member";
     db.run(
-      `INSERT OR REPLACE INTO users (id, name, email, role, picture, provider, strategy)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        user.name ?? null,
-        user.email,
-        user.role ?? "member",
-        user.picture ?? null,
-        user.provider ?? null,
-        user.strategy ?? null,
-      ],
+      `INSERT INTO users (id, name, email, role, picture, provider)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(email) DO UPDATE SET name = ?2, picture = ?5`,
+      [profile.id, profile.name ?? null, profile.email, role, profile.avatar ?? null, profile.provider],
     );
+    return db
+      .query("SELECT id FROM users WHERE email = ?")
+      .get(profile.email) as { id: string };
   },
-  del: (id: string) => {
-    db.run("DELETE FROM users WHERE id = ?", [id]);
+
+  update(id: string, fields: Partial<User>) {
+    const keys = Object.keys(fields);
+    if (!keys.length) return;
+    const set = keys.map((k, i) => `${k} = ?${i + 2}`).join(", ");
+    db.run(`UPDATE users SET ${set} WHERE id = ?1`, [id, ...Object.values(fields)]);
   },
-  add: (prefix: string, user: UserRow) => {
-    const id = crypto.randomUUID();
-    usersTable.set(prefix + id, user);
-    return id;
-  },
+
+  del: (id: string) => db.run("DELETE FROM users WHERE id = ?", [id]),
+
+  list: ({ page = 1, search = "" }) =>
+    db
+      .query(
+        `SELECT id, name, email, role, picture FROM users
+         WHERE name LIKE ?1 OR email LIKE ?1
+         ORDER BY rowid LIMIT 10 OFFSET ?2`,
+      )
+      .all(`%${search}%`, (page - 1) * 10) as User[],
 };
-
-type SessionRow = { user: string; provider: string; created: string };
-
-const sessionsTable = {
-  HAS_EXPIRATION: true,
-  get: (id: string) => {
-    const row = db
-      .query("SELECT * FROM sessions WHERE id = ?")
-      .get(id) as (SessionRow & { expires_at: number | null }) | null;
-    if (!row) return null;
-    if (row.expires_at && row.expires_at <= Date.now()) {
-      sessionsTable.del(id);
-      return null;
-    }
-    return { user: row.user, provider: row.provider, created: row.created };
-  },
-  set: (id: string, session: SessionRow | null, expires?: number | null) => {
-    if (session === null) return sessionsTable.del(id);
-    db.run(
-      `INSERT OR REPLACE INTO sessions (id, user, provider, created, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        id,
-        session.user ?? null,
-        session.provider ?? null,
-        session.created ?? null,
-        expires == null ? null : Date.now() + expires * 1000,
-      ],
-    );
-  },
-  del: (id: string) => {
-    db.run("DELETE FROM sessions WHERE id = ?", [id]);
-  },
-};
-
-const list = async ({ page = 1, search = "" }) =>
-  db
-    .query(
-      `SELECT id, name, email, role, picture FROM users
-       WHERE name LIKE ?1 OR email LIKE ?1
-       ORDER BY rowid LIMIT 10 OFFSET ?2`,
-    )
-    .all(`%${search}%`, (page - 1) * 10) as User[];
-
-// Shared with the server options; a derived store loses the extensions
-export const users = Object.assign(kv(usersTable), { list });
-
-// A built store keeps its own expiry, the server's 1w default only covers raw sources
-export const sessions = kv(sessionsTable).expires("1w");

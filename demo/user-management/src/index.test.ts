@@ -14,7 +14,8 @@ Object.assign(process.env, {
 Object.assign(globalThis.env ?? {}, process.env);
 
 const { default: app } = await import("./index.tsx");
-const { sessions, users } = await import("./db.ts");
+const { users } = await import("./db.ts");
+const { signJwt } = await import("../../../src/helpers/jwt.ts");
 const api = app.test();
 
 // The server captured its settings at construction; don't leak the fake
@@ -22,38 +23,19 @@ const api = app.test();
 delete process.env.SECRETS;
 delete globalThis.env.SECRETS;
 
-// A signed-in browser is just a session record + its cookie
-const ADMIN = "REqA2l022l8Q0tuI";
-const MEMBER = "REqA2l022l8Q0tuJ";
-const as = (id: string) => ({ headers: { cookie: `session=${id}` } });
+// A signed-in browser carries a credential holding the id `getUser` resolves
+let ADMIN: string;
+let MEMBER: string;
+const as = (token: string) => ({ headers: { cookie: `session=${token}` } });
 
 beforeAll(async () => {
-  await users.set("g1", {
-    id: "g1",
-    name: "Ada",
-    email: "ada@x.com",
-    role: "admin",
-    provider: "github",
-    strategy: "cookie",
-  });
-  await users.set("g2", {
-    id: "g2",
-    name: "Bob",
-    email: "bob@x.com",
-    role: "member",
-    provider: "github",
-    strategy: "cookie",
-  });
-  await sessions.set(ADMIN, {
-    user: "g1",
-    provider: "github",
-    created: "2026-08-10",
-  });
-  await sessions.set(MEMBER, {
-    user: "g2",
-    provider: "github",
-    created: "2026-08-10",
-  });
+  users.upsert({ id: "g1", name: "Ada", email: "ada@x.com", provider: "github" });
+  users.upsert({ id: "g2", name: "Bob", email: "bob@x.com", provider: "github" });
+  users.update("g1", { role: "admin" });
+  users.update("g2", { role: "member" });
+
+  ADMIN = await signJwt({ sub: "g1" }, "test-secret-long", 3600);
+  MEMBER = await signJwt({ sub: "g2" }, "test-secret-long", 3600);
 });
 
 describe("pages", () => {

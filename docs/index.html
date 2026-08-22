@@ -277,12 +277,18 @@ export default server()
     </header>
     <p>
       Supports
-      <a href="/documentation/authentication#oauth-providers">Google</a>,
-      <a href="/documentation/authentication#oauth-providers">Github</a>,
-      <a href="/documentation/authentication#oauth-providers">Facebook</a>,
-      <a href="/documentation/authentication#email-and-password">email</a>,
-      <a href="/documentation/authentication">etc.</a> login with cookies or
-      tokens.
+      <a href="/documentation/authentication#the-providers">Google</a>,
+      <a href="/documentation/authentication#the-providers">Github</a>,
+      <a href="/documentation/authentication#the-providers">Facebook</a>,
+      <a href="/documentation/authentication#the-providers">60 more</a>. Also
+      <a href="/documentation/authentication#a-library">Better Auth</a>,
+      <a href="/documentation/authentication#checking-a-token-minted-elsewhere"
+        >Clerk</a
+      >,
+      <a href="/documentation/authentication#any-oidc-issuer">OIDC</a>,
+      <a href="/documentation/authentication#checking-a-token-minted-elsewhere"
+        >JWKS</a
+      >.
     </p>
   </div>
   <div class="feature">
@@ -292,12 +298,13 @@ export default server()
         height="22"
         src="https://raw.githubusercontent.com/franciscop/server-next/master/docs/img/hash.svg"
       />
-      <h3>Fully typed</h3>
+      <h3>Schemas and types</h3>
     </header>
     <p>
-      From <a href="/documentation/router#parameters">route params</a> to
-      <a href="/documentation/context#ctxbody">request bodies</a> so you can
-      write with confidence.
+      Full <a href="/documentation/options#optionsopenapi">OpenAPI schema</a>,
+      <a href="/documentation/router#validation">validation</a> with Zod,
+      valibot, or arktype, and
+      <a href="/documentation/router#parameters">fully typed</a>.
     </p>
   </div>
   <div class="feature">
@@ -379,10 +386,9 @@ export default server()
   <div>
     <pre><code class="language-js">import server from "@server/next";
 
-// Sign in at /auth/login/github
-const auth = { strategy: "cookie", providers: ["github"] };
-
-export default server({ auth })
+// Sign in at /auth/login/github. No database, no store,
+// no callbacks: the profile is signed into the cookie.
+export default server({ auth: "cookie:github" })
   .get("/me", ctx =&gt; ctx.user || 401);
 </code></pre>
   </div>

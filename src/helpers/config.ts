@@ -1,9 +1,8 @@
-import parseAuthOptions from "../auth/parseAuthOptions";
+import parseAuth from "../auth/parse";
 import Bucket from "./bucket";
 import createLogger from "./logger";
 import { resolveSecrets } from "./secrets";
 import { resolveSecurity } from "./security";
-import toStore, { toStoreExpiring } from "./store";
 import { resolveUploads } from "./upload";
 
 import type { CorsSettings, LogLevel, Options, Settings } from "..";
@@ -130,47 +129,21 @@ export default function config(options: Options = {}): Settings {
 
   if (options.auth || env.AUTH) {
     // The env string is validated (and rejected) inside parseAuthOptions
-    settings.auth = parseAuthOptions(
+    settings.auth = parseAuth(
       options.auth || (env.AUTH as Options["auth"]) || null,
     );
   }
 
-  // The in-memory defaults lose everything on restart and aren't shared across
-  // instances, so a production app with auth must configure real stores. Every
-  // strategy needs `users` (each login reads it for the existing-user upsert
-  // and persists the record); only `sessions` is skipped by the stateless
-  // `jwt`, which stores no login at all.
-  if (settings.auth) {
-    if (!settings.auth.users) {
-      if (production) {
-        throw new Error(
-          "Auth in production needs a persistent `users` store, like " +
-            "auth: { ..., users: kv(redis).prefix('user:') }.",
-        );
-      }
-      settings.auth.users = toStore(new Map());
-    }
-    if (!settings.auth.sessions && !settings.auth.strategy.includes("jwt")) {
-      if (production) {
-        throw new Error(
-          "Auth in production needs a persistent `sessions` store, like " +
-            "auth: { ..., sessions: kv(redis).prefix('session:') }.",
-        );
-      }
-      settings.auth.sessions = toStoreExpiring(new Map(), "1w");
-    }
-  }
-
-  // The `jwt` strategy signs tokens with the first `secrets` entry. With none
-  // set, config generates a random `unsafe-` one per process, which would
-  // invalidate every token on restart and across instances, so warn loudly
-  // (always, not gated on the `log` level, since it silently breaks auth).
+  // Every credential is signed with the first `secrets` entry. With none set,
+  // config generates a random `unsafe-` one per process, which would
+  // invalidate every credential on restart and across instances, so warn
+  // loudly (always, not gated on `log`, since it silently breaks auth).
   if (
-    settings.auth?.strategy.includes("jwt") &&
+    settings.auth?.some((one) => one.name === "flow") &&
     settings.secrets[0].startsWith("unsafe-")
   ) {
     console.warn(
-      "[server:auth] jwt strategy with no SECRETS set: tokens are signed with a " +
+      "[server:auth] auth with no SECRETS set: credentials are signed with a " +
         "random per-process secret, so they break on restart and across " +
         "instances. Set the SECRETS environment variable (or the `secrets` option).",
     );
@@ -199,7 +172,8 @@ export default function config(options: Options = {}): Settings {
   // Startup summary: one concise line per configured module (only with `log`)
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
   if (settings.auth) {
-    log.message("auth", `${settings.auth.providers.join(", ")} auth enabled`);
+    const names = settings.auth.map((one) => one.name).join(", ");
+    log.message("auth", ` enabled`);
   }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));

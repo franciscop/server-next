@@ -1,6 +1,5 @@
 import * as http from 'http';
 import { Readable } from 'node:stream';
-export { default as kv } from 'polystore';
 export { default as bucket } from 'bucket';
 
 type LimitOptions = {
@@ -170,59 +169,75 @@ type BasicValue = string | number | boolean | null;
 type SerializableValue = BasicValue | {
     [key: string]: SerializableValue;
 } | Array<SerializableValue>;
-type StoreSource = KVStore | Map<string, any> | string | Record<string, any>;
-type KVStore = {
+type Strategy = "session" | "cookie" | "token" | "jwt";
+type AuthProfile = {
+    provider: string;
+    id: string;
+    email: string;
     name?: string;
-    prefix: (prefix?: string) => KVStore;
-    get: <T = SerializableValue>(key: string) => Promise<T | null>;
-    set: <T = SerializableValue>(key: string, value: T, options?: {
-        expires?: string | number | null;
-    }) => Promise<void | string>;
-    has: (key: string) => Promise<boolean>;
-    del: (key: string) => Promise<void | string>;
-    keys: () => Promise<string[]>;
+    avatar?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    raw: Record<string, any>;
 };
-type Provider = "email" | "github" | "google" | "microsoft" | "discord" | "facebook" | "apple";
-type Strategy = "cookie" | "jwt" | "token";
-type AuthSession = {
-    user: string;
-    provider: Provider;
-    created: string;
+type AuthMeta = {
+    issuedAt: Date;
+    expiresAt?: Date;
+    strategy?: Strategy;
+    provider?: string;
 };
-type AuthUser<T = Record<string, any>> = T & {
-    id: string | number;
-    provider: Provider;
-    strategy: Strategy;
-    email: string;
-};
-type ProfileUser = {
-    id: string | number;
-    email: string;
+type AuthClaims = {
+    sub: string;
 } & Record<string, any>;
-type AuthOption = `${Strategy}:${Provider}` | {
-    strategy: Strategy;
-    providers?: Provider | Provider[];
-    users?: StoreSource;
-    sessions?: StoreSource;
-    redirect?: string;
-    onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
-    onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
-    onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
-    onToken?: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
-    onLogout?: (ctx: Context) => unknown;
+type Awaitable<T> = T | Promise<T>;
+type ProviderOptions = {
+    id?: string;
+    secret?: string;
+    scope?: string | string[];
+    issuer?: string;
+} & Record<string, any>;
+type RedirectOption = string | ((user: any, ctx: Context) => Awaitable<string>) | {
+    login?: string | ((user: any, ctx: Context) => Awaitable<string>);
+    logout?: string;
+    error?: string;
 };
-type AuthSettings = {
-    providers: Provider[];
-    strategy: Strategy;
-    users: KVStore;
-    sessions: KVStore;
-    onProfile?: (raw: any, provider: Provider) => ProfileUser | Promise<ProfileUser>;
-    onLogin?: (loginUser: AuthUser, existingUser: AuthUser | null, ctx: Context) => ProfileUser | Promise<ProfileUser>;
-    onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
-    onToken: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
-    onLogout?: (ctx: Context) => unknown;
-    redirect: string;
+type AuthConfig<U = AuthProfile> = {
+    providers: string | readonly string[] | Record<string, string | ProviderOptions>;
+    strategy?: Strategy | readonly Strategy[];
+    expires?: string;
+    redirect?: RedirectOption;
+    onLogin?: (profile: AuthProfile, ctx: Context) => Awaitable<string | number | undefined>;
+    getUser?: (id: string, ctx: Context) => Awaitable<U>;
+    toPublicUser?: (user: any) => Awaitable<any>;
+    onLogout?: (id: string, ctx: Context) => Awaitable<void>;
 };
+type AuthVerify<U = AuthClaims> = {
+    verify: string;
+    audience: string | readonly string[];
+    cookie?: string;
+    audienceClaim?: string | readonly string[];
+    getUser?: (id: string, ctx: Context) => Awaitable<U>;
+};
+type AuthInstance = {
+    handler: (request: Request) => Awaitable<Response>;
+    path?: string;
+    user?: (ctx: Context) => Awaitable<any>;
+};
+type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
+type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | AuthInstance | readonly AuthOption[];
+type UserOf<A> = A extends readonly (infer M)[] ? UserOf<M> : A extends (...args: any[]) => infer R ? NonNullable<Awaited<R>> : A extends {
+    getUser: (...args: any[]) => infer R;
+} ? NonNullable<Awaited<R>> : A extends {
+    verify: any;
+} ? AuthClaims : A extends {
+    providers: any;
+} ? AuthProfile : A extends string ? AuthProfile : never;
+type AuthEntry = {
+    name: string;
+    user: (ctx: Context) => Promise<any>;
+    routes?: (app: Server) => void;
+};
+type AuthSettings = AuthEntry[];
 type LogLevel = "info";
 type Logger = {
     level?: LogLevel;
@@ -253,13 +268,13 @@ type SecuritySettings = {
 };
 type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 type OnResponse = (response: Response, ctx: Context) => Response | void | Promise<Response | void>;
-type Options = {
+type Options<A = AuthOption> = {
     port?: number;
     secrets?: string | string[];
     public?: string | Bucket;
     uploads?: string | Bucket | UploadOptions;
     cors?: CorsOptions;
-    auth?: AuthOption;
+    auth?: A;
     openapi?: boolean | string | {
         path?: string;
         title?: string;
@@ -339,6 +354,7 @@ type Context<C extends ContextTypes = {}> = {
     socket?: WebSocket;
     sockets?: WebSocket[];
     user?: Field<C, "user", Record<string, any>>;
+    auth?: AuthMeta;
     init: number;
     app: Server;
 } & ("body" extends keyof C ? {
@@ -560,6 +576,31 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
         }) => Promise<Response>;
     };
 }
+declare function server<U = AuthProfile>(options: Omit<Options, "auth"> & {
+    auth: AuthConfig<U>;
+}): Server<{
+    user: U;
+}>;
+declare function server(options: Omit<Options, "auth"> & {
+    auth: string;
+}): Server<{
+    user: AuthProfile;
+}>;
+declare function server<U = AuthClaims>(options: Omit<Options, "auth"> & {
+    auth: AuthVerify<U>;
+}): Server<{
+    user: U;
+}>;
+declare function server<U>(options: Omit<Options, "auth"> & {
+    auth: AuthFunction<U>;
+}): Server<{
+    user: NonNullable<Awaited<U>>;
+}>;
+declare function server<A extends readonly AuthOption[]>(options: Omit<Options, "auth"> & {
+    auth: A;
+}): Server<{
+    user: UserOf<A[number]>;
+}>;
 declare function server<C extends ContextTypes = {}>(options?: Options): Server<C>;
 
-export { type AuthOption, type AuthSession, type AuthSettings, type AuthUser, type BasicValue, type Body, type BodyMode, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type KVStore, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProfileUser, type Provider, type Route, type RouteOptions, type RouteSchema, type RouterMethod, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type StoreSource, type Strategy, type Time, type UploadOptions, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type Body, type BodyMode, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type Route, type RouteOptions, type RouteSchema, type RouterMethod, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadedFile, type UserOf, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

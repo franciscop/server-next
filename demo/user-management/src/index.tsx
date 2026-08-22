@@ -1,5 +1,5 @@
 import server, { type AuthOption, type Context } from "../../..";
-import { sessions, users } from "./db.ts";
+import { users } from "./db.ts";
 import Docs from "./Docs.tsx";
 import Home from "./Home.tsx";
 import {
@@ -11,7 +11,7 @@ import {
   type User,
 } from "./schemas.ts";
 
-// A fully-fledged user management app: GitHub login, users and sessions in a
+// A fully-fledged user management app: GitHub login, users in a
 // real SQLite database, a validated management API, its OpenAPI spec, and a
 // docs UI. See the readme for setup, then `npm run dev`.
 
@@ -25,17 +25,12 @@ const requireAdmin = (ctx: Context<{ user: User }>) => {
 };
 
 const auth: AuthOption = {
-  strategy: "cookie",
-  providers: ["github"],
-  users,
-  sessions,
+  providers: "github",
   redirect: "/",
-  // Default the role by email; the stored record (UI promotions) wins
-  onLogin: (user, existing) => ({
-    role: user.email === env.ADMIN_EMAIL ? "admin" : "member",
-    ...existing,
-    ...user,
-  }),
+  // The only two places auth touches the database: store whoever logged in and
+  // return the id the cookie points at, then resolve it on every request.
+  onLogin: (profile) => users.upsert(profile).id,
+  getUser: (id) => users.find(id),
 };
 
 export default server<{ user: User }>({
@@ -45,7 +40,7 @@ export default server<{ user: User }>({
 })
   // ============ Pages ============
   .get("/", { schema: false }, async (ctx) => {
-    const everyone = ctx.user?.role === "admin" ? await users.list({}) : [];
+    const everyone = ctx.user?.role === "admin" ? users.list({}) : [];
     return <Home user={ctx.user} everyone={everyone} />;
   })
   .get("/docs", { schema: false }, () => <Docs />)
@@ -65,8 +60,12 @@ export default server<{ user: User }>({
     { body: NewUser, response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      const id = await users.add(ctx.body);
-      return users.get<User>(id);
+      const { id } = users.upsert({
+        id: crypto.randomUUID(),
+        provider: "manual",
+        ...ctx.body,
+      });
+      return users.find(id);
     },
   )
   .get(
@@ -74,8 +73,7 @@ export default server<{ user: User }>({
     { response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      const user = await users.get<User>(ctx.url.params.id);
-      return user ?? 404;
+      return users.find(ctx.url.params.id) ?? 404;
     },
   )
   .put(
@@ -83,14 +81,12 @@ export default server<{ user: User }>({
     { body: UserPatch, response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      const stored = await users.get<User>(ctx.url.params.id);
-      if (!stored) return 404;
-      const updated = { ...stored, ...ctx.body };
-      await users.set(ctx.url.params.id, updated);
-      return updated;
+      if (!users.find(ctx.url.params.id)) return 404;
+      users.update(ctx.url.params.id, ctx.body);
+      return users.find(ctx.url.params.id);
     },
   )
-  .delete("/api/users/:id", requireAdmin, async (ctx) => {
-    await users.del(ctx.url.params.id);
+  .delete("/api/users/:id", requireAdmin, (ctx) => {
+    users.del(ctx.url.params.id);
     return 204;
   });

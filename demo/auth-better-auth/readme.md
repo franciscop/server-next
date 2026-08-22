@@ -17,4 +17,4 @@ handshakes included.
 
 The framework has **no such mode today**. It was prototyped end to end against
 the real library (it works, in about 50 lines) and then reverted while the
-design settled. See `ideas/auth-docs.md` for the shape it landed on.
+design settled. See `docs/5. Authentication.md` for the API that landed.

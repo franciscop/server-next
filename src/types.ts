@@ -220,127 +220,139 @@ export type SerializableValue =
   | { [key: string]: SerializableValue }
   | Array<SerializableValue>;
 
-// Anything the `auth.users` / `auth.sessions` options accept: a plain `Map`, a
-// Redis or DynamoDB client, a `file://` path, or an already-wrapped store. It's
-// passed through polystore's `kv()` at boot, so auth always sees a `KVStore`.
-export type StoreSource =
-  | KVStore
-  | Map<string, any>
-  | string
-  | Record<string, any>;
+export type Strategy = "session" | "cookie" | "token" | "jwt";
 
-export type KVStore = {
-  name?: string;
-  prefix: (prefix?: string) => KVStore;
-  get: <T = SerializableValue>(key: string) => Promise<T | null>;
-  set: <T = SerializableValue>(
-    key: string,
-    value: T,
-    options?: { expires?: string | number | null },
-  ) => Promise<void | string>;
-  has: (key: string) => Promise<boolean>;
-  del: (key: string) => Promise<void | string>;
-  keys: () => Promise<string[]>;
-};
-
-export type Provider =
-  | "email"
-  | "github"
-  | "google"
-  | "microsoft"
-  | "discord"
-  | "facebook"
-  | "apple";
-export type Strategy = "cookie" | "jwt" | "token";
-
-// One login record (`cookie`/`token` strategies), stored under the credential
-// the client carries; `user` keys into `auth.users`. Internal to auth.
-export type AuthSession = {
-  user: string;
-  provider: Provider;
-  created: string;
-};
-
-export type AuthUser<T = Record<string, any>> = T & {
-  id: string | number;
-  provider: Provider;
-  strategy: Strategy;
+// What every provider produces, normalised, so adding one is not a code change.
+// `raw` keeps the untouched response for provider-specific fields.
+export type AuthProfile = {
+  provider: string;
+  id: string;
   email: string;
+  name?: string;
+  avatar?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  raw: Record<string, any>;
 };
 
-// The minimum every auth callback must return: the `id` keys the user in the
-// store, and the `email` is guaranteed on every user auth hands you.
-export type ProfileUser = { id: string | number; email: string } & Record<
-  string,
-  any
->;
+// What the credential itself asserts, with no lookup behind it. Present
+// whenever a credential we can read authenticated the request, so absent for
+// the function and library shapes, where there is nothing of ours to parse.
+export type AuthMeta = {
+  issuedAt: Date;
+  expiresAt?: Date;
+  // How this particular request authenticated, when several are accepted
+  strategy?: Strategy;
+  // Who vouched for them: the provider they logged in with, or the issuer
+  provider?: string;
+};
 
-// The string form takes a single provider (`<strategy>:<provider>`). For several
-// providers, use the object form with a `providers` array.
-export type AuthOption =
-  | `${Strategy}:${Provider}`
+// A verified token's payload; `sub` is the person's id at that issuer
+export type AuthClaims = { sub: string } & Record<string, any>;
+
+type Awaitable<T> = T | Promise<T>;
+
+// Only the handshake is configured per provider; everything else is app-wide.
+// Unknown keys pass through to that provider's authorize URL.
+export type ProviderOptions = {
+  id?: string;
+  secret?: string;
+  scope?: string | string[];
+  // An OIDC issuer, which makes this a generic provider: discovery finds its
+  // endpoints and the id_token claims become the profile
+  issuer?: string;
+} & Record<string, any>;
+
+export type RedirectOption =
+  | string
+  | ((user: any, ctx: Context) => Awaitable<string>)
   | {
-      strategy: Strategy;
-      providers?: Provider | Provider[];
-      // One record per person, keyed by the login's subject. Defaults to an
-      // in-memory Map; production requires an explicit store.
-      users?: StoreSource;
-      // One record per login, keyed by the credential the client carries.
-      // Unused by the stateless `jwt`; the others default to an in-memory Map
-      // (with a 1w expiry), and production requires an explicit store.
-      sessions?: StoreSource;
-      redirect?: string;
-      // Callbacks over the login lifecycle. Each one fully replaces the
-      // built-in step (they never run "on top of" the default), and the user
-      // they return must carry an `id` and an `email`. Deny by throwing.
-      // Maps a provider's raw OAuth payload into your user (OAuth logins only)
-      onProfile?: (
-        raw: any,
-        provider: Provider,
-      ) => ProfileUser | Promise<ProfileUser>;
-      // Builds the record to persist from the fresh login + the stored user
-      // (`null` on a first login); the default is an upsert where fresh wins
-      onLogin?: (
-        loginUser: AuthUser,
-        existingUser: AuthUser | null,
-        ctx: Context,
-      ) => ProfileUser | Promise<ProfileUser>;
-      // Shapes the user exposed on ctx.user and login responses; the default
-      // strips `password`. Runs on every authenticated request
-      onUser?: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
-      // Builds the `jwt` token payload from the stored record, once per login;
-      // the default strips `password`. The payload is client-readable.
-      onToken?: (
-        user: AuthUser,
-        ctx: Context,
-      ) => ProfileUser | Promise<ProfileUser>;
-      // Event fired when a session is revoked through POST /auth/logout
-      onLogout?: (ctx: Context) => unknown;
+      login?: string | ((user: any, ctx: Context) => Awaitable<string>);
+      logout?: string;
+      error?: string;
     };
 
-export type AuthSettings = {
-  providers: Provider[];
-  strategy: Strategy;
-
-  // One record per person; logins point into it via their `user` field
-  users: KVStore;
-  // One record per login; unused by the stateless `jwt`
-  sessions: KVStore;
-
-  onProfile?: (
-    raw: any,
-    provider: Provider,
-  ) => ProfileUser | Promise<ProfileUser>;
+// A login flow we run: the routes are mounted here, the credential is ours
+export type AuthConfig<U = AuthProfile> = {
+  providers: string | readonly string[] | Record<string, string | ProviderOptions>;
+  strategy?: Strategy | readonly Strategy[];
+  expires?: string;
+  redirect?: RedirectOption;
+  // Once, after a handshake: store whoever this is and return the id the
+  // credential points at. Refuse a login by throwing
   onLogin?: (
-    loginUser: AuthUser,
-    existingUser: AuthUser | null,
+    profile: AuthProfile,
     ctx: Context,
-  ) => ProfileUser | Promise<ProfileUser>;
-  onUser: <T = AuthUser>(user: T, ctx: Context) => T | Promise<T>;
-  onToken: (user: AuthUser, ctx: Context) => ProfileUser | Promise<ProfileUser>;
-  onLogout?: (ctx: Context) => unknown;
-  redirect: string;
+  ) => Awaitable<string | number | undefined>;
+  // That id back into the user. Per request for `session` and `token`, once at
+  // login for `cookie` and `jwt`
+  getUser?: (id: string, ctx: Context) => Awaitable<U>;
+  // What gets signed into the credential, for `cookie` and `jwt`
+  toPublicUser?: (user: any) => Awaitable<any>;
+  // Anything of yours that should go when the credential is cleared
+  onLogout?: (id: string, ctx: Context) => Awaitable<void>;
 };
+
+// A credential minted elsewhere: no routes, no client secret, no flow.
+// `audience` is required, since one issuer serves many applications
+export type AuthVerify<U = AuthClaims> = {
+  verify: string;
+  audience: string | readonly string[];
+  // Where the token rides. Defaults to `Authorization: Bearer`; name a cookie
+  // when their SDK stores it there for a same-origin app
+  cookie?: string;
+  // Which claim carries the audience. Standard is `aud`, but Clerk uses
+  // `azp` and Cognito access tokens use `client_id`. The first one present
+  // is the one checked.
+  audienceClaim?: string | readonly string[];
+  getUser?: (id: string, ctx: Context) => Awaitable<U>;
+};
+
+// A library that runs its own handshake and serves its own routes
+export type AuthInstance = {
+  handler: (request: Request) => Awaitable<Response>;
+  path?: string;
+  user?: (ctx: Context) => Awaitable<any>;
+};
+
+// Request in, user out, for a credential we did not mint
+export type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
+
+// The string form is `<strategy>:<provider>` and takes no callbacks, so there
+// is no database: the profile itself is signed into the credential.
+export type AuthOption =
+  | string
+  | AuthFunction
+  | AuthConfig<any>
+  | AuthVerify<any>
+  | AuthInstance
+  | readonly AuthOption[];
+
+// `ctx.user` is whatever the configured `auth` produces, so an app never
+// declares a User type. An array gives the union of its members.
+export type UserOf<A> = A extends readonly (infer M)[]
+  ? UserOf<M>
+  : A extends (...args: any[]) => infer R
+    ? NonNullable<Awaited<R>>
+    : A extends { getUser: (...args: any[]) => infer R }
+      ? NonNullable<Awaited<R>>
+      : A extends { verify: any }
+        ? AuthClaims
+        : A extends { providers: any }
+          ? AuthProfile
+          : A extends string
+            ? AuthProfile
+            : never;
+
+// Every shape normalises to this: resolve a user, and optionally own some
+// routes. The array is tried in order, first to answer wins.
+export type AuthEntry = {
+  name: string;
+  user: (ctx: Context) => Promise<any>;
+  routes?: (app: Server) => void;
+};
+
+export type AuthSettings = AuthEntry[];
 
 export type LogLevel = "info";
 
@@ -397,14 +409,14 @@ type OnResponse = (
   ctx: Context,
 ) => Response | void | Promise<Response | void>;
 
-export type Options = {
+export type Options<A = AuthOption> = {
   port?: number;
   // Signs tokens. Several rotate: the first signs, any of them verifies
   secrets?: string | string[];
   public?: string | Bucket;
   uploads?: string | Bucket | UploadOptions;
   cors?: CorsOptions;
-  auth?: AuthOption;
+  auth?: A;
   // Serve the generated OpenAPI spec: `true` for /openapi.json, a string for
   // another path, or an object also overriding the package.json-derived info
   openapi?:
@@ -537,6 +549,7 @@ export type Context<C extends ContextTypes = {}> = {
   socket?: WebSocket;
   sockets?: WebSocket[];
   user?: Field<C, "user", Record<string, any>>;
+  auth?: AuthMeta;
   init: number;
   app: Server;
 } & ("body" extends keyof C

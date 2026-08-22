@@ -1,44 +1,45 @@
-import type { Context } from "..";
-import { createId } from "../helpers";
-import createCookies from "../helpers/createCookies";
+import { signJwt, verifyJwt } from "../helpers/jwt";
 import ServerError from "../ServerError";
+import type { Context } from "..";
 import type { Cookie } from "../types";
 
 const NAME = "oauth_state";
+const EXPIRES = "10m";
 
-// Creates a CSRF `state` token bound to the user's browser via a short-lived
-// HttpOnly cookie, returned alongside the cookie to set. The provider echoes
-// the token back on the callback, where it must match the cookie.
-//
-// Apple's callback is a cross-site POST, so its state cookie needs
-// `SameSite=None` (which requires `Secure`, i.e. HTTPS — which Apple uses).
-export function startState(
+// What has to survive the redirect: the CSRF `state` the provider echoes back,
+// and the payload it must not see (a PKCE `codeVerifier`, resolved scopes).
+export type Pending = { state: string; payload?: Record<string, any> };
+
+// Bound to the browser through a short-lived HttpOnly cookie, and signed:
+// a forged `codeVerifier` would defeat PKCE, so this is closer to a secret
+// than a bare state token is.
+export async function startState(
   ctx: Context,
-  crossSite = false,
-): { state: string; cookie: Cookie } {
-  const state = createId();
+  pending: Pending,
+): Promise<Cookie> {
+  const value = await signJwt(pending, ctx.options.secrets[0], 10 * 60);
   return {
-    state,
-    cookie: {
-      value: state,
-      path: "/",
-      expires: "10m",
-      httpOnly: true,
-      secure: crossSite || ctx.platform.production,
-      sameSite: crossSite ? "None" : "Lax",
-    },
+    value,
+    path: "/",
+    expires: EXPIRES,
+    httpOnly: true,
+    secure: ctx.platform.production,
+    sameSite: "Lax",
   };
 }
 
 // Reject the callback unless the echoed state matches the browser's cookie
-export function checkState(ctx: Context, received?: string): void {
-  const expected = ctx.cookies[NAME];
-  if (!expected || !received || expected !== received) {
+export async function readState(
+  ctx: Context,
+  received?: string,
+): Promise<Pending> {
+  const cookie = ctx.cookies[NAME];
+  if (!cookie || !received) throw ServerError.AUTH_INVALID_STATE();
+  const pending = (await verifyJwt(cookie, ctx.options.secrets)) as Pending;
+  if (!pending || pending.state !== received) {
     throw ServerError.AUTH_INVALID_STATE();
   }
+  return pending;
 }
 
-// One-time use: clear the cookie once the callback has consumed the state
-export function clearState(): string {
-  return createCookies(NAME, { value: null });
-}
+export { NAME as STATE_COOKIE };

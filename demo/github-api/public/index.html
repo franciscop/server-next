@@ -12,6 +12,14 @@
     <script type="module">
       const out = document.querySelector("#out");
 
+      // Coming back from the login: the token rides in the fragment, which
+      // browsers never send to a server. Take it and clean the URL.
+      const fragment = new URLSearchParams(location.hash.slice(1));
+      if (fragment.get("token")) {
+        localStorage.token = fragment.get("token");
+        history.replaceState(null, "", location.pathname);
+      }
+
       // Already signed in? The token is ours to keep and send.
       const token = localStorage.token;
       if (token) {
@@ -23,15 +31,10 @@
           : "Token rejected, sign in again.";
       }
 
-      // Ask the server where to send the visitor, with our own CSRF state
+      // Ask the server where to send the visitor; it mounts no redirect of
+      // its own under a client-held credential
       document.querySelector("#login").onclick = async () => {
-        const state = crypto.randomUUID();
-        sessionStorage.state = state;
-        const params = new URLSearchParams({
-          redirect_uri: `${location.origin}/callback`,
-          state,
-        });
-        const res = await fetch(`/auth/login/github?${params}`, {
+        const res = await fetch("/auth/login/github", {
           headers: { accept: "application/json" },
         });
         const { url } = await res.json();

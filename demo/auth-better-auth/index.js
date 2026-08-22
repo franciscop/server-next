@@ -1,6 +1,6 @@
 // NOT RUNNABLE YET. This is what using Better Auth would look like if `auth`
 // accepted a third-party system; the framework has no such mode today. It was
-// prototyped and reverted, see ideas/auth-docs.md.
+// prototyped and reverted, see docs/5. Authentication.md.
 //
 // import server from "../..";
 // import { betterAuth } from "better-auth";

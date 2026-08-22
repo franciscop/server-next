@@ -1,47 +1,45 @@
-import kv from "polystore";
+import { signJwt } from "../helpers/jwt";
 import server from "..";
 
-// A rotation must not log everyone out: move the live key into second place,
-// put a new one first, and the tokens already in the wild keep working.
-describe("rotating `secrets` with a live jwt login", () => {
-  const CREDENTIALS = { email: "abc@test.com", password: "11111111" };
+// A rotation must not sign everyone out: move the live key into second place,
+// put a new one first, and the credentials already in the wild keep working.
+describe("rotating `secrets` with a live login", () => {
   const OLD = "old-key";
   const NEW = "new-key";
+  const rows = new Map([["u1", { id: "u1", email: "a@b.c" }]]);
 
-  const users = kv(new Map());
   const app = (secrets: string | string[]) =>
     server({
       secrets,
-      auth: { strategy: "jwt", providers: ["email"], users },
-    }).get("/me", (ctx) => ctx.user || "No data");
+      auth: {
+        providers: "github",
+        onLogin: (profile) => profile.id,
+        getUser: (id: string) => rows.get(id),
+      },
+    }).get("/me", (ctx) => ctx.user ?? "anonymous");
 
-  const before = app(OLD);
-  const during = app([NEW, OLD]);
-  const after = app([NEW]);
+  const me = (instance: ReturnType<typeof app>, cookie: string) =>
+    instance.test().get("/me", { headers: { cookie: `session=${cookie}` } });
 
-  const me = (instance: ReturnType<typeof app>, token: string) =>
-    instance.test().get("/me", {
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-  it("accepts a token issued before the rotation", async () => {
-    const register = await before
-      .test()
-      .post("/auth/register/email", CREDENTIALS);
-    const { token } = await register.json();
-
-    expect((await me(before, token)).status).toBe(200);
-    expect((await me(during, token)).status).toBe(200);
-
-    // ...and stops once the old key is dropped, a full `expires` window later
-    expect((await me(after, token)).status).toBe(401);
+  beforeAll(() => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
   });
 
-  it("issues new tokens with the new key", async () => {
-    const login = await during.test().post("/auth/login/email", CREDENTIALS);
-    const { token } = await login.json();
+  it("accepts a credential issued before the rotation", async () => {
+    const before = await signJwt({ sub: "u1" }, OLD, 3600);
 
-    expect((await me(after, token)).status).toBe(200);
+    expect((await me(app(OLD), before)).status).toBe(200);
+    expect((await me(app([NEW, OLD]), before)).status).toBe(200);
+
+    // ...and stops once the old key is dropped, a full `expires` window later
+    expect((await me(app([NEW]), before)).status).toBe(401);
+  });
+
+  it("signs new credentials with the first key", async () => {
+    const after = await signJwt({ sub: "u1" }, NEW, 3600);
+    expect((await me(app([NEW, OLD]), after)).status).toBe(200);
+    expect((await me(app([OLD]), after)).status).toBe(401);
   });
 });
 

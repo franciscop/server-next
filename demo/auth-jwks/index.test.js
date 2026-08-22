@@ -1,90 +1,72 @@
-// This demo has its own dependency (jose) in its own node_modules, so the
-// tests only run after `npm install` here. A fresh checkout (CI) has not done
-// that, so skip rather than fail the whole suite.
-const jose = await import("jose").catch(() => null);
-const suite = jose ? describe : describe.skip;
+import server from "../..";
+import { signRS256, testIssuer } from "../../src/auth/tests/issuer.ts";
 
-suite("verifying hosted-auth JWTs", () => {
-  // A local "issuer": its own keys, its own discovery document and JWKS
-  // endpoint, served by another server() instance, so the whole hosted-auth
-  // flow runs with no vendor at all.
+// The whole hosted-auth path against a local issuer: its own RSA key pair, its
+// own discovery document and its own JWKS endpoint. No vendor, no network.
+describe("verifying hosted-auth JWTs", () => {
   const ISSUER = "http://localhost:3001";
   const AUDIENCE = "my-app";
-
-  let api;
-  let token;
+  let issuer;
 
   beforeAll(async () => {
-    const { SignJWT, exportJWK, generateKeyPair } = jose;
-    const { default: server } = await import("../..");
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
-    const jwk = { ...(await exportJWK(publicKey)), alg: "RS256", use: "sig" };
-
-    const issuer = server({ port: 3001 })
-      .get("/.well-known/openid-configuration", () => ({
-        issuer: ISSUER,
-        jwks_uri: `${ISSUER}/keys`, // deliberately not "jwks.json": nobody uses that
-      }))
-      .get("/keys", () => ({ keys: [jwk] }))
-      .test();
-
-    // The network fetches jose and the app make are answered by the issuer app
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = async (url, opts) => {
-      if (String(url).startsWith(ISSUER)) {
-        return issuer.get(new URL(url).pathname);
-      }
-      return realFetch(url, opts);
-    };
-
-    const { default: app } = await import("./index.js");
-    api = app.test();
-
-    token = ({ aud = AUDIENCE, iss = ISSUER, key = privateKey, ...claims }) =>
-      new SignJWT(claims)
-        .setProtectedHeader({ alg: "RS256" })
-        .setIssuedAt()
-        .setIssuer(iss)
-        .setAudience(aud)
-        .setExpirationTime("5m")
-        .sign(key);
+    issuer = await testIssuer(ISSUER);
   });
+  afterAll(() => issuer.restore());
 
-  const meWith = async (jwt) =>
-    api.get("/me", { headers: { authorization: `Bearer ${jwt}` } });
+  const app = server({ auth: { verify: ISSUER, audience: AUDIENCE } })
+    .get("/me", (ctx) => ctx.user ?? 401)
+    .get("/admin", (ctx) => {
+      if (!ctx.user) return 401;
+      if (ctx.user.app_metadata?.role !== "admin") return 403;
+      return "welcome";
+    });
+
+  const meWith = (jwt) =>
+    app.test().get("/me", { headers: { authorization: `Bearer ${jwt}` } });
+
+  const token = (claims) =>
+    signRS256(issuer.key, { iss: ISSUER, aud: AUDIENCE, ...claims });
 
   it("finds the keys through the discovery document", async () => {
-    const me = await meWith(await token({ sub: "u1", email: "ada@x.com" }));
-    expect(me.status).toBe(200);
-    expect((await me.json()).email).toBe("ada@x.com");
+    const res = await meWith(await token({ sub: "u1", email: "ada@x.com" }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).email).toBe("ada@x.com");
   });
 
   it("no token is anonymous", async () => {
-    expect((await api.get("/me")).status).toBe(401);
+    expect((await app.test().get("/me")).status).toBe(401);
   });
 
   it("rejects a token signed by someone else", async () => {
-    const { privateKey: mallory } = await jose.generateKeyPair("RS256");
-    const jwt = await token({ sub: "u1", email: "bad@x.com", key: mallory });
+    const mallory = await testIssuer("https://evil.test", false);
+    const jwt = await signRS256(mallory.key, {
+      iss: ISSUER,
+      aud: AUDIENCE,
+      sub: "u1",
+    });
     expect((await meWith(jwt)).status).toBe(401);
   });
 
   it("rejects a token minted for another app, same issuer", async () => {
     // The signature is valid: only the audience check catches this one
-    const jwt = await token({ sub: "u1", email: "bad@x.com", aud: "other-app" });
+    const jwt = await token({ sub: "u1", aud: "other-app" });
     expect((await meWith(jwt)).status).toBe(401);
   });
 
   it("rejects a token from another issuer", async () => {
-    const jwt = await token({
-      sub: "u1",
-      email: "bad@x.com",
-      iss: "https://evil.example",
-    });
+    const jwt = await token({ sub: "u1", iss: "https://evil.example" });
     expect((await meWith(jwt)).status).toBe(401);
   });
 
   it("rejects garbage without crashing", async () => {
     expect((await meWith("not.a.jwt")).status).toBe(401);
+  });
+
+  it("reads a role off the claims", async () => {
+    const jwt = await token({ sub: "u1", app_metadata: { role: "admin" } });
+    const res = await app
+      .test()
+      .get("/admin", { headers: { authorization: `Bearer ${jwt}` } });
+    expect(await res.text()).toBe("welcome");
   });
 });

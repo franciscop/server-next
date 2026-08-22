@@ -6,12 +6,10 @@
   "main": "index.js",
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "MIT",
-  "description": "Verify hosted-auth JWTs (Supabase, Auth0, Cognito, Keycloak...) against a JWKS endpoint",
+  "description": "Verify hosted-auth JWTs (Supabase, Auth0, Cognito, Keycloak...) with no dependency",
   "scripts": {
     "dev": "bun --hot .",
-    "start": "bun ."
-  },
-  "dependencies": {
-    "jose": "^6.2.9"
+    "start": "bun .",
+    "test": "bun test"
   }
 }
