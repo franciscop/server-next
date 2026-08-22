@@ -357,7 +357,7 @@ describe("client-owned flow (SPA)", () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
     try {
-      const api = server({ secret: "s3cret", auth: "jwt:google" }).test();
+      const api = server({ secrets: "s3cret", auth: "jwt:google" }).test();
       const res = await api.post("/auth/verify/google", { code: "abc" });
       expect(res.status).toBe(201);
       expect(res.headers.get("set-cookie")).toBeNull();

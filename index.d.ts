@@ -255,7 +255,7 @@ type OnError = (error: Error, ctx: Context) => Response | Promise<Response>;
 type OnResponse = (response: Response, ctx: Context) => Response | void | Promise<Response | void>;
 type Options = {
     port?: number;
-    secret?: string;
+    secrets?: string | string[];
     public?: string | Bucket;
     uploads?: string | Bucket | UploadOptions;
     cors?: CorsOptions;
@@ -275,7 +275,7 @@ type Options = {
 };
 type Settings = {
     port: number;
-    secret: string;
+    secrets: string[];
     public?: Bucket;
     uploads?: ({
         bucket: Bucket;

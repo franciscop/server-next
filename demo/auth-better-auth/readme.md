@@ -16,6 +16,5 @@ mount its handler and resolve `ctx.user` from its session, WebSocket
 handshakes included.
 
 The framework has **no such mode today**. It was prototyped end to end against
-the real library (it works, in about 50 lines) and then reverted, since the
-design is still open. See `ideas/auth.md` for the findings, the alternatives
-and what it would cost.
+the real library (it works, in about 50 lines) and then reverted while the
+design settled. See `ideas/auth-docs.md` for the shape it landed on.

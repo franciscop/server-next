@@ -111,7 +111,7 @@ describe("onLogin", () => {
     const seen: any[] = [];
     const users = kv(new Map());
     const api = server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
@@ -134,7 +134,7 @@ describe("onLogin", () => {
   it("owns the stored record", async () => {
     const users = kv(new Map());
     const api = server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
@@ -153,7 +153,7 @@ describe("onLogin", () => {
   it("denies by throwing, storing nothing", async () => {
     const users = kv(new Map());
     const api = server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
@@ -176,7 +176,7 @@ describe("onLogin", () => {
   it("rejects a non-object return instead of storing it", async () => {
     const users = kv(new Map());
     const api = server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",
@@ -196,7 +196,7 @@ describe("onLogin", () => {
 describe("onUser", () => {
   const app = (onUser?: any) =>
     server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: { strategy: "token", providers: "email", onUser },
     })
       .get("/me", (ctx) => ctx.user || 401)
@@ -245,7 +245,7 @@ describe("onLogout", () => {
   it("fires on POST /auth/logout with ctx.user still set", async () => {
     let logged: any;
     const api = server({
-      secret: "s3cret-s3cret",
+      secrets: "s3cret-s3cret",
       auth: {
         strategy: "token",
         providers: "email",

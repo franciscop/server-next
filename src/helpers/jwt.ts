@@ -51,10 +51,11 @@ export async function signJwt(
 }
 
 // Verify an HS256 JWT; returns the payload, or null when the format, algorithm,
-// signature, or expiry is invalid.
+// signature, or expiry is invalid. Several secrets are tried in order, so a
+// token signed with the previous key still verifies during a rotation.
 export async function verifyJwt(
   token: string,
-  secret: string,
+  secret: string | string[],
 ): Promise<Record<string, any> | null> {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -68,13 +69,17 @@ export async function verifyJwt(
   }
   if (header?.alg !== "HS256") return null; // reject `none` / alg confusion
 
-  const key = await hmacKey(secret);
-  const ok = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    unb64url(sig),
-    enc.encode(`${head}.${body}`),
-  );
+  let ok = false;
+  for (const candidate of Array.isArray(secret) ? secret : [secret]) {
+    const key = await hmacKey(candidate);
+    ok = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      unb64url(sig),
+      enc.encode(`${head}.${body}`),
+    );
+    if (ok) break;
+  }
   if (!ok) return null;
 
   let payload: any;

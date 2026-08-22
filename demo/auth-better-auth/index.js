@@ -1,6 +1,6 @@
 // NOT RUNNABLE YET. This is what using Better Auth would look like if `auth`
 // accepted a third-party system; the framework has no such mode today. It was
-// prototyped and reverted, see ideas/auth.md.
+// prototyped and reverted, see ideas/auth-docs.md.
 //
 // import server from "../..";
 // import { betterAuth } from "better-auth";
@@ -11,7 +11,7 @@
 //   database: memoryAdapter(db),
 //   emailAndPassword: { enabled: true },
 //   baseURL: "http://localhost:3000",
-//   secret: process.env.SECRET,
+//   secrets: process.env.SECRETS,
 // });
 //
 // export default server({ auth })

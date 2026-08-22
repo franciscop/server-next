@@ -1,7 +1,7 @@
 import parseAuthOptions from "../auth/parseAuthOptions";
 import Bucket from "./bucket";
-import createId from "./createId";
 import createLogger from "./logger";
+import { resolveSecrets } from "./secrets";
 import { resolveSecurity } from "./security";
 import toStore, { toStoreExpiring } from "./store";
 import { resolveUploads } from "./upload";
@@ -28,6 +28,20 @@ export default function config(options: Options = {}): Settings {
     }
   }
 
+  if (opts.secret !== undefined) {
+    throw new Error(
+      "The `secret` option is now `secrets`, and takes one key or several: " +
+        "`secrets: [current, previous]` signs with the first and verifies " +
+        "with any, so rotating a key no longer signs everyone out.",
+    );
+  }
+  if (env.SECRET && !env.SECRETS) {
+    throw new Error(
+      "The SECRET environment variable is now SECRETS, a comma-separated " +
+        "list. Rename it, or every token signed with the old key breaks.",
+    );
+  }
+
   // Logging: off by default (undefined); `info` (or the LOG_LEVEL env var) turns
   // on the startup + request logs.
   const raw = options.log ?? env.LOG_LEVEL;
@@ -38,7 +52,7 @@ export default function config(options: Options = {}): Settings {
   const settings: Settings = {
     // `env.PORT` is a string, so coerce it: `settings.port` is a number
     port: options.port || Number(env.PORT) || 3000,
-    secret: options.secret || env.SECRET || `unsafe-${createId()}`,
+    secrets: resolveSecrets(options.secrets),
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
@@ -147,18 +161,18 @@ export default function config(options: Options = {}): Settings {
     }
   }
 
-  // The `jwt` strategy signs tokens with `secret`. With no secret set, config
-  // generates a random `unsafe-` one per process, which would invalidate every
-  // token on restart and across instances, so warn loudly (always, not gated on
-  // the `log` level, since it silently breaks auth).
+  // The `jwt` strategy signs tokens with the first `secrets` entry. With none
+  // set, config generates a random `unsafe-` one per process, which would
+  // invalidate every token on restart and across instances, so warn loudly
+  // (always, not gated on the `log` level, since it silently breaks auth).
   if (
     settings.auth?.strategy.includes("jwt") &&
-    settings.secret.startsWith("unsafe-")
+    settings.secrets[0].startsWith("unsafe-")
   ) {
     console.warn(
-      "[server:auth] jwt strategy with no SECRET set: tokens are signed with a " +
+      "[server:auth] jwt strategy with no SECRETS set: tokens are signed with a " +
         "random per-process secret, so they break on restart and across " +
-        "instances. Set the SECRET environment variable (or the `secret` option).",
+        "instances. Set the SECRETS environment variable (or the `secrets` option).",
     );
   }
 

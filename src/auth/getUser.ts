@@ -13,7 +13,7 @@ async function getJwtUser(ctx: Context): Promise<AuthUser | undefined> {
   if (type?.toLowerCase() !== "bearer" || !token) {
     throw ServerError.AUTH_INVALID_HEADER({ type });
   }
-  const payload = await verifyJwt(token, ctx.options.secret);
+  const payload = await verifyJwt(token, ctx.options.secrets);
   if (!payload) throw ServerError.AUTH_INVALID_TOKEN();
 
   const { iat, exp, ...claims } = payload as Record<string, any>;

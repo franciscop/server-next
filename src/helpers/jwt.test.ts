@@ -49,3 +49,33 @@ describe("jwt (HS256)", () => {
     expect(await verifyJwt(forged, secret)).toBe(null);
   });
 });
+
+describe("rotating secrets", () => {
+  const current = "new-key";
+  const previous = "old-key";
+
+  it("verifies against any of the keys", async () => {
+    const token = await signJwt({ sub: "123" }, current);
+    expect(await verifyJwt(token, [current, previous])).toMatchObject({
+      sub: "123",
+    });
+    expect(await verifyJwt(token, previous)).toBe(null);
+  });
+
+  it("keeps tokens signed with the outgoing key valid", async () => {
+    const before = await signJwt({ sub: "123" }, previous);
+    expect(await verifyJwt(before, [current, previous])).toMatchObject({
+      sub: "123",
+    });
+  });
+
+  it("still rejects a token signed with an unrelated key", async () => {
+    const forged = await signJwt({ sub: "evil" }, "someone-elses-key");
+    expect(await verifyJwt(forged, [current, previous])).toBe(null);
+  });
+
+  it("drops the old key once it is removed", async () => {
+    const before = await signJwt({ sub: "123" }, previous);
+    expect(await verifyJwt(before, [current])).toBe(null);
+  });
+});

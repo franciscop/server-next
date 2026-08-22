@@ -8,7 +8,7 @@ export {};
 Object.assign(process.env, {
   GITHUB_ID: "test-id",
   GITHUB_SECRET: "test-secret",
-  SECRET: "test-secret-long",
+  SECRETS: "test-secret-long",
   DB_FILE: ":memory:",
 });
 Object.assign(globalThis.env ?? {}, process.env);
@@ -18,9 +18,9 @@ const { sessions, users } = await import("./db.ts");
 const api = app.test();
 
 // The server captured its settings at construction; don't leak the fake
-// SECRET into other test files sharing this process
-delete process.env.SECRET;
-delete globalThis.env.SECRET;
+// SECRETS into other test files sharing this process
+delete process.env.SECRETS;
+delete globalThis.env.SECRETS;
 
 // A signed-in browser is just a session record + its cookie
 const ADMIN = "REqA2l022l8Q0tuI";

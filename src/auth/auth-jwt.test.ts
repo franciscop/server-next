@@ -9,7 +9,7 @@ describe("jwt auth flow", () => {
   const userStore = kv(new Map());
   const users = () => userStore.keys();
   const app = server({
-    secret: "app-secret",
+    secrets: "app-secret",
     auth: { strategy: "jwt", providers: ["email"], users: userStore },
   }).get("/me", (ctx) => ctx.user || "No data");
   const api = app.test();
@@ -71,7 +71,7 @@ describe("jwt auth flow", () => {
 
       // A set secret -> no warning.
       warnings.length = 0;
-      server({ secret: "stable", auth: "jwt:email" });
+      server({ secrets: "stable", auth: "jwt:email" });
       expect(warnings.some((w) => w.includes("SECRET"))).toBe(false);
     } finally {
       console.warn = original;
@@ -96,7 +96,7 @@ describe("jwt auth flow", () => {
 
   it("onToken trims what the token carries", async () => {
     const app = server({
-      secret: "app-secret",
+      secrets: "app-secret",
       auth: {
         strategy: "jwt",
         providers: ["email"],
@@ -126,7 +126,7 @@ describe("jwt auth flow", () => {
 
   it("onUser extends ctx.user per request, without touching the token", async () => {
     const app = server({
-      secret: "app-secret",
+      secrets: "app-secret",
       auth: {
         strategy: "jwt",
         providers: ["email"],
@@ -166,7 +166,7 @@ describe("jwt auth flow", () => {
   });
 
   it("is cookie-free: nothing is stored or minted", async () => {
-    const app = server({ secret: "app-secret", auth: "jwt:email" })
+    const app = server({ secrets: "app-secret", auth: "jwt:email" })
       .get("/ok", () => "stateless")
       .test();
 

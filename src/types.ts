@@ -399,7 +399,8 @@ type OnResponse = (
 
 export type Options = {
   port?: number;
-  secret?: string;
+  // Signs tokens. Several rotate: the first signs, any of them verifies
+  secrets?: string | string[];
   public?: string | Bucket;
   uploads?: string | Bucket | UploadOptions;
   cors?: CorsOptions;
@@ -421,7 +422,8 @@ export type Options = {
 
 export type Settings = {
   port: number;
-  secret: string;
+  // Every key accepted when verifying; the first is the one that signs
+  secrets: string[];
   public?: Bucket;
   uploads?: ({ bucket: Bucket } & LimitOptions) | null;
   cors?: CorsSettings;

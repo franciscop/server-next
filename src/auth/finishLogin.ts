@@ -66,7 +66,12 @@ export default async function finishLogin(
       provider: input.provider,
     };
     assertUser(payload, "onToken");
-    const token = await signJwt(payload, ctx.options.secret, 7 * 24 * 60 * 60);
+    // The first key is the active one; the rest only verify
+    const token = await signJwt(
+      payload,
+      ctx.options.secrets[0],
+      7 * 24 * 60 * 60,
+    );
     // The body matches what ctx.user will be on the next request
     const exposed = await onUser(payload, ctx);
     assertUser(exposed, "onUser");

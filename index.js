@@ -1040,13 +1040,17 @@ async function verifyJwt(token, secret) {
     return null;
   }
   if (header?.alg !== "HS256") return null;
-  const key = await hmacKey(secret);
-  const ok = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    unb64url(sig),
-    enc.encode(`${head}.${body}`)
-  );
+  let ok = false;
+  for (const candidate of Array.isArray(secret) ? secret : [secret]) {
+    const key = await hmacKey(candidate);
+    ok = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      unb64url(sig),
+      enc.encode(`${head}.${body}`)
+    );
+    if (ok) break;
+  }
   if (!ok) return null;
   let payload;
   try {
@@ -1102,7 +1106,11 @@ async function finishLogin(ctx, input, opts = {}) {
       provider: input.provider
     };
     assertUser(payload, "onToken");
-    const token = await signJwt(payload, ctx.options.secret, 7 * 24 * 60 * 60);
+    const token = await signJwt(
+      payload,
+      ctx.options.secrets[0],
+      7 * 24 * 60 * 60
+    );
     const exposed = await onUser(payload, ctx);
     assertUser(exposed, "onUser");
     return status(201).json({ ...exposed, token });
@@ -1754,6 +1762,13 @@ function createLogger(level) {
   };
 }
 
+// src/helpers/secrets.ts
+function resolveSecrets(option) {
+  const given = option ?? globalThis.env.SECRETS?.split(",");
+  const list = (Array.isArray(given) ? given : [given]).map((one) => one?.trim()).filter(Boolean);
+  return list.length ? list : [`unsafe-${createId()}`];
+}
+
 // src/helpers/security.ts
 function resolveSecurity(security) {
   const off = security === false;
@@ -1827,13 +1842,23 @@ function config(options = {}) {
       );
     }
   }
+  if (opts.secret !== void 0) {
+    throw new Error(
+      "The `secret` option is now `secrets`, and takes one key or several: `secrets: [current, previous]` signs with the first and verifies with any, so rotating a key no longer signs everyone out."
+    );
+  }
+  if (env2.SECRET && !env2.SECRETS) {
+    throw new Error(
+      "The SECRET environment variable is now SECRETS, a comma-separated list. Rename it, or every token signed with the old key breaks."
+    );
+  }
   const raw = options.log ?? env2.LOG_LEVEL;
   const level = raw === true ? "info" : raw === false ? void 0 : raw;
   const log = createLogger(level);
   const settings = {
     // `env.PORT` is a string, so coerce it: `settings.port` is a number
     port: options.port || Number(env2.PORT) || 3e3,
-    secret: options.secret || env2.SECRET || `unsafe-${createId()}`,
+    secrets: resolveSecrets(options.secrets),
     log,
     // How request bodies are read: parsed into ctx.body by default; `raw` keeps
     // the Buffer, `stream` hands the handler the unread web ReadableStream.
@@ -1906,9 +1931,9 @@ function config(options = {}) {
       settings.auth.sessions = toStoreExpiring(/* @__PURE__ */ new Map(), "1w");
     }
   }
-  if (settings.auth?.strategy.includes("jwt") && settings.secret.startsWith("unsafe-")) {
+  if (settings.auth?.strategy.includes("jwt") && settings.secrets[0].startsWith("unsafe-")) {
     console.warn(
-      "[server:auth] jwt strategy with no SECRET set: tokens are signed with a random per-process secret, so they break on restart and across instances. Set the SECRET environment variable (or the `secret` option)."
+      "[server:auth] jwt strategy with no SECRETS set: tokens are signed with a random per-process secret, so they break on restart and across instances. Set the SECRETS environment variable (or the `secrets` option)."
     );
   }
   if (options.openapi) {
@@ -2373,7 +2398,7 @@ async function getJwtUser(ctx) {
   if (type2?.toLowerCase() !== "bearer" || !token) {
     throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   }
-  const payload = await verifyJwt(token, ctx.options.secret);
+  const payload = await verifyJwt(token, ctx.options.secrets);
   if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
   const { iat, exp, ...claims } = payload;
   if (!claims.id || !claims.email) throw ServerError_default.AUTH_INVALID_TOKEN();

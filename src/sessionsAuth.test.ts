@@ -54,14 +54,14 @@ describe("production boot guard", () => {
     await inProduction(() => {
       // No `sessions` needed: jwt stores no login record
       const app = server({
-        secret: "s3cret",
+        secrets: "s3cret",
         auth: { strategy: "jwt", providers: "email", users: new Map() },
       });
       expect(app).toBeDefined();
       // But `users` always is: every login does the existing-user upsert
       globalThis.env.GITHUB_ID = "id";
       globalThis.env.GITHUB_SECRET = "secret";
-      expect(() => server({ secret: "s3cret", auth: "jwt:github" })).toThrow(
+      expect(() => server({ secrets: "s3cret", auth: "jwt:github" })).toThrow(
         /users/,
       );
     });

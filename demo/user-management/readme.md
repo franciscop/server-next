@@ -13,7 +13,7 @@ Create a GitHub OAuth app with the callback URL set to
 ```bash
 echo "GITHUB_ID=your-client-id" >> .env
 echo "GITHUB_SECRET=your-client-secret" >> .env
-echo "SECRET=a-long-random-string" >> .env
+echo "SECRETS=a-long-random-string" >> .env
 echo "ADMIN_EMAIL=you@example.com" >> .env
 npm run dev   # bun with hot reloading; `npm start` for a plain run
 ```
