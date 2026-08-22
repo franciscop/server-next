@@ -12,7 +12,9 @@ import server from '@server/next';
 const auth = {
   providers: 'discord',
   strategy: 'jwt',
-  onLogin: (profile) => upsertUser(profile).id,
+  // Record whoever just signed in, and return the id the token will carry
+  onLogin: (profile) => db.users.upsert({ email: profile.email, name: profile.name }).id,
+  // Turn that id back into the person, once at login for a signed strategy
   getUser: (id) => db.users.find(id),
   toPublicUser: (user) => ({ id: user.id, name: user.name, role: user.role }),
   redirect: '/',
@@ -85,7 +87,7 @@ That is also what the platforms recommend (`ASWebAuthenticationSession` on iOS, 
 A signed token cannot be taken back. Nothing is stored, so there is nothing to delete, and it stays valid until it expires. Keep that window short if it matters:
 
 ```js
-const auth = { providers: 'discord', strategy: 'jwt', expires: '1h', /* ... */ };
+const auth = { ...auth, expires: '1h' };   // alongside the callbacks above
 ```
 
 If you need to end a session on demand, for a "sign out everywhere" button or after a security incident, use `session` or `token` instead, where the credential is an id you can delete. [Revocable sessions](/tutorials/j-revocable-sessions-in-postgres) covers that.
@@ -95,7 +97,7 @@ If you need to end a session on demand, for a "sign out everywhere" button or af
 Plenty of products are both: a server-rendered dashboard and a mobile client on the same database. Accept either credential, and the first named strategy is the one issued at login:
 
 ```js
-const auth = { providers: 'discord', strategy: ['session', 'jwt'], /* ... */ };
+const auth = { ...auth, strategy: ['session', 'jwt'] };
 ```
 
 [`ctx.auth.strategy`](/documentation/context#ctxauth) then tells a handler how the current request authenticated, which is useful when a route should exist for the dashboard but not the public API.

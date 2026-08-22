@@ -88,7 +88,9 @@ The limit of claims shows up as soon as you own data. A token tells you Supabase
 const auth = {
   issuer: process.env.SUPABASE_ISSUER,
   audience: 'authenticated',
-  getUser: (id) => db.users.bySupabaseId(id),
+  // `id` is the `sub` claim: Supabase's id for that person
+  getUser: (id) =>
+    db.query('SELECT * FROM users WHERE supabase_id = ?').get(id),
 };
 
 export default server({ auth })

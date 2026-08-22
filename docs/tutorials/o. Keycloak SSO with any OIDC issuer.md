@@ -13,7 +13,9 @@ const auth = {
   providers: {
     work: 'https://sso.company.com/realms/employees',
   },
-  onLogin: (profile) => upsertUser(profile).id,
+  // Record whoever signed in, and return the id the cookie will carry
+  onLogin: (profile) => db.users.upsert({ email: profile.email, name: profile.name }).id,
+  // Turn that id back into the person, on every request
   getUser: (id) => db.users.find(id),
 };
 
@@ -56,9 +58,12 @@ An OIDC token carries a standard set of claims (`sub`, `email`, `name`, `picture
 ```js
   onLogin: (profile) => {
     const groups = profile.raw.groups ?? [];
-    const id = upsertUser(profile).id;
-    db.users.update(id, { role: groups.includes('admins') ? 'admin' : 'member' });
-    return id;
+    const user = db.users.upsert({
+      email: profile.email,
+      name: profile.name,
+      role: groups.includes('admins') ? 'admin' : 'member',
+    });
+    return user.id;
   },
 ```
 
