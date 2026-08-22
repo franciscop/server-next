@@ -33,20 +33,15 @@ When you want your own user records, add two callbacks. `onLogin` stores whoever
 
 ```js
 import server from '@server/next';
-import { sql } from './db.js';
+import { db } from './db.js';
 
 export default server({
   auth: {
     providers: 'github',
-    onLogin: async (profile) => {
-      const [user] = await sql`
-        insert into users (email, name, avatar, github_id)
-        values (${profile.email}, ${profile.name}, ${profile.avatar}, ${profile.id})
-        on conflict (email) do update set name = excluded.name
-        returning id`;
-      return user.id;
-    },
-    getUser: async (id) => (await sql`select * from users where id = ${id}`)[0],
+    // Find or create the person, and return the id the cookie will carry
+    onLogin: (profile) => db.users.upsertByEmail(profile).id,
+    // Turn that id back into the person, on every request
+    getUser: (id) => db.users.find(id),
   },
 });
 ```

@@ -89,8 +89,7 @@ const auth = {
   issuer: process.env.SUPABASE_ISSUER,
   audience: 'authenticated',
   // `id` is the `sub` claim: Supabase's id for that person
-  getUser: (id) =>
-    db.query('SELECT * FROM users WHERE supabase_id = ?').get(id),
+  getUser: (id) => db.users.bySupabaseId(id),
 };
 
 export default server({ auth })

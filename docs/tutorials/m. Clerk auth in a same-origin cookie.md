@@ -58,7 +58,7 @@ const auth = {
   audienceClaim: 'azp',
   cookie: '__session',
   // `id` is the `sub` claim: Clerk's id for that person
-  getUser: (id) => db.query('SELECT * FROM users WHERE clerk_id = ?').get(id),
+  getUser: (id) => db.users.byClerkId(id),
 };
 ```
 

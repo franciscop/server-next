@@ -6,50 +6,32 @@ That is fine for a personal tool and unacceptable for anything with an account s
 
 ## 1. A row per login
 
-```sql
-CREATE TABLE sessions (
-  id UUID PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  user_agent TEXT,
-  ip TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
+Add a `sessions` table alongside your users: an id, the `user_id` it belongs to, and whatever you want to show people about it, typically the user agent, the IP and when it was created.
 
 `user_agent` and `ip` are not required, but they are what turns this into a feature people can use: without them an account settings page can only offer "you have 3 sessions", which nobody can act on.
 
-`ON DELETE CASCADE` means deleting a user takes their logins with them, so a deleted account cannot leave a working credential behind.
+Point the foreign key at your users with `ON DELETE CASCADE`, so deleting someone takes their logins with them and a deleted account cannot leave a working credential behind.
 
 ## 2. Point the credential at it
 
 ```js
-import postgres from 'postgres';
-const sql = postgres(process.env.DATABASE_URL);
-
 const auth = {
   providers: 'github',
 
   onLogin: async (profile, ctx) => {
-    const [user] = await sql`
-      insert into users (email, name, avatar)
-      values (${profile.email}, ${profile.name}, ${profile.avatar})
-      on conflict (email) do update set name = excluded.name
-      returning id`;
-
-    const [session] = await sql`
-      insert into sessions (id, user_id, user_agent, ip)
-      values (${crypto.randomUUID()}, ${user.id}, ${ctx.headers['user-agent'] ?? ''}, ${ctx.ip})
-      returning id`;
-
-    return session.id;
+    const user = await db.users.upsertByEmail(profile);
+    const session = await db.sessions.create({
+      userId: user.id,
+      userAgent: ctx.headers['user-agent'],
+      ip: ctx.ip,
+    });
+    return session.id;                  // the cookie points at the login
   },
 
-  getUser: async (id) => (await sql`
-    select users.* from sessions
-    join users on users.id = sessions.user_id
-    where sessions.id = ${id}`)[0],
+  // One query: the session row, joined to the person it belongs to
+  getUser: (id) => db.sessions.findUser(id),
 
-  onLogout: (id) => sql`delete from sessions where id = ${id}`,
+  onLogout: (id) => db.sessions.delete(id),
 };
 ```
 
@@ -66,23 +48,20 @@ The cost is one join per request. That is the price of being able to revoke, and
 The session id is what `getUser` receives, so listing someone's logins is an ordinary query:
 
 ```js
-  .get('/account/sessions', async (ctx) => {
+  .get('/account/sessions', (ctx) => {
     if (!ctx.user) return 401;
-    return sql`
-      select id, user_agent, ip, created_at from sessions
-      where user_id = ${ctx.user.id} order by created_at desc`;
+    return db.sessions.forUser(ctx.user.id);
   })
 
   .del('/account/sessions/:id', async (ctx) => {
     if (!ctx.user) return 401;
-    await sql`
-      delete from sessions
-      where id = ${ctx.url.params.id} and user_id = ${ctx.user.id}`;
+    // Scoped by user, so an id that is not theirs matches nothing
+    await db.sessions.deleteOwned(ctx.url.params.id, ctx.user.id);
     return 204;
   })
 ```
 
-The `and user_id = ...` in that delete is doing real work. Without it, anyone signed in could pass someone else's session id and sign them out. Scoping the query to the current user means an id that is not theirs matches nothing, and they cannot tell whether it existed.
+That the delete is scoped by user is doing real work. Without it, anyone signed in could pass someone else's session id and sign them out. Matching on both means an id that is not theirs affects nothing, and they cannot tell whether it existed.
 
 To mark which row is the current device, compare against [`ctx.auth.issuedAt`](/documentation/context#ctxauth), which is when this particular credential was minted.
 
@@ -91,7 +70,7 @@ To mark which row is the current device, compare against [`ctx.auth.issuedAt`](/
 ```js
   .post('/account/sign-out-everywhere', async (ctx) => {
     if (!ctx.user) return 401;
-    await sql`delete from sessions where user_id = ${ctx.user.id}`;
+    await db.sessions.deleteForUser(ctx.user.id);
     return 204;
   })
 ```
@@ -102,11 +81,7 @@ Worth wiring into a password change, an email change, or a "I think someone has 
 
 Rows outlive the cookies pointing at them, so the table grows forever unless you prune it:
 
-```sql
-DELETE FROM sessions WHERE created_at < now() - interval '30 days';
-```
-
-Run it on a schedule. The credential itself expires after [`expires`](/documentation/authentication#expires), 30 days by default, so anything older than that window can never be presented again and is pure dead weight. Keep the two numbers in step, or you will either delete live sessions or keep useless ones.
+Delete anything older than the credential's own lifetime, on a schedule. The credential itself expires after [`expires`](/documentation/authentication#expires), 30 days by default, so anything older than that window can never be presented again and is pure dead weight. Keep the two numbers in step, or you will either delete live sessions or keep useless ones.
 
 ## Next steps
 

@@ -79,13 +79,13 @@ const auth = {
   issuer: `https://securetoken.google.com/${PROJECT}`,
   audience: PROJECT,
   // `id` is the `sub` claim: the Firebase uid
-  getUser: (id) => db.query('SELECT * FROM users WHERE firebase_uid = ?').get(id),
+  getUser: (id) => db.users.byFirebaseUid(id),
 };
 ```
 
 The written-out form is here because `getUser` has no place in the `'jwt:firebase'` string. Everything else it sets is the same.
 
-Key your table on the **uid**, not the email. The uid is stable for the life of the account, while the email can change, be absent entirely (phone sign-in) or be reused by a different person after a deletion. That query returning `undefined` is how you find out someone signed in for the first time, which is a reasonable place to create the row.
+Key your table on the **uid**, not the email. The uid is stable for the life of the account, while the email can change, be absent entirely (phone sign-in) or be reused by a different person after a deletion. That lookup returning `undefined` is how you find out someone signed in for the first time, which is a reasonable place to create the row.
 
 ## 5. Anonymous users
 

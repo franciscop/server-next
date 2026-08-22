@@ -5,43 +5,19 @@ Offering one provider is a decision you make for your users; offering two is a d
 ## 1. Name them
 
 ```js
-// db.js
-import { Database } from 'bun:sqlite';
-
-export const db = new Database('./data.db');
-
-db.run(`CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT,
-  avatar TEXT
-)`);
-```
-
-```js
-// index.js
 import server from '@server/next';
-import { db } from './db.js';
 
 const auth = {
   providers: ['github', 'google'],
-
-  onLogin: (profile) => {
-    db.run(
-      `INSERT INTO users (id, email, name, avatar) VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT(email) DO UPDATE SET name = ?3, avatar = ?4`,
-      [crypto.randomUUID(), profile.email, profile.name, profile.avatar],
-    );
-    return db.query('SELECT id FROM users WHERE email = ?').get(profile.email).id;
-  },
-
-  getUser: (id) => db.query('SELECT * FROM users WHERE id = ?').get(id),
+  // Find or create the person by email, and return the id for the cookie
+  onLogin: (profile) => db.users.upsertByEmail(profile).id,
+  getUser: (id) => db.users.find(id),
 };
 
 export default server({ auth });
 ```
 
-`onLogin` runs once when someone finishes signing in and returns the id the cookie will carry; `getUser` turns it back into the person on every request. [Google login persisted in SQLite](/tutorials/h-google-login-persisted-in-sqlite) covers that pair on its own.
+This assumes a `users` table of your own with a unique email, which is what makes the merging in step 2 work. [Google login persisted in SQLite](/tutorials/h-google-login-persisted-in-sqlite) covers the two callbacks on their own.
 
 ```sh
 SECRETS=a-long-random-string
@@ -64,7 +40,7 @@ Register each one's callback URL with that provider: `https://your-host/auth/cal
 
 The profile arriving at `onLogin` is normalised, so the one function above handles both providers. Which one it came from is in `profile.provider`, but every field is in the same place either way, which is why there is no branch in it.
 
-Because the upsert keys on **email**, signing in with GitHub today and Google tomorrow finds the same row, returns the same id, and puts the same id in the cookie. From your app's point of view nothing happened: same person, same account, same data.
+Because the lookup keys on **email**, signing in with GitHub today and Google tomorrow finds the same row, returns the same id, and puts the same id in the cookie. From your app's point of view nothing happened: same person, same account, same data.
 
 That is usually what people expect, and its absence is a common source of support tickets ("my projects are gone") from someone who clicked a different button than last time.
 
@@ -72,20 +48,17 @@ That is usually what people expect, and its absence is a common source of suppor
 
 Merging silently is fine until someone asks which accounts are connected, or you want to offer "disconnect Google". For that, store the provider's own id as you go:
 
-```js
-// db.js, alongside the CREATE TABLE
-db.run(`ALTER TABLE users ADD COLUMN github_id TEXT`);
-db.run(`ALTER TABLE users ADD COLUMN google_id TEXT`);
-```
+Add a `github_id` and `google_id` column, then fill whichever one this login came through:
 
 ```js
-// index.js, at the end of onLogin
-    const { id } = db.query('SELECT id FROM users WHERE email = ?').get(profile.email);
-    db.run(`UPDATE users SET ${profile.provider}_id = ? WHERE id = ?`, [profile.id, id]);
-    return id;
+  onLogin: (profile) => {
+    const user = db.users.upsertByEmail(profile);
+    db.users.update(user.id, { [`${profile.provider}_id`]: profile.id });
+    return user.id;
+  },
 ```
 
-Interpolating `profile.provider` into SQL is safe here only because your provider list is a fixed literal in the config: it is `'github'` or `'google'` and can never be anything else. It is not user input. A column name cannot be a bound parameter, which is why it is written this way, so keep that list closed and never build it from a request.
+Building a column name from `profile.provider` is safe here only because your provider list is a fixed literal in the config: it is `'github'` or `'google'` and can never be anything else. It never comes from the request. Keep that list closed, and if your storage layer interpolates the key into SQL, remember a column name cannot be a bound parameter.
 
 ## 4. Which one is this request
 

@@ -6,28 +6,7 @@ The moment you add a table, two questions appear. Where does the login write to 
 
 This uses SQLite through Bun because it needs no server to run, but the shape is identical for Postgres or MySQL.
 
-## 1. The table
-
-```js
-// db.js
-import { Database } from 'bun:sqlite';
-
-export const db = new Database('./data.db');
-
-db.run(`CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT,
-  avatar TEXT,
-  role TEXT NOT NULL DEFAULT 'member'
-)`);
-```
-
-Nothing here is prescribed by the framework. There is no schema to inherit, no migration to run and no column that has to be named a certain way, because auth never touches this table itself: it only calls your two functions.
-
-The `UNIQUE` on `email` is what the upsert below relies on, and `role` is the reason this tutorial exists.
-
-## 2. The two callbacks
+## 1. The two callbacks
 
 ```js
 import server from '@server/next';
@@ -37,21 +16,23 @@ const auth = {
   providers: 'google',
 
   onLogin: (profile) => {
-    db.run(
-      `INSERT INTO users (id, email, name, avatar)
-       VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT(email) DO UPDATE SET name = ?3, avatar = ?4`,
-      [crypto.randomUUID(), profile.email, profile.name, profile.avatar],
-    );
-    return db.query('SELECT id FROM users WHERE email = ?').get(profile.email).id;
+    const user = db.users.upsertByEmail({
+      id: crypto.randomUUID(),
+      email: profile.email,
+      name: profile.name,
+      avatar: profile.avatar,
+    });
+    return user.id;
   },
 
-  getUser: (id) => db.query('SELECT * FROM users WHERE id = ?').get(id),
+  getUser: (id) => db.users.find(id),
 };
 
 export default server({ auth })
   .get('/me', (ctx) => ctx.user ?? 401);
 ```
+
+This assumes a `users` table of your own with a unique `email` and a `role` column, and the two functions above it. Neither is prescribed by the framework: there is no schema to inherit and no column that has to be named a certain way, because auth never touches your database itself.
 
 ```sh
 SECRETS=a-long-random-string
@@ -67,19 +48,19 @@ Between them, the cookie holds nothing but a signed id. That is what makes the r
 
 Returning `undefined` from `getUser` is how you say "this credential is no longer good". Delete a row and that person is signed out everywhere at once, with no session store to clear.
 
-## 3. Two details in that upsert
+## 2. Two details in that upsert
 
 **It matches on `email`, not on Google's id.** Someone who later signs in through a different provider with the same address lands on the same account rather than getting a second, empty one. The cost is that you are trusting Google to have verified the address, which it does.
 
-**`ON CONFLICT` deliberately leaves `role` alone.** It updates the name and avatar, which Google owns and may have changed, and never touches the column you own. Miss that and promoting someone to admin lasts exactly until their next sign-in, which is a maddening bug to reproduce.
+**It must leave `role` alone.** Update the name and avatar, which Google owns and may have changed, and never touch the columns you own. Miss that and promoting someone to admin lasts exactly until their next sign-in, which is a maddening bug to reproduce. In SQL that is an `ON CONFLICT (email) DO UPDATE` listing only the provider's fields.
 
-## 4. Use the column
+## 3. Use the column
 
 ```js
   .get('/admin', (ctx) => {
     if (!ctx.user) return 401;
     if (ctx.user.role !== 'admin') return 403;
-    return db.query('SELECT id, email, role FROM users').all();
+    return db.users.all();
   })
 ```
 
@@ -87,7 +68,7 @@ Two checks, because they mean different things: `401` says "I do not know who yo
 
 Auth deliberately does none of this for you. It resolves who someone is and stops there, because whether a given route needs a role, a plan or a paid subscription is your product's business.
 
-## 5. Refuse a login
+## 4. Refuse a login
 
 Some people should not get an account at all. Throwing from `onLogin` stops the login before any row is written, and the message reaches your error page:
 
