@@ -39,7 +39,9 @@ describe("streaming response errors (Node adapter)", () => {
       expect(rejections).toEqual([]);
       expect(text).not.toBe("response hung");
     } finally {
-      process.off("unhandledRejection", onRej);
+      // Through EventEmitter: bun-types adds a `process.off("memoryPressure")`
+      // overload, and @types/node types no `off` on Process to compete with it
+      (process as NodeJS.EventEmitter).off("unhandledRejection", onRej);
       httpServer.close();
     }
   });

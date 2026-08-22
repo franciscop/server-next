@@ -12,7 +12,6 @@
     "start": "bun ."
   },
   "dependencies": {
-    "fancy-ui": "file:./fancy-ui",
     "llmrender": "^1.0.8",
     "react": "file:../.."
   }
