@@ -13,7 +13,7 @@ describe("verifying hosted-auth JWTs", () => {
   });
   afterAll(() => issuer.restore());
 
-  const app = server({ auth: { verify: ISSUER, audience: AUDIENCE } })
+  const app = server({ auth: { issuer: ISSUER, audience: AUDIENCE } })
     .get("/me", (ctx) => ctx.user ?? 401)
     .get("/admin", (ctx) => {
       if (!ctx.user) return 401;

@@ -5,7 +5,7 @@ Google and every other issuer of standard JWTs: point at the issuer, say who
 the token should be for, and the claims land on `ctx.user`.
 
 ```js
-server({ auth: { verify: ISSUER, audience: AUDIENCE } });
+server({ auth: { issuer: ISSUER, audience: AUDIENCE } });
 ```
 
 No SDK, no dependency. The issuer's discovery document gives the key set, which

@@ -1572,11 +1572,11 @@ var bearer2 = (ctx) => {
   return token;
 };
 function entry2(options) {
-  const { verify: issuer, audience } = options;
+  const { issuer, audience } = options;
   const claimNames = options.audienceClaim ? Array.isArray(options.audienceClaim) ? options.audienceClaim : [options.audienceClaim] : ["aud"];
   if (!audience) {
     throw new Error(
-      "`verify` needs an `audience`: one issuer serves many applications, and without it a token minted for another one is accepted here."
+      "`issuer` needs an `audience`: one issuer serves many applications, and without it a token minted for another one is accepted here."
     );
   }
   const allowed = Array.isArray(audience) ? audience : [audience];
@@ -1697,7 +1697,7 @@ function vendorEntry(strategy, name) {
     );
   }
   return entry2({
-    verify: issuer,
+    issuer,
     audience,
     ...vendor.claim ? { audienceClaim: vendor.claim } : {},
     ...strategy === "cookie" ? { cookie: vendor.cookie } : {}
@@ -1718,7 +1718,7 @@ function toEntry(auth2) {
     return [{ name: "function", user: async (ctx) => auth2(ctx) }];
   }
   if (auth2 && typeof auth2 === "object") {
-    if ("verify" in auth2) return [entry2(auth2)];
+    if ("issuer" in auth2) return [entry2(auth2)];
     if ("providers" in auth2) return [entry(auth2)];
     if ("handler" in auth2) {
       const instance = auth2;
@@ -1750,7 +1750,7 @@ function toEntry(auth2) {
     }
   }
   throw new Error(
-    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ verify, audience }`, a library instance, or an array of those."
+    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ issuer, audience }`, a library instance, or an array of those."
   );
 }
 

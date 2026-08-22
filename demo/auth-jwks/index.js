@@ -16,7 +16,7 @@ const AUDIENCE = process.env.AUDIENCE || "my-app";
 // applications, all signed with the same keys, so a token minted for a
 // different app carries a valid signature and the same issuer. The audience is
 // the only claim that separates them.
-const auth = { verify: ISSUER, audience: AUDIENCE };
+const auth = { issuer: ISSUER, audience: AUDIENCE };
 
 export default server({ auth })
   // No token is anonymous; a broken one is a 401 before this runs

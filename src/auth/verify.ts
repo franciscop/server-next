@@ -66,7 +66,7 @@ const bearer = (ctx: Context): string | undefined => {
 };
 
 export function entry(options: AuthVerify): AuthEntry {
-  const { verify: issuer, audience } = options;
+  const { issuer, audience } = options;
   // Standard is `aud`, but Clerk puts the authorized party in `azp` and
   // Cognito access tokens use `client_id`. The first one present is checked.
   const claimNames = options.audienceClaim
@@ -76,7 +76,7 @@ export function entry(options: AuthVerify): AuthEntry {
     : ["aud"];
   if (!audience) {
     throw new Error(
-      "`verify` needs an `audience`: one issuer serves many applications, " +
+      "`issuer` needs an `audience`: one issuer serves many applications, " +
         "and without it a token minted for another one is accepted here.",
     );
   }

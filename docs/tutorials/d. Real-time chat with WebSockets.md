@@ -1,4 +1,4 @@
-# Real-time chat
+# Real-time chat with WebSockets
 
 Build a tiny chat: every message a client sends is broadcast to everyone connected. Native WebSockets, no socket library on either end, the same on Node and Bun.
 

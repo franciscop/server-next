@@ -1,4 +1,4 @@
-# API keys
+# Protect an API with API keys
 
 Protect a machine-to-machine API with a shared secret key. No auth config needed, a three-line middleware does it.
 

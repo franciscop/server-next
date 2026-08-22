@@ -14,7 +14,7 @@ describe("checking a token minted elsewhere", () => {
   afterAll(() => issuer.restore());
 
   const app = () =>
-    server({ auth: { verify: ISSUER, audience: AUDIENCE } }).get(
+    server({ auth: { issuer: ISSUER, audience: AUDIENCE } }).get(
       "/me",
       (ctx) => ctx.user ?? "anonymous",
     );
@@ -84,7 +84,7 @@ describe("checking a token minted elsewhere", () => {
     const rows = new Map([["u1", { id: "u1", role: "admin" }]]);
     const mapped = server({
       auth: {
-        verify: ISSUER,
+        issuer: ISSUER,
         audience: AUDIENCE,
         getUser: (id: string) => rows.get(id),
       },
@@ -102,7 +102,7 @@ describe("checking a token minted elsewhere", () => {
   });
 
   it("requires an audience, since one issuer serves many apps", () => {
-    expect(() => server({ auth: { verify: ISSUER } as any })).toThrow(/audience/);
+    expect(() => server({ auth: { issuer: ISSUER } as any })).toThrow(/audience/);
   });
 });
 
@@ -119,7 +119,7 @@ describe("a vendor token in a cookie", () => {
 
   const app = () =>
     server({
-      auth: { verify: ISSUER, audience: "my-api", cookie: "__session" },
+      auth: { issuer: ISSUER, audience: "my-api", cookie: "__session" },
     }).get("/me", (ctx) => ctx.user ?? "anonymous");
 
   it("reads the named cookie", async () => {
@@ -168,7 +168,7 @@ describe("the audience claim", () => {
 
   const app = (audienceClaim?: string | string[]) =>
     server({
-      auth: { verify: ISSUER, audience: "my-app", audienceClaim },
+      auth: { issuer: ISSUER, audience: "my-app", audienceClaim },
     }).get("/me", (ctx) => ctx.user ?? "anonymous");
 
   const call = (app: any, token: string) =>

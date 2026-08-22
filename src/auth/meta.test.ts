@@ -82,7 +82,7 @@ describe("ctx.auth for a token minted elsewhere", () => {
 
   it("reads the claims, and names the issuer as the provider", async () => {
     const app = server({
-      auth: { verify: ISSUER, audience: "my-api" },
+      auth: { issuer: ISSUER, audience: "my-api" },
     }).get("/auth", (ctx) => ctx.auth ?? "none");
 
     const token = await signRS256(issuer.key, {

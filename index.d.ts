@@ -212,7 +212,7 @@ type AuthConfig<U = AuthProfile> = {
     onLogout?: (id: string, ctx: Context) => Awaitable<void>;
 };
 type AuthVerify<U = AuthClaims> = {
-    verify: string;
+    issuer: string;
     audience: string | readonly string[];
     cookie?: string;
     audienceClaim?: string | readonly string[];
@@ -228,7 +228,7 @@ type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | Au
 type UserOf<A> = A extends readonly (infer M)[] ? UserOf<M> : A extends (...args: any[]) => infer R ? NonNullable<Awaited<R>> : A extends {
     getUser: (...args: any[]) => infer R;
 } ? NonNullable<Awaited<R>> : A extends {
-    verify: any;
+    issuer: any;
 } ? AuthClaims : A extends {
     providers: any;
 } ? AuthProfile : A extends string ? AuthProfile : never;

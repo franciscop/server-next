@@ -1,4 +1,4 @@
-# File uploads
+# Upload files to disk or S3
 
 Build an avatar endpoint: accept an image, validate its size and type, store it, and serve it back.
 

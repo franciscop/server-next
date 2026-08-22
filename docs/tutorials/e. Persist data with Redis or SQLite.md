@@ -1,6 +1,6 @@
-# Persisting data
+# Persist data with Redis or SQLite
 
-The [REST API tutorial](/tutorials/1-build-a-rest-api) kept notes in a `Map`, so they vanish on restart. Swap it for a store built with [polystore](https://polystore.dev/) and the same code persists to Redis, the filesystem, DynamoDB, and more.
+The [REST API tutorial](/tutorials/a-build-a-rest-api-with-javascript) kept notes in a `Map`, so they vanish on restart. Swap it for a store built with [polystore](https://polystore.dev/) and the same code persists to Redis, the filesystem, DynamoDB, and more.
 
 ## 1. From Map to store
 

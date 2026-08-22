@@ -1,4 +1,4 @@
-# Sign in with GitHub
+# Sign in with GitHub using OAuth
 
 Add "Sign in with GitHub" to an app: log users in, protect a route, and let them log out. The same steps work for any OAuth provider.
 
@@ -80,5 +80,5 @@ export default server({ auth: 'cookie:github' })
 
 ## Next steps
 
-- Swap the in-memory `Map` for a persistent [store](/tutorials/5-persisting-data).
+- Swap the in-memory `Map` for a persistent [store](/tutorials/e-persist-data-with-redis-or-sqlite).
 - Add more providers with the object form: `auth: { providers: ['github', 'google'] }`. See [Authentication](/documentation/authentication).

@@ -50,7 +50,7 @@ server({ auth: "cookie:github" }).get("/me", (ctx) => {
 });
 
 // 3. Checking a token minted elsewhere: claims by default...
-server({ auth: { verify: "https://x.supabase.co/auth/v1", audience: "authenticated" } })
+server({ auth: { issuer: "https://x.supabase.co/auth/v1", audience: "authenticated" } })
   .get("/me", (ctx) => {
     const sub: string | undefined = ctx.user?.sub;
     return { sub };
@@ -59,7 +59,7 @@ server({ auth: { verify: "https://x.supabase.co/auth/v1", audience: "authenticat
 // ...or your own row, when `getUser` maps it
 server({
   auth: {
-    verify: "https://x.supabase.co/auth/v1",
+    issuer: "https://x.supabase.co/auth/v1",
     audience: "authenticated",
     getUser: (id) => db.users.find(id),
   },

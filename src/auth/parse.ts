@@ -51,7 +51,7 @@ function vendorEntry(strategy: string, name: string): AuthEntry {
   }
 
   return verifyEntry({
-    verify: issuer,
+    issuer,
     audience,
     ...(vendor.claim ? { audienceClaim: vendor.claim } : {}),
     ...(strategy === "cookie" ? { cookie: vendor.cookie } : {}),
@@ -78,7 +78,7 @@ function toEntry(auth: AuthOption): AuthEntry[] {
   }
 
   if (auth && typeof auth === "object") {
-    if ("verify" in auth) return [verifyEntry(auth as any)];
+    if ("issuer" in auth) return [verifyEntry(auth as any)];
     if ("providers" in auth) return [flowEntry(auth as any)];
     // A library that runs its own handshake and serves its own routes
     if ("handler" in auth) {
@@ -116,6 +116,6 @@ function toEntry(auth: AuthOption): AuthEntry[] {
 
   throw new Error(
     "Invalid `auth`: it takes a string, a function, `{ providers }`, " +
-      "`{ verify, audience }`, a library instance, or an array of those.",
+      "`{ issuer, audience }`, a library instance, or an array of those.",
   );
 }

@@ -296,7 +296,9 @@ export type AuthConfig<U = AuthProfile> = {
 // A credential minted elsewhere: no routes, no client secret, no flow.
 // `audience` is required, since one issuer serves many applications
 export type AuthVerify<U = AuthClaims> = {
-  verify: string;
+  // The OIDC issuer whose tokens this accepts, the same URL a provider would
+  // take. Its keys are discovered from it and cached.
+  issuer: string;
   audience: string | readonly string[];
   // Where the token rides. Defaults to `Authorization: Bearer`; name a cookie
   // when their SDK stores it there for a same-origin app
@@ -336,7 +338,7 @@ export type UserOf<A> = A extends readonly (infer M)[]
     ? NonNullable<Awaited<R>>
     : A extends { getUser: (...args: any[]) => infer R }
       ? NonNullable<Awaited<R>>
-      : A extends { verify: any }
+      : A extends { issuer: any }
         ? AuthClaims
         : A extends { providers: any }
           ? AuthProfile

@@ -1,4 +1,4 @@
-# Build a REST API
+# Build a REST API with JavaScript
 
 We'll build a small notes API from scratch: list, create, read, update and delete notes. Everything here runs the same on Node and Bun.
 
