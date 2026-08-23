@@ -1,3 +1,4 @@
+import { signJwt } from "../helpers/jwt";
 import server from "..";
 
 // The full round trip against a stubbed GitHub: login, callback, and what the
@@ -204,5 +205,55 @@ describe("what the visitor sees when a login fails", () => {
       encodeURIComponent("Could not sign you in"),
     );
     expect(res.headers.get("set-cookie") ?? "").not.toContain("session=ey");
+  });
+});
+
+// A credential the server can no longer verify (a rotated secret, an upgrade,
+// another app's cookie on the same host) should not follow someone around.
+describe("a stale cookie clears itself", () => {
+  const auth = {
+    providers: "github",
+    onLogin: (p: any) => p.id,
+    getUser: (id: string) => ({ id }),
+  };
+  beforeAll(() => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+  });
+
+  it("is anonymous, and clears the cookie so a refresh is clean", async () => {
+    const api = server({ secrets: "s", auth })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+
+    const res = await api.get("/", {
+      headers: { cookie: "session=left-over-from-before-the-upgrade" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("anonymous");
+
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("session=");
+    expect(setCookie.toLowerCase()).toContain("max-age=0");
+  });
+
+  it("leaves a valid cookie alone", async () => {
+    const token = await signJwt({ sub: "u1" }, "s", 3600);
+    const api = server({ secrets: "s", auth })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+
+    const res = await api.get("/", { headers: { cookie: `session=${token}` } });
+    expect((await res.json()).id).toBe("u1");
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("Max-Age=0");
+  });
+
+  it("says nothing when there was no cookie at all", async () => {
+    const api = server({ secrets: "s", auth })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+    const res = await api.get("/");
+    expect(res.headers.get("set-cookie")).toBe(null);
   });
 });

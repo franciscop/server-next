@@ -42,6 +42,15 @@ export default async function parseResponse(
   // short-circuit. May rebuild `out`, so it runs before the headers below.
   out = await applyCache(out, ctx);
 
+  // A credential that can never verify again (a rotated secret, an upgrade)
+  // is cleared, so a refresh starts clean instead of failing the same way
+  if ((ctx as any).clearCookie) {
+    out.headers.append(
+      "set-cookie",
+      `${(ctx as any).clearCookie}=; Path=/; Max-Age=0; HttpOnly`,
+    );
+  }
+
   // Only attach the headers if the user is using the timing API
   // 1 item is the `init` so it doesn't count
   if (ctx.time?.times?.length > 1) {

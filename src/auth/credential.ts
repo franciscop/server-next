@@ -3,7 +3,7 @@ import { signJwt, verifyJwt } from "../helpers/jwt";
 import ServerError from "../ServerError";
 import type { AuthMeta, Context, Strategy } from "../types";
 
-const NAME = "session";
+export const NAME = "session";
 
 // Two axes, four names: where the credential rides, and what it holds. An
 // opaque id needs somewhere to be looked up; signed data needs nowhere.
@@ -52,8 +52,12 @@ export async function read(
   if (!token) return;
   const payload = await verifyJwt(token, ctx.options.secrets);
   if (!payload) {
-    if (inCookie(strategy)) return;
-    throw ServerError.AUTH_INVALID_TOKEN();
+    if (!inCookie(strategy)) throw ServerError.AUTH_INVALID_TOKEN();
+    // Nothing can ever make this cookie verify again (a rotated secret, an
+    // upgrade, another app on the same host), so clear it instead of failing
+    // the same way on every future request.
+    (ctx as any).clearCookie = NAME;
+    return;
   }
   return payload as Payload;
 }

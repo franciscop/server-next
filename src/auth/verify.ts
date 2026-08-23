@@ -94,10 +94,12 @@ export function entry(options: AuthVerify): AuthEntry {
       try {
         claims = await check(token, issuer, allowed, claimNames);
       } catch (error) {
-        // A stale or foreign cookie is just signed out; their SDK will
-        // refresh it. A bad bearer token was sent deliberately: 401.
-        if (options.cookie) return;
-        throw error;
+        // A stale or foreign cookie is just signed out, and cleared so it
+        // stops arriving; their SDK re-issues a good one. A bad bearer token
+        // was sent deliberately: 401.
+        if (!options.cookie) throw error;
+        (ctx as any).clearCookie = options.cookie;
+        return;
       }
       ctx.auth = {
         issuedAt: new Date((claims.iat ?? 0) * 1000),
