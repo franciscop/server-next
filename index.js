@@ -1021,6 +1021,16 @@ function seconds(expires) {
   if (!ms) throw new Error(`Invalid \`expires\`: "${expires}"`);
   return Math.round(ms / 1e3);
 }
+var looksLikeOurs = (token) => {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const header = JSON.parse(atob(parts[0].replace(/-/g, "+").replace(/_/g, "/")));
+    return header?.alg === "HS256";
+  } catch {
+    return false;
+  }
+};
 var bearer = (ctx) => {
   const header = ctx.headers.authorization;
   if (!header) return;
@@ -1034,8 +1044,13 @@ async function read(ctx, strategy) {
   if (!token) return;
   const payload = await verifyJwt(token, ctx.options.secrets);
   if (!payload) {
-    if (inCookie(strategy)) return;
-    throw ServerError_default.AUTH_INVALID_TOKEN();
+    if (!inCookie(strategy)) throw ServerError_default.AUTH_INVALID_TOKEN();
+    ctx.clearCookie = NAME;
+    ctx.options.log?.message(
+      "auth",
+      looksLikeOurs(token) ? "discarded a session cookie signed with a key that is not in SECRETS. If you rotated it, keep the previous value: secrets: [current, previous]" : "discarded a session cookie that was not issued by this app"
+    );
+    return;
   }
   return payload;
 }
@@ -1592,8 +1607,13 @@ function entry2(options) {
       try {
         claims2 = await check(token, issuer, allowed, claimNames);
       } catch (error) {
-        if (options.cookie) return;
-        throw error;
+        if (!options.cookie) throw error;
+        ctx.clearCookie = options.cookie;
+        ctx.options.log?.message(
+          "auth",
+          `discarded a ${options.cookie} cookie that ${issuer} did not sign, or that has expired`
+        );
+        return;
       }
       ctx.auth = {
         issuedAt: new Date((claims2.iat ?? 0) * 1e3),
@@ -2170,6 +2190,12 @@ async function parseResponse(out, ctx) {
   applyCors(out, ctx);
   applySecurity(out, ctx);
   out = await applyCache(out, ctx);
+  if (ctx.clearCookie) {
+    out.headers.append(
+      "set-cookie",
+      `${ctx.clearCookie}=; Path=/; Max-Age=0; HttpOnly`
+    );
+  }
   if (ctx.time?.times?.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }

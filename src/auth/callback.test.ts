@@ -257,3 +257,67 @@ describe("a stale cookie clears itself", () => {
     expect(res.headers.get("set-cookie")).toBe(null);
   });
 });
+
+// A cookie that cannot verify is handled silently, but an operator turning
+// logging on should be told why, especially the one cause they can fix.
+describe("logging a discarded cookie", () => {
+  const auth = {
+    providers: "github",
+    onLogin: (p: any) => p.id,
+    getUser: (id: string) => ({ id }),
+  };
+  const realLog = console.log;
+  let lines: string[];
+
+  beforeEach(() => {
+    lines = [];
+    console.log = (...args: any[]) => lines.push(args.join(" "));
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+  });
+  afterEach(() => {
+    console.log = realLog;
+  });
+
+  const hit = async (cookie: string, log: any = "info") => {
+    const api = server({ secrets: "s", log, auth })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+    return api.get("/", { headers: { cookie: `session=${cookie}` } });
+  };
+
+  it("names the fixable cause: signed with a key that is gone", async () => {
+    // A real credential, signed with a secret this app no longer has
+    const orphan = await signJwt({ sub: "u1" }, "the-previous-secret", 3600);
+    await hit(orphan);
+    const said = lines.join(" ");
+    expect(said).toContain("discarded a session cookie");
+    expect(said).toContain("SECRETS");
+  });
+
+  it("says something quieter for a cookie that is not ours at all", async () => {
+    await hit("left-over-from-another-app");
+    const said = lines.join(" ");
+    expect(said).toContain("was not issued by this app");
+    // Not the rotation advice: this one is nobody's fault
+    expect(said).not.toContain("SECRETS");
+  });
+
+  it("says nothing at all with logging off", async () => {
+    await hit("left-over-from-another-app", false);
+    expect(lines.join(" ")).toBe("");
+  });
+
+  it("never logs the token or its contents", async () => {
+    const orphan = await signJwt(
+      { sub: "u1", email: "ada@secret.example" },
+      "the-previous-secret",
+      3600,
+    );
+    await hit(orphan);
+    const said = lines.join(" ");
+    // Unverified claims are attacker-controlled: they must not reach the log
+    expect(said).not.toContain("ada@secret.example");
+    expect(said).not.toContain(orphan.slice(0, 24));
+  });
+});

@@ -220,3 +220,28 @@ describe("the audience claim", () => {
     expect((await call(app(["aud", "client_id"]), token)).status).toBe(401);
   });
 });
+
+describe("a vendor's stale cookie clears itself", () => {
+  const ISSUER = "https://clearing-issuer.test";
+  let issuer: Awaited<ReturnType<typeof testIssuer>>;
+
+  beforeAll(async () => {
+    issuer = await testIssuer(ISSUER);
+  });
+  afterAll(() => issuer.restore());
+
+  it("stops a dead vendor cookie arriving forever", async () => {
+    const app = server({
+      auth: { issuer: ISSUER, audience: "my-api", cookie: "__session" },
+    }).get("/me", (ctx) => ctx.user ?? "anonymous");
+
+    const res = await app
+      .test()
+      .get("/me", { headers: { cookie: "__session=not.a.jwt" } });
+
+    expect(await res.text()).toBe("anonymous");
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("__session=");
+    expect(setCookie.toLowerCase()).toContain("max-age=0");
+  });
+});

@@ -29,6 +29,20 @@ export function seconds(expires: string): number {
   return Math.round(ms / 1000);
 }
 
+// Whether a token even claims to be one of ours, without verifying it: three
+// parts and an HS256 header. Structure only, so nothing attacker-controlled is
+// read out of it.
+const looksLikeOurs = (token: string): boolean => {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const header = JSON.parse(atob(parts[0].replace(/-/g, "+").replace(/_/g, "/")));
+    return header?.alg === "HS256";
+  } catch {
+    return false;
+  }
+};
+
 const bearer = (ctx: Context): string | undefined => {
   const header = ctx.headers.authorization as string | undefined;
   if (!header) return;
@@ -57,6 +71,16 @@ export async function read(
     // upgrade, another app on the same host), so clear it instead of failing
     // the same way on every future request.
     (ctx as any).clearCookie = NAME;
+    // One of these has a fix, and it is the one worth naming. Never log the
+    // token or its claims: unverified, they are attacker-controlled.
+    ctx.options.log?.message(
+      "auth",
+      looksLikeOurs(token)
+        ? "discarded a session cookie signed with a key that is not in " +
+            "SECRETS. If you rotated it, keep the previous value: " +
+            "secrets: [current, previous]"
+        : "discarded a session cookie that was not issued by this app",
+    );
     return;
   }
   return payload as Payload;

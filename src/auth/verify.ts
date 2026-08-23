@@ -99,6 +99,10 @@ export function entry(options: AuthVerify): AuthEntry {
         // was sent deliberately: 401.
         if (!options.cookie) throw error;
         (ctx as any).clearCookie = options.cookie;
+        ctx.options.log?.message(
+          "auth",
+          `discarded a ${options.cookie} cookie that ${issuer} did not sign, or that has expired`,
+        );
         return;
       }
       ctx.auth = {
