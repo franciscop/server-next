@@ -39,19 +39,20 @@ describe("ctx.auth", () => {
     expect(body.user).toBe("u1");
   });
 
-  it("says which strategy this request used, when several are accepted", async () => {
-    const both = app({ strategy: ["session", "jwt"], toPublicUser: (u: any) => u });
-    const token = await signJwt({ sub: "u1" }, "s", 3600);
+  it("says how this request authenticated", async () => {
+    const jwt = app({ strategy: "jwt", toPublicUser: (u: any) => u });
+    const token = await signJwt({ sub: "u1", user: { id: "u1" } }, "s", 3600);
 
-    const viaCookie = await both
-      .test()
-      .get("/auth", { headers: { cookie: `session=${token}` } });
-    expect((await viaCookie.json()).strategy).toBe("session");
-
-    const viaHeader = await both
+    const viaHeader = await jwt
       .test()
       .get("/auth", { headers: { authorization: `Bearer ${token}` } });
     expect((await viaHeader.json()).strategy).toBe("jwt");
+
+    const session = app({});
+    const viaCookie = await session
+      .test()
+      .get("/auth", { headers: { cookie: `session=${token}` } });
+    expect((await viaCookie.json()).strategy).toBe("session");
   });
 
   it("carries the provider a login came through", async () => {

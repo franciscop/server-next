@@ -92,15 +92,9 @@ const auth = { ...auth, expires: '1h' };   // alongside the callbacks above
 
 If you need to end a session on demand, for a "sign out everywhere" button or after a security incident, use `session` or `token` instead, where the credential is an id you can delete. [Revocable sessions](/tutorials/j-revocable-sessions-in-postgres) covers that.
 
-## 6. Serving a browser app and an API at once
+## 6. One credential per app
 
-Plenty of products are both: a server-rendered dashboard and a mobile client on the same database. Accept either credential, and the first named strategy is the one issued at login:
-
-```js
-const auth = { ...auth, strategy: ['session', 'jwt'] };
-```
-
-[`ctx.auth.strategy`](/documentation/context#ctxauth) then tells a handler how the current request authenticated, which is useful when a route should exist for the dashboard but not the public API.
+An app issues and reads one kind of credential. If yours is both a server-rendered dashboard and an API, pick the carrier your primary client needs, and give the other client its own deployment against the same database rather than mixing carriers in one process.
 
 ## Next steps
 

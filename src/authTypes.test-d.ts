@@ -79,23 +79,10 @@ server({ auth: (ctx) => db.users.byApiKey(String(ctx.headers["x-api-key"])) }).g
   },
 );
 
-// 5. Several at once: ctx.user is the union
+// 5. One method per app: an array is refused at the type level too
 server({
-  auth: [
-    {
-      providers: "github" as const,
-      onLogin: async (profile: unknown) => (await db.users.upsert(profile)).id,
-      getUser: (id: string) => db.users.find(id),
-    },
-    (): Claims | undefined => undefined,
-  ],
-}).get("/me", (ctx) => {
-  if (!ctx.user) return 401;
-  // Both members have `email`, so it is reachable without narrowing
-  const email: string = ctx.user.email;
-  // @ts-expect-error `role` only exists on one member of the union
-  ctx.user.role;
-  return { email };
+  // @ts-expect-error several methods are not accepted; use `providers`
+  auth: [(ctx: any) => ({ id: "1" })],
 });
 
 // The explicit generic still wins, for apps that declare their own

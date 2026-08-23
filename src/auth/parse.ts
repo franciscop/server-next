@@ -4,11 +4,16 @@ import { entry as verifyEntry } from "./verify";
 import VENDORS from "./vendors";
 
 // Every shape of `auth` normalises to the same thing: resolve a user, and
-// optionally own some routes. See docs/5. Authentication.md.
-export default function parseAuth(auth: Options["auth"]): AuthEntry[] | null {
+// optionally own routes. See docs/5. Authentication.md.
+export default function parseAuth(auth: Options["auth"]): AuthEntry | null {
   if (!auth) return null;
-  const list = Array.isArray(auth) ? auth : [auth];
-  return list.flatMap((one) => toEntry(one as AuthOption));
+  if (Array.isArray(auth)) {
+    throw new Error(
+      "`auth` takes one method. For several login options, list them under " +
+        "`providers` instead: auth: { providers: ['github', 'google'], ... }.",
+    );
+  }
+  return toEntry(auth as AuthOption);
 }
 
 // A vendor ran the login itself, so the strategy only says where their token
@@ -58,7 +63,7 @@ function vendorEntry(strategy: string, name: string): AuthEntry {
   });
 }
 
-function toEntry(auth: AuthOption): AuthEntry[] {
+function toEntry(auth: AuthOption): AuthEntry {
   // `<strategy>:<name>`, with no callbacks, so there is no database
   if (typeof auth === "string") {
     const [strategy, name] = auth.split(":");
@@ -69,17 +74,17 @@ function toEntry(auth: AuthOption): AuthEntry[] {
           "token a vendor issued.",
       );
     }
-    if (VENDORS[name]) return [vendorEntry(strategy, name)];
-    return [flowEntry({ strategy, providers: name } as any)];
+    if (VENDORS[name]) return vendorEntry(strategy, name);
+    return flowEntry({ strategy, providers: name } as any);
   }
 
   if (typeof auth === "function") {
-    return [{ name: "function", user: async (ctx: Context) => auth(ctx as any) }];
+    return { name: "function", user: async (ctx: Context) => auth(ctx as any) };
   }
 
   if (auth && typeof auth === "object") {
-    if ("issuer" in auth) return [verifyEntry(auth as any)];
-    if ("providers" in auth) return [flowEntry(auth as any)];
+    if ("issuer" in auth) return verifyEntry(auth as any);
+    if ("providers" in auth) return flowEntry(auth as any);
     // A library that runs its own handshake and serves its own routes
     if ("handler" in auth) {
       const instance = auth as any;
@@ -97,20 +102,18 @@ function toEntry(auth: AuthOption): AuthEntry[] {
             ...(ctx.body ? { duplex: "half" } : {}),
           } as RequestInit),
         );
-      return [
-        {
-          name: `instance:${path}`,
-          user: async (ctx: Context) => instance.user?.(ctx),
-          routes: (app) => {
-            const wildcard = `${path}/*`;
-            app.get(wildcard, raw, forward);
-            app.post(wildcard, raw, forward);
-            app.put(wildcard, raw, forward);
-            app.patch(wildcard, raw, forward);
-            app.delete(wildcard, raw, forward);
-          },
+      return {
+        name: `instance:${path}`,
+        user: async (ctx: Context) => instance.user?.(ctx),
+        routes: (app) => {
+          const wildcard = `${path}/*`;
+          app.get(wildcard, raw, forward);
+          app.post(wildcard, raw, forward);
+          app.put(wildcard, raw, forward);
+          app.patch(wildcard, raw, forward);
+          app.delete(wildcard, raw, forward);
         },
-      ];
+      };
     }
   }
 

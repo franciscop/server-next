@@ -29,14 +29,11 @@ describe("socket auth", () => {
     expect(await socketUser(app as any, {}, {})).toBe(undefined);
   });
 
-  it("tries the entries in order, first to answer wins", async () => {
+  it("resolves a function shape from the partial context", async () => {
     const app = server({
-      auth: [
-        (ctx: any) => (ctx.headers["x-a"] ? { id: "a" } : undefined),
-        (ctx: any) => (ctx.cookies.uid ? { id: ctx.cookies.uid } : undefined),
-      ],
+      auth: (ctx: any) => (ctx.cookies.uid ? { id: ctx.cookies.uid } : undefined),
     });
-    expect(await socketUser(app as any, { "x-a": "1" }, {})).toMatchObject({ id: "a" });
     expect(await socketUser(app as any, {}, { uid: "b" })).toMatchObject({ id: "b" });
+    expect(await socketUser(app as any, {}, {})).toBe(undefined);
   });
 });

@@ -147,11 +147,13 @@ describe("a vendor token in a cookie", () => {
     expect(await res.text()).toBe("anonymous");
   });
 
-  it("still rejects a tampered cookie", async () => {
+  it("treats a tampered or stale cookie as signed out", async () => {
+    // Cookies arrive ambiently (stale logins, other apps on localhost), so a
+    // bad one is anonymous rather than a site-wide 401; the SDK re-issues it
     const res = await app()
       .test()
       .get("/me", { headers: { cookie: "__session=not.a.jwt" } });
-    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("anonymous");
   });
 });
 

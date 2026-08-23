@@ -1,5 +1,5 @@
 import ServerError from "../ServerError";
-import type { AuthEntry, AuthVerify, Context } from "../types";
+import type { AuthClaims, AuthEntry, AuthVerify, Context } from "../types";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -59,9 +59,9 @@ const bearer = (ctx: Context): string | undefined => {
   const header = ctx.headers.authorization as string | undefined;
   if (!header) return;
   const [type, token] = header.trim().split(" ");
-  if (type?.toLowerCase() !== "bearer" || !token) {
-    throw ServerError.AUTH_INVALID_HEADER({ type });
-  }
+  // Another scheme (Basic, a proxy's) is not ours to police: no credential
+  if (type?.toLowerCase() !== "bearer") return;
+  if (!token) throw ServerError.AUTH_INVALID_HEADER({ type });
   return token;
 };
 
@@ -90,7 +90,15 @@ export function entry(options: AuthVerify): AuthEntry {
         : bearer(ctx);
       if (!token) return; // anonymous, not an error
 
-      const claims = await check(token, issuer, allowed, claimNames);
+      let claims: AuthClaims;
+      try {
+        claims = await check(token, issuer, allowed, claimNames);
+      } catch (error) {
+        // A stale or foreign cookie is just signed out; their SDK will
+        // refresh it. A bad bearer token was sent deliberately: 401.
+        if (options.cookie) return;
+        throw error;
+      }
       ctx.auth = {
         issuedAt: new Date((claims.iat ?? 0) * 1000),
         expiresAt: claims.exp ? new Date(claims.exp * 1000) : undefined,

@@ -275,7 +275,7 @@ export type RedirectOption =
 // A login flow we run: the routes are mounted here, the credential is ours
 export type AuthConfig<U = AuthProfile> = {
   providers: string | readonly string[] | Record<string, string | ProviderOptions>;
-  strategy?: Strategy | readonly Strategy[];
+  strategy?: Strategy;
   expires?: string;
   redirect?: RedirectOption;
   // Once, after a handshake: store whoever this is and return the id the
@@ -327,34 +327,30 @@ export type AuthOption =
   | AuthFunction
   | AuthConfig<any>
   | AuthVerify<any>
-  | AuthInstance
-  | readonly AuthOption[];
+  | AuthInstance;
 
 // `ctx.user` is whatever the configured `auth` produces, so an app never
 // declares a User type. An array gives the union of its members.
-export type UserOf<A> = A extends readonly (infer M)[]
-  ? UserOf<M>
-  : A extends (...args: any[]) => infer R
+export type UserOf<A> = A extends (...args: any[]) => infer R
+  ? NonNullable<Awaited<R>>
+  : A extends { getUser: (...args: any[]) => infer R }
     ? NonNullable<Awaited<R>>
-    : A extends { getUser: (...args: any[]) => infer R }
-      ? NonNullable<Awaited<R>>
-      : A extends { issuer: any }
-        ? AuthClaims
-        : A extends { providers: any }
+    : A extends { issuer: any }
+      ? AuthClaims
+      : A extends { providers: any }
+        ? AuthProfile
+        : A extends string
           ? AuthProfile
-          : A extends string
-            ? AuthProfile
-            : never;
+          : never;
 
-// Every shape normalises to this: resolve a user, and optionally own some
-// routes. The array is tried in order, first to answer wins.
+// Every shape normalises to this: resolve a user, and optionally own routes
 export type AuthEntry = {
   name: string;
   user: (ctx: Context) => Promise<any>;
   routes?: (app: Server) => void;
 };
 
-export type AuthSettings = AuthEntry[];
+export type AuthSettings = AuthEntry;
 
 export type LogLevel = "info";
 

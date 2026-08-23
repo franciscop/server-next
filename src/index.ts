@@ -114,9 +114,6 @@ export default function server<U = AuthClaims>(
 export default function server<U>(
   options: Omit<Options, "auth"> & { auth: AuthFunction<U> },
 ): Server<{ user: NonNullable<Awaited<U>> }>;
-export default function server<A extends readonly AuthOption[]>(
-  options: Omit<Options, "auth"> & { auth: A },
-): Server<{ user: UserOf<A[number]> }>;
 export default function server<C extends ContextTypes = {}>(
   options?: Options,
 ): Server<C>;

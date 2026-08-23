@@ -1,3 +1,4 @@
+import { parse } from "../helpers/createCookies";
 import { signJwt, verifyJwt } from "../helpers/jwt";
 import ServerError from "../ServerError";
 import type { AuthMeta, Context, Strategy } from "../types";
@@ -21,40 +22,40 @@ export type Payload = {
   exp?: number;
 };
 
-const UNITS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
-
+// The same parser cookies use, so '30d', '12 hours' and '1y' all work
 export function seconds(expires: string): number {
-  const match = /^(\d+)([smhdw])$/.exec(expires);
-  if (!match) throw new Error(`Invalid \`expires\`: "${expires}"`);
-  return Number(match[1]) * UNITS[match[2]];
+  const ms = parse(expires);
+  if (!ms) throw new Error(`Invalid \`expires\`: "${expires}"`);
+  return Math.round(ms / 1000);
 }
 
 const bearer = (ctx: Context): string | undefined => {
   const header = ctx.headers.authorization as string | undefined;
   if (!header) return;
   const [type, token] = header.trim().split(" ");
-  if (type?.toLowerCase() !== "bearer" || !token) {
-    throw ServerError.AUTH_INVALID_HEADER({ type });
-  }
+  // Another scheme (Basic, a proxy's) is not ours to police: no credential
+  if (type?.toLowerCase() !== "bearer") return;
+  // `Bearer` with nothing after it is a client that meant to send one
+  if (!token) throw ServerError.AUTH_INVALID_HEADER({ type });
   return token;
 };
 
-// Read whichever carrier this app accepts. A missing credential is anonymous;
-// a present but unverifiable one is a 401, since silently treating an expired
-// token as "not logged in" sends clients hunting in the wrong place.
+// Read the strategy's carrier. A missing credential is anonymous. A broken
+// one splits by carrier: cookies arrive ambiently (stale, another app on
+// localhost, an expired login), so a bad cookie is just signed out; a bearer
+// token was attached deliberately, so a bad one is a 401 the client must see.
 export async function read(
   ctx: Context,
-  strategies: Strategy[],
-): Promise<{ payload: Payload; strategy: Strategy } | undefined> {
-  for (const strategy of strategies) {
-    const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);
-    if (!token) continue;
-    const payload = await verifyJwt(token, ctx.options.secrets);
-    if (!payload) throw ServerError.AUTH_INVALID_TOKEN();
-    // Which one matched matters: an app accepting both a cookie and a bearer
-    // token cannot otherwise tell how this request authenticated
-    return { payload: payload as Payload, strategy };
+  strategy: Strategy,
+): Promise<Payload | undefined> {
+  const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);
+  if (!token) return;
+  const payload = await verifyJwt(token, ctx.options.secrets);
+  if (!payload) {
+    if (inCookie(strategy)) return;
+    throw ServerError.AUTH_INVALID_TOKEN();
   }
+  return payload as Payload;
 }
 
 // The credential's own claims, as `ctx.auth`

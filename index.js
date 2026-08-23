@@ -1016,29 +1016,28 @@ async function verifyJwt(token, secret) {
 var NAME = "session";
 var inCookie = (s) => s === "session" || s === "cookie";
 var isSigned = (s) => s === "cookie" || s === "jwt";
-var UNITS2 = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 function seconds(expires) {
-  const match = /^(\d+)([smhdw])$/.exec(expires);
-  if (!match) throw new Error(`Invalid \`expires\`: "${expires}"`);
-  return Number(match[1]) * UNITS2[match[2]];
+  const ms = parse(expires);
+  if (!ms) throw new Error(`Invalid \`expires\`: "${expires}"`);
+  return Math.round(ms / 1e3);
 }
 var bearer = (ctx) => {
   const header = ctx.headers.authorization;
   if (!header) return;
   const [type2, token] = header.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer" || !token) {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
+  if (type2?.toLowerCase() !== "bearer") return;
+  if (!token) throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   return token;
 };
-async function read(ctx, strategies) {
-  for (const strategy of strategies) {
-    const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);
-    if (!token) continue;
-    const payload = await verifyJwt(token, ctx.options.secrets);
-    if (!payload) throw ServerError_default.AUTH_INVALID_TOKEN();
-    return { payload, strategy };
+async function read(ctx, strategy) {
+  const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);
+  if (!token) return;
+  const payload = await verifyJwt(token, ctx.options.secrets);
+  if (!payload) {
+    if (inCookie(strategy)) return;
+    throw ServerError_default.AUTH_INVALID_TOKEN();
   }
+  return payload;
 }
 var meta = (payload, strategy) => ({
   issuedAt: new Date(payload.iat * 1e3),
@@ -1395,31 +1394,28 @@ function parseProviders(given) {
 var target = async (where, fallback, user, ctx) => typeof where === "function" ? where(user, ctx) : where ?? fallback;
 function entry(config2) {
   const list = parseProviders(config2.providers);
-  const strategies = Array.isArray(config2.strategy) ? config2.strategy : [config2.strategy ?? "session"];
-  for (const one of strategies) {
-    if (!["session", "cookie", "token", "jwt"].includes(one)) {
-      throw new Error(
-        `Unknown strategy "${one}"; it takes 'session', 'cookie', 'token' or 'jwt'.`
-      );
-    }
+  const strategy = config2.strategy ?? "session";
+  if (!["session", "cookie", "token", "jwt"].includes(strategy)) {
+    throw new Error(
+      `Unknown strategy "${strategy}"; it takes 'session', 'cookie', 'token' or 'jwt'.`
+    );
   }
   const expires = config2.expires ?? "30d";
+  seconds(expires);
   const { onLogin, getUser, toPublicUser, onLogout } = config2;
   if (onLogin && !getUser) {
     throw new Error("`onLogin` needs a `getUser`: something has to resolve the id it returns.");
   }
-  for (const strategy of strategies) {
-    if (isSigned(strategy)) {
-      if (getUser && !toPublicUser) {
-        throw new Error(
-          `The \`${strategy}\` strategy signs the user into the credential, so it needs a \`toPublicUser\` to say what goes in. Signing the whole row would publish whatever else is on it.`
-        );
-      }
-    } else if (!getUser) {
+  if (isSigned(strategy)) {
+    if (getUser && !toPublicUser) {
       throw new Error(
-        `The \`${strategy}\` strategy puts an id in the credential, so it needs a \`getUser\` to resolve it. With no database, use \`cookie\` or \`jwt\`.`
+        `The \`${strategy}\` strategy signs the user into the credential, so it needs a \`toPublicUser\` to say what goes in. Signing the whole row would publish whatever else is on it.`
       );
     }
+  } else if (!getUser) {
+    throw new Error(
+      `The \`${strategy}\` strategy puts an id in the credential, so it needs a \`getUser\` to resolve it. With no database, use \`cookie\` or \`jwt\`.`
+    );
   }
   const publicProfile = ({ id, email, name, avatar }) => ({
     id,
@@ -1431,19 +1427,28 @@ function entry(config2) {
   const loginTo = typeof config2.redirect === "object" ? redirects.login : config2.redirect;
   const finish = async (ctx, profile) => {
     const payload = getUser ? await (async () => {
-      const id = await onLogin(profile, ctx);
+      let id;
+      try {
+        id = await onLogin(profile, ctx);
+      } catch (error) {
+        error.expose = true;
+        throw error;
+      }
       if (id === void 0 || id === null) {
         throw new Error("`onLogin` must return the id the credential points at");
       }
-      if (!isSigned(strategies[0])) return { sub: String(id) };
+      if (!isSigned(strategy)) return { sub: String(id) };
       const user2 = await getUser(String(id), ctx);
+      if (user2 === void 0 || user2 === null) {
+        throw new Error(`getUser returned nothing for the id "${id}" that onLogin just returned`);
+      }
       return { user: await toPublicUser(user2) };
     })() : { user: publicProfile(profile) };
     const signed = { ...payload, provider: profile.provider };
     const token = await issue(ctx, signed, expires);
     const user = signed.user ?? await getUser(signed.sub, ctx);
     const to = await target(loginTo, "/", user, ctx);
-    if (inCookie(strategies[0])) {
+    if (inCookie(strategy)) {
       return cookies("session", {
         value: token,
         path: "/",
@@ -1458,9 +1463,8 @@ function entry(config2) {
   return {
     name: "flow",
     async user(ctx) {
-      const found = await read(ctx, strategies);
-      if (!found) return;
-      const { payload, strategy } = found;
+      const payload = await read(ctx, strategy);
+      if (!payload) return;
       ctx.auth = meta(payload, strategy);
       if (payload.user) return payload.user;
       if (!payload.sub) return;
@@ -1495,8 +1499,10 @@ function entry(config2) {
             res = await finish(ctx, profile);
           } catch (error) {
             const to = await target(redirects.error, "/", null, ctx);
-            const message = error.message;
-            res = redirect(`${to}?error=${encodeURIComponent(message)}`);
+            let message = "Could not sign you in";
+            if (error?.expose) message = error.message;
+            else console.error(`[server:auth] ${name} callback failed:`, error);
+            res = await redirect(`${to}?error=${encodeURIComponent(message)}`);
           }
           res.headers.append(
             "set-cookie",
@@ -1507,12 +1513,10 @@ function entry(config2) {
         app.get(`/auth/callback/${name}`, SPEC, callback);
       }
       app.post("/auth/logout", SPEC, async (ctx) => {
-        const found = await read(ctx, strategies).catch(() => void 0);
-        if (onLogout && found?.payload.sub) {
-          await onLogout(found.payload.sub, ctx);
-        }
+        const payload = await read(ctx, strategy).catch(() => void 0);
+        if (onLogout && payload?.sub) await onLogout(payload.sub, ctx);
         const to = await target(redirects.logout, "/", null, ctx);
-        if (!inCookie(strategies[0])) return status(204);
+        if (!inCookie(strategy)) return status(204);
         return cookies("session", { value: null }).redirect(to);
       });
     }
@@ -1566,9 +1570,8 @@ var bearer2 = (ctx) => {
   const header = ctx.headers.authorization;
   if (!header) return;
   const [type2, token] = header.trim().split(" ");
-  if (type2?.toLowerCase() !== "bearer" || !token) {
-    throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
-  }
+  if (type2?.toLowerCase() !== "bearer") return;
+  if (!token) throw ServerError_default.AUTH_INVALID_HEADER({ type: type2 });
   return token;
 };
 function entry2(options) {
@@ -1585,7 +1588,13 @@ function entry2(options) {
     async user(ctx) {
       const token = options.cookie ? ctx.cookies[options.cookie] : bearer2(ctx);
       if (!token) return;
-      const claims2 = await check(token, issuer, allowed, claimNames);
+      let claims2;
+      try {
+        claims2 = await check(token, issuer, allowed, claimNames);
+      } catch (error) {
+        if (options.cookie) return;
+        throw error;
+      }
       ctx.auth = {
         issuedAt: new Date((claims2.iat ?? 0) * 1e3),
         expiresAt: claims2.exp ? new Date(claims2.exp * 1e3) : void 0,
@@ -1668,8 +1677,12 @@ var vendors_default = VENDORS;
 // src/auth/parse.ts
 function parseAuth(auth2) {
   if (!auth2) return null;
-  const list = Array.isArray(auth2) ? auth2 : [auth2];
-  return list.flatMap((one) => toEntry(one));
+  if (Array.isArray(auth2)) {
+    throw new Error(
+      "`auth` takes one method. For several login options, list them under `providers` instead: auth: { providers: ['github', 'google'], ... }."
+    );
+  }
+  return toEntry(auth2);
 }
 function vendorEntry(strategy, name) {
   const vendor = vendors_default[name];
@@ -1711,15 +1724,15 @@ function toEntry(auth2) {
         `Invalid auth "${auth2}": the string form is "<strategy>:<name>", like "cookie:github" to log people in, or "jwt:clerk" to check a token a vendor issued.`
       );
     }
-    if (vendors_default[name]) return [vendorEntry(strategy, name)];
-    return [entry({ strategy, providers: name })];
+    if (vendors_default[name]) return vendorEntry(strategy, name);
+    return entry({ strategy, providers: name });
   }
   if (typeof auth2 === "function") {
-    return [{ name: "function", user: async (ctx) => auth2(ctx) }];
+    return { name: "function", user: async (ctx) => auth2(ctx) };
   }
   if (auth2 && typeof auth2 === "object") {
-    if ("issuer" in auth2) return [entry2(auth2)];
-    if ("providers" in auth2) return [entry(auth2)];
+    if ("issuer" in auth2) return entry2(auth2);
+    if ("providers" in auth2) return entry(auth2);
     if ("handler" in auth2) {
       const instance = auth2;
       const path = (instance.path ?? "/api/auth").replace(/\/$/, "");
@@ -1733,20 +1746,18 @@ function toEntry(auth2) {
           ...ctx.body ? { duplex: "half" } : {}
         })
       );
-      return [
-        {
-          name: `instance:${path}`,
-          user: async (ctx) => instance.user?.(ctx),
-          routes: (app) => {
-            const wildcard = `${path}/*`;
-            app.get(wildcard, raw, forward);
-            app.post(wildcard, raw, forward);
-            app.put(wildcard, raw, forward);
-            app.patch(wildcard, raw, forward);
-            app.delete(wildcard, raw, forward);
-          }
+      return {
+        name: `instance:${path}`,
+        user: async (ctx) => instance.user?.(ctx),
+        routes: (app) => {
+          const wildcard = `${path}/*`;
+          app.get(wildcard, raw, forward);
+          app.post(wildcard, raw, forward);
+          app.put(wildcard, raw, forward);
+          app.patch(wildcard, raw, forward);
+          app.delete(wildcard, raw, forward);
         }
-      ];
+      };
     }
   }
   throw new Error(
@@ -1816,16 +1827,16 @@ var STATUS_TEXT = {
   502: "Bad Gateway",
   503: "Service Unavailable"
 };
-var UNITS3 = ["b", "kb", "mb", "gb", "tb"];
+var UNITS2 = ["b", "kb", "mb", "gb", "tb"];
 function formatBytes(bytes) {
   if (!bytes || bytes < 0) return "0b";
   const i = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
-    UNITS3.length - 1
+    UNITS2.length - 1
   );
   const value = bytes / 1024 ** i;
   const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${rounded}${UNITS3[i]}`;
+  return `${rounded}${UNITS2[i]}`;
 }
 var SCOPE_COLORS = {
   start: "green",
@@ -2014,10 +2025,10 @@ function config(options = {}) {
       options.auth || env2.AUTH || null
     );
   }
-  if (settings.auth?.some((one) => one.name === "flow") && settings.secrets[0].startsWith("unsafe-")) {
-    console.warn(
-      "[server:auth] auth with no SECRETS set: credentials are signed with a random per-process secret, so they break on restart and across instances. Set the SECRETS environment variable (or the `secrets` option)."
-    );
+  if (settings.auth?.name === "flow" && settings.secrets[0].startsWith("unsafe-")) {
+    const message = "Auth needs a stable secret: credentials are signed with it, and the random per-process fallback breaks them on restart and across instances. Set the SECRETS environment variable (or the `secrets` option).";
+    if (env2.NODE_ENV === "production") throw new Error(message);
+    console.warn(`[server:auth] ${message}`);
   }
   if (options.openapi) {
     const o = options.openapi;
@@ -2032,10 +2043,7 @@ function config(options = {}) {
   });
   settings.onResponse = options.onResponse;
   const loc = (v) => typeof v === "string" ? v : "enabled";
-  if (settings.auth) {
-    const names = settings.auth.map((one) => one.name).join(", ");
-    log.message("auth", ` enabled`);
-  }
+  if (settings.auth) log.message("auth", `${settings.auth.name} enabled`);
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {
@@ -2412,17 +2420,11 @@ function toWeb(nodeStream) {
 
 // src/auth/index.ts
 function auth(app) {
-  const entries = app.settings.auth;
+  const entry3 = app.settings.auth;
   app.use(async function middle(ctx) {
-    for (const entry3 of entries) {
-      const user = await entry3.user(ctx);
-      if (user) {
-        ctx.user = user;
-        return;
-      }
-    }
+    ctx.user = await entry3.user(ctx);
   });
-  for (const entry3 of entries) entry3.routes?.(app);
+  entry3.routes?.(app);
 }
 
 // src/helpers/parseRange.ts
@@ -2664,10 +2666,7 @@ function timer(ctx) {
 async function socketUser(app, headers2, cookies2) {
   if (!app.settings.auth) return void 0;
   const ctx = { options: app.settings, headers: headers2, cookies: cookies2 };
-  for (const entry3 of app.settings.auth) {
-    const user = await entry3.user(ctx);
-    if (user) return user;
-  }
+  return app.settings.auth.user(ctx);
 }
 
 // src/helpers/wsNode.ts

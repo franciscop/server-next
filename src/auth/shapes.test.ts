@@ -35,19 +35,10 @@ describe("the shapes of `auth`", () => {
     expect(await (await me(app)).text()).toBe("anonymous");
   });
 
-  it("an array: first to answer wins", async () => {
-    const app = server({
-      auth: [
-        (ctx: any) => (ctx.headers["x-a"] ? { id: "a" } : undefined),
-        (ctx: any) => (ctx.headers["x-b"] ? { id: "b" } : undefined),
-      ],
-    }).get("/me", (ctx) => ctx.user ?? "anonymous");
-
-    expect(await (await me(app, { headers: { "x-b": "1" } })).json()).toMatchObject({ id: "b" });
-    expect(
-      await (await me(app, { headers: { "x-a": "1", "x-b": "1" } })).json(),
-    ).toMatchObject({ id: "a" });
-    expect(await (await me(app)).text()).toBe("anonymous");
+  it("refuses an array: one method per app, several providers inside it", () => {
+    expect(() => server({ auth: [() => ({ id: "a" })] as any })).toThrow(
+      /one method/,
+    );
   });
 
   it("a library instance: its routes are mounted at its own path", async () => {
@@ -104,7 +95,7 @@ describe("verifying a vendor's token by name", () => {
     env.CLERK_ISSUER = "https://touched-donkey-12.clerk.accounts.dev";
     env.CLERK_AUDIENCE = "my-api";
     const app = server({ auth: "jwt:clerk" });
-    expect(app.settings.auth[0].name).toBe(
+    expect(app.settings.auth.name).toBe(
       "verify:https://touched-donkey-12.clerk.accounts.dev",
     );
   });
@@ -162,7 +153,7 @@ describe("provider and vendor names do not collide", () => {
     env2.CLERK_AUDIENCE = "https://app.example.com";
     try {
       const app = server({ auth: "jwt:clerk" });
-      expect(app.settings.auth[0].name).toContain("verify:");
+      expect(app.settings.auth.name).toContain("verify:");
     } finally {
       delete env2.CLERK_ISSUER;
       delete env2.CLERK_AUDIENCE;
@@ -239,7 +230,7 @@ describe("firebase", () => {
     env2.FIREBASE_ISSUER = "https://securetoken.google.com/my-project";
     env2.FIREBASE_AUDIENCE = "my-project";
     const app = server({ auth: "jwt:firebase" });
-    expect(app.settings.auth[0].name).toBe(
+    expect(app.settings.auth.name).toBe(
       "verify:https://securetoken.google.com/my-project",
     );
   });
@@ -258,6 +249,89 @@ describe("firebase", () => {
     env2.GCIP_ISSUER = "https://securetoken.google.com/my-project";
     env2.GCIP_AUDIENCE = "my-project";
     const app = server({ auth: "jwt:gcip" });
-    expect(app.settings.auth[0].name).toContain("securetoken.google.com");
+    expect(app.settings.auth.name).toContain("securetoken.google.com");
+  });
+});
+
+// Cookies arrive ambiently: stale logins, other apps sharing localhost. A bad
+// one is signed out; a bad bearer token was attached deliberately, so 401.
+describe("broken credentials, by carrier", () => {
+  const base = {
+    providers: "github",
+    onLogin: (p: any) => p.id,
+    getUser: (id: string) => ({ id }),
+  };
+  beforeAll(() => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+  });
+
+  it("a stale session cookie is anonymous, not a site-wide 401", async () => {
+    const api = server({ secrets: "s", auth: base })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+    const res = await api.get("/", {
+      headers: { cookie: "session=left-over-from-another-app" },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("anonymous");
+  });
+
+  it("a broken bearer token is still a 401 the client must see", async () => {
+    const api = server({ secrets: "s", auth: { ...base, strategy: "token" } })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+    const res = await api.get("/", {
+      headers: { authorization: "Bearer tampered" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("another Authorization scheme is not ours to police", async () => {
+    const api = server({ secrets: "s", auth: { ...base, strategy: "token" } })
+      .get("/", (ctx) => ctx.user ?? "anonymous")
+      .test();
+    const res = await api.get("/", {
+      headers: { authorization: "Basic dXNlcjpwYXNz" },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("anonymous");
+  });
+});
+
+// Config mistakes fail at boot, where the operator sees them, rather than
+// per-login in the visitor's face.
+describe("boot-time validation", () => {
+  const base = {
+    providers: "github",
+    onLogin: (p: any) => p.id,
+    getUser: (id: string) => ({ id }),
+  };
+  beforeAll(() => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+  });
+
+  it("takes any duration the cookie parser takes", () => {
+    expect(() => server({ secrets: "s", auth: { ...base, expires: "1y" } })).not.toThrow();
+    expect(() => server({ secrets: "s", auth: { ...base, expires: "12 hours" } })).not.toThrow();
+  });
+
+  it("refuses a duration it cannot parse", () => {
+    expect(() => server({ secrets: "s", auth: { ...base, expires: "1 parsec" } })).toThrow(
+      /expires/,
+    );
+  });
+
+  it("refuses to boot in production with no stable secret", () => {
+    const env2 = globalThis.env as Record<string, string | undefined>;
+    env2.NODE_ENV = "production";
+    try {
+      expect(() => server({ auth: base })).toThrow(/SECRETS/);
+      // With one set, it boots
+      expect(() => server({ secrets: "s", auth: base })).not.toThrow();
+    } finally {
+      delete env2.NODE_ENV;
+    }
   });
 });

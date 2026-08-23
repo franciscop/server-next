@@ -9,7 +9,7 @@ import type {
   Strategy,
 } from "../types";
 import type { Server } from "..";
-import { inCookie, isSigned, issue, meta, read } from "./credential";
+import { inCookie, isSigned, issue, meta, read, seconds } from "./credential";
 import type { Provider } from "./providers/oauth";
 import shipped, { ISSUERS } from "./providers";
 import oidcProvider from "./providers/oidc";
@@ -65,19 +65,14 @@ const target = async (
 
 export function entry(config: AuthConfig): AuthEntry {
   const list = parseProviders(config.providers);
-  const strategies = (
-    Array.isArray(config.strategy)
-      ? config.strategy
-      : [config.strategy ?? "session"]
-  ) as Strategy[];
-  for (const one of strategies) {
-    if (!["session", "cookie", "token", "jwt"].includes(one)) {
-      throw new Error(
-        `Unknown strategy "${one}"; it takes 'session', 'cookie', 'token' or 'jwt'.`,
-      );
-    }
+  const strategy = (config.strategy ?? "session") as Strategy;
+  if (!["session", "cookie", "token", "jwt"].includes(strategy)) {
+    throw new Error(
+      `Unknown strategy "${strategy}"; it takes 'session', 'cookie', 'token' or 'jwt'.`,
+    );
   }
   const expires = config.expires ?? "30d";
+  seconds(expires); // a bad duration is a config error, so it fails at boot
 
   const { onLogin, getUser, toPublicUser, onLogout } = config;
 
@@ -86,21 +81,19 @@ export function entry(config: AuthConfig): AuthEntry {
   if (onLogin && !getUser) {
     throw new Error("`onLogin` needs a `getUser`: something has to resolve the id it returns.");
   }
-  for (const strategy of strategies) {
-    if (isSigned(strategy)) {
-      if (getUser && !toPublicUser) {
-        throw new Error(
-          `The \`${strategy}\` strategy signs the user into the credential, so it ` +
-            "needs a `toPublicUser` to say what goes in. Signing the whole row " +
-            "would publish whatever else is on it.",
-        );
-      }
-    } else if (!getUser) {
+  if (isSigned(strategy)) {
+    if (getUser && !toPublicUser) {
       throw new Error(
-        `The \`${strategy}\` strategy puts an id in the credential, so it needs a ` +
-          "`getUser` to resolve it. With no database, use `cookie` or `jwt`.",
+        `The \`${strategy}\` strategy signs the user into the credential, so it ` +
+          "needs a `toPublicUser` to say what goes in. Signing the whole row " +
+          "would publish whatever else is on it.",
       );
     }
+  } else if (!getUser) {
+    throw new Error(
+      `The \`${strategy}\` strategy puts an id in the credential, so it needs a ` +
+        "`getUser` to resolve it. With no database, use `cookie` or `jwt`.",
+    );
   }
 
   // The default toPublicUser: what gets signed is held and readable by the
@@ -120,12 +113,24 @@ export function entry(config: AuthConfig): AuthEntry {
     // Signed strategies with no callbacks carry the profile itself
     const payload = getUser
       ? await (async () => {
-          const id = await onLogin!(profile, ctx);
+          let id: string | number | undefined;
+          try {
+            id = await onLogin!(profile, ctx);
+          } catch (error) {
+            // A refusal, and its message is meant for the person reading it
+            (error as any).expose = true;
+            throw error;
+          }
           if (id === undefined || id === null) {
             throw new Error("`onLogin` must return the id the credential points at");
           }
-          if (!isSigned(strategies[0])) return { sub: String(id) };
+          if (!isSigned(strategy)) return { sub: String(id) };
           const user = await getUser(String(id), ctx);
+          if (user === undefined || user === null) {
+            // Signing an empty credential would look like a successful login
+            // that leaves them anonymous everywhere
+            throw new Error(`getUser returned nothing for the id "${id}" that onLogin just returned`);
+          }
           return { user: await toPublicUser!(user) };
         })()
       : { user: publicProfile(profile) };
@@ -137,7 +142,7 @@ export function entry(config: AuthConfig): AuthEntry {
     const user = signed.user ?? (await getUser!(signed.sub as string, ctx));
     const to = await target(loginTo, "/", user, ctx);
 
-    if (inCookie(strategies[0])) {
+    if (inCookie(strategy)) {
       return cookies("session", {
         value: token,
         path: "/",
@@ -156,9 +161,8 @@ export function entry(config: AuthConfig): AuthEntry {
     name: "flow",
 
     async user(ctx: Context) {
-      const found = await read(ctx, strategies);
-      if (!found) return;
-      const { payload, strategy } = found;
+      const payload = await read(ctx, strategy);
+      if (!payload) return;
       ctx.auth = meta(payload, strategy);
       if (payload.user) return payload.user;
       if (!payload.sub) return;
@@ -203,11 +207,14 @@ export function entry(config: AuthConfig): AuthEntry {
             );
             res = await finish(ctx, profile);
           } catch (error) {
-            // `onLogin` refuses a login by throwing, and its message is meant
-            // for the person reading it
+            // Only a deliberate refusal (an `onLogin` throw) reaches the
+            // visitor; anything else could leak internals, so it is logged
+            // for the operator and shown as a generic failure
             const to = await target(redirects.error, "/", null, ctx);
-            const message = (error as Error).message;
-            res = redirect(`${to}?error=${encodeURIComponent(message)}`);
+            let message = "Could not sign you in";
+            if ((error as any)?.expose) message = (error as Error).message;
+            else console.error(`[server:auth] ${name} callback failed:`, error);
+            res = await redirect(`${to}?error=${encodeURIComponent(message)}`);
           }
           // One-time use: the state is spent
           res.headers.append(
@@ -221,12 +228,10 @@ export function entry(config: AuthConfig): AuthEntry {
       }
 
       app.post("/auth/logout", SPEC, async (ctx: Context) => {
-        const found = await read(ctx, strategies).catch(() => undefined);
-        if (onLogout && found?.payload.sub) {
-          await onLogout(found.payload.sub, ctx);
-        }
+        const payload = await read(ctx, strategy).catch(() => undefined);
+        if (onLogout && payload?.sub) await onLogout(payload.sub, ctx);
         const to = await target(redirects.logout, "/", null, ctx);
-        if (!inCookie(strategies[0])) return status(204);
+        if (!inCookie(strategy)) return status(204);
         return cookies("session", { value: null }).redirect(to);
       });
     },

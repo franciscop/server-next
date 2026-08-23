@@ -109,3 +109,100 @@ describe("the login callback", () => {
     expect(seen.raw.company).toBe("Analytical Engines");
   });
 });
+
+// Only a deliberate refusal reaches the visitor. Anything else (a database
+// down, a bad client secret) is logged for the operator and shown generically.
+describe("what the visitor sees when a login fails", () => {
+  const realFetch = globalThis.fetch;
+  const realError = console.error;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    console.error = realError;
+  });
+
+  const login = async (api: any) => {
+    const res = await api.get("/auth/login/github");
+    const state = new URL(res.headers.get("location")).searchParams.get("state");
+    const cookie = res.headers.get("set-cookie").split(";")[0];
+    return api.get(`/auth/callback/github?code=c0d3&state=${state}`, {
+      headers: { cookie },
+    });
+  };
+
+  it("shows an onLogin refusal verbatim", async () => {
+    globalThis.fetch = (async (url: any, opts: any) => {
+      const one = url instanceof Request ? url.url : String(url);
+      if (one.includes("access_token")) return Response.json({ access_token: "t" });
+      if (one.includes("api.github.com/user")) {
+        return Response.json({ id: 1, email: "a@b.c", name: "Ada" });
+      }
+      return realFetch(url, opts);
+    }) as typeof fetch;
+
+    const api = server({
+      secrets: "s",
+      auth: {
+        providers: "github",
+        onLogin: () => {
+          throw new Error("Use your work account");
+        },
+        getUser: (id: string) => ({ id }),
+      },
+    }).test();
+
+    const res = await login(api);
+    expect(res.headers.get("location")).toContain(
+      `error=${encodeURIComponent("Use your work account")}`,
+    );
+  });
+
+  it("hides an internal failure behind a generic message, and logs it", async () => {
+    // The token exchange itself blows up: a bad client secret, an outage
+    globalThis.fetch = (async () => {
+      throw new Error("connect ECONNREFUSED 10.0.0.5:443");
+    }) as unknown as typeof fetch;
+
+    const logged: any[] = [];
+    console.error = (...args: any[]) => logged.push(args.join(" "));
+
+    const api = server({ secrets: "s", auth: "cookie:github" }).test();
+    const res = await login(api);
+
+    const location = res.headers.get("location");
+    expect(location).toContain(encodeURIComponent("Could not sign you in"));
+    expect(location).not.toContain("ECONNREFUSED");
+    // The operator gets the real error object (its cause carries the
+    // network detail); the visitor gets none of it
+    expect(logged.join(" ")).toContain("github callback failed");
+  });
+
+  it("treats getUser returning nothing at login as a failure, not a login", async () => {
+    globalThis.fetch = (async (url: any, opts: any) => {
+      const one = url instanceof Request ? url.url : String(url);
+      if (one.includes("access_token")) return Response.json({ access_token: "t" });
+      if (one.includes("api.github.com/user")) {
+        return Response.json({ id: 1, email: "a@b.c", name: "Ada" });
+      }
+      return realFetch(url, opts);
+    }) as typeof fetch;
+    console.error = () => {};
+
+    const api = server({
+      secrets: "s",
+      auth: {
+        providers: "github",
+        strategy: "cookie",
+        onLogin: () => "ghost",
+        getUser: () => undefined,
+        toPublicUser: (u: any) => u,
+      },
+    }).test();
+
+    const res = await login(api);
+    // A generic failure, and no session cookie: not a silent anonymous login
+    expect(res.headers.get("location")).toContain(
+      encodeURIComponent("Could not sign you in"),
+    );
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("session=ey");
+  });
+});

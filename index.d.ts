@@ -203,7 +203,7 @@ type RedirectOption = string | ((user: any, ctx: Context) => Awaitable<string>) 
 };
 type AuthConfig<U = AuthProfile> = {
     providers: string | readonly string[] | Record<string, string | ProviderOptions>;
-    strategy?: Strategy | readonly Strategy[];
+    strategy?: Strategy;
     expires?: string;
     redirect?: RedirectOption;
     onLogin?: (profile: AuthProfile, ctx: Context) => Awaitable<string | number | undefined>;
@@ -224,8 +224,8 @@ type AuthInstance = {
     user?: (ctx: Context) => Awaitable<any>;
 };
 type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
-type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | AuthInstance | readonly AuthOption[];
-type UserOf<A> = A extends readonly (infer M)[] ? UserOf<M> : A extends (...args: any[]) => infer R ? NonNullable<Awaited<R>> : A extends {
+type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | AuthInstance;
+type UserOf<A> = A extends (...args: any[]) => infer R ? NonNullable<Awaited<R>> : A extends {
     getUser: (...args: any[]) => infer R;
 } ? NonNullable<Awaited<R>> : A extends {
     issuer: any;
@@ -237,7 +237,7 @@ type AuthEntry = {
     user: (ctx: Context) => Promise<any>;
     routes?: (app: Server) => void;
 };
-type AuthSettings = AuthEntry[];
+type AuthSettings = AuthEntry;
 type LogLevel = "info";
 type Logger = {
     level?: LogLevel;
@@ -595,11 +595,6 @@ declare function server<U>(options: Omit<Options, "auth"> & {
     auth: AuthFunction<U>;
 }): Server<{
     user: NonNullable<Awaited<U>>;
-}>;
-declare function server<A extends readonly AuthOption[]>(options: Omit<Options, "auth"> & {
-    auth: A;
-}): Server<{
-    user: UserOf<A[number]>;
 }>;
 declare function server<C extends ContextTypes = {}>(options?: Options): Server<C>;
 

@@ -136,17 +136,15 @@ export default function config(options: Options = {}): Settings {
 
   // Every credential is signed with the first `secrets` entry. With none set,
   // config generates a random `unsafe-` one per process, which would
-  // invalidate every credential on restart and across instances, so warn
-  // loudly (always, not gated on `log`, since it silently breaks auth).
-  if (
-    settings.auth?.some((one) => one.name === "flow") &&
-    settings.secrets[0].startsWith("unsafe-")
-  ) {
-    console.warn(
-      "[server:auth] auth with no SECRETS set: credentials are signed with a " +
-        "random per-process secret, so they break on restart and across " +
-        "instances. Set the SECRETS environment variable (or the `secrets` option).",
-    );
+  // invalidate every credential on restart and across instances: a warning in
+  // development, a refusal in production.
+  if (settings.auth?.name === "flow" && settings.secrets[0].startsWith("unsafe-")) {
+    const message =
+      "Auth needs a stable secret: credentials are signed with it, and the " +
+      "random per-process fallback breaks them on restart and across " +
+      "instances. Set the SECRETS environment variable (or the `secrets` option).";
+    if (env.NODE_ENV === "production") throw new Error(message);
+    console.warn(`[server:auth] ${message}`);
   }
 
   // OpenAPI: the generated spec, served at its conventional path by default.
@@ -171,10 +169,7 @@ export default function config(options: Options = {}): Settings {
 
   // Startup summary: one concise line per configured module (only with `log`)
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
-  if (settings.auth) {
-    const names = settings.auth.map((one) => one.name).join(", ");
-    log.message("auth", ` enabled`);
-  }
+  if (settings.auth) log.message("auth", `${settings.auth.name} enabled`);
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {

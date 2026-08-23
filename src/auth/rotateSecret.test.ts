@@ -32,14 +32,15 @@ describe("rotating `secrets` with a live login", () => {
     expect((await me(app(OLD), before)).status).toBe(200);
     expect((await me(app([NEW, OLD]), before)).status).toBe(200);
 
-    // ...and stops once the old key is dropped, a full `expires` window later
-    expect((await me(app([NEW]), before)).status).toBe(401);
+    // ...and once the old key is dropped, those sessions are signed out: a
+    // stale cookie is anonymous rather than an error
+    expect(await (await me(app([NEW]), before)).text()).toBe("anonymous");
   });
 
   it("signs new credentials with the first key", async () => {
     const after = await signJwt({ sub: "u1" }, NEW, 3600);
     expect((await me(app([NEW, OLD]), after)).status).toBe(200);
-    expect((await me(app([OLD]), after)).status).toBe(401);
+    expect(await (await me(app([OLD]), after)).text()).toBe("anonymous");
   });
 });
 
