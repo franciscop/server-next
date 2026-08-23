@@ -6,6 +6,7 @@ export { default as cors, applyCors } from "./cors";
 export { default as createCookies } from "./createCookies";
 export { default as createId } from "./createId";
 export { default as etag } from "./etag";
+export { default as forwarded } from "./forwarded";
 export { default as createWebsocket } from "./createWebsocket";
 export { default as define } from "./define";
 export { default as getMachine } from "./getMachine";

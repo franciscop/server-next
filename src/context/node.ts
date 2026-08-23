@@ -4,6 +4,7 @@ import type { Context, Server } from "..";
 import {
   clientIp,
   define,
+  forwarded,
   parseCookies,
   parseHeaders,
   setBodySource,
@@ -40,6 +41,9 @@ export default async function createNode(
   const path = (req.url || "/").replace(/\/$/, "") || "/";
   const baseUrl = `${scheme}://${host}`;
   const url = new URL(path, baseUrl) as Context["url"];
+  // The socket only knows whether *this* hop was TLS, which behind a proxy is
+  // not what the visitor used. See the note in the winter adapter.
+  forwarded(url, headers, app.settings.security.trustProxy);
   define(url, "query", (url: URL) =>
     Object.fromEntries(url.searchParams.entries()),
   );

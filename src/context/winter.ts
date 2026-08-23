@@ -2,6 +2,7 @@ import type { Context, Server } from "..";
 import {
   clientIp,
   define,
+  forwarded,
   parseCookies,
   parseHeaders,
   setBodySource,
@@ -26,6 +27,10 @@ export default async function createWinter(
 
   const baseUrl = req.url.replace(/\/$/, "") || "/";
   const url = new URL(baseUrl) as Context["url"];
+  // A TLS-terminating proxy forwards plain HTTP, so the wire scheme and host
+  // are not the visitor's. Every consumer of ctx.url depends on this being
+  // right: absolute links, redirects, and the OAuth redirect_uri.
+  forwarded(url, headers, app.settings.security.trustProxy);
   define(url, "query", (url: URL) =>
     Object.fromEntries(url.searchParams.entries()),
   );

@@ -2110,6 +2110,27 @@ function applyCors(res, ctx) {
   }
 }
 
+// src/helpers/forwarded.ts
+var first2 = (value) => {
+  const one = Array.isArray(value) ? value[0] : value;
+  return one?.split(",")[0].trim() || void 0;
+};
+function forwarded(url, headers2, trustProxy) {
+  if (!trustProxy) return;
+  const proto = first2(headers2["x-forwarded-proto"]);
+  if (proto === "http" || proto === "https") url.protocol = `${proto}:`;
+  const host = first2(headers2["x-forwarded-host"]);
+  const port = first2(headers2["x-forwarded-port"]);
+  if (host?.includes(":")) {
+    url.host = host;
+  } else if (host) {
+    url.hostname = host;
+    url.port = port ?? "";
+  } else if (port) {
+    url.port = port;
+  }
+}
+
 // src/helpers/createWebsocket.ts
 function createWebsocket(sockets, handlers) {
   const run2 = (event, socket, body) => {
@@ -2906,6 +2927,7 @@ async function createNode(req, app, signal = new AbortController().signal) {
   const path = (req.url || "/").replace(/\/$/, "") || "/";
   const baseUrl = `${scheme}://${host}`;
   const url = new URL(path, baseUrl);
+  forwarded(url, headers2, app.settings.security.trustProxy);
   define(
     url,
     "query",
@@ -2949,6 +2971,7 @@ async function createWinter(req, app, server2) {
   const cookies2 = parseCookies(headers2.cookie);
   const baseUrl = req.url.replace(/\/$/, "") || "/";
   const url = new URL(baseUrl);
+  forwarded(url, headers2, app.settings.security.trustProxy);
   define(
     url,
     "query",
