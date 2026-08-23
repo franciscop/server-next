@@ -1,6 +1,6 @@
 import server from "../../";
 import { ServerStyleSheet } from "styled-components";
-import { styled, getStyles } from "./ssr.jsx";
+import { styled, getStyles } from "./ssr";
 
 const Title = styled.h1`
   font-size: 2rem;
