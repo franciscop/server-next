@@ -2498,7 +2498,7 @@ function parseRange(header, size) {
 }
 
 // src/middle/assets.ts
-var CACHE_CONTROL = "public, max-age=3600";
+var DEFAULT_CACHE = "public, max-age=3600";
 async function assets(ctx) {
   if (!ctx.options.public) return;
   if (ctx.method !== "get" && ctx.method !== "head") return;
@@ -2511,7 +2511,9 @@ async function assets(ctx) {
     if (info ? !meta2 : !await file2.exists()) return;
     const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
     const ctype = ext && mimes_default[ext] || meta2?.type || ext;
-    const headers2 = { "cache-control": CACHE_CONTROL };
+    const headers2 = {
+      "cache-control": resolveCache(ctx.options.cache) ?? DEFAULT_CACHE
+    };
     let tag;
     if (meta2) {
       const stamp = meta2.modified ? meta2.modified.getTime() : 0;

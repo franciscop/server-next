@@ -1,9 +1,13 @@
+import { resolveCache } from "../helpers/cache";
 import mimes from "../helpers/mimes";
 import parseRange from "../helpers/parseRange";
 import { status, type } from "../reply";
 import type { Context } from "../types";
 
-const CACHE_CONTROL = "public, max-age=3600";
+// What an asset is cached for when the app hasn't said. A global `cache`
+// replaces it, including `cache: false`, so turning caching off turns it off
+// here too.
+const DEFAULT_CACHE = "public, max-age=3600";
 
 export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;
@@ -28,7 +32,9 @@ export default async function assets(ctx: Context) {
     // for text types; the bucket's type covers extensions we don't know.
     const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
     const ctype = (ext && mimes[ext]) || meta?.type || ext;
-    const headers: Record<string, string> = { "cache-control": CACHE_CONTROL };
+    const headers: Record<string, string> = {
+      "cache-control": resolveCache(ctx.options.cache) ?? DEFAULT_CACHE,
+    };
 
     let tag: string | undefined;
     if (meta) {

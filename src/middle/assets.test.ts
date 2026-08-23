@@ -72,6 +72,43 @@ describe("static assets", () => {
   });
 });
 
+describe("static assets and the `cache` option", () => {
+  it("follows a global `cache` instead of the default hour", async () => {
+    const app = server({ public: "./", cache: "1d" }).test();
+    const res = await app.get("/readme.md");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+  });
+
+  it("honours `cache: false`, so nothing is cached when caching is off", async () => {
+    const app = server({ public: "./", cache: false }).test();
+    const res = await app.get("/readme.md");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("keeps the default hour when no `cache` is set", async () => {
+    const app = server({ public: "./" }).test();
+    const res = await app.get("/readme.md");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+  });
+
+  it("carries the same value on a 304", async () => {
+    const app = server({ public: "./", cache: "1d" }).test();
+    const first = await app.get("/readme.md");
+    const res = await app.get("/readme.md", {
+      headers: { "if-none-match": first.headers.get("etag")! },
+    });
+    expect(res.status).toBe(304);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+  });
+
+  it("carries the same value on a range response", async () => {
+    const app = server({ public: "./", cache: "1d" }).test();
+    const res = await app.get("/readme.md", { headers: { range: "bytes=0-3" } });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+  });
+});
+
 describe("static assets over a real bucket (bucket lib)", () => {
   afterAll(cleanupBuckets);
 
