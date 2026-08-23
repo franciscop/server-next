@@ -30,6 +30,10 @@ export const getStyles = (sheet) => {
     const styleTags = sheet.getStyleTags();
     sheet.seal();
     _sheet = null;
-    return html.replace("</head>", `${styleTags}</head>`);
+    // A fragment (an htmx swap) has no <head>, so the styles go in front of
+    // it rather than being dropped
+    const head = html.indexOf("</head>");
+    if (head === -1) return styleTags + html;
+    return html.slice(0, head) + styleTags + html.slice(head);
   };
 };

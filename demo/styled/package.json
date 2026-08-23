@@ -1,16 +1,18 @@
 {
-  "name": "styled",
+  "name": "styled-demo",
   "version": "0.0.1",
-  "main": "index.jsx",
+  "private": true,
+  "type": "module",
+  "main": "index.tsx",
   "author": "Francisco Presencia <public@francisco.io> (https://francisco.io/)",
   "license": "MIT",
-  "description": "Demo using styled-components with server-side rendering",
+  "description": "Component-scoped CSS in ~200 lines, with no dependencies",
   "dependencies": {
-    "@server/next": "file:../../",
-    "styled-components": "^6"
+    "@server/next": "file:../../"
   },
   "scripts": {
     "dev": "bun --hot .",
-    "start": "bun ."
+    "start": "bun .",
+    "test": "bun test"
   }
 }
