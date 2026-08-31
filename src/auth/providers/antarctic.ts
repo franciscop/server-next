@@ -1,6 +1,7 @@
 import type { AuthProfile, Context, ProviderOptions } from "../../types";
+import toArray from "../../util/toArray";
 import type { Provider } from "./oauth";
-import { credentials, passthrough } from "./oauth";
+import { callbackUrl, credentials, passthrough } from "./oauth";
 
 // Every provider antarctic ships, wrapped once. Their classes already own the
 // endpoints, the token exchange and the profile mapping, so this only bridges
@@ -21,8 +22,8 @@ export default function antarcticProvider(
   Client: any,
 ): Provider {
   const client = (ctx: Context, options: ProviderOptions) => {
+    // A missing id was already refused at boot (parseProviders)
     const { id, secret } = credentials(name, options);
-    if (!id) throw new Error(`${name.toUpperCase()}_ID is not set`);
     return new Client({
       // Whatever that provider needs beyond the standard four: Auth0 takes a
       // `domain`, Keycloak a `realm`, Gitea a `baseURL`, Mastodon an
@@ -30,11 +31,10 @@ export default function antarcticProvider(
       ...passthrough(options),
       clientId: id,
       clientSecret: secret,
-      redirectURI: `${ctx.url.origin}/auth/callback/${name}`,
+      redirectURI: callbackUrl(ctx, name),
+      // One list whether given as an array or a space-separated string
       scopes: options.scope
-        ? Array.isArray(options.scope)
-          ? options.scope
-          : options.scope.split(" ")
+        ? toArray<string>(options.scope).flatMap((s) => s.split(" "))
         : undefined,
       store: nowhere,
     });

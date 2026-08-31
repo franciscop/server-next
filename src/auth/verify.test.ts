@@ -22,6 +22,43 @@ describe("checking a token minted elsewhere", () => {
   const withToken = (token: string) =>
     app().test().get("/me", { headers: { authorization: `Bearer ${token}` } });
 
+  // Dashboards print an issuer both ways, and `iss` itself carries the slash
+  // for some (Auth0), so neither side can be trusted to be bare.
+  it("matches an issuer configured with a trailing slash", async () => {
+    const app = server({
+      auth: { issuer: `${ISSUER}/`, audience: AUDIENCE },
+    }).get("/me", (ctx) => ctx.user ?? "anonymous");
+    const token = await signRS256(issuer.key, {
+      iss: ISSUER,
+      aud: AUDIENCE,
+      sub: "u1",
+    });
+    const res = await app
+      .test()
+      .get("/me", { headers: { authorization: `Bearer ${token}` } });
+    expect(res.status).toBe(200);
+  });
+
+  it("matches a token whose `iss` carries the trailing slash", async () => {
+    const token = await signRS256(issuer.key, {
+      iss: `${ISSUER}/`,
+      aud: AUDIENCE,
+      sub: "u1",
+    });
+    const res = await withToken(token);
+    expect(res.status).toBe(200);
+  });
+
+  it("still rejects a different issuer", async () => {
+    const token = await signRS256(issuer.key, {
+      iss: "https://elsewhere.test",
+      aud: AUDIENCE,
+      sub: "u1",
+    });
+    const res = await withToken(token);
+    expect(res.status).toBe(401);
+  });
+
   it("finds the keys through the discovery document", async () => {
     const token = await signRS256(issuer.key, {
       iss: ISSUER,
@@ -243,5 +280,34 @@ describe("a vendor's stale cookie clears itself", () => {
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("__session=");
     expect(setCookie.toLowerCase()).toContain("max-age=0");
+  });
+});
+
+describe("ctx.auth for a token minted elsewhere", () => {
+  const ISSUER = "https://meta-issuer.test";
+  let issuer: Awaited<ReturnType<typeof testIssuer>>;
+
+  beforeAll(async () => {
+    issuer = await testIssuer(ISSUER);
+  });
+  afterAll(() => issuer.restore());
+
+  it("reads the claims, and names the issuer as the provider", async () => {
+    const app = server({
+      auth: { issuer: ISSUER, audience: "my-api" },
+    }).get("/auth", (ctx) => ctx.auth ?? "none");
+
+    const token = await signRS256(issuer.key, {
+      iss: ISSUER,
+      aud: "my-api",
+      sub: "u1",
+    });
+    const body = await (
+      await app.test().get("/auth", { headers: { authorization: `Bearer ${token}` } })
+    ).json();
+
+    expect(body.provider).toBe(ISSUER);
+    expect(body.strategy).toBe("jwt");
+    expect(Date.now() - new Date(body.issuedAt).getTime()).toBeLessThan(5000);
   });
 });

@@ -9,6 +9,17 @@ describe("static assets", () => {
     expect(await res.text()).toContain("# Server");
   });
 
+  it("wins over a same-named route; the route is the fallback", async () => {
+    const app = server({ public: "./" })
+      .get("/readme.md", () => "the route")
+      .get("/not-a-file.md", () => "the route")
+      .test();
+    // The file exists, so it is served; the route never runs
+    expect(await (await app.get("/readme.md")).text()).toContain("# Server");
+    // No file for the path, so the route answers
+    expect(await (await app.get("/not-a-file.md")).text()).toBe("the route");
+  });
+
   it("sets Cache-Control, ETag and Last-Modified", async () => {
     const app = server({ public: "./" }).test();
     const res = await app.get("/readme.md");

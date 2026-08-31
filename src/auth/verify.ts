@@ -1,17 +1,12 @@
-import ServerError from "../ServerError";
+import { clearOnSend } from "../http/createCookies";
+import { decodeJwt, unb64url } from "./jwt";
+import ServerError from "../errors";
 import type { AuthClaims, AuthEntry, AuthVerify, Context } from "../types";
+import toArray from "../util/toArray";
+import { bearer, meta } from "./credential";
+import { bare, discover } from "./discovery";
 
 const enc = new TextEncoder();
-const dec = new TextDecoder();
-
-const unb64url = (seg: string): Uint8Array<ArrayBuffer> => {
-  let b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
-  b64 += "=".repeat((4 - (b64.length % 4)) % 4);
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-};
 
 const ALGS: Record<string, any> = {
   RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
@@ -32,8 +27,7 @@ function keysOf(issuer: string, refresh = false): Promise<Map<string, CryptoKey>
   let entry = cache.get(issuer);
   if (!entry || (refresh && Date.now() - entry.at > 60_000)) {
     const keys = (async () => {
-      const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-      const discovery = await fetch(url).then((r) => r.json());
+      const discovery = await discover(issuer);
       const set = await fetch(discovery.jwks_uri).then((r) => r.json());
       const out = new Map<string, CryptoKey>();
       for (const jwk of set.keys ?? []) {
@@ -55,32 +49,19 @@ function keysOf(issuer: string, refresh = false): Promise<Map<string, CryptoKey>
   return entry.keys;
 }
 
-const bearer = (ctx: Context): string | undefined => {
-  const header = ctx.headers.authorization as string | undefined;
-  if (!header) return;
-  const [type, token] = header.trim().split(" ");
-  // Another scheme (Basic, a proxy's) is not ours to police: no credential
-  if (type?.toLowerCase() !== "bearer") return;
-  if (!token) throw ServerError.AUTH_INVALID_HEADER({ type });
-  return token;
-};
-
-export function entry(options: AuthVerify): AuthEntry {
-  const { issuer, audience } = options;
+export default function verifyEntry(options: AuthVerify): AuthEntry {
+  const issuer = bare(options.issuer);
+  const { audience } = options;
   // Standard is `aud`, but Clerk puts the authorized party in `azp` and
   // Cognito access tokens use `client_id`. The first one present is checked.
-  const claimNames = options.audienceClaim
-    ? Array.isArray(options.audienceClaim)
-      ? options.audienceClaim
-      : [options.audienceClaim]
-    : ["aud"];
+  const claimNames = toArray(options.audienceClaim ?? "aud");
   if (!audience) {
     throw new Error(
       "`issuer` needs an `audience`: one issuer serves many applications, " +
         "and without it a token minted for another one is accepted here.",
     );
   }
-  const allowed = Array.isArray(audience) ? audience : [audience];
+  const allowed = toArray(audience);
 
   return {
     name: `verify:${issuer}`,
@@ -94,23 +75,24 @@ export function entry(options: AuthVerify): AuthEntry {
       try {
         claims = await check(token, issuer, allowed, claimNames);
       } catch (error) {
+        // An unreachable issuer is an outage, not a bad credential: clearing
+        // the cookie here would sign everyone out on a network blip
+        if ((error as any)?.code === "AUTH_ISSUER_UNREACHABLE") throw error;
         // A stale or foreign cookie is just signed out, and cleared so it
         // stops arriving; their SDK re-issues a good one. A bad bearer token
         // was sent deliberately: 401.
         if (!options.cookie) throw error;
-        (ctx as any).clearCookie = options.cookie;
+        clearOnSend(ctx, options.cookie);
         ctx.options.log?.message(
           "auth",
           `discarded a ${options.cookie} cookie that ${issuer} did not sign, or that has expired`,
         );
         return;
       }
-      ctx.auth = {
-        issuedAt: new Date((claims.iat ?? 0) * 1000),
-        expiresAt: claims.exp ? new Date(claims.exp * 1000) : undefined,
-        strategy: options.cookie ? "cookie" : "jwt",
-        provider: issuer,
-      };
+      ctx.auth = meta(
+        { iat: claims.iat ?? 0, exp: claims.exp, provider: issuer },
+        options.cookie ? "cookie" : "jwt",
+      );
       if (!options.getUser) return claims;
       return options.getUser(claims.sub, ctx);
     },
@@ -125,18 +107,9 @@ async function check(
   allowed: readonly string[],
   claimNames: readonly string[],
 ) {
-  const parts = token.split(".");
-  if (parts.length !== 3) throw ServerError.AUTH_INVALID_TOKEN();
-  const [head, body, sig] = parts;
-
-  let header: any;
-  let claims: any;
-  try {
-    header = JSON.parse(dec.decode(unb64url(head)));
-    claims = JSON.parse(dec.decode(unb64url(body)));
-  } catch {
-    throw ServerError.AUTH_INVALID_TOKEN();
-  }
+  const t = decodeJwt(token);
+  if (!t) throw ServerError.AUTH_INVALID_TOKEN();
+  const { head, body, sig, header, claims } = t;
 
   const algorithm = ALGS[header?.alg];
   if (!algorithm) throw ServerError.AUTH_INVALID_TOKEN(); // no `none`, no HS*
@@ -155,15 +128,14 @@ async function check(
   const now = Math.floor(Date.now() / 1000);
   if (claims.exp && now >= claims.exp) throw ServerError.AUTH_INVALID_TOKEN();
   if (claims.nbf && now < claims.nbf) throw ServerError.AUTH_INVALID_TOKEN();
-  if (claims.iss !== issuer) throw ServerError.AUTH_INVALID_TOKEN();
+  if (bare(claims.iss ?? "") !== issuer) throw ServerError.AUTH_INVALID_TOKEN();
 
   // Whichever of the configured claims this token actually carries
   const name = claimNames.find((one) => claims[one] !== undefined);
   if (!name) throw ServerError.AUTH_INVALID_TOKEN();
-  const value = claims[name];
-  const aud = Array.isArray(value) ? value : [value];
+  const aud = toArray(claims[name]);
   if (!aud.some((one: string) => allowed.includes(one))) {
     throw ServerError.AUTH_INVALID_TOKEN();
   }
-  return claims;
+  return claims as AuthClaims;
 }

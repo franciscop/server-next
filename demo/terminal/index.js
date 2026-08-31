@@ -134,26 +134,33 @@ ${printableRows.map((row) => `│  ${row.text}${"".padEnd(size - totalSize, " ")
 
 render();
 
-const logger = (ctx) => {
-  ctx.unstableOn("finish", async (e) => {
-    rows.push({
-      method: ctx.method,
-      path: ctx.url.pathname,
-      status: e.res.status,
-      reqSize: e.headers["content-length"] || 0,
-      error: e.error,
-      type: (e.res.headers.get("content-type") || "plain/text")
-        .split(";")[0]
-        .split("/")[1],
-      resSize: (await e.res.clone().arrayBuffer()).byteLength,
-      time: Math.round(100 * (e.end - e.init)) / 100,
-    });
-    render();
-  });
+// The thrown error is only visible here, so it is kept for the line below
+const errors = new WeakMap();
+
+const onError = (error, ctx) => {
+  errors.set(ctx, error);
+  return new Response(error.message, { status: 500 });
 };
 
-export default server()
-  .use(logger)
+// Every finished response, whatever produced it: a route, a 404, an error
+const onResponse = async (res, ctx) => {
+  const init = ctx.time?.times?.[0]?.[1] ?? performance.now();
+  rows.push({
+    method: ctx.method,
+    path: ctx.url.pathname,
+    status: res.status,
+    reqSize: ctx.headers["content-length"] || 0,
+    error: errors.get(ctx),
+    type: (res.headers.get("content-type") || "plain/text")
+      .split(";")[0]
+      .split("/")[1],
+    resSize: (await res.clone().arrayBuffer()).byteLength,
+    time: Math.round(100 * (performance.now() - init)) / 100,
+  });
+  render();
+};
+
+export default server({ onError, onResponse })
   .get(
     "/",
     () => `<!DOCTYPE html>

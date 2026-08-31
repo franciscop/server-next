@@ -16,14 +16,15 @@
     "build": "bunx tsup src/index.ts --format esm --dts --out-dir . --target node24 --external zod --external @valibot/to-json-schema",
     "prepare": "mkdir -p node_modules/@server && ln -sfn ../.. node_modules/@server/next",
     "start": "bun test --watch",
-    "lint": "npx tsc --noEmit && npx @biomejs/biome lint ./src --skip=lint/suspicious/noExplicitAny --skip=lint/style/noParameterAssign --skip=lint/suspicious/noConfusingVoidType --skip=lint/complexity/noBannedTypes",
-    "test": "npm run test:bun && tsc --noEmit",
-    "test:bun": "bun test"
+    "lint": "npx tsc --noEmit && npx @biomejs/biome lint ./src --error-on-warnings",
+    "test": "npm run test:bun && npm run lint",
+    "test:bun": "bun test src demo"
   },
   "main": "index.js",
   "type": "module",
   "types": "index.d.ts",
   "files": [
+    "index.js",
     "index.d.ts",
     "src/jsx/*.js",
     "src/jsx/jsx-runtime.d.ts"
@@ -58,7 +59,8 @@
       "Authentication": "docs/5. Authentication.md",
       "Testing": "docs/6. Testing.md",
       "Concepts": "docs/7. Concepts.md",
-      "FAQ": "docs/8. FAQ.md"
+      "Errors": "docs/8. Errors.md",
+      "FAQ": "docs/9. FAQ.md"
     },
     "tutorials": "docs/tutorials"
   },

@@ -1,7 +1,8 @@
-import { signJwt, verifyJwt } from "../helpers/jwt";
-import ServerError from "../ServerError";
+import { signJwt, verifyJwt } from "./jwt";
+import ServerError from "../errors";
 import type { Context } from "..";
 import type { Cookie } from "../types";
+import { authCookie } from "./credential";
 
 const NAME = "oauth_state";
 const EXPIRES = "10m";
@@ -18,14 +19,7 @@ export async function startState(
   pending: Pending,
 ): Promise<Cookie> {
   const value = await signJwt(pending, ctx.options.secrets[0], 10 * 60);
-  return {
-    value,
-    path: "/",
-    expires: EXPIRES,
-    httpOnly: true,
-    secure: ctx.platform.production,
-    sameSite: "Lax",
-  };
+  return authCookie(ctx, value, EXPIRES);
 }
 
 // Reject the callback unless the echoed state matches the browser's cookie

@@ -1,5 +1,5 @@
 import server from "..";
-import { signJwt } from "../helpers/jwt";
+import { signJwt } from "./jwt";
 import socketUser from "./socketUser";
 
 // The WebSocket upgrade resolves the user from the request's headers and

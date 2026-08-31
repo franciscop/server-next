@@ -7,5 +7,5 @@ export default function auth(app: Server) {
   app.use(async function middle(ctx: Context) {
     ctx.user = await entry.user(ctx);
   });
-  entry.routes?.(app);
+  if (entry.routes) app.use(entry.routes());
 }

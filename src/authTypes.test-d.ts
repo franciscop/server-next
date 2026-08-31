@@ -4,7 +4,6 @@
 import server from ".";
 
 type User = { id: string; email: string; role: "admin" | "user" };
-type Claims = { sub: string; email: string; app_metadata?: { role?: string } };
 
 declare const db: {
   users: {
@@ -82,7 +81,7 @@ server({ auth: (ctx) => db.users.byApiKey(String(ctx.headers["x-api-key"])) }).g
 // 5. One method per app: an array is refused at the type level too
 server({
   // @ts-expect-error several methods are not accepted; use `providers`
-  auth: [(ctx: any) => ({ id: "1" })],
+  auth: [(_ctx: any) => ({ id: "1" })],
 });
 
 // The explicit generic still wins, for apps that declare their own

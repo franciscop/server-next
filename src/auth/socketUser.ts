@@ -1,4 +1,5 @@
 import type { Server } from "..";
+import type { AuthContext } from "./types";
 
 // The user for a WebSocket connection, from the upgrade request's headers and
 // cookies, through the same entry as HTTP. A browser sends the session cookie
@@ -14,8 +15,14 @@ export default async function socketUser(
   cookies: Record<string, string>,
 ): Promise<any> {
   if (!app.settings.auth) return undefined;
-  // The entry only reads `options`, `headers` and `cookies`, so a partial
-  // context is enough to reuse the full HTTP resolution.
-  const ctx = { options: app.settings, headers, cookies } as any;
+  // There is no request/response cycle behind an upgrade, so this is the
+  // whole contract an entry may rely on; AuthContext types that guarantee.
+  const ctx: AuthContext = {
+    options: app.settings,
+    headers,
+    cookies,
+    platform: app.platform,
+    app,
+  };
   return app.settings.auth.user(ctx);
 }

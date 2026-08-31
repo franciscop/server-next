@@ -6,9 +6,10 @@ import type {
   RouteOptions as Options,
   PathToParams,
   Route,
+  Settings,
   StandardSchemaV1,
 } from "./types";
-import { resolveUploads } from "./helpers/upload";
+import { resolveUploads } from "./body/upload";
 
 // Middleware spelled out structurally: comparing Middleware<A> to
 // Middleware<B> uses alias variance (invariant here), rejecting smaller slices
@@ -50,6 +51,10 @@ function checkParserConflict(options: Options, globalParser?: string): void {
 }
 
 export class Router<C extends ContextTypes = {}> {
+  // Assigned by the Server subclass; a bare router has none. Declared here so
+  // route registration can check options against the global config.
+  protected settings?: Settings;
+
   // Cross-cutting middleware added with .use(); they run on every request
   middleware: Middleware[] = [];
 
@@ -86,7 +91,7 @@ export class Router<C extends ContextTypes = {}> {
     if (rest[0] != null && typeof rest[0] !== "function") {
       options = rest.shift();
     }
-    checkParserConflict(options, (this as any).settings?.parser);
+    checkParserConflict(options, this.settings?.parser);
     // Resolved here (once, at boot) so ctx.options.uploads is always the
     // final `{ bucket, ...limits }` shape no matter where it came from
     if (options.uploads !== undefined) {
@@ -234,7 +239,7 @@ export class Router<C extends ContextTypes = {}> {
         for (const m of Object.keys(arg.handlers) as Method[]) {
           for (const route of arg.handlers[m]) {
             // The router's routes now meet the server's global parser default
-            checkParserConflict(route.options, (this as any).settings?.parser);
+            checkParserConflict(route.options, this.settings?.parser);
             const base = m === "socket" ? [] : this.middleware;
             this.handlers[m].push({
               path: route.path,

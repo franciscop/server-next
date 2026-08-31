@@ -1,14 +1,9 @@
 // A local OIDC issuer for tests: its own RSA key pair, its own discovery
 // document and JWKS endpoint, served by intercepting fetch. No dependencies,
 // so the whole hosted-auth path runs with no vendor and no network.
-const enc = new TextEncoder();
+import { b64url } from "../jwt";
 
-const b64url = (data: string | Uint8Array): string => {
-  const bytes = typeof data === "string" ? enc.encode(data) : data;
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
+const enc = new TextEncoder();
 
 export async function signRS256(
   key: CryptoKeyPair,

@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import server, { file, type } from ".";
-import localBucket from "./helpers/bucket";
-import createId from "./helpers/createId";
+import localBucket from "./body/bucket";
+import createId from "./util/createId";
 
 // Fresh built-in local buckets in a throwaway temp dir.
 const ROOT = new URL("./tests/uploads/_serve/", import.meta.url).pathname;
@@ -128,7 +128,8 @@ describe("serving files stays inside the folder", () => {
     // The bucket throws rather than reading a sibling file
     const res = await (await app()).test().get("/b/..%2F..%2Fsecret.txt");
     expect(res.status).toBe(500);
-    expect(await res.text()).toContain("escapes the bucket");
+    // The bucket's own message names a path, so it stays out of the response
+    expect(await res.text()).toBe("Server Error");
   });
 
   it("a bucket keeps an absolute id inside itself", async () => {

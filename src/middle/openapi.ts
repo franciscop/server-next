@@ -23,7 +23,7 @@ const clean = ({ $schema, ...schema }: any) => schema;
 // dynamically so the framework stays dependency-free and reuses the library
 // the app built the schema with. Valibot needs its `@valibot/to-json-schema`
 // companion installed. Anything else (or a schema the vendor can't express)
-// falls back to the zod-internals reader below, then to a plain string.
+// is simply omitted from the spec rather than guessed at.
 async function toJsonSchema(schema: any): Promise<any> {
   try {
     if (typeof schema?.toJsonSchema === "function") {
@@ -39,44 +39,19 @@ async function toJsonSchema(schema: any): Promise<any> {
       return clean(mod.toJsonSchema(schema));
     }
   } catch {
-    // fall through to the introspection fallback
+    // an unconvertible schema is left out of the spec
   }
-  return zodToSchema(schema);
+  return undefined;
 }
 
-// Convert Zod to OpenAPI requestBody without external libraries
-function zodToSchema(schema: any): any {
-  const type = schema?.def?.type || "string";
-
-  if (type === "object") {
-    const shape = schema.def.shape;
-    const properties: Record<string, any> = {};
-    const req: string[] = [];
-
-    for (const key in shape) {
-      const field = shape[key];
-      properties[key] = zodToSchema(field);
-
-      if (!field.isOptional() && !field.isNullable()) {
-        req.push(key);
-      }
-    }
-    const required = req.length ? req : undefined;
-
-    return { type, properties, required };
-  }
-
-  if (type === "array") {
-    return { type, items: zodToSchema(schema.def.element) };
-  }
-
-  return { type };
-}
-
-const pkgProm = fsp
-  .readFile("package.json", "utf-8")
-  .then((data) => JSON.parse(data))
-  .catch(() => ({}));
+// Read once, on the first spec request, not at import time: the module loads
+// with the framework whether or not openapi is enabled.
+let pkgProm: Promise<Record<string, any>> | undefined;
+const getPkg = () =>
+  (pkgProm ??= fsp
+    .readFile("package.json", "utf-8")
+    .then((data) => JSON.parse(data))
+    .catch(() => ({})));
 
 const generateOpenApiPaths = async (
   handlers: Record<string, any[]>,
@@ -111,7 +86,9 @@ const generateOpenApiPaths = async (
         | undefined;
       if (meta?.body) {
         const schema = await toJsonSchema(meta.body);
-        requestBody = { content: { "application/json": { schema } } };
+        if (schema) {
+          requestBody = { content: { "application/json": { schema } } };
+        }
       }
 
       let responses:
@@ -124,9 +101,11 @@ const generateOpenApiPaths = async (
         | undefined;
       if (meta?.response) {
         const schema = await toJsonSchema(meta.response);
-        responses = {
-          200: { description: "OK", content: { "application/json": { schema } } },
-        };
+        if (schema) {
+          responses = {
+            200: { description: "OK", content: { "application/json": { schema } } },
+          };
+        }
       }
 
       const parameters: any[] = [];
@@ -149,7 +128,7 @@ const generateOpenApiPaths = async (
       // A `query` schema's properties become the query parameters
       if (meta?.query) {
         const schema = await toJsonSchema(meta.query);
-        for (const [name, prop] of Object.entries(schema.properties ?? {})) {
+        for (const [name, prop] of Object.entries(schema?.properties ?? {})) {
           parameters.push({
             name,
             in: "query",
@@ -179,7 +158,7 @@ const generateOpenApiPaths = async (
 // The spec itself, as JSON. There's no built-in viewer: every docs UI is a
 // static shell pointing at this route, so it stays a copy-paste in the docs.
 export default async (ctx: Context): Promise<Record<string, any>> => {
-  const pkg = await pkgProm;
+  const pkg = await getPkg();
   // The root option wins; the app's own package.json fills the rest
   const { title, description, version } = ctx.options.openapi ?? {};
   const domain = (pkg as any).homepage || ctx.url.origin;

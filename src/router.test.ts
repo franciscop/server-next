@@ -137,19 +137,28 @@ describe("global middleware as a fallthrough", () => {
 });
 
 describe("per-route options", () => {
-  it("merges route options over the global settings (local wins)", async () => {
-    const api = server({ secrets: "g" })
-      .get("/a", { schema: { tags: "x", title: "T" } }, (ctx) => ({
-        schema: (ctx.options as any).schema,
+  it("merges route settings over the global ones (local wins)", async () => {
+    const api = server({ secrets: "g", cache: "1h" })
+      .get("/a", { cache: false }, (ctx) => ({
+        cache: ctx.options.cache,
         secrets: ctx.options.secrets,
       }))
-      .get("/b", (ctx) => ({ schema: (ctx.options as any).schema ?? null }))
+      .get("/b", (ctx) => ({ cache: ctx.options.cache }))
       .test();
 
     expect(await (await api.get("/a")).json()).toEqual({
-      schema: { tags: "x", title: "T" },
+      cache: false,
       secrets: ["g"],
     });
-    expect(await (await api.get("/b")).json()).toEqual({ schema: null });
+    expect(await (await api.get("/b")).json()).toEqual({ cache: "1h" });
+  });
+
+  it("keeps route schemas off ctx.options, which is settings only", async () => {
+    const api = server()
+      .get("/a", { schema: { tags: "x", title: "T" } }, (ctx) => ({
+        schema: (ctx.options as any).schema ?? null,
+      }))
+      .test();
+    expect(await (await api.get("/a")).json()).toEqual({ schema: null });
   });
 });

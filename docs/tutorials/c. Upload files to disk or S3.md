@@ -27,7 +27,7 @@ Swap the folder for the object form to reject files *before* your handler runs:
 export default server({
   uploads: {
     bucket: './uploads',
-    maxSize: '5mb',
+    maxFileSize: '5mb',
     fileType: ['image/jpeg', 'image/png'],
   },
 })

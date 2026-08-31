@@ -2,7 +2,7 @@ import { FileSystem } from "bucket";
 // bucket's own IBucket type (aliased to avoid clashing with our `Bucket`).
 import type { Bucket as IBucket } from "bucket";
 import { rm } from "node:fs/promises";
-import createId from "../helpers/createId";
+import createId from "../util/createId";
 
 // Real `bucket` FileSystem instances in throwaway temp dirs, so tests exercise
 // the actual canonical interface instead of a hand-rolled mock. Call

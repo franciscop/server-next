@@ -64,7 +64,9 @@ import {
   FortyTwo,
 } from "antarctic";
 import antarcticProvider from "./antarctic";
-import type { Provider } from "./oauth";
+import { credentials, type Provider } from "./oauth";
+import oidcProvider from "./oidc";
+import type { AuthConfig, ProviderOptions } from "../../types";
 
 // Every provider [antarctic](https://github.com/franciscop/antarctic) ships,
 // which owns the endpoints, the token exchange and the profile mapping for
@@ -161,8 +163,67 @@ for (const [alias, target] of Object.entries(ALIASES)) {
 // Providers that speak OIDC need no code at all: discovery finds their
 // endpoints and the id_token claims are already the profile. A name here is
 // only a shortcut for an issuer the user would otherwise have to look up.
-export const ISSUERS: Record<string, string> = {
+const ISSUERS: Record<string, string> = {
   paypal: "https://www.paypal.com",
 };
+
+// One provider as the flow runs it: the name it is mounted under, the options
+// it was configured with, and what executes the handshake
+export type Named = {
+  name: string;
+  options: ProviderOptions;
+  provider: Provider;
+};
+
+// `providers` takes a name, a list of names, or an object keyed by name whose
+// value is an issuer URL or that provider's options; every form ends up here
+// as name -> options
+function normalizeProviders(
+  given: AuthConfig["providers"],
+): Record<string, ProviderOptions> {
+  if (typeof given === "string") return { [given]: {} };
+  if (Array.isArray(given)) {
+    return Object.fromEntries(given.map((name) => [name, {}]));
+  }
+  const map: Record<string, ProviderOptions> = {};
+  for (const [name, raw] of Object.entries(given)) {
+    map[name] = typeof raw === "string" ? { issuer: raw } : { ...raw };
+  }
+  return map;
+}
+
+// Pick what runs each provider: anything with an issuer goes through OIDC
+// discovery, a shipped name uses its own class
+function resolveProvider(name: string, options: ProviderOptions): Provider {
+  // A name we know the issuer for behaves exactly like one given by URL
+  if (!options.issuer && !providers[name] && ISSUERS[name]) {
+    options.issuer = ISSUERS[name];
+  }
+  if (options.issuer) return oidcProvider(name);
+  if (providers[name]) return providers[name];
+  throw new Error(
+    `Unknown provider "${name}". Give it an \`issuer\` to use any OIDC ` +
+      `provider, or pick one of "${Object.keys(providers).join('", "')}".`,
+  );
+}
+
+export function parseProviders(given: AuthConfig["providers"]): Named[] {
+  const map = normalizeProviders(given);
+  const list = Object.entries(map).map(([name, options]) => {
+    const provider = resolveProvider(name, options);
+    // Checked at boot like every other auth misconfiguration: left unchecked,
+    // a missing client id only surfaces when someone clicks "Log in".
+    if (!credentials(name, options).id) {
+      throw new Error(
+        `Provider "${name}" has no client id: set the ` +
+          `${name.toUpperCase()}_ID environment variable (usually along ` +
+          `${name.toUpperCase()}_SECRET), or pass \`{ id, secret }\` in its options.`,
+      );
+    }
+    return { name, options, provider };
+  });
+  if (!list.length) throw new Error("Auth needs at least one provider");
+  return list;
+}
 
 export default providers;

@@ -1,6 +1,6 @@
-import { resolveCache } from "../helpers/cache";
-import mimes from "../helpers/mimes";
-import parseRange from "../helpers/parseRange";
+import { resolveCache } from "../http/cache";
+import { mimeOf } from "../http/mimes";
+import parseRange from "../http/parseRange";
 import { status, type } from "../reply";
 import type { Context } from "../types";
 
@@ -9,6 +9,8 @@ import type { Context } from "../types";
 // here too.
 const DEFAULT_CACHE = "public, max-age=3600";
 
+// Runs before the route handlers: an existing public file wins over a
+// same-named route by design, and the route is the fallback.
 export default async function assets(ctx: Context) {
   if (!ctx.options.public) return;
   if (ctx.method !== "get" && ctx.method !== "head") return;
@@ -31,7 +33,7 @@ export default async function assets(ctx: Context) {
     // Our own MIME table wins over the bucket's, since it carries the charset
     // for text types; the bucket's type covers extensions we don't know.
     const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
-    const ctype = (ext && mimes[ext]) || meta?.type || ext;
+    const ctype = mimeOf(ctx.url.pathname) || meta?.type || ext;
     const headers: Record<string, string> = {
       "cache-control": resolveCache(ctx.options.cache) ?? DEFAULT_CACHE,
     };

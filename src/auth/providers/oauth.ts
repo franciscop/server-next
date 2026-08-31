@@ -1,4 +1,5 @@
 import type { AuthProfile, Context, ProviderOptions } from "../../types";
+import toArray from "../../util/toArray";
 import type { Pending } from "../state";
 
 export type Provider = {
@@ -30,10 +31,14 @@ export const passthrough = (options: ProviderOptions) => {
   return rest as Record<string, string>;
 };
 
-export const scopeOf = (options: ProviderOptions, fallback: string) => {
-  const scope = options.scope ?? fallback;
-  return Array.isArray(scope) ? scope.join(" ") : scope;
-};
+export const scopeOf = (options: ProviderOptions, fallback: string) =>
+  toArray(options.scope ?? fallback).join(" ");
+
+// The mounted route and the redirect_uri sent to the provider must agree;
+// both derive from here so they cannot drift.
+export const callbackPath = (name: string) => `/auth/callback/${name}`;
+export const callbackUrl = (ctx: Context, name: string) =>
+  `${ctx.url.origin}${callbackPath(name)}`;
 
 export const search = (base: string, params: Record<string, any>) => {
   const query = new URLSearchParams();

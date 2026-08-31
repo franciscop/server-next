@@ -1,106 +1,105 @@
 import type { IncomingMessage } from "node:http";
 import type { BunEnv, Server } from "..";
 import socketUser from "../auth/socketUser";
-import { handleRequest, parseCookies, parseHeaders } from "../helpers";
-import { attachWebsocket } from "../helpers/wsNode";
+import handleRequest from "../pipeline/handleRequest";
+import parseCookies from "../http/parseCookies";
+import parseHeaders from "../http/parseHeaders";
+import writeResponse from "./writeResponse";
+import { attachWebsocket } from "../ws/wsNode";
 import createNode from "./node";
 import createWinter from "./winter";
 
 export const Winter = async (app: Server, request: Request, env: BunEnv) => {
-	// A WebSocket upgrade (Bun): resolve the auth user from the request and pass
-	// it along as the socket's `data`, so handlers see it as `ctx.user`. Only
-	// actual upgrade requests are handed to `env.upgrade`; everything else falls
-	// through to the normal request pipeline below.
-	if (env?.upgrade) {
-		const wantsWs =
-			String(request.headers.get("upgrade") || "").toLowerCase() ===
-			"websocket";
-		if (wantsWs) {
-			const headers = parseHeaders(request.headers);
-			const cookies = parseCookies(headers.cookie);
-			// A present-but-invalid credential throws: refuse the upgrade with 401,
-			// the same status an HTTP route gives (absent/expired connects anonymously).
-			let user: unknown;
-			try {
-				user = await socketUser(app, headers, cookies);
-			} catch {
-				return new Response("Unauthorized", { status: 401 });
-			}
-			if (env.upgrade(request, { data: { user } })) return;
-		}
-	}
-	Object.assign(globalThis.env, env); // Extend env with the passed vars
+  // A WebSocket upgrade (Bun): resolve the auth user from the request and pass
+  // it along as the socket's `data`, so handlers see it as `ctx.user`. Only
+  // actual upgrade requests are handed to `env.upgrade`; everything else falls
+  // through to the normal request pipeline below.
+  if (env?.upgrade) {
+    const wantsWs =
+      String(request.headers.get("upgrade") || "").toLowerCase() ===
+      "websocket";
+    if (wantsWs) {
+      const headers = parseHeaders(request.headers);
+      const cookies = parseCookies(headers.cookie);
+      // A present-but-invalid credential throws: refuse the upgrade with 401,
+      // the same status an HTTP route gives (absent/expired connects anonymously).
+      let user: unknown;
+      try {
+        user = await socketUser(app, headers, cookies);
+      } catch {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      if (env.upgrade(request, { data: { user } })) return;
+    }
+  }
+  // The 2nd fetch argument is the env vars on the worker runtimes, but on Bun
+  // it is the runtime's Server object (.requestIP/.upgrade). Only real env may
+  // be merged into the process env: copying Bun's server onto globalThis.env
+  // would pollute it with functions, once per request, forever.
+  const isRuntimeServer =
+    typeof env?.upgrade === "function" || typeof env?.requestIP === "function";
+  if (env && !isRuntimeServer) Object.assign(globalThis.env, env);
 
-	// In Bun, the 2nd fetch arg is the server object (with .requestIP/.upgrade)
-	const ctx = await createWinter(request, app, env);
-	const res = await handleRequest(app, ctx);
-	return res;
+  try {
+    const ctx = await createWinter(request, app, env);
+    return await handleRequest(app, ctx);
+  } catch {
+    // Building the context itself failed (handleRequest catches its own
+    // errors), so there is no ctx for onError: answer with a bare 500
+    // rather than letting the rejection escape the runtime's handler.
+    return new Response("Server Error", { status: 500 });
+  }
 };
 
 export const Node = async (app: Server) => {
-	const http = await import("node:http");
+  const http = await import("node:http");
 
-	const server = http.createServer(
-		async (request: IncomingMessage, response) => {
-			// Abort `ctx.signal` when the client disconnects before the response is
-			// done, so handlers can cancel upstream work (fetches, streams, queries)
-			const controller = new AbortController();
-			response.on("close", () => {
-				if (!response.writableFinished) controller.abort();
-			});
-			const ctx = await createNode(request, app, controller.signal);
-			if ("error" in ctx) throw ctx.error;
+  const server = http.createServer(
+    async (request: IncomingMessage, response) => {
+      // Abort `ctx.signal` when the client disconnects before the response is
+      // done, so handlers can cancel upstream work (fetches, streams, queries)
+      const controller = new AbortController();
+      response.on("close", () => {
+        if (!response.writableFinished) controller.abort();
+      });
 
-			const out = await handleRequest(app, ctx);
+      let out: Response;
+      try {
+        const ctx = await createNode(request, app, controller.signal);
+        out = await handleRequest(app, ctx);
+      } catch {
+        // Building the context itself failed (handleRequest catches its own
+        // errors), so there is no ctx for onError: answer with a bare 500
+        // instead of leaving the socket hanging with no response at all.
+        response.writeHead(500);
+        response.end("Server Error");
+        return;
+      }
 
-			response.writeHead(out.status || 200, parseHeaders(out.headers));
-			try {
-				if (out.body instanceof ReadableStream) {
-					// Cancel the reader on disconnect so the source cleans up, instead
-					// of looping forever writing to a dead socket.
-					const reader = out.body.getReader();
-					response.on("close", () => reader.cancel().catch(() => {}));
-					while (true) {
-						const { value, done } = await reader.read();
-						if (done) break;
-						response.write(value);
-					}
-				} else {
-					response.write(out.body || "");
-				}
-				response.end();
-			} catch {
-				// The stream errored after the headers (and maybe some body) were sent,
-				// so we can't change the status. Abort the connection so the client sees
-				// a truncated/failed response rather than a clean end, and we don't leak
-				// an unhandled rejection out of the request callback.
-				if (!response.destroyed) response.destroy();
-			}
-		},
-	);
+      await writeResponse(out, response);
+    },
+  );
 
-	// WebSockets: handle the HTTP upgrade and bridge to the `.socket()` handlers
-	await attachWebsocket(server, app);
+  // WebSockets: handle the HTTP upgrade and bridge to the `.socket()` handlers
+  await attachWebsocket(server, app);
 
-	server.listen(app.settings.port, () => {
-		app.settings.log.start(`http://localhost:${app.settings.port}/`);
-	});
+  server.listen(app.settings.port, () => {
+    app.settings.log.start(`http://localhost:${app.settings.port}/`);
+  });
 
-	return server;
+  return server;
 };
 
 export const Netlify = async (
-	app: Server,
-	request: Request,
-	context: unknown,
+  app: Server,
+  request: Request,
+  // Netlify's own context object; unused, but the platform always passes it
+  _context: unknown,
 ) => {
-	// ?? consider simply renaming to "ctx.next()"
-	// @ts-expect-error
-	request.context = context;
-	if (typeof Netlify === "undefined") {
-		throw new Error("Netlify doesn't exist");
-	}
-	const ctx = await createWinter(request, app);
-	const res = await handleRequest(app, ctx);
-	return res;
+  try {
+    const ctx = await createWinter(request, app);
+    return await handleRequest(app, ctx);
+  } catch {
+    return new Response("Server Error", { status: 500 });
+  }
 };

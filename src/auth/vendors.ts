@@ -1,3 +1,6 @@
+import type { AuthEntry } from "../types";
+import verifyEntry from "./verify";
+
 // Auth vendors we can verify tokens from. They all publish their keys the same
 // way, so the only per-vendor knowledge is where the token rides and which
 // environment variables hold the tenant's issuer and audience.
@@ -8,7 +11,7 @@
 // Only vendors that are not also login providers live here, so a name never
 // means two things. Auth0, Cognito and Keycloak are providers you can log in
 // with, so verifying their tokens uses the explicit `{ verify, audience }`.
-export type Vendor = {
+type Vendor = {
   // Where their SDK stores the token for a same-origin app, when it does. The
   // ones that keep it in memory or localStorage have no cookie to read.
   cookie?: string;
@@ -20,7 +23,7 @@ export type Vendor = {
   docs: string;
 };
 
-const VENDORS: Record<string, Vendor> = {
+export const VENDORS: Record<string, Vendor> = {
   clerk: {
     cookie: "__session",
     // Clerk session tokens carry no `aud`: the authorized party (your
@@ -48,4 +51,49 @@ const VENDORS: Record<string, Vendor> = {
   },
 };
 
-export default VENDORS;
+// A vendor ran the login itself, so the strategy only says where their token
+// rides: `jwt:` for `Authorization: Bearer`, `cookie:` for the cookie their
+// SDK sets on a same-origin app. The tenant's issuer and audience differ per
+// account, so they come from the environment by name.
+export default function vendorEntry(strategy: string, name: string): AuthEntry {
+  const vendor = VENDORS[name];
+  const KEY = name.toUpperCase();
+
+  if (strategy !== "jwt" && strategy !== "cookie") {
+    throw new Error(
+      `"${strategy}:${name}" is not possible: ${name} issues a signed token, ` +
+        `and "${strategy}" means an opaque id resolved through a \`getUser\` ` +
+        `of yours. Use "jwt:${name}", or "cookie:${name}" for a same-origin app.`,
+    );
+  }
+  if (strategy === "cookie" && !vendor.cookie) {
+    throw new Error(
+      `"cookie:${name}" is not possible: ${name} does not store its token in ` +
+        `a cookie with a fixed name. Use "jwt:${name}", or name the cookie ` +
+        `yourself with { verify, audience, cookie }.`,
+    );
+  }
+
+  const issuer = globalThis.env[`${KEY}_ISSUER`];
+  if (!issuer) {
+    throw new Error(
+      `${KEY}_ISSUER is not set, and it differs per account, so it cannot be ` +
+        `guessed. See ${vendor.docs}`,
+    );
+  }
+  const audience = globalThis.env[`${KEY}_AUDIENCE`];
+  if (!audience) {
+    throw new Error(
+      `${KEY}_AUDIENCE is not set. It should be ${vendor.audience}. One issuer ` +
+        `serves many applications, all signed with the same keys, so without ` +
+        `it a token minted for another one is accepted here.`,
+    );
+  }
+
+  return verifyEntry({
+    issuer,
+    audience,
+    ...(vendor.claim ? { audienceClaim: vendor.claim } : {}),
+    ...(strategy === "cookie" ? { cookie: vendor.cookie } : {}),
+  });
+}

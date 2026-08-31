@@ -518,7 +518,7 @@ export default server()
     <pre><code class="language-js">export default server({
   uploads: {
     bucket: "./uploads",
-    maxSize: "5mb",
+    maxFileSize: "5mb",
     fileType: ["image/jpeg", "image/png"],
   },
 }).post("/avatar", ctx =&gt; ctx.body.avatar);</code></pre>

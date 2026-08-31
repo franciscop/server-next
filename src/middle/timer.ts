@@ -1,5 +1,11 @@
 import type { Context } from "..";
 
+export type Time = {
+  (name: string): void;
+  times: [string, number][];
+  headers: () => string;
+};
+
 export const createTime = () => {
   const times: [string, number][] = [["init", performance.now()]];
   const time = (name: string) => times.push([name, performance.now()]);

@@ -1,15 +1,12 @@
-import {
-  createCookies,
-  iteratorAsyncToReadable,
-  iteratorToReadable,
-  mimes,
-  resolveCache,
-  toWeb,
-} from "./helpers";
-import disposition from "./helpers/disposition";
-import fileType from "./helpers/fileType";
-import isHtml from "./helpers/isHtml";
-import isReadableStream from "./helpers/isReadableStream";
+import { isBucketFile } from "./body/bucket";
+import { resolveCache } from "./http/cache";
+import createCookies from "./http/createCookies";
+import mimes from "./http/mimes";
+import setIfAbsent from "./http/setIfAbsent";
+import disposition from "./http/disposition";
+import fileType from "./http/fileType";
+import { CLIMBS } from "./http/security";
+import serialize from "./pipeline/serialize";
 import type { Readable } from "node:stream";
 import type {
   BucketFile,
@@ -134,9 +131,7 @@ class Reply {
     // no effect on compliant recipients"), so it's redundant. Text types (text/*)
     // do carry `; charset=utf-8`; JSON deliberately doesn't, matching Hono/Elysia
     // and the fetch spec.
-    if (!this.res.headers.get("content-type")) {
-      this.res.headers.set("content-type", "application/json");
-    }
+    setIfAbsent(this.res.headers, "content-type", "application/json");
     return this.send(JSON.stringify(body));
   }
 
@@ -158,7 +153,7 @@ class Reply {
     // A '..' segment means the path was built from input that climbed out of
     // where it was meant to stay; `send` (Express) refuses these too. Normal
     // paths are already resolved, since path.join() collapses the dots.
-    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(path)) {
+    if (CLIMBS.test(path)) {
       return new Response(null, { status: 404 });
     }
     try {
@@ -238,74 +233,13 @@ class Reply {
     }
 
     // A bucket file: same handling as returning one, including the 404
-    if (
-      body &&
-      typeof body.stream === "function" &&
-      typeof body.bytes === "function" &&
-      typeof body.exists === "function" &&
-      typeof body.name === "string"
-    ) {
+    if (isBucketFile(body)) {
       return this.file(body);
     }
 
-    if (body instanceof Blob) {
-      if (!headers.get("content-type") && body.type) {
-        headers.set("content-type", body.type);
-      }
-      return new Response(body, { status, headers });
-    }
-
-    if (typeof body === "string") {
-      if (!headers.get("content-type")) {
-        headers.set("content-type", isHtml(body) ? mimes.html : mimes.text);
-      }
-      if (!headers.has("content-length")) {
-        headers.set("content-length", String(Buffer.byteLength(body)));
-      }
-      return new Response(body, { status, headers });
-    }
-
-    const name = body?.constructor?.name;
-    // Buffer or any typed array (e.g. the Uint8Array from a bucket file's
-    // bytes()) is sent as raw bytes.
-    if (body instanceof Uint8Array) {
-      if (!headers.has("content-length")) {
-        headers.set("content-length", String(body.length));
-      }
-      return new Response(body as BodyInit, { status, headers });
-    }
-
-    if (typeof body?.getReader === "function") {
-      return new Response(body, { status, headers });
-    }
-
-    if (name === "PassThrough" || name === "Readable") {
-      return new Response(toWeb(body), { status, headers });
-    }
-
-    if (isReadableStream(body)) {
-      return new Response(toWeb(body), { status, headers });
-    }
-
-    // Generators stream their chunks as they are produced. Arrays are data,
-    // not a stream, so they fall through to JSON below (as returning one does)
-    if (!Array.isArray(body) && body?.[Symbol.iterator]) {
-      return new Response(iteratorToReadable(body), { status, headers });
-    }
-    if (body?.[Symbol.asyncIterator]) {
-      return new Response(iteratorAsyncToReadable(body), { status, headers });
-    }
-
-    // Default sends it as json. Bare `application/json`, no charset: JSON is
-    // always UTF-8 by spec, so the param is redundant (see json() above).
-    if (!headers.get("content-type")) {
-      headers.set("content-type", "application/json");
-    }
-    const payload = JSON.stringify(body);
-    if (!headers.has("content-length")) {
-      headers.set("content-length", String(Buffer.byteLength(payload)));
-    }
-    return new Response(payload, { status, headers });
+    // Everything else serializes by shape: Blob, string, bytes, streams,
+    // iterables, and JSON as the default.
+    return new Response(serialize(body, headers), { status, headers });
   }
 }
 

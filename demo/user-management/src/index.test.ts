@@ -15,7 +15,7 @@ Object.assign(globalThis.env ?? {}, process.env);
 
 const { default: app } = await import("./index.tsx");
 const { users } = await import("./db.ts");
-const { signJwt } = await import("../../../src/helpers/jwt.ts");
+const { signJwt } = await import("../../../src/auth/jwt.ts");
 const api = app.test();
 
 // The server captured its settings at construction; don't leak the fake

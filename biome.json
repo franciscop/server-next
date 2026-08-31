@@ -1,6 +1,22 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
   "linter": {
-    "includes": ["**", "!src/jsx/**"]
+    "includes": ["**", "!src/jsx/**"],
+    "rules": {
+      "complexity": { "noBannedTypes": "off" },
+      "style": {
+        "noNonNullAssertion": "off",
+        "noParameterAssign": "off"
+      },
+      "suspicious": {
+        "noConfusingVoidType": "off",
+        "noExplicitAny": "off"
+      }
+    }
   }
 }

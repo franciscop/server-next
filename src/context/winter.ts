@@ -1,13 +1,5 @@
 import type { Context, Server } from "..";
-import {
-  clientIp,
-  define,
-  forwarded,
-  parseCookies,
-  parseHeaders,
-  setBodySource,
-} from "../helpers";
-import isValidMethod from "./isValidMethod";
+import createContext from "./create";
 
 export default async function createWinter(
   req: Request,
@@ -15,50 +7,16 @@ export default async function createWinter(
   // The runtime's server object (e.g. Bun's), used to read the socket IP
   server?: any,
 ): Promise<Context> {
-  const init = performance.now();
-
-  const method = req.method.toLowerCase();
-  if (!isValidMethod(method)) {
-    throw new Error(`Invalid HTTP method: ${method}`);
-  }
-
-  const headers = parseHeaders(req.headers);
-  const cookies = parseCookies(headers.cookie);
-
-  const baseUrl = req.url.replace(/\/$/, "") || "/";
-  const url = new URL(baseUrl) as Context["url"];
-  // A TLS-terminating proxy forwards plain HTTP, so the wire scheme and host
-  // are not the visitor's. Every consumer of ctx.url depends on this being
-  // right: absolute links, redirects, and the OAuth redirect_uri.
-  forwarded(url, headers, app.settings.security.trustProxy);
-  define(url, "query", (url: URL) =>
-    Object.fromEntries(url.searchParams.entries()),
-  );
-
-  // Don't read the body yet: handleRequest resolves it once the route (and its
-  // `body` mode) is known, so a `stream` route never buffers. req.body is
-  // already a web ReadableStream, so no conversion is needed here.
-  const source = {
-    getBuffer: async () => Buffer.from(await req.arrayBuffer()),
-    getStream: () => req.body ?? undefined,
-  };
-
-  const ctx: Context = {
-    options: app.settings,
-    platform: app.platform,
-    url,
-    method,
-    body: undefined,
-    headers,
-    cookies,
+  return createContext(app, {
+    method: req.method,
+    headers: req.headers,
+    url: req.url,
     signal: req.signal,
-    init,
-    app,
-    ip: clientIp(headers, {
-      remoteAddress: server?.requestIP?.(req)?.address || "",
-      trustProxy: app.settings.security.trustProxy,
-    }),
-  };
-  setBodySource(ctx, source);
-  return ctx;
+    remoteAddress: server?.requestIP?.(req)?.address || "",
+    source: {
+      // req.body is already a web ReadableStream, so no conversion is needed
+      getBuffer: async () => Buffer.from(await req.arrayBuffer()),
+      getStream: () => req.body ?? undefined,
+    },
+  });
 }

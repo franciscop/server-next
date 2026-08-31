@@ -22,16 +22,21 @@ type NoBodyRequest = Omit<RequestInit, "body">;
 export default function ServerTest(app: Server) {
   const port = app.settings.port;
 
-  // let cookie = "";
   const fetch = async (
     method: Method,
     path: string,
     options: NoBodyRequest & { body?: BodyValue } = {},
   ) => {
-    if (!options.headers) options.headers = {};
-    if (isSerializable(options.body)) {
-      options.headers["content-type"] = "application/json";
-      options.body = JSON.stringify(options.body);
+    // Never write back into what the caller passed: one options object reused
+    // across calls (the natural pattern for auth headers) would otherwise keep
+    // the content-type of the first JSON body, and the next upload through it
+    // would be read as JSON. `new Headers` also accepts the shapes a plain
+    // object index misses: a Headers instance and a [key, value][] array.
+    const headers = new Headers(options.headers as HeadersInit);
+    let body = options.body;
+    if (isSerializable(body)) {
+      headers.set("content-type", "application/json");
+      body = JSON.stringify(body);
     }
     // A full http(s) URL is used as-is, so a test can exercise the host it
     // runs on (`ctx.url.origin`, subdomains, ...); anything else is a path
@@ -48,8 +53,10 @@ export default function ServerTest(app: Server) {
       : `http://localhost:${port}${path}`;
     return await app.fetch(
       new Request(url, {
-        method,
         ...(options as RequestInit),
+        method,
+        headers,
+        body: body as BodyInit,
       }),
     );
   };

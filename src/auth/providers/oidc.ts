@@ -1,7 +1,15 @@
 import type { AuthProfile, Context, ProviderOptions } from "../../types";
 import type { Provider } from "./oauth";
-import createId from "../../helpers/createId";
-import { credentials, passthrough, scopeOf, search } from "./oauth";
+import createId from "../../util/createId";
+import { decodeJwt } from "../jwt";
+import { discover } from "../discovery";
+import {
+  callbackUrl,
+  credentials,
+  passthrough,
+  scopeOf,
+  search,
+} from "./oauth";
 
 // Any OIDC issuer, with no file of its own: the discovery document says where
 // everything lives, and the id_token's claims already are the profile. That is
@@ -10,29 +18,10 @@ import { credentials, passthrough, scopeOf, search } from "./oauth";
 // The id_token arrives over a direct TLS connection to the token endpoint, so
 // its signature needs no separate check here (unlike a token handed to us by a
 // client, which `verify` checks against the issuer's published keys).
-const discovered = new Map<string, Promise<any>>();
-
-export function discover(issuer: string): Promise<any> {
-  let doc = discovered.get(issuer);
-  if (!doc) {
-    const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-    doc = fetch(url).then((r) => {
-      if (!r.ok) throw new Error(`Cannot reach the OIDC issuer at ${url}`);
-      return r.json();
-    });
-    // A failed fetch must not poison the cache
-    doc.catch(() => discovered.delete(issuer));
-    discovered.set(issuer, doc);
-  }
-  return doc;
-}
-
 const claims = (token: string): Record<string, any> => {
-  const body = token.split(".")[1];
-  if (!body) throw new Error("The issuer returned no usable id_token");
-  let b64 = body.replace(/-/g, "+").replace(/_/g, "/");
-  b64 += "=".repeat((4 - (b64.length % 4)) % 4);
-  return JSON.parse(atob(b64));
+  const t = token ? decodeJwt(token) : null;
+  if (!t) throw new Error("The issuer returned no usable id_token");
+  return t.claims;
 };
 
 export default function oidcProvider(name: string): Provider {
@@ -44,7 +33,7 @@ export default function oidcProvider(name: string): Provider {
         client_id: credentials(name, options).id,
         response_type: "code",
         scope: scopeOf(options, "openid email profile"),
-        redirect_uri: `${ctx.url.origin}/auth/callback/${name}`,
+        redirect_uri: callbackUrl(ctx, name),
         state,
         ...passthrough(options),
       });
@@ -60,7 +49,7 @@ export default function oidcProvider(name: string): Provider {
         code,
         grant_type: "authorization_code",
       });
-      body.set("redirect_uri", `${ctx.url.origin}/auth/callback/${name}`);
+      body.set("redirect_uri", callbackUrl(ctx, name));
       const res = await fetch(doc.token_endpoint, {
         method: "POST",
         headers: {

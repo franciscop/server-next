@@ -1,7 +1,9 @@
 import "./errors/index";
-import "./polyfill";
+import "./boot/polyfill";
 
-import { config, createWebsocket, getMachine } from "./helpers";
+import config from "./boot/config";
+import createWebsocket from "./ws/createWebsocket";
+import getMachine from "./boot/getMachine";
 import { assets, auth, openapi, preflight, timer } from "./middle";
 
 import * as handlers from "./context/handlers";
@@ -10,7 +12,6 @@ import ServerTest from "./ServerTest";
 import type {
   AuthConfig,
   AuthFunction,
-  AuthOption,
   AuthProfile,
   AuthClaims,
   AuthVerify,
@@ -19,11 +20,10 @@ import type {
   Options,
   Platform,
   Settings,
-  UserOf,
 } from "./types";
 
 export class Server<C extends ContextTypes = {}> extends Router<C> {
-  settings: Settings;
+  declare settings: Settings;
   platform: Platform;
 
   sockets: WebSocket[];
@@ -45,7 +45,9 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     this.websocket = createWebsocket(this.sockets, this.handlers);
 
     if (this.platform.runtime === "node") {
-      this.node();
+      // A failed boot (port in use, bad listen) must surface; unawaited it
+      // would vanish as an unhandled rejection out of the constructor
+      this.node().catch((error) => console.error("[server:start]", error));
     } else if (this.platform.runtime === "bun") {
       // Bun serves the `export default` itself, so there's no listen callback to
       // hook, so log the startup banner here, since the port is already known.
@@ -124,7 +126,7 @@ export default function server(options?: Options) {
 
 export * from "./reply";
 export { default as router } from "./router";
-export { default as ServerError } from "./ServerError";
+export { default as ServerError } from "./errors";
 export { default as ValidationError } from "./errors/ValidationError";
 export type * from "./types";
 
