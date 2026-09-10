@@ -6,6 +6,7 @@ Offering one provider is a decision you make for your users; offering two is a d
 
 ```js
 import server from '@server/next';
+import db from './db.js';
 
 const auth = {
   providers: ['github', 'google'],

@@ -62,7 +62,7 @@ const auth = {
 };
 ```
 
-The last four lines are what the shorthand was setting; `getUser` is the reason to write it out.
+The first four lines are what the shorthand was setting; `getUser` is the reason to write it out.
 
 Store Clerk's `sub` as the foreign key rather than the email, which people change and which Clerk lets them have several of. Create the row from Clerk's `user.created` [webhook](https://clerk.com/docs/integrations/webhooks) so your table is populated before anyone's first request, rather than lazily on a cache miss.
 

@@ -53,7 +53,7 @@ The session id is what `getUser` receives, so listing someone's logins is an ord
     return db.sessions.forUser(ctx.user.id);
   })
 
-  .del('/account/sessions/:id', async (ctx) => {
+  .delete('/account/sessions/:id', async (ctx) => {
     if (!ctx.user) return 401;
     // Scoped by user, so an id that is not theirs matches nothing
     await db.sessions.deleteOwned(ctx.url.params.id, ctx.user.id);

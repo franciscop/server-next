@@ -22,7 +22,7 @@ import server, { bucket, kv } from '@server/next';
 import { createClient } from 'redis';
 
 const redis = kv(createClient({ url }));
-const uploads = bucket.S3('my-bucket', { id, key });
+const uploads = bucket.S3('my-bucket', { id, secret });
 
 export default server({
   uploads,
