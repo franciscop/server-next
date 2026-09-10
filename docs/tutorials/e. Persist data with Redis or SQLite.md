@@ -7,8 +7,8 @@ The [REST API tutorial](/tutorials/a-build-a-rest-api-with-javascript) kept note
 Install [polystore](https://polystore.dev/) (`npm install polystore`) and back it with a `Map` in development:
 
 ```js
-import server, { status } from '@server/next';
-import kv from 'polystore';
+import server, { status } from "@server/next";
+import kv from "polystore";
 
 const notes = kv(new Map());
 
@@ -37,8 +37,8 @@ Every store call is async, so `await` them.
 Point the same `kv()` at Redis and nothing else changes:
 
 ```js
-import kv from 'polystore';
-import { createClient } from 'redis';
+import kv from "polystore";
+import { createClient } from "redis";
 
 const notes = kv(createClient({ url: process.env.REDIS_URL }));
 ```
@@ -63,6 +63,12 @@ export default server({
   },
 });
 // notes and the signed-in users now persist across restarts
+```
+
+```sh
+SECRETS=a-long-random-string
+GITHUB_ID=...
+GITHUB_SECRET=...
 ```
 
 [Auth](/documentation/authentication) takes no store of its own: `onLogin` and `getUser` are the only places it touches your data, so it uses whatever you already have.

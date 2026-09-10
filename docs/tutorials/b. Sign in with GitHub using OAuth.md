@@ -17,7 +17,7 @@ SECRETS=a-long-random-string  # signs the session cookie
 ```
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server({ auth: 'cookie:github' })
   .get('/', (ctx) =>
@@ -32,8 +32,8 @@ In development that is all you need: the profile is signed into the cookie, so t
 When you want your own user records, add two callbacks. `onLogin` stores whoever just logged in and returns the id the cookie points at; `getUser` turns that id back into the user on every request:
 
 ```js
-import server from '@server/next';
-import { db } from './db.js';
+import server from "@server/next";
+import db from "./db.js";
 
 export default server({
   auth: {
@@ -75,5 +75,5 @@ export default server({ auth: 'cookie:github' })
 
 ## Next steps
 
-- Swap the in-memory `Map` for a persistent [store](/tutorials/e-persist-data-with-redis-or-sqlite).
+- Point those two callbacks at a real [store](/tutorials/e-persist-data-with-redis-or-sqlite).
 - Add more providers with the object form: `auth: { providers: ['github', 'google'] }`. See [Authentication](/documentation/authentication).

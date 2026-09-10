@@ -7,10 +7,12 @@ The thing that carries that permission is the **access token**, handed over once
 ## 1. Ask for the scope
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
+
+const SCOPES = ['repo', 'read:user'];
 
 const auth = {
-  providers: { github: { scope: ['repo', 'read:user'] } },
+  providers: { github: { scope: SCOPES } },
   // Record whoever signed in, and return the id the cookie will carry
   onLogin: (profile) => db.users.upsert({ email: profile.email, name: profile.name }).id,
   // Turn that id back into the person, on every request
@@ -20,7 +22,13 @@ const auth = {
 export default server({ auth });
 ```
 
-This assumes a `users` table of your own, and a place to keep tokens: somewhere keyed by user id, holding the token and the scopes it came with. Keeping those in their own table rather than a column on `users` is worth doing, so that an ordinary query for a person never drags a live credential along with it. [Google login persisted in SQLite](/tutorials/h-google-login-persisted-in-sqlite) covers the two callbacks on their own if they are new to you.
+```sh
+SECRETS=a-long-random-string
+GITHUB_ID=...
+GITHUB_SECRET=...
+```
+
+This assumes a `users` table of your own, and a place to keep tokens: somewhere keyed by user id, holding the token and the scopes you asked for. Keeping those in their own table rather than a column on `users` is worth doing, so that an ordinary query for a person never drags a live credential along with it. [Google login persisted in SQLite](/tutorials/h-google-login-persisted-in-sqlite) covers the two callbacks on their own if they are new to you.
 
 Scopes are configured per provider because they only mean anything to that provider: `repo` is a GitHub concept, and Google would not know what to do with it.
 
@@ -35,7 +43,7 @@ It arrives on the profile, once, at login. Nothing keeps it for you:
     const user = db.users.upsert({ email: profile.email, name: profile.name });
     db.tokens.save(user.id, {
       accessToken: encrypt(profile.accessToken),
-      scopes: profile.scopes ?? [],
+      scopes: SCOPES,
     });
     return user.id;
   },
@@ -74,22 +82,22 @@ Returning the `fetch` promise streams GitHub's response straight through to your
 
 The `403` covers a real case rather than being defensive: somebody who signed in before you added the scope has an account but no stored token. They need to go through the login again to grant it, and a clear error is what lets your frontend tell them so.
 
-## 4. Scopes people actually granted
+## 4. When they grant less than you asked
 
-A consent screen is a negotiation. GitHub lets people approve less than you asked for, and other providers do the same, so the granted set comes back with the token rather than matching your request:
+A consent screen is a negotiation. GitHub lets people approve fewer scopes than you requested, and other providers do the same.
 
-That is why the snippet above stores `profile.scopes`, what they actually granted, rather than what you asked for. Read it back before offering a feature:
+The profile carries the access token, not the scopes it came with, so what you stored is what you asked for. Let the provider settle the difference: a call that needs `repo` and comes back `403` means the grant was narrower, and the fix is another trip through the login.
 
 ```js
-  .get('/repos', (ctx) => {
+  .get('/repos', async (ctx) => {
     if (!ctx.user) return 401;
     const stored = db.tokens.find(ctx.user.id);
-    if (!stored?.scopes.includes('repo')) return 403;
-    // ...call the API
+    if (!stored) return 403;   // signed in before you asked for the scope
+    // ...call the API, and treat its own 403 as "not granted"
   })
 ```
 
-Check it before offering a feature. Hiding a button someone cannot use is a better experience than letting them press it and surfacing a `403` from GitHub that they can do nothing about.
+Hiding a button someone cannot use is a better experience than letting them press it, so keep the failure visible in your UI rather than silently swallowing it.
 
 ## 5. Provider-specific fields
 

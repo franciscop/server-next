@@ -9,7 +9,7 @@ For an app served from your own domain, Clerk stores that token in a cookie, whi
 ## 1. Read their cookie
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server({ auth: 'cookie:clerk' })
   .get('/', (ctx) => ctx.user ? `Hello ${ctx.user.sub}` : 'Signed out');

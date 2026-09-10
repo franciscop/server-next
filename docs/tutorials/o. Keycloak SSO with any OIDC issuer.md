@@ -7,7 +7,7 @@ They do have something better. Anything speaking OpenID Connect publishes its ow
 ## 1. Point at the realm
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 const auth = {
   providers: {

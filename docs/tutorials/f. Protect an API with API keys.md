@@ -7,7 +7,7 @@ Protect a machine-to-machine API with a shared secret key. No auth config needed
 Compare the `Authorization` header against a key from the environment. Read it once at startup and throw if it's missing, so a misconfigured deploy fails at boot instead of running unprotected:
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 // API_KEY=a-long-random-string in the environment
 const API_KEY = process.env.API_KEY;
@@ -53,7 +53,7 @@ curl -H "Authorization: Bearer a-long-random-string" localhost:3000/data
 With the default body parsing, uploaded files stream to storage *while the request is being read*, before your middleware gets a say. For uploads that must never touch storage without a key, take the raw stream instead and write it after the check:
 
 ```js
-import server, { bucket } from '@server/next';
+import server, { bucket } from "@server/next";
 
 const uploads = bucket.FS('./uploads');
 

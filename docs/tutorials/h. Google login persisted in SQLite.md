@@ -9,8 +9,8 @@ This uses SQLite through Bun because it needs no server to run, but the shape is
 ## 1. The two callbacks
 
 ```js
-import server from '@server/next';
-import { db } from './db.js';
+import server from "@server/next";
+import db from "./db.js";
 
 const auth = {
   providers: 'google',
@@ -42,7 +42,7 @@ GOOGLE_SECRET=...
 
 **`onLogin` runs once**, right after Google confirms who somebody is. It receives the normalised profile and its job is to make sure a row exists, then return **the id that the cookie will carry**. Nothing else about what it returns is used.
 
-**`getUser` runs on every request** that reads `ctx.user`. It receives that same id back and returns the person. Whatever it returns is `ctx.user`, untouched: no wrapping, no extra fields.
+**`getUser` runs on every request**. It receives that same id back and returns the person. Whatever it returns is `ctx.user`, untouched: no wrapping, no extra fields.
 
 Between them, the cookie holds nothing but a signed id. That is what makes the role column work: because the row is read fresh each time, a change to it applies on the very next request rather than whenever someone next signs in.
 

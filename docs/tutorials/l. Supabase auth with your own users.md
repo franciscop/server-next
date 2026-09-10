@@ -7,7 +7,7 @@ This is the opposite arrangement to [signing in with GitHub](/tutorials/b-sign-i
 ## 1. Verify the token
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server({ auth: 'jwt:supabase' })
   .get('/api/me', (ctx) => ctx.user ?? 401);
@@ -29,7 +29,7 @@ Nothing here needs a client secret, because verifying a signature only needs the
 Your frontend already has a Supabase client, and after someone signs in it holds their **session**: an access token, a refresh token, and an expiry. The access token is the part your server wants.
 
 ```js
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

@@ -7,7 +7,7 @@ Build a tiny chat: every message a client sends is broadcast to everyone connect
 Handle the three socket events with `.socket(event, fn)`. `ctx.socket` is the current connection, `ctx.sockets` is every open one, and on a message `ctx.body` is what the client sent:
 
 ```js
-import server, { file } from '@server/next';
+import server, { file } from "@server/next";
 
 export default server()
   .get('/', () => file('./index.html'))

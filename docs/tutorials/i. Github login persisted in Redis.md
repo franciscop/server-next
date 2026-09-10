@@ -14,8 +14,8 @@ npm install polystore redis
 
 ```js
 // db.js
-import kv from 'polystore';
-import { createClient } from 'redis';
+import kv from "polystore";
+import { createClient } from "redis";
 
 const redis = kv(createClient({ url: process.env.REDIS_URL }));
 
@@ -32,8 +32,8 @@ Swapping `createClient(...)` for `new Map()` gives you an in-memory version for 
 A relational database can find a row by email through an index. Redis cannot: it looks things up by key and nothing else. So the email gets its own key pointing at the id, and the id points at the record.
 
 ```js
-import server from '@server/next';
-import { users, byEmail } from './db.js';
+import server from "@server/next";
+import { users, byEmail } from "./db.js";
 
 const auth = {
   providers: 'github',
@@ -58,6 +58,12 @@ const auth = {
 
 export default server({ auth })
   .get('/me', (ctx) => ctx.user ?? 401);
+```
+
+```sh
+SECRETS=a-long-random-string
+GITHUB_ID=...
+GITHUB_SECRET=...
 ```
 
 The `byEmail` lookup is what makes a returning person land on their existing record instead of a fresh one. First sign-in: no key, so a new id is generated. Every time after: the key is there, the same id comes back, and the record is updated in place.

@@ -7,7 +7,7 @@ npm install @server/next
 ```
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server({ uploads: './uploads' })
   .get('/', () => 'Hello world')
@@ -15,24 +15,26 @@ export default server({ uploads: './uploads' })
   .post('/avatar', (ctx) => ctx.body.avatar.path);
 ```
 
-Key-value stores and file storage come included, so logins work out of the box and `uploads` takes a folder path. For Redis, S3 and the rest, pass the client straight in:
+File storage comes included, so `uploads` takes a folder path or any bucket. Auth stores nothing of its own: two callbacks put the user wherever you already keep data.
 
 ```js
-import server, { bucket, kv } from '@server/next';
-import { createClient } from 'redis';
+import server, { bucket } from "@server/next";
+import { createClient } from "redis";
 
-const redis = kv(createClient({ url }));
+const redis = await createClient({ url }).connect();
 const uploads = bucket.S3('my-bucket', { id, secret });
 
 export default server({
   uploads,
   auth: {
-    strategy: 'cookie',
     providers: ['github'],
-    users: redis.prefix('user:'),
-    sessions: redis.prefix('session:'),
+    onLogin: async (profile) => {
+      await redis.set(`user:${profile.id}`, JSON.stringify(profile));
+      return profile.id;
+    },
+    getUser: async (id) => JSON.parse(await redis.get(`user:${id}`)),
   },
 });
 ```
 
-See the [full documentation](https://serverjs.io/documentation).
+See the [full documentation](https://server-js.com/documentation).

@@ -10,7 +10,7 @@ npm install @server/next
 
 ```js
 // index.js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server()
   .get('/', () => 'Notes API');
@@ -27,7 +27,7 @@ node index.js   # or: bun index.js
 Keep the notes in a `Map` for now (swap it for a [polystore](https://polystore.dev/) store like Redis to persist them). Return a value from a handler and it is sent as JSON; return a number and it becomes the status code.
 
 ```js
-import server, { status } from '@server/next';
+import server, { status } from "@server/next";
 
 const notes = new Map();
 
@@ -80,7 +80,7 @@ No ports or running server needed. [`.test()`](/documentation/testing) drives re
 
 ```js
 // index.test.js
-import app from './index.js';
+import app from "./index.js";
 
 it('creates and reads a note', async () => {
   const api = app.test();

@@ -7,7 +7,7 @@ Worth being clear about what Firebase is, because the naming misleads. It is not
 ## 1. Verify the token
 
 ```js
-import server from '@server/next';
+import server from "@server/next";
 
 export default server({ auth: 'jwt:firebase' })
   .get('/api/me', (ctx) => ctx.user ?? 401);
