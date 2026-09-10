@@ -5,7 +5,9 @@ describe("static assets", () => {
   it("can serve a simple file", async () => {
     const app = server({ public: "./" }).test();
     const res = await app.get("/readme.md");
-    expect(res.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    expect(res.headers.get("content-type")).toBe(
+      "text/markdown; charset=utf-8",
+    );
     expect(await res.text()).toContain("# Server");
   });
 
@@ -114,7 +116,9 @@ describe("static assets and the `cache` option", () => {
 
   it("carries the same value on a range response", async () => {
     const app = server({ public: "./", cache: "1d" }).test();
-    const res = await app.get("/readme.md", { headers: { range: "bytes=0-3" } });
+    const res = await app.get("/readme.md", {
+      headers: { range: "bytes=0-3" },
+    });
     expect(res.status).toBe(206);
     expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
   });
@@ -140,16 +144,22 @@ describe("static assets over a real bucket (bucket lib)", () => {
     expect(await res.text()).toBe("4567");
 
     // suffix range
-    const suffix = await app.get("/data.bin", { headers: { range: "bytes=-4" } });
+    const suffix = await app.get("/data.bin", {
+      headers: { range: "bytes=-4" },
+    });
     expect(suffix.status).toBe(206);
     expect(await suffix.text()).toBe("CDEF");
 
     // open-ended range
-    const open = await app.get("/data.bin", { headers: { range: "bytes=10-" } });
+    const open = await app.get("/data.bin", {
+      headers: { range: "bytes=10-" },
+    });
     expect(await open.text()).toBe("ABCDEF");
 
     // unsatisfiable
-    const bad = await app.get("/data.bin", { headers: { range: "bytes=100-" } });
+    const bad = await app.get("/data.bin", {
+      headers: { range: "bytes=100-" },
+    });
     expect(bad.status).toBe(416);
   });
 });

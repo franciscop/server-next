@@ -16,16 +16,12 @@ server()
       return { name, age };
     },
   )
-  .get(
-    "/list",
-    { query: z.object({ page: z.coerce.number() }) },
-    (ctx) => {
-      const page: number = ctx.url.query.page;
-      // @ts-expect-error `missing` is not part of the schema
-      ctx.url.query.missing;
-      return { page };
-    },
-  )
+  .get("/list", { query: z.object({ page: z.coerce.number() }) }, (ctx) => {
+    const page: number = ctx.url.query.page;
+    // @ts-expect-error `missing` is not part of the schema
+    ctx.url.query.missing;
+    return { page };
+  })
   .get("/plain/:id", (ctx) => {
     // Without schemas nothing changes: params from the path, query free-form
     const id: string = ctx.url.params.id;

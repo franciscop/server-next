@@ -20,7 +20,9 @@ describe("checking a token minted elsewhere", () => {
     );
 
   const withToken = (token: string) =>
-    app().test().get("/me", { headers: { authorization: `Bearer ${token}` } });
+    app()
+      .test()
+      .get("/me", { headers: { authorization: `Bearer ${token}` } });
 
   // Dashboards print an issuer both ways, and `iss` itself carries the slash
   // for some (Auth0), so neither side can be trusted to be bare.
@@ -139,7 +141,9 @@ describe("checking a token minted elsewhere", () => {
   });
 
   it("requires an audience, since one issuer serves many apps", () => {
-    expect(() => server({ auth: { issuer: ISSUER } as any })).toThrow(/audience/);
+    expect(() => server({ auth: { issuer: ISSUER } as any })).toThrow(
+      /audience/,
+    );
   });
 });
 
@@ -303,7 +307,9 @@ describe("ctx.auth for a token minted elsewhere", () => {
       sub: "u1",
     });
     const body = await (
-      await app.test().get("/auth", { headers: { authorization: `Bearer ${token}` } })
+      await app
+        .test()
+        .get("/auth", { headers: { authorization: `Bearer ${token}` } })
     ).json();
 
     expect(body.provider).toBe(ISSUER);

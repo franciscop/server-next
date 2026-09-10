@@ -14,11 +14,11 @@
   ],
   "scripts": {
     "build": "bunx tsup src/index.ts --format esm --dts --out-dir . --target node24 --external zod --external @valibot/to-json-schema",
-    "prepare": "mkdir -p node_modules/@server && ln -sfn ../.. node_modules/@server/next",
+    "postinstall": "mkdir -p node_modules/@server && ln -sfn ../.. node_modules/@server/next",
     "start": "bun test --watch",
-    "lint": "npx tsc --noEmit && npx @biomejs/biome lint ./src --error-on-warnings",
-    "test": "npm run test:bun && npm run lint",
-    "test:bun": "bun test src demo"
+    "lint": "npm run prettier && npx tsc --noEmit && npx @biomejs/biome lint ./src --error-on-warnings",
+    "prettier": "prettier --write ./src",
+    "test": "bun test src demo"
   },
   "main": "index.js",
   "type": "module",
@@ -75,6 +75,7 @@
     "arktype": "^2.2.3",
     "bun": "^1.3.13",
     "check-dts": "^0.8.2",
+    "prettier": "^3.9.6",
     "tsup": "^8.5.1",
     "typescript": "^6.0.2",
     "valibot": "^1.4.2",

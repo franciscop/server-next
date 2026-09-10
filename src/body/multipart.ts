@@ -88,7 +88,12 @@ export default async function parseMultipart(
       } else if (state === "headers") {
         const i = buf.indexOf(BREAK);
         if (i === -1) break;
-        part = startPart(buf.subarray(0, i).toString("utf-8"), bucket, limits, budget);
+        part = startPart(
+          buf.subarray(0, i).toString("utf-8"),
+          bucket,
+          limits,
+          budget,
+        );
         buf = buf.subarray(i + BREAK.length);
         state = "body";
         advanced = true;

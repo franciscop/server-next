@@ -1,4 +1,14 @@
-import server, { cache, cookies, download, headers, json, redirect, send, status, type } from ".";
+import server, {
+  cache,
+  cookies,
+  download,
+  headers,
+  json,
+  redirect,
+  send,
+  status,
+  type,
+} from ".";
 
 describe("null-body statuses", () => {
   // 204/205/304/101 must not carry a body, or Node/undici throws when building
@@ -51,7 +61,9 @@ describe("Reply", () => {
     });
 
     it("keeps the status and headers set before a JSX body", async () => {
-      const res = await status(201).headers("x-a", "1").send(() => "<p>ok</p>");
+      const res = await status(201)
+        .headers("x-a", "1")
+        .send(() => "<p>ok</p>");
       expect(res.status).toBe(201);
       expect(res.headers.get("x-a")).toBe("1");
       expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
@@ -150,7 +162,9 @@ describe("Reply", () => {
 
   describe("cache()", () => {
     it("the last cache-control write wins, no merging", async () => {
-      const res = await cache("1h").headers("cache-control", "no-store").send("x");
+      const res = await cache("1h")
+        .headers("cache-control", "no-store")
+        .send("x");
       expect(res.headers.get("cache-control")).toBe("no-store");
     });
   });
@@ -171,24 +185,32 @@ describe("Reply", () => {
     });
 
     it("can set a cookie with path", async () => {
-      const res = await cookies({ hello: { value: "world", path: "/hello" } }).send();
+      const res = await cookies({
+        hello: { value: "world", path: "/hello" },
+      }).send();
       expect(res.headers.get("set-cookie")).toBe("hello=world;Path=/hello");
     });
 
     it("can set a cookie with path", async () => {
-      const res = await cookies({ h: { value: "b", path: "/hello/world" } }).send();
+      const res = await cookies({
+        h: { value: "b", path: "/hello/world" },
+      }).send();
       expect(res.headers.get("set-cookie")).toBe("h=b;Path=/hello/world");
     });
 
     it("can set a cookie with expires (number)", async () => {
-      const res = await cookies({ hello: { value: "world", expires: 5000 } }).send();
+      const res = await cookies({
+        hello: { value: "world", expires: 5000 },
+      }).send();
       const diff = getExpiresDiff(res.headers.get("set-cookie"));
       expect(diff).toBeGreaterThanOrEqual(3900);
       expect(diff).toBeLessThanOrEqual(5100);
     });
 
     it("can set a cookie with expires (string)", async () => {
-      const res = await cookies({ hello: { value: "w", expires: "5weeks" } }).send();
+      const res = await cookies({
+        hello: { value: "w", expires: "5weeks" },
+      }).send();
       const diff = getExpiresDiff(res.headers.get("set-cookie"));
       const fiveWeeks = 5 * 7 * 24 * 3600 * 1000;
       expect(diff).toBeGreaterThanOrEqual(fiveWeeks - 1100);
@@ -212,7 +234,9 @@ describe("Reply", () => {
     });
 
     it("can delete a cookie with expires", async () => {
-      const res = await cookies({ hello: { value: "world", expires: 0 } }).send();
+      const res = await cookies({
+        hello: { value: "world", expires: 0 },
+      }).send();
       const [, expiresStr] = res.headers
         .get("set-cookie")
         .match(/Expires=([^;]+)/);
@@ -228,7 +252,9 @@ describe("Reply", () => {
     });
 
     it("can set multiple cookies by calling it multiple times", async () => {
-      const res = await cookies({ hello: "world" }).cookies({ hello: "bye" }).send();
+      const res = await cookies({ hello: "world" })
+        .cookies({ hello: "bye" })
+        .send();
       expect(res.headers.get("set-cookie")).toBe(
         "hello=world;Path=/, hello=bye;Path=/",
       );
@@ -297,7 +323,9 @@ describe("Reply", () => {
     it("prompts a download with filename", async () => {
       const res = await download("hello.md").send("Hi");
       expect(await res.text()).toBe("Hi");
-      expect(res.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+      expect(res.headers.get("content-type")).toBe(
+        "text/markdown; charset=utf-8",
+      );
       expect(res.headers.get("content-disposition")).toBe(
         'attachment; filename="hello.md"',
       );
@@ -305,7 +333,9 @@ describe("Reply", () => {
 
     it("automatically infers the content type", async () => {
       const res = await download("hello.md").send("Hi");
-      expect(res.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+      expect(res.headers.get("content-type")).toBe(
+        "text/markdown; charset=utf-8",
+      );
       expect(res.headers.get("content-disposition")).toBe(
         'attachment; filename="hello.md"',
       );
@@ -355,7 +385,9 @@ describe("Reply", () => {
     it("keeps spaces readable in the saved filename", async () => {
       // filename= is a quoted string; browsers do not percent-decode it
       const res = await download("my file.csv").send("a,b");
-      expect(res.headers.get("content-disposition")).toBe('attachment; filename="my file.csv"');
+      expect(res.headers.get("content-disposition")).toBe(
+        'attachment; filename="my file.csv"',
+      );
     });
 
     it("sends non-ASCII names via RFC 5987 filename*", async () => {
@@ -366,7 +398,9 @@ describe("Reply", () => {
     });
 
     it("an explicit content-disposition wins over download()'s", async () => {
-      const res = await download("a.txt").headers("content-disposition", "inline").send("x");
+      const res = await download("a.txt")
+        .headers("content-disposition", "inline")
+        .send("x");
       expect(res.headers.get("content-disposition")).toBe("inline");
     });
 
@@ -397,7 +431,7 @@ describe("Reply", () => {
       // encodeURIComponent leaves ' ( ) * alone, but attr-char forbids them
       const res = await download("wow(*).pdf").send("x");
       const cd = res.headers.get("content-disposition") || "";
-      expect(cd).toContain("filename=\"wow(*).pdf\"");
+      expect(cd).toContain('filename="wow(*).pdf"');
       expect(cd).not.toContain("filename*");
     });
 
@@ -409,7 +443,9 @@ describe("Reply", () => {
       const uni = await download("日本語(1).pdf").send("x");
       const cd = uni.headers.get("content-disposition") || "";
       expect(cd).toContain('filename="???(1).pdf"');
-      expect(cd).toContain("filename*=UTF-8''%E6%97%A5%E6%9C%AC%E8%AA%9E%281%29.pdf");
+      expect(cd).toContain(
+        "filename*=UTF-8''%E6%97%A5%E6%9C%AC%E8%AA%9E%281%29.pdf",
+      );
     });
   });
 });

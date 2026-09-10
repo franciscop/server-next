@@ -69,15 +69,17 @@ export default async function assets(ctx: Context) {
       }
       if (range) {
         const { start, end } = range;
-        return type(ctype)
-          .status(206)
-          .headers({
-            ...headers,
-            "content-range": `bytes ${start}-${end}/${meta.size}`,
-            "content-length": String(end - start + 1),
-          })
-          // slice() is a file view (end exclusive); stream just that range.
-          .send(file.slice(start, end + 1).stream());
+        return (
+          type(ctype)
+            .status(206)
+            .headers({
+              ...headers,
+              "content-range": `bytes ${start}-${end}/${meta.size}`,
+              "content-length": String(end - start + 1),
+            })
+            // slice() is a file view (end exclusive); stream just that range.
+            .send(file.slice(start, end + 1).stream())
+        );
       }
     }
 

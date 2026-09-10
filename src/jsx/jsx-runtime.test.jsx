@@ -431,9 +431,9 @@ describe("style tag", () => {
       expect(
         <style minify>{'a::after { content: "a; b: c"; }'}</style>,
       ).toRender('<style>a::after{content:"a; b: c"}</style>');
-      expect(
-        <style minify>{"a::after { content: 'x  y'; }"}</style>,
-      ).toRender("<style>a::after{content:'x  y'}</style>");
+      expect(<style minify>{"a::after { content: 'x  y'; }"}</style>).toRender(
+        "<style>a::after{content:'x  y'}</style>",
+      );
     });
 
     it("handles an escaped quote inside a value", () => {

@@ -36,7 +36,11 @@ for (const ext in mimes) extByMime[mimes[ext]] = ext;
 // A repeated field name collects its values into an array, whether they are text
 // fields (e.g. checkboxes) or files (e.g. a gallery). The first value is kept as
 // a scalar; a second occurrence turns it into an array.
-export function addField(body: Record<string, any>, name: string, value: any): void {
+export function addField(
+  body: Record<string, any>,
+  name: string,
+  value: any,
+): void {
   if (body[name] === undefined) {
     body[name] = value;
     return;
@@ -135,7 +139,10 @@ export function startPart(
 }
 
 // Stop a half-written file and take the partial bytes back out of the bucket
-async function abortFile(part: Part & { kind: "file" }, error: Error): Promise<never> {
+async function abortFile(
+  part: Part & { kind: "file" },
+  error: Error,
+): Promise<never> {
   if (part.opened) {
     try {
       part.opened.controller.error(error);
@@ -149,7 +156,10 @@ async function abortFile(part: Part & { kind: "file" }, error: Error): Promise<n
 }
 
 // Both budgets, checked on every chunk so nothing oversized is ever completed
-async function checkSize(part: Part & { kind: "file" }, added: number): Promise<void> {
+async function checkSize(
+  part: Part & { kind: "file" },
+  added: number,
+): Promise<void> {
   part.budget.used += added;
   const { maxFileSize, maxTotalSize } = part.limits;
   if (maxFileSize != null && part.size > parseBytes(maxFileSize)) {
@@ -193,7 +203,12 @@ function openFile(part: Part & { kind: "file" }): void {
     },
   });
   const file = part.bucket.file(id);
-  part.opened = { type, file, controller, write: file.write(readable, { type }) };
+  part.opened = {
+    type,
+    file,
+    controller,
+    write: file.write(readable, { type }),
+  };
 }
 
 export async function feedPart(part: Part, data: Buffer): Promise<void> {
@@ -222,7 +237,10 @@ export async function feedPart(part: Part, data: Buffer): Promise<void> {
   await checkSize(part, data.length);
 }
 
-export async function endPart(part: Part, body: Record<string, any>): Promise<void> {
+export async function endPart(
+  part: Part,
+  body: Record<string, any>,
+): Promise<void> {
   if (part.kind === "text") {
     const buf = Buffer.concat(part.chunks);
     const value = isProbablyText(buf) ? buf.toString("utf-8").trim() : buf;

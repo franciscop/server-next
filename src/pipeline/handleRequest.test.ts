@@ -8,7 +8,10 @@ describe("the second fetch argument", () => {
       requestIP: () => ({ address: "10.1.2.3" }),
       upgrade: () => false,
     };
-    const res = await app.fetch(new Request("http://localhost/"), bunServer as any);
+    const res = await app.fetch(
+      new Request("http://localhost/"),
+      bunServer as any,
+    );
     // The server object still works as the IP source...
     expect(await res.text()).toBe("10.1.2.3");
     // ...but none of its functions leak into the global env
@@ -18,7 +21,9 @@ describe("the second fetch argument", () => {
 
   it("merges worker-style env vars", async () => {
     const app = server({ log: false }).get("/", () => "hi");
-    await app.fetch(new Request("http://localhost/"), { MY_TEST_VAR: "yes" } as any);
+    await app.fetch(new Request("http://localhost/"), {
+      MY_TEST_VAR: "yes",
+    } as any);
     expect(globalThis.env.MY_TEST_VAR).toBe("yes");
     delete (globalThis.env as any).MY_TEST_VAR;
   });
@@ -49,8 +54,8 @@ describe("unknown HTTP methods", () => {
   });
 
   it("reaches a custom onError with the METHOD_NOT_ALLOWED code", async () => {
-    const onError = mock((error: any) =>
-      new Response(error.code, { status: error.status }),
+    const onError = mock(
+      (error: any) => new Response(error.code, { status: error.status }),
     );
     const app = server({ log: false, onError }).get("/", () => "hi");
     const res = await app.fetch(
@@ -64,9 +69,7 @@ describe("unknown HTTP methods", () => {
 
 describe("handleRequest onError", () => {
   it("calls onError when an error is thrown", async () => {
-    const onError = mock(
-      () => new Response("Custom error", { status: 418 }),
-    );
+    const onError = mock(() => new Response("Custom error", { status: 418 }));
 
     const res = await server({ onError })
       .get("/", () => {

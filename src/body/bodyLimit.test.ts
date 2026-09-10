@@ -2,7 +2,8 @@ import { rm } from "node:fs/promises";
 import server from "../index";
 
 // Throwaway uploads dir under the gitignored src/tests/uploads/, cleaned up after.
-const UPLOADS = new URL("./tests/uploads/_bodylimit/", import.meta.url).pathname;
+const UPLOADS = new URL("./tests/uploads/_bodylimit/", import.meta.url)
+  .pathname;
 afterAll(() => rm(UPLOADS, { recursive: true, force: true }));
 
 describe("security.maxBodySize (request size limit)", () => {

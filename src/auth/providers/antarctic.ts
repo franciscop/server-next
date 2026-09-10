@@ -17,10 +17,7 @@ const nowhere = {
   del: async () => {},
 };
 
-export default function antarcticProvider(
-  name: string,
-  Client: any,
-): Provider {
+export default function antarcticProvider(name: string, Client: any): Provider {
   const client = (ctx: Context, options: ProviderOptions) => {
     // A missing id was already refused at boot (parseProviders)
     const { id, secret } = credentials(name, options);

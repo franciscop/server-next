@@ -140,7 +140,9 @@ describe("the docs page", () => {
     const documented = [...doc.matchAll(/^### ([A-Z_]+)$/gm)].map((m) => m[1]);
     const codes = Object.keys(ServerError).filter((k) => /^[A-Z_]+$/.test(k));
     for (const code of codes) {
-      expect(documented, `${code} is missing from docs/8. Errors.md`).toContain(code);
+      expect(documented, `${code} is missing from docs/8. Errors.md`).toContain(
+        code,
+      );
     }
   });
 });
@@ -177,7 +179,10 @@ describe("the development page is inert", () => {
       const lines: string[] = [];
       const real = console.error;
       console.error = (...a: any[]) => lines.push(a.join(" "));
-      const r = await server({ log: false }).get(fn).test().get(path, { headers: html });
+      const r = await server({ log: false })
+        .get(fn)
+        .test()
+        .get(path, { headers: html });
       console.error = real;
       return [r];
     })();

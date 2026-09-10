@@ -67,21 +67,31 @@ describe("the stored key", () => {
 
   it("has no extension when the bytes say nothing", async () => {
     const bucket = mockBucket();
-    const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
+    const { raw, contentType } = makeMultipart(
+      "doc.txt",
+      "hello",
+      "text/plain",
+    );
     const body = await parseBody(raw, contentType, bucket);
     expect(body.file.path).toMatch(/^\w{16}$/);
     expect(body.file.type).toBe("text/plain");
   });
 
   it("produces the same shape with and without limits", async () => {
-    const { raw, contentType } = makeMultipart("doc.txt", "hello", "text/plain");
+    const { raw, contentType } = makeMultipart(
+      "doc.txt",
+      "hello",
+      "text/plain",
+    );
     const plain = await parseBody(raw, contentType, mockBucket());
     const limited = await parseBody(raw, contentType, {
       bucket: mockBucket(),
       maxFileSize: "10mb",
     });
 
-    expect(Object.keys(plain.file).sort()).toEqual(Object.keys(limited.file).sort());
+    expect(Object.keys(plain.file).sort()).toEqual(
+      Object.keys(limited.file).sort(),
+    );
     expect(plain.file.name).toBe(limited.file.name);
     expect(plain.file.type).toBe(limited.file.type);
     expect(plain.file.size).toBe(limited.file.size);
@@ -111,7 +121,11 @@ describe("upload validation", () => {
 
     it("accepts files within maxFileSize", async () => {
       const { raw, contentType } = makeMultipart("photo.jpg", "small content");
-      const body = await parseBody(raw, contentType, dest({ maxFileSize: "10mb" }));
+      const body = await parseBody(
+        raw,
+        contentType,
+        dest({ maxFileSize: "10mb" }),
+      );
       expect(body.file).toBeDefined();
     });
   });
@@ -133,33 +147,61 @@ describe("upload validation", () => {
 
   describe("fileType", () => {
     it("rejects by mime type", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        "data",
+        "image/jpeg",
+      );
       await expect(
         parseBody(raw, contentType, dest({ fileType: ["image/png"] })),
       ).rejects.toThrow(/file type/i);
     });
 
     it("rejects by extension", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", "data", "image/jpeg");
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        "data",
+        "image/jpeg",
+      );
       await expect(
         parseBody(raw, contentType, dest({ fileType: [".png"] })),
       ).rejects.toThrow(/file type/i);
     });
 
     it("accepts a matching mime type", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", JPEG, "image/jpeg");
-      const body = await parseBody(raw, contentType, dest({ fileType: ["image/jpeg"] }));
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        JPEG,
+        "image/jpeg",
+      );
+      const body = await parseBody(
+        raw,
+        contentType,
+        dest({ fileType: ["image/jpeg"] }),
+      );
       expect(body.file).toBeDefined();
     });
 
     it("accepts a matching extension", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", JPEG, "image/jpeg");
-      const body = await parseBody(raw, contentType, dest({ fileType: [".jpg"] }));
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        JPEG,
+        "image/jpeg",
+      );
+      const body = await parseBody(
+        raw,
+        contentType,
+        dest({ fileType: [".jpg"] }),
+      );
       expect(body.file).toBeDefined();
     });
 
     it("accepts when extension or mime matches (OR logic)", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", JPEG, "image/jpeg");
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        JPEG,
+        "image/jpeg",
+      );
       const body = await parseBody(
         raw,
         contentType,
@@ -171,21 +213,40 @@ describe("upload validation", () => {
 
   describe("text fields are unaffected", () => {
     it("still parses text fields when a file is validated and stored", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", "imgdata", "image/jpeg");
-      const body = await parseBody(raw, contentType, dest({ maxFileSize: "1mb" }));
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        "imgdata",
+        "image/jpeg",
+      );
+      const body = await parseBody(
+        raw,
+        contentType,
+        dest({ maxFileSize: "1mb" }),
+      );
       expect(body.text).toBe("hello");
     });
 
     it("still parses text fields when a file is rejected", async () => {
-      const { raw, contentType } = makeMultipart("photo.jpg", "toolarge", "image/jpeg");
+      const { raw, contentType } = makeMultipart(
+        "photo.jpg",
+        "toolarge",
+        "image/jpeg",
+      );
       // The whole parse rejects when a file fails validation
-      await expect(parseBody(raw, contentType, dest({ maxFileSize: 1 }))).rejects.toThrow();
+      await expect(
+        parseBody(raw, contentType, dest({ maxFileSize: 1 })),
+      ).rejects.toThrow();
     });
   });
 });
 
 describe("uploads option (object form)", () => {
-  const post = (uploads: any, file = "small", type = "image/jpeg", name = "photo.jpg") => {
+  const post = (
+    uploads: any,
+    file = "small",
+    type = "image/jpeg",
+    name = "photo.jpg",
+  ) => {
     const { raw, contentType } = makeMultipart(name, file, type);
     return server({ uploads })
       .post("/", (ctx) => ({ ok: !!(ctx.body as any).file }))
@@ -194,11 +255,14 @@ describe("uploads option (object form)", () => {
   };
 
   it("accepts a file within the limits", async () => {
-    const res = await post({
-      bucket: mockBucket(),
-      maxFileSize: "1mb",
-      fileType: ["image/jpeg", ".jpg"],
-    }, "\xff\xd8\xff\xe0");
+    const res = await post(
+      {
+        bucket: mockBucket(),
+        maxFileSize: "1mb",
+        fileType: ["image/jpeg", ".jpg"],
+      },
+      "\xff\xd8\xff\xe0",
+    );
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
   });
@@ -206,7 +270,10 @@ describe("uploads option (object form)", () => {
   // The client chose the file, so a rejected upload is a 4xx it can act on,
   // not a server error that pages the operator.
   it("rejects a file over maxFileSize with a 413", async () => {
-    const res = await post({ bucket: mockBucket(), maxFileSize: 10 }, "a".repeat(100));
+    const res = await post(
+      { bucket: mockBucket(), maxFileSize: 10 },
+      "a".repeat(100),
+    );
     expect(res.status).toBe(413);
     expect(await res.text()).toMatch(/too large/);
   });
@@ -225,7 +292,11 @@ describe("uploads option (object form)", () => {
 
   it("hands onError a code to branch on", async () => {
     let seen: any;
-    const { raw, contentType } = makeMultipart("photo.jpg", "a".repeat(100), "image/jpeg");
+    const { raw, contentType } = makeMultipart(
+      "photo.jpg",
+      "a".repeat(100),
+      "image/jpeg",
+    );
     const res = await server({
       uploads: { bucket: mockBucket(), maxFileSize: 10 },
       onError: (error: any) => {

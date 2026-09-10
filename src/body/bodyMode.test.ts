@@ -14,7 +14,9 @@ describe("body mode resolution", () => {
     const api = server()
       .post("/", (ctx) => ctx.body)
       .test();
-    const res = await api.post("/", JSON.stringify({ a: 1 }), { headers: json });
+    const res = await api.post("/", JSON.stringify({ a: 1 }), {
+      headers: json,
+    });
     expect(await res.json()).toEqual({ a: 1 });
   });
 
@@ -44,7 +46,9 @@ describe("body: raw", () => {
         text: (ctx.body as Buffer).toString(),
       }))
       .test();
-    const res = await api.post("/", JSON.stringify({ a: 1 }), { headers: json });
+    const res = await api.post("/", JSON.stringify({ a: 1 }), {
+      headers: json,
+    });
     // raw ignores content-type: the JSON is NOT parsed, just the bytes
     expect(await res.json()).toEqual({ isBuffer: true, text: '{"a":1}' });
   });
@@ -61,7 +65,10 @@ describe("body: stream", () => {
       .test();
 
     const res = await api.post("/echo", "streamed-bytes");
-    expect(await res.json()).toEqual({ isStream: true, text: "streamed-bytes" });
+    expect(await res.json()).toEqual({
+      isStream: true,
+      text: "streamed-bytes",
+    });
   });
 
   it("streams the body straight into a bucket folder", async () => {
@@ -82,7 +89,10 @@ describe("body: stream", () => {
       "pretend-this-is-a-big-file",
     );
 
-    await fsp.rm("./src/tests/uploads/abc123", { recursive: true, force: true });
+    await fsp.rm("./src/tests/uploads/abc123", {
+      recursive: true,
+      force: true,
+    });
   });
 
   it("streams into a real bucket's folder() (bucket lib)", async () => {

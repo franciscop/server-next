@@ -49,11 +49,12 @@ server({ auth: "cookie:github" }).get("/me", (ctx) => {
 });
 
 // 3. Checking a token minted elsewhere: claims by default...
-server({ auth: { issuer: "https://x.supabase.co/auth/v1", audience: "authenticated" } })
-  .get("/me", (ctx) => {
-    const sub: string | undefined = ctx.user?.sub;
-    return { sub };
-  });
+server({
+  auth: { issuer: "https://x.supabase.co/auth/v1", audience: "authenticated" },
+}).get("/me", (ctx) => {
+  const sub: string | undefined = ctx.user?.sub;
+  return { sub };
+});
 
 // ...or your own row, when `getUser` maps it
 server({
@@ -68,15 +69,14 @@ server({
 });
 
 // 4. A function: whatever it returns
-server({ auth: (ctx) => db.users.byApiKey(String(ctx.headers["x-api-key"])) }).get(
-  "/me",
-  (ctx) => {
-    const id: string | undefined = ctx.user?.id;
-    // @ts-expect-error not a field of User
-    ctx.user?.nope;
-    return { id };
-  },
-);
+server({
+  auth: (ctx) => db.users.byApiKey(String(ctx.headers["x-api-key"])),
+}).get("/me", (ctx) => {
+  const id: string | undefined = ctx.user?.id;
+  // @ts-expect-error not a field of User
+  ctx.user?.nope;
+  return { id };
+});
 
 // 5. One method per app: an array is refused at the type level too
 server({

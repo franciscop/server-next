@@ -8,10 +8,14 @@ describe("the shapes of `auth`", () => {
   it("a function: request in, user out", async () => {
     const app = server({
       auth: (ctx: any) =>
-        ctx.headers["x-api-key"] === "k" ? { id: "1", email: "a@b.c" } : undefined,
+        ctx.headers["x-api-key"] === "k"
+          ? { id: "1", email: "a@b.c" }
+          : undefined,
     }).get("/me", (ctx) => ctx.user ?? "anonymous");
 
-    expect(await (await me(app, { headers: { "x-api-key": "k" } })).json()).toMatchObject({
+    expect(
+      await (await me(app, { headers: { "x-api-key": "k" } })).json(),
+    ).toMatchObject({
       email: "a@b.c",
     });
     expect(await (await me(app)).text()).toBe("anonymous");

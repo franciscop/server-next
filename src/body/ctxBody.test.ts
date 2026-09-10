@@ -82,7 +82,9 @@ describe("ctx.body parse: JSON", () => {
   ];
   for (const [label, value] of cases) {
     it(`parses ${label}`, async () => {
-      const res = await echo.post("/", JSON.stringify(value), { headers: json });
+      const res = await echo.post("/", JSON.stringify(value), {
+        headers: json,
+      });
       expect((await res.json()).body).toEqual(value);
     });
   }
@@ -121,7 +123,9 @@ describe("ctx.body parse: url-encoded", () => {
   });
 
   it("decodes percent-encoding and plus", async () => {
-    const res = await echo.post("/", "q=a%20b+c&e=a%40b.com", { headers: form });
+    const res = await echo.post("/", "q=a%20b+c&e=a%40b.com", {
+      headers: form,
+    });
     expect((await res.json()).body).toEqual({ q: "a b c", e: "a@b.com" });
   });
 });
@@ -132,7 +136,9 @@ describe("ctx.body parse: multipart fields", () => {
       { name: "first", value: "Francisco" },
       { name: "last", value: "Presencia" },
     ]);
-    const res = await echo.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await echo.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     expect((await res.json()).body).toEqual({
       first: "Francisco",
       last: "Presencia",
@@ -144,7 +150,9 @@ describe("ctx.body parse: multipart fields", () => {
       { name: "tag", value: "a" },
       { name: "tag", value: "b" },
     ]);
-    const res = await echo.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await echo.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     expect((await res.json()).body).toEqual({ tag: ["a", "b"] });
   });
 
@@ -153,7 +161,9 @@ describe("ctx.body parse: multipart fields", () => {
       { name: "ids[]", value: "1" },
       { name: "ids[]", value: "2" },
     ]);
-    const res = await echo.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await echo.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     expect((await res.json()).body).toEqual({ ids: ["1", "2"] });
   });
 });
@@ -166,9 +176,16 @@ describe("ctx.body parse: multipart files", () => {
   it("stores a file and mixes it with fields", async () => {
     const body = multipart([
       { name: "title", value: "my pic" },
-      { name: "avatar", filename: "a.png", type: "image/png", content: "PNGDATA" },
+      {
+        name: "avatar",
+        filename: "a.png",
+        type: "image/png",
+        content: "PNGDATA",
+      },
     ]);
-    const res = await api.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await api.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     const out = await res.json();
 
     expect(out.title).toBe("my pic");
@@ -178,19 +195,30 @@ describe("ctx.body parse: multipart files", () => {
       size: 7,
     });
     // the bytes actually streamed to disk
-    expect(await fsp.readFile(`${TMP}/${out.avatar.path}`, "utf8")).toBe("PNGDATA");
+    expect(await fsp.readFile(`${TMP}/${out.avatar.path}`, "utf8")).toBe(
+      "PNGDATA",
+    );
   });
 
   it("stores multiple distinct files", async () => {
     const body = multipart([
       { name: "doc", filename: "a.txt", type: "text/plain", content: "alpha" },
-      { name: "img", filename: "b.png", type: "image/png", content: "betabeta" },
+      {
+        name: "img",
+        filename: "b.png",
+        type: "image/png",
+        content: "betabeta",
+      },
     ]);
-    const res = await api.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await api.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     const out = await res.json();
 
     expect(await fsp.readFile(`${TMP}/${out.doc.path}`, "utf8")).toBe("alpha");
-    expect(await fsp.readFile(`${TMP}/${out.img.path}`, "utf8")).toBe("betabeta");
+    expect(await fsp.readFile(`${TMP}/${out.img.path}`, "utf8")).toBe(
+      "betabeta",
+    );
     expect(out.doc.size).toBe(5);
     expect(out.img.size).toBe(8);
   });
@@ -200,14 +228,20 @@ describe("ctx.body parse: multipart files", () => {
       { name: "photos", filename: "a.txt", type: "text/plain", content: "one" },
       { name: "photos", filename: "b.txt", type: "text/plain", content: "two" },
     ]);
-    const res = await api.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await api.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     const out = await res.json();
 
     expect(out.photos).toHaveLength(2);
     expect(out.photos[0].name).toBe("a.txt");
     expect(out.photos[1].name).toBe("b.txt");
-    expect(await fsp.readFile(`${TMP}/${out.photos[0].path}`, "utf8")).toBe("one");
-    expect(await fsp.readFile(`${TMP}/${out.photos[1].path}`, "utf8")).toBe("two");
+    expect(await fsp.readFile(`${TMP}/${out.photos[0].path}`, "utf8")).toBe(
+      "one",
+    );
+    expect(await fsp.readFile(`${TMP}/${out.photos[1].path}`, "utf8")).toBe(
+      "two",
+    );
   });
 
   // Dropping an uploaded file without a word is worse than refusing it, so an
@@ -217,7 +251,9 @@ describe("ctx.body parse: multipart files", () => {
       { name: "name", value: "alice" },
       { name: "file", filename: "x.bin", content: "ignored" },
     ]);
-    const res = await echo.post("/", body, { headers: { "content-type": MULTIPART } });
+    const res = await echo.post("/", body, {
+      headers: { "content-type": MULTIPART },
+    });
     expect(res.status).toBe(500);
     expect(await res.text()).toBe("Server Error");
   });
@@ -296,7 +332,9 @@ describe("ctx.body raw mode", () => {
         text: (ctx.body as Buffer).toString(),
       }))
       .test();
-    const res = await api.post("/", JSON.stringify({ a: 1 }), { headers: json });
+    const res = await api.post("/", JSON.stringify({ a: 1 }), {
+      headers: json,
+    });
     expect(await res.json()).toEqual({ isBuffer: true, text: '{"a":1}' });
   });
 });
@@ -305,8 +343,13 @@ describe("ctx.body stream mode", () => {
   it("is a ReadableStream that yields the exact bytes", async () => {
     const api = server()
       .post("/", { parser: "stream" }, async (ctx) => {
-        const buf = Buffer.from(await new Response(ctx.body as ReadableStream).arrayBuffer());
-        return { isStream: ctx.body instanceof ReadableStream, hex: buf.toString("hex") };
+        const buf = Buffer.from(
+          await new Response(ctx.body as ReadableStream).arrayBuffer(),
+        );
+        return {
+          isStream: ctx.body instanceof ReadableStream,
+          hex: buf.toString("hex"),
+        };
       })
       .test();
     const res = await api.post("/", Buffer.from([0xde, 0xad, 0xbe, 0xef]));
@@ -383,9 +426,7 @@ describe("streaming parser: chunk splitting", () => {
   });
 
   it("Case B: a raw file streamed in tiny chunks keeps its bytes and size", async () => {
-    const bytes = Buffer.from(
-      Array.from({ length: 1000 }, (_, i) => i % 256),
-    );
+    const bytes = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256));
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(bytes, 5), "image/png", bucket);
     expect(out.size).toBe(1000);
@@ -399,10 +440,19 @@ describe("streaming parser: buffer and stream inputs agree", () => {
   it("a Buffer and a 1-byte stream produce the same fields", async () => {
     const body = multipart([
       { name: "a", value: "1" },
-      { name: "f", filename: "f.txt", type: "text/plain", content: "hello world" },
+      {
+        name: "f",
+        filename: "f.txt",
+        type: "text/plain",
+        content: "hello world",
+      },
     ]);
     const viaBuffer = await parseBody(body, MULTIPART, capturingBucket());
-    const viaStream = await parseBody(streamOf(body, 1), MULTIPART, capturingBucket());
+    const viaStream = await parseBody(
+      streamOf(body, 1),
+      MULTIPART,
+      capturingBucket(),
+    );
 
     expect(viaBuffer.a).toBe(viaStream.a);
     expect(viaBuffer.f.name).toBe(viaStream.f.name);

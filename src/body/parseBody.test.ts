@@ -91,7 +91,8 @@ describe("parseBody", () => {
   it("records correct file size", async () => {
     const fileContent = "exactly this content";
     let body = `--${BOUNDARY}\r\n`;
-    body += 'Content-Disposition: form-data; name="doc"; filename="doc.txt"\r\n';
+    body +=
+      'Content-Disposition: form-data; name="doc"; filename="doc.txt"\r\n';
     body += "Content-Type: text/plain\r\n\r\n";
     body += `${fileContent}\r\n`;
     body += `--${BOUNDARY}--\r\n`;
@@ -108,7 +109,8 @@ describe("parseBody", () => {
 
   it("handles lowercase Content-Type in multipart part headers", async () => {
     let body = `--${BOUNDARY}\r\n`;
-    body += 'Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n';
+    body +=
+      'Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n';
     body += "content-type: image/jpeg\r\n\r\n"; // lowercase
     body += "fakejpegdata\r\n";
     body += `--${BOUNDARY}--\r\n`;
@@ -124,7 +126,8 @@ describe("parseBody", () => {
 
   it("preserves the original filename separate from the stored key", async () => {
     let body = `--${BOUNDARY}\r\n`;
-    body += 'Content-Disposition: form-data; name="photo"; filename="my photo (1).jpeg"\r\n';
+    body +=
+      'Content-Disposition: form-data; name="photo"; filename="my photo (1).jpeg"\r\n';
     body += "Content-Type: image/jpeg\r\n\r\n";
     body += "fakejpegdata\r\n";
     body += `--${BOUNDARY}--\r\n`;
@@ -157,7 +160,11 @@ describe("a multipart body with no boundary", () => {
   it("rejects an empty boundary the same way", async () => {
     const bucket = mockBucket();
     expect(
-      parseBody(Buffer.from("x", "utf-8"), "multipart/form-data; boundary=", bucket),
+      parseBody(
+        Buffer.from("x", "utf-8"),
+        "multipart/form-data; boundary=",
+        bucket,
+      ),
     ).rejects.toThrow(/boundary/i);
     expect(await count(bucket)).toBe(0);
   });

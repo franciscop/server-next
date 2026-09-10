@@ -14,7 +14,8 @@ export default class ValidationError extends ServerError {
     issues: readonly StandardIssue[],
   ) {
     // A response breaking its own contract is a server bug, not client input
-    const code = source === "response" ? "VALIDATION_FAILED" : "INVALID_REQUEST";
+    const code =
+      source === "response" ? "VALIDATION_FAILED" : "INVALID_REQUEST";
     const { status, message } = definition(code)!;
     super(code, status, message, { source });
     this.source = source;

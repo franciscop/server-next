@@ -19,13 +19,22 @@ const ascii = (text: string): number[] =>
 // Order matters: a longer, more specific signature must come before a shorter
 // one that prefixes it (RIFF containers, and the two GIF versions).
 const SIGNATURES: Signature[] = [
-  { type: "image/png", magic: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  {
+    type: "image/png",
+    magic: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  },
   { type: "image/jpeg", magic: [0xff, 0xd8, 0xff] },
   { type: "image/gif", magic: ascii("GIF87a") },
   { type: "image/gif", magic: ascii("GIF89a") },
   // RIFF containers: the format is at byte 8, so the whole thing is one match
-  { type: "image/webp", magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WEBP")] },
-  { type: "audio/wav", magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WAVE")] },
+  {
+    type: "image/webp",
+    magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WEBP")],
+  },
+  {
+    type: "audio/wav",
+    magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WAVE")],
+  },
   { type: "image/bmp", magic: ascii("BM") },
   { type: "image/tiff", magic: [0x49, 0x49, 0x2a, 0x00] },
   { type: "image/tiff", magic: [0x4d, 0x4d, 0x00, 0x2a] },
@@ -44,7 +53,10 @@ const SIGNATURES: Signature[] = [
 // How many bytes are needed before any of the above can be decided
 export const HEAD_SIZE = 32;
 
-const matches = (head: Uint8Array, { magic, offset = 0 }: Signature): boolean => {
+const matches = (
+  head: Uint8Array,
+  { magic, offset = 0 }: Signature,
+): boolean => {
   if (head.length < offset + magic.length) return false;
   return magic.every((byte, i) => byte === null || head[offset + i] === byte);
 };

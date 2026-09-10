@@ -203,6 +203,7 @@ type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | Au
 type AuthContext = Pick<Context, "options" | "headers" | "cookies" | "platform" | "app">;
 type AuthEntry = {
     name: string;
+    providers?: string[];
     user: (ctx: AuthContext) => Promise<any>;
     routes?: () => Router;
 };

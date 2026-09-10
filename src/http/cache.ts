@@ -7,7 +7,9 @@ import setIfAbsent from "./setIfAbsent";
 // nothing to set. A duration ('1h') or number of seconds becomes a public
 // max-age; `false`/`0` is an explicit no-store, to punch through a global
 // default. For anything fancier, set the header yourself with headers().
-export function resolveCache(value: CacheOption | undefined | null): string | null {
+export function resolveCache(
+  value: CacheOption | undefined | null,
+): string | null {
   if (value === false || value === 0) return "no-store";
   if (typeof value === "number") return `public, max-age=${Math.round(value)}`;
   if (typeof value !== "string") return null;
@@ -19,7 +21,7 @@ export function resolveCache(value: CacheOption | undefined | null): string | nu
 //
 //  1. The Cache-Control default from the route/global `cache` option, set only
 //     if the route didn't set one itself (via cache()/headers()), so explicit
-//     always wins — the same "set if absent" rule as the security headers.
+//     always wins, the same "set if absent" rule as the security headers.
 //  2. A strong ETag for buffered GET responses, with a 304 short-circuit when
 //     the client already has that exact body (If-None-Match). Streaming bodies
 //     have no content-length and are skipped, since hashing them would mean
@@ -29,7 +31,10 @@ export function resolveCache(value: CacheOption | undefined | null): string | nu
 // cached. HEAD is included so its headers match the GET exactly (the body is
 // stripped after finalize). Returns the response to send (possibly a rebuilt
 // one or a 304).
-export async function applyCache(out: Response, ctx: Context): Promise<Response> {
+export async function applyCache(
+  out: Response,
+  ctx: Context,
+): Promise<Response> {
   if ((ctx.method !== "get" && ctx.method !== "head") || out.status !== 200) {
     return out;
   }

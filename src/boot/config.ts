@@ -68,7 +68,11 @@ export default function config(options: Options = {}): Settings {
   // on the startup + request logs.
   const raw = options.log ?? env.LOG_LEVEL;
   const level: LogLevel | undefined =
-    raw === true ? "info" : raw === false ? undefined : (raw as LogLevel | undefined);
+    raw === true
+      ? "info"
+      : raw === false
+        ? undefined
+        : (raw as LogLevel | undefined);
   const log = createLogger(level);
 
   const settings: Settings = {
@@ -159,7 +163,10 @@ export default function config(options: Options = {}): Settings {
   // config generates a random `unsafe-` one per process, which would
   // invalidate every credential on restart and across instances: a warning in
   // development, a refusal in production.
-  if (settings.auth?.name === "flow" && settings.secrets[0].startsWith("unsafe-")) {
+  if (
+    settings.auth?.name === "flow" &&
+    settings.secrets[0].startsWith("unsafe-")
+  ) {
     const message =
       "Auth needs a stable secret: credentials are signed with it, and the " +
       "random per-process fallback breaks them on restart and across " +
@@ -184,7 +191,10 @@ export default function config(options: Options = {}): Settings {
 
   // Startup summary: one concise line per configured module (only with `log`)
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
-  if (settings.auth) log.message("auth", `${settings.auth.name} enabled`);
+  if (settings.auth) {
+    const { name, providers } = settings.auth;
+    log.message("auth", `${providers?.join(",") ?? name} enabled`);
+  }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {

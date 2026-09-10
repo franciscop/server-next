@@ -41,7 +41,9 @@ describe("the friendly names own their environment", () => {
     const api = server({
       secrets: "s",
       auth: {
-        providers: { cognito: { domain: "acme.auth.eu-west-1.amazoncognito.com" } },
+        providers: {
+          cognito: { domain: "acme.auth.eu-west-1.amazoncognito.com" },
+        },
         onLogin: (p: any) => p.id,
         getUser: (id: string) => ({ id }),
       },

@@ -23,8 +23,8 @@ export function setBodySource(ctx: Context, source: BodySource): void {
 //
 // The size limit (`security.maxBodySize`, default 1mb) caps only the bytes that
 // enter memory: full-body buffers and multipart *text* fields. File bytes
-// stream through to `uploads` and are exempt, since they're bounded by
-// upload().limit(). The counter therefore lives at the buffering choke points
+// stream through to `uploads` and are exempt, since they follow its own
+// maxFileSize and maxTotalSize. The counter therefore lives at the choke points
 // inside parseBody, not here.
 //
 // This runs at dispatch (after routing) so a per-route mode can take effect and

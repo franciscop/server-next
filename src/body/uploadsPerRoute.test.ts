@@ -22,7 +22,9 @@ describe("per-route uploads", () => {
     const api = server()
       .post("/avatar", { uploads: `${ROOT}_avatars` }, (ctx) => ctx.body)
       .test();
-    const res = await api.post("/avatar", multipart("avatar", "pix"), { headers });
+    const res = await api.post("/avatar", multipart("avatar", "pix"), {
+      headers,
+    });
     expect(res.status).toBe(200);
     const { avatar } = await res.json();
     expect(avatar.name).toBe("f.txt");
@@ -35,12 +37,16 @@ describe("per-route uploads", () => {
       .post("/other", (ctx) => ctx.body)
       .test();
 
-    const video = await api.post("/video", multipart("file", "vid"), { headers });
+    const video = await api.post("/video", multipart("file", "vid"), {
+      headers,
+    });
     const { file: v } = await video.json();
     expect(await Bun.file(`${ROOT}_videos/${v.path}`).text()).toBe("vid");
 
     // Sibling routes still use the global destination
-    const other = await api.post("/other", multipart("file", "glob"), { headers });
+    const other = await api.post("/other", multipart("file", "glob"), {
+      headers,
+    });
     const { file: o } = await other.json();
     expect(await Bun.file(`${ROOT}_global/${o.path}`).text()).toBe("glob");
   });
@@ -69,7 +75,9 @@ describe("per-route uploads", () => {
       .test();
 
     // File fields are silently skipped without a destination
-    const off = await api.post("/no-files", multipart("file", "nope"), { headers });
+    const off = await api.post("/no-files", multipart("file", "nope"), {
+      headers,
+    });
     expect(await off.json()).toEqual({});
 
     const on = await api.post("/files", multipart("file", "yep"), { headers });

@@ -30,13 +30,15 @@ export type InferParamType<T extends string> = T extends keyof ParamTypeMap
   : string;
 
 export type ParamsToObject<Params extends string> = {
-  [K in Params as K extends `${infer Key}:${infer _Type}?`
-    ? Key
-    : K extends `${infer Key}:${infer _Type}`
+  [
+    K in Params as K extends `${infer Key}:${infer _Type}?`
       ? Key
-      : K extends `${infer Key}?`
+      : K extends `${infer Key}:${infer _Type}`
         ? Key
-        : K]: K extends `${infer _Key}:${infer Type}?`
+        : K extends `${infer Key}?`
+          ? Key
+          : K
+  ]: K extends `${infer _Key}:${infer Type}?`
     ? InferParamType<Type> | undefined
     : K extends `${infer _Key}:${infer Type}`
       ? InferParamType<Type>

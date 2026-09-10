@@ -245,7 +245,8 @@ function createCookies(key, val) {
   if (val.value === null) val.expires = EXPIRED;
   const { value, path, expires, maxAge, httpOnly, secure, sameSite } = val;
   let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path || "/"}`;
-  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
+  if (typeof expires !== "undefined")
+    str += `;Expires=${normalizeExpires(expires)}`;
   if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
   if (httpOnly) str += ";HttpOnly";
   if (secure) str += ";Secure";
@@ -513,7 +514,11 @@ function serialize(body, headers2) {
     return body;
   }
   if (typeof body === "string") {
-    fill(headers2, isHtml(body) ? mimes_default.html : mimes_default.text, Buffer.byteLength(body));
+    fill(
+      headers2,
+      isHtml(body) ? mimes_default.html : mimes_default.text,
+      Buffer.byteLength(body)
+    );
     return body;
   }
   if (body instanceof Uint8Array) {
@@ -676,13 +681,22 @@ var redirect = (...args) => r().redirect(...args);
 // src/body/sniff.ts
 var ascii = (text) => [...text].map((char) => char.charCodeAt(0));
 var SIGNATURES = [
-  { type: "image/png", magic: [137, 80, 78, 71, 13, 10, 26, 10] },
+  {
+    type: "image/png",
+    magic: [137, 80, 78, 71, 13, 10, 26, 10]
+  },
   { type: "image/jpeg", magic: [255, 216, 255] },
   { type: "image/gif", magic: ascii("GIF87a") },
   { type: "image/gif", magic: ascii("GIF89a") },
   // RIFF containers: the format is at byte 8, so the whole thing is one match
-  { type: "image/webp", magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WEBP")] },
-  { type: "audio/wav", magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WAVE")] },
+  {
+    type: "image/webp",
+    magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WEBP")]
+  },
+  {
+    type: "audio/wav",
+    magic: [...ascii("RIFF"), null, null, null, null, ...ascii("WAVE")]
+  },
   { type: "image/bmp", magic: ascii("BM") },
   { type: "image/tiff", magic: [73, 73, 42, 0] },
   { type: "image/tiff", magic: [77, 77, 0, 42] },
@@ -828,7 +842,11 @@ var Router = class _Router {
     }
     const base = method === "socket" ? [] : this.middleware;
     const fns = [...base, ...rest].filter((fn) => fn != null);
-    this.handlers[method].push({ path, options, fns });
+    this.handlers[method].push({
+      path,
+      options,
+      fns
+    });
     return this.self();
   }
   socket(pathOrMid, optionsOrMid, ...middleware) {
@@ -1018,7 +1036,9 @@ function validate(strategy, expires, config2) {
   seconds(expires);
   const { onLogin, getUser, toPublicUser } = config2;
   if (onLogin && !getUser) {
-    throw new Error("`onLogin` needs a `getUser`: something has to resolve the id it returns.");
+    throw new Error(
+      "`onLogin` needs a `getUser`: something has to resolve the id it returns."
+    );
   }
   if (isSigned(strategy)) {
     if (getUser && !toPublicUser) {
@@ -1054,7 +1074,9 @@ async function credentialPayload(config2, strategy, ctx, profile) {
   if (!isSigned(strategy)) return { sub: String(id) };
   const user = await getUser(String(id), ctx);
   if (user === void 0 || user === null) {
-    throw new Error(`getUser returned nothing for the id "${id}" that onLogin just returned`);
+    throw new Error(
+      `getUser returned nothing for the id "${id}" that onLogin just returned`
+    );
   }
   return { user: await toPublicUser(user) };
 }
@@ -1450,7 +1472,12 @@ var callbackRoute = ({ name, options, provider }, redirects, finish) => async (c
   const pending = await readState(ctx, query.state);
   if (!query.code) throw errors_default.AUTH_NO_CODE();
   try {
-    const profile = await provider.exchange(ctx, options, query.code, pending);
+    const profile = await provider.exchange(
+      ctx,
+      options,
+      query.code,
+      pending
+    );
     return spendState(await finish(ctx, profile));
   } catch (error) {
     const message = failureMessage(error, name);
@@ -1477,6 +1504,7 @@ function flowEntry(config2) {
   };
   return {
     name: "flow",
+    providers: list.map((one) => one.name),
     async user(ctx) {
       const payload = await read(ctx, strategy);
       if (!payload) return;
@@ -1489,7 +1517,11 @@ function flowEntry(config2) {
       const r2 = router();
       for (const one of list) {
         r2.get(`/auth/login/${one.name}`, SPEC, loginRoute(one));
-        r2.get(callbackPath(one.name), SPEC, callbackRoute(one, redirects, finish));
+        r2.get(
+          callbackPath(one.name),
+          SPEC,
+          callbackRoute(one, redirects, finish)
+        );
       }
       r2.post("/auth/logout", SPEC, async (ctx) => {
         const payload = await read(ctx, strategy).catch(() => void 0);
@@ -1548,7 +1580,9 @@ function keysOf(issuer, refresh = false) {
         if (!algorithm) continue;
         out.set(
           jwk.kid,
-          await crypto.subtle.importKey("jwk", jwk, algorithm, false, ["verify"])
+          await crypto.subtle.importKey("jwk", jwk, algorithm, false, [
+            "verify"
+          ])
         );
       }
       return out;
@@ -1717,7 +1751,7 @@ function toEntry(auth2) {
     if ("handler" in auth2) return instanceEntry(auth2);
   }
   throw new Error(
-    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ issuer, audience }`, a library instance, or an array of those."
+    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ issuer, audience }`, or a library instance."
   );
 }
 
@@ -2005,7 +2039,10 @@ function config(options = {}) {
   settings.onError = options.onError || defaultOnError;
   settings.onResponse = options.onResponse;
   const loc = (v) => typeof v === "string" ? v : "enabled";
-  if (settings.auth) log.message("auth", `${settings.auth.name} enabled`);
+  if (settings.auth) {
+    const { name, providers: providers2 } = settings.auth;
+    log.message("auth", `${providers2?.join(",") ?? name} enabled`);
+  }
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {
@@ -2213,7 +2250,10 @@ var generateOpenApiPaths = async (handlers, specPath) => {
         const schema = await toJsonSchema(meta2.response);
         if (schema) {
           responses = {
-            200: { description: "OK", content: { "application/json": { schema } } }
+            200: {
+              description: "OK",
+              content: { "application/json": { schema } }
+            }
           };
         }
       }
@@ -2354,70 +2394,6 @@ async function socketUser(app, headers2, cookies2) {
   return app.settings.auth.user(ctx);
 }
 
-// src/http/cors.ts
-var localhost = /^https?:\/\/localhost(:\d+)?$/;
-function cors(config2, origin = "") {
-  origin = origin?.toLowerCase();
-  if (config2 === true) return origin || null;
-  if (config2 === "*") return "*";
-  if (!origin) return null;
-  if (localhost.test(origin)) return origin;
-  const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
-  if (arr.includes(origin)) return origin;
-  console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
-  return null;
-}
-function applyCors(res, ctx) {
-  const settings = ctx.options.cors;
-  if (!settings) return;
-  const requestOrigin = ctx.headers.origin || "";
-  let origin = cors(settings.origin, requestOrigin);
-  if (!origin) return;
-  if (settings.credentials && origin === "*") {
-    if (!requestOrigin) return;
-    origin = requestOrigin.toLowerCase();
-  }
-  res.headers.set("Access-Control-Allow-Origin", origin);
-  res.headers.set("Access-Control-Allow-Methods", settings.methods);
-  res.headers.set("Access-Control-Allow-Headers", settings.headers);
-  if (settings.credentials) {
-    res.headers.set("Access-Control-Allow-Credentials", "true");
-  }
-  if (origin !== "*") res.headers.append("Vary", "Origin");
-  if (ctx.method === "options") {
-    res.headers.set("Access-Control-Max-Age", "86400");
-  }
-}
-
-// src/pipeline/parseResponse.ts
-async function parseResponse(out, ctx) {
-  if (!out && typeof out !== "string") return null;
-  if (typeof out === "function") {
-    out = await out(ctx);
-    if (!out && typeof out !== "string") return null;
-  }
-  if (typeof out === "number") {
-    return new Response(null, { status: out });
-  }
-  if (!(out instanceof Response) || out.url) {
-    out = await send(out);
-  }
-  return out;
-}
-async function finalize(out, ctx) {
-  applyCors(out, ctx);
-  applySecurity(out, ctx);
-  out = await applyCache(out, ctx);
-  const stale = toClear(ctx);
-  if (stale) {
-    out.headers.append("set-cookie", clearCookie(stale));
-  }
-  if (ctx.time?.times?.length > 1) {
-    out.headers.set("Server-Timing", ctx.time.headers());
-  }
-  return out;
-}
-
 // src/body/bodyParts.ts
 var asIterable = (s) => s;
 function getMatching(string, regex) {
@@ -2523,7 +2499,12 @@ function openFile(part) {
     }
   });
   const file2 = part.bucket.file(id);
-  part.opened = { type: type2, file: file2, controller, write: file2.write(readable, { type: type2 }) };
+  part.opened = {
+    type: type2,
+    file: file2,
+    controller,
+    write: file2.write(readable, { type: type2 })
+  };
 }
 async function feedPart(part, data) {
   if (data.length === 0) return;
@@ -2637,7 +2618,12 @@ async function parseMultipart(stream, boundary, bucket2, limits, max = INF) {
       } else if (state === "headers") {
         const i = buf.indexOf(BREAK);
         if (i === -1) break;
-        part = startPart(buf.subarray(0, i).toString("utf-8"), bucket2, limits, budget);
+        part = startPart(
+          buf.subarray(0, i).toString("utf-8"),
+          bucket2,
+          limits,
+          budget
+        );
         buf = buf.subarray(i + BREAK.length);
         state = "body";
         advanced = true;
@@ -2745,7 +2731,8 @@ async function parseBody(input, contentType, dest, max = INF, length) {
     const buf = await toBuffer(input, max);
     return buf.length ? buf : void 0;
   }
-  if (!bucket2) throw errors_default.UPLOAD_NOT_CONFIGURED({ name: "the request body" });
+  if (!bucket2)
+    throw errors_default.UPLOAD_NOT_CONFIGURED({ name: "the request body" });
   const { maxFileSize } = limits;
   if (length != null && maxFileSize != null && length > parseBytes(maxFileSize)) {
     throw errors_default.UPLOAD_TOO_LARGE({
@@ -2804,6 +2791,21 @@ async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
   return parsed;
 }
 
+// src/context/isValidMethod.ts
+var methods = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "socket"
+];
+function isValidMethod(method) {
+  return methods.includes(method);
+}
+
 // src/util/define.ts
 function define(obj, key, cb) {
   Object.defineProperty(obj, key, {
@@ -2818,6 +2820,70 @@ function define(obj, key, cb) {
       return obj[key];
     }
   });
+}
+
+// src/http/cors.ts
+var localhost = /^https?:\/\/localhost(:\d+)?$/;
+function cors(config2, origin = "") {
+  origin = origin?.toLowerCase();
+  if (config2 === true) return origin || null;
+  if (config2 === "*") return "*";
+  if (!origin) return null;
+  if (localhost.test(origin)) return origin;
+  const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
+  if (arr.includes(origin)) return origin;
+  console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
+  return null;
+}
+function applyCors(res, ctx) {
+  const settings = ctx.options.cors;
+  if (!settings) return;
+  const requestOrigin = ctx.headers.origin || "";
+  let origin = cors(settings.origin, requestOrigin);
+  if (!origin) return;
+  if (settings.credentials && origin === "*") {
+    if (!requestOrigin) return;
+    origin = requestOrigin.toLowerCase();
+  }
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Access-Control-Allow-Methods", settings.methods);
+  res.headers.set("Access-Control-Allow-Headers", settings.headers);
+  if (settings.credentials) {
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  if (origin !== "*") res.headers.append("Vary", "Origin");
+  if (ctx.method === "options") {
+    res.headers.set("Access-Control-Max-Age", "86400");
+  }
+}
+
+// src/pipeline/parseResponse.ts
+async function parseResponse(out, ctx) {
+  if (!out && typeof out !== "string") return null;
+  if (typeof out === "function") {
+    out = await out(ctx);
+    if (!out && typeof out !== "string") return null;
+  }
+  if (typeof out === "number") {
+    return new Response(null, { status: out });
+  }
+  if (!(out instanceof Response) || out.url) {
+    out = await send(out);
+  }
+  return out;
+}
+async function finalize(out, ctx) {
+  applyCors(out, ctx);
+  applySecurity(out, ctx);
+  out = await applyCache(out, ctx);
+  const stale = toClear(ctx);
+  if (stale) {
+    out.headers.append("set-cookie", clearCookie(stale));
+  }
+  if (ctx.time?.times?.length > 1) {
+    out.headers.set("Server-Timing", ctx.time.headers());
+  }
+  return out;
 }
 
 // src/errors/ValidationError.ts
@@ -2860,21 +2926,6 @@ async function validateResponse(out, options) {
 function replace2(target2, values) {
   for (const key of Object.keys(target2)) delete target2[key];
   Object.assign(target2, values);
-}
-
-// src/context/isValidMethod.ts
-var methods = [
-  "get",
-  "post",
-  "put",
-  "patch",
-  "delete",
-  "head",
-  "options",
-  "socket"
-];
-function isValidMethod(method) {
-  return methods.includes(method);
 }
 
 // src/pipeline/handleRequest.ts
@@ -3240,7 +3291,14 @@ function forwarded(url, headers2, trustProxy) {
 }
 
 // src/context/create.ts
-function createContext(app, { method: rawMethod, headers: rawHeaders, url: rawUrl, signal, remoteAddress, source }) {
+function createContext(app, {
+  method: rawMethod,
+  headers: rawHeaders,
+  url: rawUrl,
+  signal,
+  remoteAddress,
+  source
+}) {
   const init = performance.now();
   const method = rawMethod?.toLowerCase() || "get";
   const headers2 = parseHeaders_default(rawHeaders);

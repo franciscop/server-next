@@ -99,7 +99,10 @@ const ABSOLUTE = /^(?:[\\/]|[a-zA-Z]:)/;
 // for '..' is valid), and their values aren't paths. Anything that resolves an
 // id to a real path (a bucket, the filesystem) still has to enforce its own
 // containment, since ids also arrive from those other sources.
-export function checkTraversal(params: Record<string, any>, ctx: Context): void {
+export function checkTraversal(
+  params: Record<string, any>,
+  ctx: Context,
+): void {
   if (!ctx.options.security?.traversalProtection) return;
   for (const param in params) {
     const value = params[param];

@@ -44,7 +44,9 @@ describe("HEAD requests", () => {
     const api = server({ public: "./" }).test();
     const res = await api.head("/readme.md");
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    expect(res.headers.get("content-type")).toBe(
+      "text/markdown; charset=utf-8",
+    );
     expect(res.headers.get("etag")).toBeTruthy();
     expect(await res.text()).toBe("");
   });

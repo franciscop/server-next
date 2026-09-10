@@ -15,7 +15,11 @@ export default function disposition(name?: string): string {
   if (!name) return "attachment";
 
   // Drop CR/LF (header injection) and any path, keeping just the filename
-  const clean = name.replace(/[\r\n]/g, "").split(/[\\/]/).pop() || "";
+  const clean =
+    name
+      .replace(/[\r\n]/g, "")
+      .split(/[\\/]/)
+      .pop() || "";
   if (!clean) return "attachment";
 
   // The quoted fallback is ASCII-only, with quotes and backslashes escaped

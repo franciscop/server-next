@@ -112,8 +112,7 @@ export const issue = (
   ctx: Context,
   payload: Omit<Payload, "iat" | "exp">,
   expires: string,
-) =>
-  signJwt(payload, ctx.options.secrets[0], seconds(expires));
+) => signJwt(payload, ctx.options.secrets[0], seconds(expires));
 
 // Boot-time checks, so a bad combination fails at server() rather than at the
 // first login. Callbacks are all or nothing: with none, there is no database,
@@ -132,7 +131,9 @@ export function validate(
 
   const { onLogin, getUser, toPublicUser } = config;
   if (onLogin && !getUser) {
-    throw new Error("`onLogin` needs a `getUser`: something has to resolve the id it returns.");
+    throw new Error(
+      "`onLogin` needs a `getUser`: something has to resolve the id it returns.",
+    );
   }
   if (isSigned(strategy)) {
     if (getUser && !toPublicUser) {
@@ -187,8 +188,9 @@ export async function credentialPayload(
   if (user === undefined || user === null) {
     // Signing an empty credential would look like a successful login
     // that leaves them anonymous everywhere
-    throw new Error(`getUser returned nothing for the id "${id}" that onLogin just returned`);
+    throw new Error(
+      `getUser returned nothing for the id "${id}" that onLogin just returned`,
+    );
   }
   return { user: await toPublicUser!(user) };
 }
-

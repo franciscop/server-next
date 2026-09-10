@@ -21,9 +21,15 @@ const ALGS: Record<string, any> = {
 // than guessed. Fetched once and kept, keyed by `kid`; an unknown kid
 // triggers one refetch (issuers rotate keys), at most once a minute so a
 // flood of bogus kids cannot hammer the issuer.
-const cache = new Map<string, { at: number; keys: Promise<Map<string, CryptoKey>> }>();
+const cache = new Map<
+  string,
+  { at: number; keys: Promise<Map<string, CryptoKey>> }
+>();
 
-function keysOf(issuer: string, refresh = false): Promise<Map<string, CryptoKey>> {
+function keysOf(
+  issuer: string,
+  refresh = false,
+): Promise<Map<string, CryptoKey>> {
   let entry = cache.get(issuer);
   if (!entry || (refresh && Date.now() - entry.at > 60_000)) {
     const keys = (async () => {
@@ -35,7 +41,9 @@ function keysOf(issuer: string, refresh = false): Promise<Map<string, CryptoKey>
         if (!algorithm) continue;
         out.set(
           jwk.kid,
-          await crypto.subtle.importKey("jwk", jwk, algorithm, false, ["verify"]),
+          await crypto.subtle.importKey("jwk", jwk, algorithm, false, [
+            "verify",
+          ]),
         );
       }
       return out;
@@ -66,9 +74,7 @@ export default function verifyEntry(options: AuthVerify): AuthEntry {
   return {
     name: `verify:${issuer}`,
     async user(ctx: Context) {
-      const token = options.cookie
-        ? ctx.cookies[options.cookie]
-        : bearer(ctx);
+      const token = options.cookie ? ctx.cookies[options.cookie] : bearer(ctx);
       if (!token) return; // anonymous, not an error
 
       let claims: AuthClaims;
@@ -118,7 +124,9 @@ async function check(
   if (!key) throw ServerError.AUTH_INVALID_TOKEN();
 
   const ok = await crypto.subtle.verify(
-    algorithm.name === "ECDSA" ? { name: "ECDSA", hash: algorithm.hash } : algorithm,
+    algorithm.name === "ECDSA"
+      ? { name: "ECDSA", hash: algorithm.hash }
+      : algorithm,
     key,
     unb64url(sig),
     enc.encode(`${head}.${body}`),

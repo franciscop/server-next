@@ -91,9 +91,4 @@ declare const plain: Context;
 const _param: string = plain.url.params.anything;
 const _email: string | undefined = plain.user?.email;
 
-export type {
-  _param as param,
-  _email as email,
-  bodyRequired,
-  bodyOptional,
-};
+export type { _param as param, _email as email, bodyRequired, bodyOptional };

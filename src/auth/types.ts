@@ -52,13 +52,12 @@ export type RedirectTargets = {
 };
 
 export type RedirectOption =
-  | string
-  | ((user: any, ctx: Context) => Awaitable<string>)
-  | RedirectTargets;
+  string | ((user: any, ctx: Context) => Awaitable<string>) | RedirectTargets;
 
 // A login flow we run: the routes are mounted here, the credential is ours
 export type AuthConfig<U = AuthProfile> = {
-  providers: string | readonly string[] | Record<string, string | ProviderOptions>;
+  providers:
+    string | readonly string[] | Record<string, string | ProviderOptions>;
   strategy?: Strategy;
   expires?: string;
   redirect?: RedirectOption;
@@ -107,11 +106,7 @@ export type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
 // The string form is `<strategy>:<provider>` and takes no callbacks, so there
 // is no database: the profile itself is signed into the credential.
 export type AuthOption =
-  | string
-  | AuthFunction
-  | AuthConfig<any>
-  | AuthVerify<any>
-  | AuthInstance;
+  string | AuthFunction | AuthConfig<any> | AuthVerify<any> | AuthInstance;
 
 // What an entry's `user()` may rely on. An HTTP request passes the full
 // Context; a WebSocket upgrade has no request/response cycle, so it builds
@@ -125,6 +120,8 @@ export type AuthContext = Pick<
 // Every shape normalises to this: resolve a user, and optionally own routes
 export type AuthEntry = {
   name: string;
+  // The provider names a login flow mounted, for the startup log
+  providers?: string[];
   user: (ctx: AuthContext) => Promise<any>;
   routes?: () => Router;
 };

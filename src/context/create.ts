@@ -21,7 +21,14 @@ type ContextParts = {
 
 export default function createContext(
   app: Server,
-  { method: rawMethod, headers: rawHeaders, url: rawUrl, signal, remoteAddress, source }: ContextParts,
+  {
+    method: rawMethod,
+    headers: rawHeaders,
+    url: rawUrl,
+    signal,
+    remoteAddress,
+    source,
+  }: ContextParts,
 ): Context {
   const init = performance.now();
 

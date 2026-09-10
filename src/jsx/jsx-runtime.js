@@ -47,18 +47,20 @@ const minifyCss = (str) => {
   // squeezed, then put back. Comments go first and unconditionally, so one
   // written inside a string is stripped along with the rest.
   const quoted = [];
-  return str
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(
-      /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
-      (match) => `\0${quoted.push(match) - 1}\0`,
-    )
-    .replace(/\s+/g, " ")
-    // `+` is left out on purpose for `calc(100% + 10px)`
-    .replace(/\s*([{}:;,>~])\s*/g, "$1")
-    .replace(/;}/g, "}")
-    .replace(/\0(\d+)\0/g, (_, i) => quoted[i])
-    .trim();
+  return (
+    str
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(
+        /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g,
+        (match) => `\0${quoted.push(match) - 1}\0`,
+      )
+      .replace(/\s+/g, " ")
+      // `+` is left out on purpose for `calc(100% + 10px)`
+      .replace(/\s*([{}:;,>~])\s*/g, "$1")
+      .replace(/;}/g, "}")
+      .replace(/\0(\d+)\0/g, (_, i) => quoted[i])
+      .trim()
+  );
 };
 
 // React element detection (safe for custom objects too)

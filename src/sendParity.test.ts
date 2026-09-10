@@ -66,9 +66,7 @@ describe("send() and return accept the same values", () => {
   });
 
   it("a Response", async () => {
-    const [a, b] = await bothWays(
-      () => new Response("made", { status: 201 }),
-    );
+    const [a, b] = await bothWays(() => new Response("made", { status: 201 }));
     expect(b).toEqual(a);
   });
 

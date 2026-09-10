@@ -103,7 +103,11 @@ export class Router<C extends ContextTypes = {}> {
     const fns = [...base, ...rest].filter((fn) => fn != null);
 
     // `uploads` was just resolved above, hence the stored-route shape
-    this.handlers[method].push({ path, options: options as Route["options"], fns });
+    this.handlers[method].push({
+      path,
+      options: options as Route["options"],
+      fns,
+    });
     return this.self();
   }
 

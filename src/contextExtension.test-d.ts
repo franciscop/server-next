@@ -32,4 +32,9 @@ const _email: string | undefined = ctx.user?.email;
 // @ts-expect-error `typeTestProjekt` is not a field on Context
 ctx.typeTestProjekt;
 
-export type { _added as added, _param as param, _method as method, _email as email };
+export type {
+  _added as added,
+  _param as param,
+  _method as method,
+  _email as email,
+};

@@ -188,7 +188,9 @@ describe("ctx.auth", () => {
   it("carries the issue and expiry times", async () => {
     const token = await signJwt({ sub: "u1" }, "s", 3600);
     const body = await (
-      await app().test().get("/auth", { headers: { cookie: `session=${token}` } })
+      await app()
+        .test()
+        .get("/auth", { headers: { cookie: `session=${token}` } })
     ).json();
 
     const issued = new Date(body.issuedAt).getTime();
@@ -218,7 +220,9 @@ describe("ctx.auth", () => {
     // Signed in at login, so it survives without a lookup of yours
     const token = await signJwt({ sub: "u1", provider: "github" }, "s", 3600);
     const body = await (
-      await app().test().get("/auth", { headers: { cookie: `session=${token}` } })
+      await app()
+        .test()
+        .get("/auth", { headers: { cookie: `session=${token}` } })
     ).json();
     expect(body.provider).toBe("github");
   });

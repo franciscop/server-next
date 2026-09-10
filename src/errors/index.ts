@@ -37,7 +37,8 @@ const registry: Record<string, ErrorDef> = {};
 
 // The definition behind a registered code, for subclasses (ValidationError)
 // that need to construct themselves rather than go through the factory.
-export const definition = (code: string): ErrorDef | undefined => registry[code];
+export const definition = (code: string): ErrorDef | undefined =>
+  registry[code];
 
 class ServerError extends Error {
   code: string;

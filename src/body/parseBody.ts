@@ -8,7 +8,8 @@ import type { LimitOptions } from "./upload";
 
 // Where files go. `false` means "ignore files, I meant it"; null/undefined mean
 // nothing was configured, which is an error as soon as a file arrives.
-type Dest = Bucket | ({ bucket: Bucket } & LimitOptions) | null | undefined | false;
+type Dest =
+  Bucket | ({ bucket: Bucket } & LimitOptions) | null | undefined | false;
 
 type Input = Buffer | ReadableStream;
 
@@ -139,10 +140,15 @@ export default async function parseBody(
   }
   // Nothing configured, and this is a file by elimination: say so rather than
   // handing back bytes nobody asked for
-  if (!bucket) throw ServerError.UPLOAD_NOT_CONFIGURED({ name: "the request body" });
+  if (!bucket)
+    throw ServerError.UPLOAD_NOT_CONFIGURED({ name: "the request body" });
   // A body that declares itself too large is refused before a byte is written
   const { maxFileSize } = limits;
-  if (length != null && maxFileSize != null && length > parseBytes(maxFileSize)) {
+  if (
+    length != null &&
+    maxFileSize != null &&
+    length > parseBytes(maxFileSize)
+  ) {
     throw ServerError.UPLOAD_TOO_LARGE({
       name: "the request body",
       size: String(length),

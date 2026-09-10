@@ -67,24 +67,27 @@ const spendState = (res: any) => {
 };
 
 // GET /auth/login/:name, which hands the browser to the provider
-const loginRoute = ({ provider, options }: Named) => async (ctx: Context) => {
-  const { url, state, payload } = await provider.authorize(ctx, options);
-  // A script asking for JSON gets the URL and sends the person there itself;
-  // a browser gets the redirect. Both carry the state cookie: a same-origin
-  // fetch stores it, so the callback's check passes either way.
-  const cookie = await startState(ctx, { state, payload });
-  if (wantsJson(ctx)) {
-    return cookies(STATE_COOKIE, cookie).json({ url });
-  }
-  return cookies(STATE_COOKIE, cookie).redirect(url);
-};
+const loginRoute =
+  ({ provider, options }: Named) =>
+  async (ctx: Context) => {
+    const { url, state, payload } = await provider.authorize(ctx, options);
+    // A script asking for JSON gets the URL and sends the person there itself;
+    // a browser gets the redirect. Both carry the state cookie: a same-origin
+    // fetch stores it, so the callback's check passes either way.
+    const cookie = await startState(ctx, { state, payload });
+    if (wantsJson(ctx)) {
+      return cookies(STATE_COOKIE, cookie).json({ url });
+    }
+    return cookies(STATE_COOKIE, cookie).redirect(url);
+  };
 
 // GET /auth/callback/:name, where the provider sends the browser back
-const callbackRoute = (
-  { name, options, provider }: Named,
-  redirects: RedirectTargets,
-  finish: Finish,
-) =>
+const callbackRoute =
+  (
+    { name, options, provider }: Named,
+    redirects: RedirectTargets,
+    finish: Finish,
+  ) =>
   async (ctx: Context) => {
     const query = ctx.url.query as Record<string, string>;
     if (query.error) return errorRedirect(redirects, ctx, query.error);
@@ -97,7 +100,12 @@ const callbackRoute = (
     if (!query.code) throw ServerError.AUTH_NO_CODE();
 
     try {
-      const profile = await provider.exchange(ctx, options, query.code, pending);
+      const profile = await provider.exchange(
+        ctx,
+        options,
+        query.code,
+        pending,
+      );
       return spendState(await finish(ctx, profile));
     } catch (error) {
       const message = failureMessage(error, name);
@@ -116,7 +124,9 @@ export default function flowEntry(config: AuthConfig): AuthEntry {
   // A single target is shorthand for `{ login: target }`; logout and error
   // then use their fallbacks
   const redirects: RedirectTargets =
-    typeof config.redirect === "object" ? config.redirect : { login: config.redirect };
+    typeof config.redirect === "object"
+      ? config.redirect
+      : { login: config.redirect };
 
   const finish: Finish = async (ctx, profile) => {
     const payload = await credentialPayload(config, strategy, ctx, profile);
@@ -138,6 +148,7 @@ export default function flowEntry(config: AuthConfig): AuthEntry {
 
   return {
     name: "flow",
+    providers: list.map((one) => one.name),
 
     async user(ctx: Context) {
       const payload = await read(ctx, strategy);
@@ -152,7 +163,11 @@ export default function flowEntry(config: AuthConfig): AuthEntry {
       const r = router();
       for (const one of list) {
         r.get(`/auth/login/${one.name}`, SPEC, loginRoute(one));
-        r.get(callbackPath(one.name), SPEC, callbackRoute(one, redirects, finish));
+        r.get(
+          callbackPath(one.name),
+          SPEC,
+          callbackRoute(one, redirects, finish),
+        );
       }
       r.post("/auth/logout", SPEC, async (ctx: Context) => {
         const payload = await read(ctx, strategy).catch(() => undefined);

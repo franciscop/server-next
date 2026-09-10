@@ -27,7 +27,11 @@ export default function serialize(body: any, headers: Headers): BodyInit {
   }
 
   if (typeof body === "string") {
-    fill(headers, isHtml(body) ? mimes.html : mimes.text, Buffer.byteLength(body));
+    fill(
+      headers,
+      isHtml(body) ? mimes.html : mimes.text,
+      Buffer.byteLength(body),
+    );
     return body;
   }
 

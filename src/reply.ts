@@ -223,7 +223,10 @@ class Reply {
         merged.append("set-cookie", cookie);
       }
       // fetch() already decoded the body, so drop a stale content-encoding
-      if (body.url && /^(br|gzip)$/.test(merged.get("content-encoding") || "")) {
+      if (
+        body.url &&
+        /^(br|gzip)$/.test(merged.get("content-encoding") || "")
+      ) {
         merged.delete("content-encoding");
       }
       return new Response(body.body, {

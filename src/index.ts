@@ -123,7 +123,6 @@ export default function server(options?: Options) {
   return new Server(options).self();
 }
 
-
 export * from "./reply";
 export { default as router } from "./router";
 export { default as ServerError } from "./errors";

@@ -57,14 +57,7 @@ export type {
 type Reply = ReturnType<typeof status>;
 
 export type Method =
-  | "get"
-  | "post"
-  | "put"
-  | "patch"
-  | "delete"
-  | "head"
-  | "options"
-  | "socket";
+  "get" | "post" | "put" | "patch" | "delete" | "head" | "options" | "socket";
 
 // The typed slices of `ctx` an app declares, e.g. `server<{ user: User }>()`;
 // keys take plain types or Standard Schemas. See "Typing ctx" in the docs.
@@ -125,9 +118,7 @@ export type Route = {
 export type BasicValue = string | number | boolean | null;
 
 export type SerializableValue =
-  | BasicValue
-  | { [key: string]: SerializableValue }
-  | Array<SerializableValue>;
+  BasicValue | { [key: string]: SerializableValue } | Array<SerializableValue>;
 
 type OnError = (
   error: RequestError,

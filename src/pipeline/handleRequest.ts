@@ -1,12 +1,12 @@
 import type { Context, Server } from "..";
-import ServerError from "../errors";
-import parseResponse, { finalize } from "./parseResponse";
-import pathPattern from "./pathPattern";
 import { resolveBody } from "../body/body";
+import isValidMethod from "../context/isValidMethod";
+import ServerError from "../errors";
 import { checkTraversal } from "../http/security";
 import define from "../util/define";
+import parseResponse, { finalize } from "./parseResponse";
+import pathPattern from "./pathPattern";
 import { validateRequest, validateResponse } from "./validate";
-import isValidMethod from "../context/isValidMethod";
 
 export default async function handleRequest(
   app: Server,
@@ -17,7 +17,7 @@ export default async function handleRequest(
   // security headers, cache/ETag, credential clearing and Server-Timing.
   if (res) res = await finalize(res, ctx);
   // The one "after the response" position (linear middleware has none): a hook
-  // over every finalized HTTP response — routes, static, 404s, onError output.
+  // over every finalized HTTP response, routes, static, 404s, onError output.
   // Return a Response to replace it (sent verbatim), or nothing to leave it as is.
   if (res && ctx.options.onResponse) {
     const replaced = await ctx.options.onResponse(res, ctx);
@@ -66,7 +66,11 @@ async function getResponse(
       // Only real settings: the route's schemas stay on route.options, so
       // ctx.options carries what its Settings type says and nothing else.
       const { parser, cache, uploads } = route.options;
-      if (parser !== undefined || cache !== undefined || uploads !== undefined) {
+      if (
+        parser !== undefined ||
+        cache !== undefined ||
+        uploads !== undefined
+      ) {
         ctx.options = { ...app.settings };
         if (parser !== undefined) ctx.options.parser = parser;
         if (cache !== undefined) ctx.options.cache = cache;

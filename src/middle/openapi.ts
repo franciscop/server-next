@@ -82,8 +82,7 @@ const generateOpenApiPaths = async (
       }
 
       let requestBody:
-        | { content: { "application/json": { schema: any } } }
-        | undefined;
+        { content: { "application/json": { schema: any } } } | undefined;
       if (meta?.body) {
         const schema = await toJsonSchema(meta.body);
         if (schema) {
@@ -103,7 +102,10 @@ const generateOpenApiPaths = async (
         const schema = await toJsonSchema(meta.response);
         if (schema) {
           responses = {
-            200: { description: "OK", content: { "application/json": { schema } } },
+            200: {
+              description: "OK",
+              content: { "application/json": { schema } },
+            },
           };
         }
       }

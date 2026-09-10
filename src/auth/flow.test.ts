@@ -9,7 +9,11 @@ describe("a login flow with your database", () => {
   const base = {
     providers: "github",
     onLogin: (profile: any) => {
-      rows.set(profile.id, { id: profile.id, email: profile.email, role: "user" });
+      rows.set(profile.id, {
+        id: profile.id,
+        email: profile.email,
+        role: "user",
+      });
       return profile.id;
     },
     getUser: (id: string) => rows.get(id),
@@ -64,13 +68,15 @@ describe("a login flow with your database", () => {
   });
 
   it("refuses a provider it does not know, naming it", () => {
-    expect(() => server({ auth: { ...base, providers: "nope" } })).toThrow(/nope/);
+    expect(() => server({ auth: { ...base, providers: "nope" } })).toThrow(
+      /nope/,
+    );
   });
 
   it("needs an issuer for a provider it does not ship", () => {
-    expect(() => server({ auth: { ...base, providers: { work: {} } } })).toThrow(
-      /issuer/i,
-    );
+    expect(() =>
+      server({ auth: { ...base, providers: { work: {} } } }),
+    ).toThrow(/issuer/i);
   });
 
   it("requires getUser with onLogin", () => {
@@ -100,7 +106,11 @@ describe("providers", () => {
     env.GOOGLE_SECRET = "secret";
     const api = server({
       secrets: "s",
-      auth: { providers: "google", onLogin: (p) => p.id, getUser: (id) => ({ id }) },
+      auth: {
+        providers: "google",
+        onLogin: (p) => p.id,
+        getUser: (id) => ({ id }),
+      },
     }).test();
 
     const res = await api.get("/auth/login/google");
@@ -113,7 +123,11 @@ describe("providers", () => {
     expect(() =>
       server({
         secrets: "s",
-        auth: { providers: "discord", onLogin: (p) => p.id, getUser: (id) => ({ id }) },
+        auth: {
+          providers: "discord",
+          onLogin: (p) => p.id,
+          getUser: (id) => ({ id }),
+        },
       }),
     ).toThrow(/DISCORD_ID/);
   });
@@ -122,7 +136,11 @@ describe("providers", () => {
     expect(() =>
       server({
         secrets: "s",
-        auth: { providers: "acme", onLogin: (p) => p.id, getUser: (id) => ({ id }) },
+        auth: {
+          providers: "acme",
+          onLogin: (p) => p.id,
+          getUser: (id) => ({ id }),
+        },
       }),
     ).toThrow(/issuer/);
   });
@@ -182,7 +200,11 @@ describe("PKCE providers", () => {
     env.TWITTER_SECRET = "secret";
     const api = server({
       secrets: "s",
-      auth: { providers: "twitter", onLogin: (p) => p.id, getUser: (id) => ({ id }) },
+      auth: {
+        providers: "twitter",
+        onLogin: (p) => p.id,
+        getUser: (id) => ({ id }),
+      },
     }).test();
 
     const res = await api.get("/auth/login/twitter");
@@ -199,7 +221,9 @@ describe("PKCE providers", () => {
     );
     expect(pending.payload.codeVerifier).toBeTruthy();
     // The verifier is the secret half: it must not be in the URL
-    expect(res.headers.get("location")).not.toContain(pending.payload.codeVerifier);
+    expect(res.headers.get("location")).not.toContain(
+      pending.payload.codeVerifier,
+    );
   });
 });
 
@@ -223,7 +247,10 @@ describe("the login callback", () => {
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
       if (one.includes("github.com/login/oauth/access_token")) {
-        return Response.json({ access_token: "gho_SECRET", token_type: "bearer" });
+        return Response.json({
+          access_token: "gho_SECRET",
+          token_type: "bearer",
+        });
       }
       if (one.includes("api.github.com/user")) {
         return Response.json(PROFILE);
@@ -238,7 +265,9 @@ describe("the login callback", () => {
   // Drive the real login redirect, then come back with its state
   const login = async (api: any) => {
     const res = await api.get("/auth/login/github");
-    const state = new URL(res.headers.get("location")).searchParams.get("state");
+    const state = new URL(res.headers.get("location")).searchParams.get(
+      "state",
+    );
     const cookie = res.headers.get("set-cookie").split(";")[0];
     return api.get(`/auth/callback/github?code=c0d3&state=${state}`, {
       headers: { cookie },
@@ -281,7 +310,9 @@ describe("the login callback", () => {
     const res = await login(api);
     const cookie = res.headers.get("set-cookie").split(";")[0];
 
-    const body = await (await api.get("/whoami", { headers: { cookie } })).json();
+    const body = await (
+      await api.get("/whoami", { headers: { cookie } })
+    ).json();
     expect(body.user).toEqual({
       id: "583231",
       email: "ada@x.com",
@@ -325,7 +356,9 @@ describe("what the visitor sees when a login fails", () => {
 
   const login = async (api: any) => {
     const res = await api.get("/auth/login/github");
-    const state = new URL(res.headers.get("location")).searchParams.get("state");
+    const state = new URL(res.headers.get("location")).searchParams.get(
+      "state",
+    );
     const cookie = res.headers.get("set-cookie").split(";")[0];
     return api.get(`/auth/callback/github?code=c0d3&state=${state}`, {
       headers: { cookie },
@@ -335,7 +368,8 @@ describe("what the visitor sees when a login fails", () => {
   it("shows an onLogin refusal verbatim", async () => {
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
-      if (one.includes("access_token")) return Response.json({ access_token: "t" });
+      if (one.includes("access_token"))
+        return Response.json({ access_token: "t" });
       if (one.includes("api.github.com/user")) {
         return Response.json({ id: 1, email: "a@b.c", name: "Ada" });
       }
@@ -382,7 +416,8 @@ describe("what the visitor sees when a login fails", () => {
   it("treats getUser returning nothing at login as a failure, not a login", async () => {
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
-      if (one.includes("access_token")) return Response.json({ access_token: "t" });
+      if (one.includes("access_token"))
+        return Response.json({ access_token: "t" });
       if (one.includes("api.github.com/user")) {
         return Response.json({ id: 1, email: "a@b.c", name: "Ada" });
       }
@@ -424,14 +459,18 @@ describe("boot-time validation", () => {
   });
 
   it("takes any duration the cookie parser takes", () => {
-    expect(() => server({ secrets: "s", auth: { ...base, expires: "1y" } })).not.toThrow();
-    expect(() => server({ secrets: "s", auth: { ...base, expires: "12 hours" } })).not.toThrow();
+    expect(() =>
+      server({ secrets: "s", auth: { ...base, expires: "1y" } }),
+    ).not.toThrow();
+    expect(() =>
+      server({ secrets: "s", auth: { ...base, expires: "12 hours" } }),
+    ).not.toThrow();
   });
 
   it("refuses a duration it cannot parse", () => {
-    expect(() => server({ secrets: "s", auth: { ...base, expires: "1 parsec" } })).toThrow(
-      /expires/,
-    );
+    expect(() =>
+      server({ secrets: "s", auth: { ...base, expires: "1 parsec" } }),
+    ).toThrow(/expires/);
   });
 
   it("refuses to boot in production with no stable secret", () => {

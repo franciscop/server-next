@@ -19,7 +19,11 @@ const requires = (field: string) =>
 
 describe("request validation", () => {
   it("passes a valid body through to the handler", async () => {
-    const app = server().post("/", { body: requires("name") }, (ctx) => ctx.body);
+    const app = server().post(
+      "/",
+      { body: requires("name") },
+      (ctx) => ctx.body,
+    );
     const res = await app.test().post("/", { name: "Ada" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ name: "Ada" });
@@ -54,7 +58,9 @@ describe("request validation", () => {
     const app = server().get("/", { query: paged }, (ctx) => ({
       page: ctx.url.query.page,
     }));
-    expect(await (await app.test().get("/?page=2")).json()).toEqual({ page: 2 });
+    expect(await (await app.test().get("/?page=2")).json()).toEqual({
+      page: 2,
+    });
     expect((await app.test().get("/")).status).toBe(422);
   });
 
@@ -67,7 +73,9 @@ describe("request validation", () => {
     const app = server().get("/users/:id", { params: numeric }, (ctx) => ({
       id: ctx.url.params.id,
     }));
-    expect(await (await app.test().get("/users/42")).json()).toEqual({ id: 42 });
+    expect(await (await app.test().get("/users/42")).json()).toEqual({
+      id: 42,
+    });
     expect((await app.test().get("/users/ada")).status).toBe(422);
   });
 
@@ -85,9 +93,11 @@ describe("request validation", () => {
 
   it("leaves everything untouched without schemas", async () => {
     const app = server().post("/", (ctx) => ctx.body);
-    expect(await (await app.test().post("/", { any: "thing" })).json()).toEqual({
-      any: "thing",
-    });
+    expect(await (await app.test().post("/", { any: "thing" })).json()).toEqual(
+      {
+        any: "thing",
+      },
+    );
   });
 });
 
@@ -169,7 +179,9 @@ describe("real libraries", () => {
       { query: v.object({ page: v.pipe(v.string(), v.transform(Number)) }) },
       (ctx) => ({ page: ctx.url.query.page }),
     );
-    expect(await (await app.test().get("/?page=3")).json()).toEqual({ page: 3 });
+    expect(await (await app.test().get("/?page=3")).json()).toEqual({
+      page: 3,
+    });
     expect((await app.test().get("/")).status).toBe(422);
   });
 

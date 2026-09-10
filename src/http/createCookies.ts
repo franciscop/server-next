@@ -70,7 +70,8 @@ export default function createCookies(key: string, val: Cookie): string {
   // characters that would otherwise end it (';', ',', '=') or break the reader
   // (a literal '%'). `??` keeps falsy values like 0 and false.
   let str = `${key}=${encodeURIComponent(value ?? "")};Path=${path || "/"}`;
-  if (typeof expires !== "undefined") str += `;Expires=${normalizeExpires(expires)}`;
+  if (typeof expires !== "undefined")
+    str += `;Expires=${normalizeExpires(expires)}`;
   if (typeof maxAge === "number") str += `;Max-Age=${maxAge}`;
   if (httpOnly) str += ";HttpOnly";
   if (secure) str += ";Secure";

@@ -70,7 +70,11 @@ describe("security headers", () => {
   it("enables opt-in headers when set", async () => {
     const csp = "default-src 'self'";
     const { headers } = await server({
-      security: { csp, corp: "same-origin", permissionsPolicy: "geolocation=()" },
+      security: {
+        csp,
+        corp: "same-origin",
+        permissionsPolicy: "geolocation=()",
+      },
     })
       .get("/", () => 200)
       .test()
@@ -128,7 +132,10 @@ describe("traversal protection", () => {
   });
 
   it("rejects a Windows-style absolute param", async () => {
-    for (const url of ["/files/C:%5CWindows%5Cwin.ini", "/files/%5C%5Cserver%5Cshare"]) {
+    for (const url of [
+      "/files/C:%5CWindows%5Cwin.ini",
+      "/files/%5C%5Cserver%5Cshare",
+    ]) {
       const res = await app.test().get(url);
       expect(res.status).toBe(400);
     }

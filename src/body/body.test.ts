@@ -110,7 +110,9 @@ describe("a malformed multipart request", () => {
     });
 
   it("is a 400, not a stored file", async () => {
-    const res = await send(server({ uploads: UPLOADS }).post("/", (ctx) => ctx.body));
+    const res = await send(
+      server({ uploads: UPLOADS }).post("/", (ctx) => ctx.body),
+    );
     expect(res.status).toBe(400);
     expect(await fsp.readdir(UPLOADS).catch(() => [])).toEqual([]);
   });

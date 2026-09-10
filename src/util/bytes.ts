@@ -12,7 +12,9 @@ export function parseBytes(value: number | string): number {
     gb: 1024 ** 3,
     tb: 1024 ** 4,
   };
-  const match = value.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)$/);
+  const match = value
+    .toLowerCase()
+    .match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)$/);
   if (!match) throw new Error(`Invalid size: "${value}"`);
   return parseFloat(match[1]) * (units[match[2]] ?? 1);
 }

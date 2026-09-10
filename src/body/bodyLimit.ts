@@ -5,8 +5,8 @@ export const INF = Number.POSITIVE_INFINITY;
 
 // Default cap on the bytes Server.js buffers in memory for a single request:
 // JSON, text and url-encoded bodies, raw mode, and multipart *text* fields.
-// Generous enough that normal JSON APIs never hit it; file bytes are exempt —
-// they stream straight to `uploads` and are bounded by upload().limit() instead.
+// Generous enough that normal JSON APIs never hit it; file bytes are exempt:
+// they stream to `uploads` and follow its own maxFileSize and maxTotalSize.
 const DEFAULT_MAX = "1mb";
 
 // `false` disables the limit; anything else (including undefined) resolves to a

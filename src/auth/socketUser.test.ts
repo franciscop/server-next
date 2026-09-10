@@ -31,9 +31,12 @@ describe("socket auth", () => {
 
   it("resolves a function shape from the partial context", async () => {
     const app = server({
-      auth: (ctx: any) => (ctx.cookies.uid ? { id: ctx.cookies.uid } : undefined),
+      auth: (ctx: any) =>
+        ctx.cookies.uid ? { id: ctx.cookies.uid } : undefined,
     });
-    expect(await socketUser(app as any, {}, { uid: "b" })).toMatchObject({ id: "b" });
+    expect(await socketUser(app as any, {}, { uid: "b" })).toMatchObject({
+      id: "b",
+    });
     expect(await socketUser(app as any, {}, {})).toBe(undefined);
   });
 });
