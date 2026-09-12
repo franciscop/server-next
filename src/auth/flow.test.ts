@@ -485,3 +485,63 @@ describe("boot-time validation", () => {
     }
   });
 });
+
+// `onLogout` is where an app cleans up after a login, so it has to run whatever
+// the credential looks like: `session` and `token` carry the id, `cookie` and
+// `jwt` carry the signed user and the id comes from inside it.
+describe("onLogout across the strategies", () => {
+  const PROFILE = { id: 583231, name: "Ada", email: "ada@x.com" };
+  const realFetch = globalThis.fetch;
+
+  beforeAll(() => {
+    env.GITHUB_ID = "id";
+    env.GITHUB_SECRET = "secret";
+    globalThis.fetch = (async (url: any, opts: any) => {
+      const one = url instanceof Request ? url.url : String(url);
+      if (one.includes("login/oauth/access_token")) {
+        return Response.json({ access_token: "t", token_type: "bearer" });
+      }
+      if (one.includes("api.github.com/user")) return Response.json(PROFILE);
+      return realFetch(url, opts);
+    }) as typeof fetch;
+  });
+  afterAll(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  for (const strategy of ["session", "cookie", "token", "jwt"] as const) {
+    it(`runs for \`${strategy}\` with the id the login stored`, async () => {
+      let got: unknown = "NOT CALLED";
+      const api = server({
+        secrets: "s",
+        auth: {
+          providers: "github",
+          strategy,
+          onLogin: (p) => p.id,
+          getUser: (id) => ({ id }),
+          toPublicUser: (u) => u,
+          onLogout: (id) => {
+            got = id;
+          },
+        },
+      }).test();
+
+      // A real login: the test client's cookie jar carries the state cookie
+      const start = await api.get("/auth/login/github");
+      const state = new URL(start.headers.get("location")!).searchParams.get(
+        "state",
+      );
+      const back = await api.get(
+        `/auth/callback/github?code=c0d3&state=${state}`,
+      );
+      // The bearer strategies hand the credential back in the fragment
+      const token = back.headers.get("location")?.split("#token=")[1];
+      const auth = token
+        ? { headers: { authorization: `Bearer ${token}` } }
+        : {};
+
+      await api.post("/auth/logout", undefined, auth);
+      expect(got).toBe("583231");
+    });
+  }
+});

@@ -16,11 +16,38 @@ function isSerializable(
   return true;
 }
 
+// `Max-Age=0` and a past `Expires` are both how a server deletes a cookie
+const deletes = (attrs: string[]): boolean =>
+  attrs.some((attr) => {
+    const [rawKey, value = ""] = attr.split("=");
+    const key = rawKey.trim().toLowerCase();
+    if (key === "max-age") return Number(value) <= 0;
+    if (key === "expires")
+      return new Date(value.trim()).getTime() <= Date.now();
+    return false;
+  });
+
 type NoBodyRequest = Omit<RequestInit, "body">;
 
 // A function that can be triggered for testing
 export default function ServerTest(app: Server) {
   const port = app.settings.port;
+
+  // A cookie jar, so a login survives across calls the way it does in a
+  // browser. Values are kept exactly as they arrived, so they go back out
+  // unchanged. Path and Domain are ignored: a test client talks to one app.
+  const jar = new Map<string, string>();
+
+  const keep = (res: Response): void => {
+    for (const line of res.headers.getSetCookie?.() ?? []) {
+      const [pair, ...attrs] = line.split(";");
+      const eq = pair.indexOf("=");
+      if (eq === -1) continue;
+      const name = pair.slice(0, eq).trim();
+      if (deletes(attrs)) jar.delete(name);
+      else jar.set(name, pair.slice(eq + 1).trim());
+    }
+  };
 
   const fetch = async (
     method: Method,
@@ -38,6 +65,11 @@ export default function ServerTest(app: Server) {
       headers.set("content-type", "application/json");
       body = JSON.stringify(body);
     }
+    // An explicit `cookie` header wins, so a test can still send its own
+    if (jar.size && !headers.has("cookie")) {
+      const sent = [...jar].map(([name, value]) => `${name}=${value}`);
+      headers.set("cookie", sent.join("; "));
+    }
     // A full http(s) URL is used as-is, so a test can exercise the host it
     // runs on (`ctx.url.origin`, subdomains, ...); anything else is a path
     // served from localhost. Another scheme is neither, and concatenating it
@@ -51,7 +83,7 @@ export default function ServerTest(app: Server) {
     const url = /^https?:\/\//i.test(path)
       ? path
       : `http://localhost:${port}${path}`;
-    return await app.fetch(
+    const res = await app.fetch(
       new Request(url, {
         ...(options as RequestInit),
         method,
@@ -59,7 +91,10 @@ export default function ServerTest(app: Server) {
         body: body as BodyInit,
       }),
     );
+    if (res) keep(res);
+    return res;
   };
+
   return {
     get: (path: string, options?: NoBodyRequest) => fetch("get", path, options),
     head: (path: string, options?: NoBodyRequest) =>
@@ -74,5 +109,10 @@ export default function ServerTest(app: Server) {
       fetch("delete", path, options),
     options: (path: string, options?: NoBodyRequest) =>
       fetch("options", path, options),
+    // The cookies the app has set so far, and a fresh session on demand
+    get cookies() {
+      return Object.fromEntries(jar);
+    },
+    clear: () => jar.clear(),
   };
 }

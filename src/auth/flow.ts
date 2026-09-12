@@ -171,7 +171,10 @@ export default function flowEntry(config: AuthConfig): AuthEntry {
       }
       r.post("/auth/logout", SPEC, async (ctx: Context) => {
         const payload = await read(ctx, strategy).catch(() => undefined);
-        if (onLogout && payload?.sub) await onLogout(payload.sub, ctx);
+        // `session` and `token` carry the id; `cookie` and `jwt` carry the
+        // signed user instead, so the id comes from inside it there
+        const id = payload?.sub ?? payload?.user?.id;
+        if (onLogout && id != null) await onLogout(String(id), ctx);
         const to = await target(redirects.logout, "/", null, ctx);
         if (!inCookie(strategy)) return status(204);
         return cookies(NAME, { value: null }).redirect(to);

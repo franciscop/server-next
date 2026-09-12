@@ -1525,7 +1525,8 @@ function flowEntry(config2) {
       }
       r2.post("/auth/logout", SPEC, async (ctx) => {
         const payload = await read(ctx, strategy).catch(() => void 0);
-        if (onLogout && payload?.sub) await onLogout(payload.sub, ctx);
+        const id = payload?.sub ?? payload?.user?.id;
+        if (onLogout && id != null) await onLogout(String(id), ctx);
         const to = await target(redirects.logout, "/", null, ctx);
         if (!inCookie(strategy)) return status(204);
         return cookies(NAME, { value: null }).redirect(to);
@@ -3442,8 +3443,27 @@ function isSerializable(body) {
   if (body instanceof URLSearchParams) return false;
   return true;
 }
+var deletes = (attrs) => attrs.some((attr) => {
+  const [rawKey, value = ""] = attr.split("=");
+  const key = rawKey.trim().toLowerCase();
+  if (key === "max-age") return Number(value) <= 0;
+  if (key === "expires")
+    return new Date(value.trim()).getTime() <= Date.now();
+  return false;
+});
 function ServerTest(app) {
   const port = app.settings.port;
+  const jar = /* @__PURE__ */ new Map();
+  const keep = (res) => {
+    for (const line of res.headers.getSetCookie?.() ?? []) {
+      const [pair, ...attrs] = line.split(";");
+      const eq = pair.indexOf("=");
+      if (eq === -1) continue;
+      const name = pair.slice(0, eq).trim();
+      if (deletes(attrs)) jar.delete(name);
+      else jar.set(name, pair.slice(eq + 1).trim());
+    }
+  };
   const fetch2 = async (method, path, options = {}) => {
     const headers2 = new Headers(options.headers);
     let body = options.body;
@@ -3451,13 +3471,17 @@ function ServerTest(app) {
       headers2.set("content-type", "application/json");
       body = JSON.stringify(body);
     }
+    if (jar.size && !headers2.has("cookie")) {
+      const sent = [...jar].map(([name, value]) => `${name}=${value}`);
+      headers2.set("cookie", sent.join("; "));
+    }
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path) && !/^https?:\/\//i.test(path)) {
       throw new Error(
         `Only http(s) URLs can be tested, received "${path}". Pass a path, or the full URL of the host the request should hit.`
       );
     }
     const url = /^https?:\/\//i.test(path) ? path : `http://localhost:${port}${path}`;
-    return await app.fetch(
+    const res = await app.fetch(
       new Request(url, {
         ...options,
         method,
@@ -3465,6 +3489,8 @@ function ServerTest(app) {
         body
       })
     );
+    if (res) keep(res);
+    return res;
   };
   return {
     get: (path, options) => fetch2("get", path, options),
@@ -3473,7 +3499,12 @@ function ServerTest(app) {
     put: (path, body, options) => fetch2("put", path, { body, ...options }),
     patch: (path, body, options) => fetch2("patch", path, { body, ...options }),
     delete: (path, options) => fetch2("delete", path, options),
-    options: (path, options) => fetch2("options", path, options)
+    options: (path, options) => fetch2("options", path, options),
+    // The cookies the app has set so far, and a fresh session on demand
+    get cookies() {
+      return Object.fromEntries(jar);
+    },
+    clear: () => jar.clear()
   };
 }
 

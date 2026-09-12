@@ -578,6 +578,10 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
             referrerPolicy?: ReferrerPolicy;
             window?: null;
         }) => Promise<Response>;
+        readonly cookies: {
+            [k: string]: string;
+        };
+        clear: () => void;
     };
 }
 declare function server<U = AuthProfile>(options: Omit<Options, "auth"> & {
