@@ -6,6 +6,13 @@ export default async function writeResponse(
   out: Response,
   response: ServerResponse,
 ): Promise<void> {
+  // The client hung up while the handler was still working. There is nobody
+  // to write to, and `writeHead` on a closed socket throws, so drop the body
+  // instead of sending a response nobody receives.
+  if (response.destroyed || response.writableEnded) {
+    out.body?.cancel().catch(() => {});
+    return;
+  }
   response.writeHead(out.status || 200, parseHeaders(out.headers));
   try {
     if (out.body instanceof ReadableStream) {

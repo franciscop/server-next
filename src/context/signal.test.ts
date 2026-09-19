@@ -51,3 +51,45 @@ describe("ctx.signal", () => {
     expect(bare.signal.aborted).toBe(false);
   });
 });
+
+// A client that hangs up mid-request cancels the work, so whatever that work
+// threw is a consequence of leaving rather than a fault worth rendering.
+describe("an abandoned request", () => {
+  const gone = () => {
+    const controller = new AbortController();
+    controller.abort();
+    return controller.signal;
+  };
+
+  it("does not call onError for what the abort knocked over", async () => {
+    let calls = 0;
+    const app = server({
+      log: false,
+      onError: () => {
+        calls++;
+        return new Response("handled", { status: 500 });
+      },
+    }).get("/boom", () => {
+      throw new Error("upstream died");
+    });
+
+    // The same throw still reaches onError while someone is listening
+    const normal = await app.fetch(new Request("http://localhost/boom"));
+    expect(normal?.status).toBe(500);
+    expect(calls).toBe(1);
+
+    // ...and is dropped once they are not
+    const res = await app.fetch(
+      new Request("http://localhost/boom", { signal: gone() }),
+    );
+    expect(res).toBeUndefined();
+    expect(calls).toBe(1);
+  });
+
+  it("leaves a healthy request alone", async () => {
+    const app = server({ log: false }).get("/", () => "fine");
+    const res = await app.fetch(new Request("http://localhost/"));
+    expect(res?.status).toBe(200);
+    expect(await res!.text()).toBe("fine");
+  });
+});

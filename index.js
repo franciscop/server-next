@@ -2995,6 +2995,7 @@ async function getResponse(app, ctx) {
     if (ctx.platform.provider === "netlify") return;
     throw errors_default.NOT_FOUND();
   } catch (error) {
+    if (ctx.signal.aborted) return;
     return ctx.options.onError(error, ctx);
   }
 }
@@ -3036,6 +3037,11 @@ var parseHeaders_default = (raw) => {
 
 // src/context/writeResponse.ts
 async function writeResponse(out, response) {
+  if (response.destroyed || response.writableEnded) {
+    out.body?.cancel().catch(() => {
+    });
+    return;
+  }
   response.writeHead(out.status || 200, parseHeaders_default(out.headers));
   try {
     if (out.body instanceof ReadableStream) {
@@ -3413,7 +3419,8 @@ var Node = async (app) => {
         response.end("Server Error");
         return;
       }
-      await writeResponse(out, response);
+      if (out) await writeResponse(out, response);
+      else if (!response.destroyed) response.destroy();
     }
   );
   await attachWebsocket(server2, app);

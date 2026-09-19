@@ -128,6 +128,10 @@ async function getResponse(
     // In other environments, a non-response is wrong and we should 404 then
     throw ServerError.NOT_FOUND();
   } catch (error: any) {
+    // A disconnect cancels whatever was in flight, so what it threw (an
+    // AbortError from a fetch, a killed query) is a consequence of leaving,
+    // not a fault to render for someone who is no longer listening.
+    if (ctx.signal.aborted) return;
     // The error response goes through the same finalize() as everything else
     return ctx.options.onError(error, ctx);
   }

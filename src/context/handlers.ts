@@ -63,7 +63,7 @@ export const Node = async (app: Server) => {
         if (!response.writableFinished) controller.abort();
       });
 
-      let out: Response;
+      let out: Response | undefined;
       try {
         const ctx = await createNode(request, app, controller.signal);
         out = await handleRequest(app, ctx);
@@ -76,7 +76,9 @@ export const Node = async (app: Server) => {
         return;
       }
 
-      await writeResponse(out, response);
+      // No response means the request was abandoned mid-flight
+      if (out) await writeResponse(out, response);
+      else if (!response.destroyed) response.destroy();
     },
   );
 
