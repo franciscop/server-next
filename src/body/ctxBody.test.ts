@@ -50,7 +50,8 @@ function multipart(
     }
   }
   s += `--${BOUNDARY}--\r\n`;
-  return Buffer.from(s, "utf-8");
+  // latin1 so a signature byte like \x89 stays one byte
+  return Buffer.from(s, "latin1");
 }
 
 const json = { "content-type": "application/json" };
@@ -180,7 +181,7 @@ describe("ctx.body parse: multipart files", () => {
         name: "avatar",
         filename: "a.png",
         type: "image/png",
-        content: "PNGDATA",
+        content: "\x89PNG\r\n\x1a\n" + "DATA",
       },
     ]);
     const res = await api.post("/", body, {
@@ -192,11 +193,11 @@ describe("ctx.body parse: multipart files", () => {
     expect(out.avatar).toMatchObject({
       name: "a.png",
       type: "image/png",
-      size: 7,
+      size: 12,
     });
     // the bytes actually streamed to disk
-    expect(await fsp.readFile(`${TMP}/${out.avatar.path}`, "utf8")).toBe(
-      "PNGDATA",
+    expect(await fsp.readFile(`${TMP}/${out.avatar.path}`, "latin1")).toBe(
+      "\x89PNG\r\n\x1a\n" + "DATA",
     );
   });
 
@@ -207,7 +208,7 @@ describe("ctx.body parse: multipart files", () => {
         name: "img",
         filename: "b.png",
         type: "image/png",
-        content: "betabeta",
+        content: "\x89PNG\r\n\x1a\n" + "beta",
       },
     ]);
     const res = await api.post("/", body, {
@@ -216,11 +217,11 @@ describe("ctx.body parse: multipart files", () => {
     const out = await res.json();
 
     expect(await fsp.readFile(`${TMP}/${out.doc.path}`, "utf8")).toBe("alpha");
-    expect(await fsp.readFile(`${TMP}/${out.img.path}`, "utf8")).toBe(
-      "betabeta",
+    expect(await fsp.readFile(`${TMP}/${out.img.path}`, "latin1")).toBe(
+      "\x89PNG\r\n\x1a\n" + "beta",
     );
     expect(out.doc.size).toBe(5);
-    expect(out.img.size).toBe(8);
+    expect(out.img.size).toBe(12);
   });
 
   it("collects a repeated file field into an array", async () => {
@@ -268,21 +269,25 @@ describe("ctx.body parse: raw single file (Case B)", () => {
     const api = server({ uploads: TMP })
       .post("/", (ctx) => ctx.body)
       .test();
-    const res = await api.post("/", Buffer.from("a movie"), {
+    // An ftyp box, so the declared type matches what the bytes say
+    const mp4 = Buffer.from("\0\0\0\x18ftypmp42a movie", "latin1");
+    const res = await api.post("/", mp4, {
       headers: { "content-type": "video/mp4" },
     });
     const out = await res.json();
 
     expect(out).toMatchObject({
       type: "video/mp4",
-      size: 7,
+      size: 19,
     });
-    expect(await fsp.readFile(`${TMP}/${out.path}`, "utf8")).toBe("a movie");
+    expect(await fsp.readFile(`${TMP}/${out.path}`, "latin1")).toBe(
+      "\0\0\0\x18ftypmp42a movie",
+    );
   });
 
   // The key is named after what the bytes are; unrecognisable bytes get no
   // extension rather than one the client's header chose.
-  it("stores unrecognised bytes under a bare key", async () => {
+  it("names unrecognised bytes after the declared type", async () => {
     const bucket = capturingBucket();
     const api = server({ uploads: bucket })
       .post("/", (ctx) => ctx.body)
@@ -290,7 +295,7 @@ describe("ctx.body parse: raw single file (Case B)", () => {
     const res = await api.post("/", Buffer.from([1, 2, 3, 4]), {
       headers: { "content-type": "application/octet-stream" },
     });
-    expect((await res.json()).path).toMatch(/^\w{16}$/);
+    expect((await res.json()).path).toMatch(/^\w+\.bin$/);
   });
 
   // Storage has to be explicit: a body we can only treat as a file, with
@@ -426,7 +431,10 @@ describe("streaming parser: chunk splitting", () => {
   });
 
   it("Case B: a raw file streamed in tiny chunks keeps its bytes and size", async () => {
-    const bytes = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256));
+    const bytes = Buffer.concat([
+      Buffer.from("\x89PNG\r\n\x1a\n", "latin1"),
+      Buffer.from(Array.from({ length: 992 }, (_, i) => i % 256)),
+    ]);
     const bucket = capturingBucket();
     const out = await parseBody(streamOf(bytes, 5), "image/png", bucket);
     expect(out.size).toBe(1000);

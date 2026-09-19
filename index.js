@@ -762,26 +762,25 @@ function resolveUploads(up) {
     maxFiles: DEFAULT_FILES
   };
 }
-function getExt(filename) {
-  const i = filename.lastIndexOf(".");
-  if (i <= 0) return ".bin";
-  return filename.slice(i).toLowerCase();
-}
 function validateFile(originalName, contentType, limits, sniffed) {
   const { fileType: fileType2 } = limits;
-  if (!fileType2 || fileType2.length === 0) return;
   if (sniffed === null && isSniffable(contentType)) {
     throw errors_default.UPLOAD_TYPE_NOT_ALLOWED({
       name: originalName,
       type: contentType,
-      allowed: fileType2
+      allowed: fileType2 ?? [contentType]
     });
   }
-  const ext = getExt(originalName);
-  const mime = contentType.toLowerCase();
-  const allowed = fileType2.some(
-    (t) => t.toLowerCase() === mime || t.toLowerCase() === ext
-  );
+  if (!fileType2 || fileType2.length === 0) return;
+  const base = (value) => value.split(";")[0].trim().toLowerCase();
+  const type2 = base(contentType);
+  const allowed = fileType2.some((one) => {
+    const entry = one.trim().toLowerCase();
+    if (entry.endsWith("/*")) return type2.startsWith(entry.slice(0, -1));
+    if (entry.includes("/")) return base(entry) === type2;
+    const mapped = mimes_default[entry.replace(/^\./, "")];
+    return Boolean(mapped) && base(mapped) === type2;
+  });
   if (!allowed) {
     throw errors_default.UPLOAD_TYPE_NOT_ALLOWED({
       name: originalName,
@@ -2147,11 +2146,11 @@ async function assets(ctx) {
   try {
     const key = ctx.url.pathname.replace(/^\/+/, "");
     const file2 = ctx.options.public.file(key);
+    const read2 = { signal: ctx.signal };
     const info = file2.info?.bind(file2);
-    const meta2 = info ? await info() : null;
-    if (info ? !meta2 : !await file2.exists()) return;
-    const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
-    const ctype = mimeOf(ctx.url.pathname) || meta2?.type || ext;
+    const meta2 = info ? await info(read2) : null;
+    if (info ? !meta2 : !await file2.exists(read2)) return;
+    const ctype = mimeOf(ctx.url.pathname) || meta2?.type || void 0;
     const headers2 = {
       "cache-control": resolveCache(ctx.options.cache) ?? DEFAULT_CACHE
     };
@@ -2180,10 +2179,10 @@ async function assets(ctx) {
           ...headers2,
           "content-range": `bytes ${start}-${end}/${meta2.size}`,
           "content-length": String(end - start + 1)
-        }).send(file2.slice(start, end + 1).stream());
+        }).send(file2.slice(start, end + 1).stream(read2));
       }
     }
-    return type(ctype).headers(headers2).send(file2.stream());
+    return type(ctype).headers(headers2).send(file2.stream(read2));
   } catch {
   }
 }
@@ -2409,8 +2408,6 @@ function isProbablyText(buffer) {
   }
   return true;
 }
-var extByMime = {};
-for (const ext in mimes_default) extByMime[mimes_default[ext]] = ext;
 function addField(body, name, value) {
   if (body[name] === void 0) {
     body[name] = value;
@@ -2419,7 +2416,7 @@ function addField(body, name, value) {
   if (!Array.isArray(body[name])) body[name] = [body[name]];
   body[name].push(value);
 }
-function makeFilePart(name, filename, declared, bucket2, limits, budget) {
+function makeFilePart(name, filename, declared, bucket2, limits, budget, signal) {
   return {
     kind: "file",
     name,
@@ -2428,13 +2425,14 @@ function makeFilePart(name, filename, declared, bucket2, limits, budget) {
     bucket: bucket2,
     limits,
     budget,
+    signal,
     head: [],
     headSize: 0,
     opened: null,
     size: 0
   };
 }
-function startPart(headerStr, bucket2, limits, budget) {
+function startPart(headerStr, bucket2, limits, budget, signal) {
   const name = getMatching(headerStr, /name="(.+?)"/).trim().replace(/\[\]$/, "");
   if (!name) return { kind: "skip" };
   const filename = getMatching(headerStr, /filename="(.+?)"/).trim();
@@ -2447,7 +2445,7 @@ function startPart(headerStr, bucket2, limits, budget) {
   if (maxFiles != null && budget.files > maxFiles) {
     throw errors_default.UPLOAD_TOO_MANY_FILES({ limit: String(maxFiles) });
   }
-  return makeFilePart(name, filename, type2, bucket2, limits, budget);
+  return makeFilePart(name, filename, type2, bucket2, limits, budget, signal);
 }
 async function abortFile(part, error) {
   if (part.opened) {
@@ -2457,8 +2455,6 @@ async function abortFile(part, error) {
       });
     } catch {
     }
-    await part.opened.file.remove().catch(() => {
-    });
   }
   throw error;
 }
@@ -2491,20 +2487,16 @@ function openFile(part) {
   const sniffed = sniff(head);
   const type2 = resolveType(sniffed, part.declared);
   validateFile(part.filename, type2, part.limits, sniffed);
-  const ext = sniffed ? extByMime[type2] : void 0;
-  const id = `${createId()}${ext ? `.${ext}` : ""}`;
   let controller;
   const readable = new ReadableStream({
     start(c) {
       controller = c;
     }
   });
-  const file2 = part.bucket.file(id);
   part.opened = {
     type: type2,
-    file: file2,
     controller,
-    write: file2.write(readable, { type: type2 })
+    write: part.bucket.create(readable, { type: type2, signal: part.signal })
   };
 }
 async function feedPart(part, data) {
@@ -2548,10 +2540,10 @@ async function endPart(part, body) {
   }
   const opened = part.opened;
   opened.controller.close();
-  await opened.write;
+  const file2 = await opened.write;
   const { minSize } = part.limits;
   if (minSize != null && part.size < parseBytes(minSize)) {
-    await opened.file.remove().catch(() => {
+    await file2.remove().catch(() => {
     });
     throw errors_default.UPLOAD_TOO_SMALL({
       name: part.filename,
@@ -2561,7 +2553,7 @@ async function endPart(part, body) {
   }
   addField(body, part.name, {
     name: part.filename,
-    path: opened.file.path,
+    path: file2.path,
     type: opened.type,
     size: part.size
   });
@@ -2581,7 +2573,7 @@ function getBoundary(header) {
   return null;
 }
 var BREAK = Buffer.from("\r\n\r\n");
-async function parseMultipart(stream, boundary, bucket2, limits, max = INF) {
+async function parseMultipart(stream, boundary, bucket2, limits, max = INF, signal) {
   const budget = { used: 0, max: INF, files: 0 };
   const delim = Buffer.from(`\r
 --${boundary}`);
@@ -2623,7 +2615,8 @@ async function parseMultipart(stream, boundary, bucket2, limits, max = INF) {
           buf.subarray(0, i).toString("utf-8"),
           bucket2,
           limits,
-          budget
+          budget,
+          signal
         );
         buf = buf.subarray(i + BREAK.length);
         state = "body";
@@ -2687,12 +2680,16 @@ function parseUrlEncoded(text) {
   }
   return out;
 }
-async function streamRawToBucket(stream, type2, bucket2, limits) {
-  const part = makeFilePart("body", "upload", type2, bucket2, limits, {
-    used: 0,
-    max: INF,
-    files: 0
-  });
+async function streamRawToBucket(stream, type2, bucket2, limits, signal) {
+  const part = makeFilePart(
+    "body",
+    "upload",
+    type2,
+    bucket2,
+    limits,
+    { used: 0, max: INF, files: 0 },
+    signal
+  );
   for await (const chunk of asIterable(stream)) {
     await feedPart(part, Buffer.from(chunk));
   }
@@ -2700,7 +2697,7 @@ async function streamRawToBucket(stream, type2, bucket2, limits) {
   await endPart(part, body);
   return part.size ? body.body : void 0;
 }
-async function parseBody(input, contentType, dest, max = INF, length) {
+async function parseBody(input, contentType, dest, max = INF, length, signal) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
   let bucket2;
   let limits = {};
@@ -2714,7 +2711,14 @@ async function parseBody(input, contentType, dest, max = INF, length) {
   if (type2 && /multipart\/form-data/i.test(type2)) {
     const boundary = getBoundary(type2);
     if (!boundary) throw errors_default.BODY_INVALID_MULTIPART();
-    return parseMultipart(toStream(input), boundary, bucket2, limits, max);
+    return parseMultipart(
+      toStream(input),
+      boundary,
+      bucket2,
+      limits,
+      max,
+      signal
+    );
   }
   if (!type2 || /^text\//i.test(type2)) {
     const buf = await toBuffer(input, max);
@@ -2742,7 +2746,7 @@ async function parseBody(input, contentType, dest, max = INF, length) {
       limit: String(maxFileSize)
     });
   }
-  return streamRawToBucket(toStream(input), type2, bucket2, limits);
+  return streamRawToBucket(toStream(input), type2, bucket2, limits, signal);
 }
 
 // src/body/body.ts
@@ -2784,7 +2788,8 @@ async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
     ctx.headers["content-type"],
     ctx.options.uploads,
     max,
-    Number.isFinite(declared) ? declared : void 0
+    Number.isFinite(declared) ? declared : void 0,
+    ctx.signal
   );
   if (size && !ctx.headers["content-length"]) {
     ctx.headers["content-length"] = String(size);

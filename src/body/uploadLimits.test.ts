@@ -127,7 +127,7 @@ describe("stored file naming", () => {
     expect(file.name).toBe("notes.txt");
   });
 
-  it("gives an unsniffable file no extension at all", async () => {
+  it("names an unsniffable file after its type, never its filename", async () => {
     const bucket = realBucket();
     const { raw, headers } = multipart([
       {
@@ -139,11 +139,16 @@ describe("stored file naming", () => {
     ]);
     const res = await app({ bucket }).post("/", raw, { headers });
     const file = (await res.json()).body.f;
-    expect(file.path).not.toContain(".");
+    // CSV has no signature, so the declared type names it; what the client
+    // called the file never reaches the bucket
+    expect(file.path).toMatch(/\.csv$/);
+    expect(file.path).not.toContain(".php");
     expect(file.name).toBe("evil.php");
   });
 
-  it("never lets the client choose the stored extension", async () => {
+  // The flip side of the rule above: with no signature to check against, a
+  // declared type is taken at face value, and `fileType` is what narrows it.
+  it("takes a declared type at face value when nothing constrains it", async () => {
     const bucket = realBucket();
     const { raw, headers } = multipart([
       {
@@ -154,7 +159,35 @@ describe("stored file naming", () => {
       },
     ]);
     const res = await app({ bucket }).post("/", raw, { headers });
-    expect((await res.json()).body.f.path).not.toContain(".php");
+    expect((await res.json()).body.f.path).toMatch(/\.php$/);
+  });
+
+  it("refuses a declared type outside `fileType`", async () => {
+    const bucket = realBucket();
+    const { raw, headers } = multipart([
+      {
+        field: "f",
+        name: "shell.php",
+        type: "application/x-httpd-php",
+        body: "<?php ?>",
+      },
+    ]);
+    const res = await app({ bucket, fileType: ["csv"] }).post("/", raw, {
+      headers,
+    });
+    expect(res.status).toBe(415);
+  });
+
+  it("cannot be slipped past `fileType` with a matching filename", async () => {
+    const bucket = realBucket();
+    const { raw, headers } = multipart([
+      // The name ends .csv, but the type it declares is what gets stored
+      { field: "f", name: "evil.csv", type: "text/html", body: "<script>" },
+    ]);
+    const res = await app({ bucket, fileType: ["csv"] }).post("/", raw, {
+      headers,
+    });
+    expect(res.status).toBe(415);
   });
 });
 

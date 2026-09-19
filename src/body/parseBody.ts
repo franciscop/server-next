@@ -63,12 +63,17 @@ async function streamRawToBucket(
   type: string,
   bucket: Bucket,
   limits: LimitOptions,
+  signal?: AbortSignal,
 ): Promise<any> {
-  const part = makeFilePart("body", "upload", type, bucket, limits, {
-    used: 0,
-    max: INF,
-    files: 0,
-  });
+  const part = makeFilePart(
+    "body",
+    "upload",
+    type,
+    bucket,
+    limits,
+    { used: 0, max: INF, files: 0 },
+    signal,
+  );
   for await (const chunk of asIterable(stream)) {
     await feedPart(part, Buffer.from(chunk));
   }
@@ -87,6 +92,7 @@ export default async function parseBody(
   dest?: Dest,
   max: number = INF,
   length?: number,
+  signal?: AbortSignal,
 ): Promise<any> {
   const type = Array.isArray(contentType) ? contentType[0] : contentType;
 
@@ -108,7 +114,14 @@ export default async function parseBody(
     // Malformed per RFC 2046, and it must not fall through: this content type
     // misses every branch below and the raw body would be stored as a file.
     if (!boundary) throw ServerError.BODY_INVALID_MULTIPART();
-    return parseMultipart(toStream(input), boundary, bucket, limits, max);
+    return parseMultipart(
+      toStream(input),
+      boundary,
+      bucket,
+      limits,
+      max,
+      signal,
+    );
   }
 
   // Types that need the whole body in hand to make sense of it: all buffered, so
@@ -155,5 +168,5 @@ export default async function parseBody(
       limit: String(maxFileSize),
     });
   }
-  return streamRawToBucket(toStream(input), type, bucket, limits);
+  return streamRawToBucket(toStream(input), type, bucket, limits, signal);
 }

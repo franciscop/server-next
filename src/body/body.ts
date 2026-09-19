@@ -86,6 +86,7 @@ export async function resolveBody(
     ctx.options.uploads,
     max,
     Number.isFinite(declared) ? declared : undefined,
+    ctx.signal,
   );
   if (size && !ctx.headers["content-length"]) {
     ctx.headers["content-length"] = String(size);

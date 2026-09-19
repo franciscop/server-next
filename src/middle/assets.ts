@@ -26,14 +26,16 @@ export default async function assets(ctx: Context) {
     // info() (size + mtime) gives a validator we can compute without reading the
     // bytes, and null when the file is missing. Buckets without info() fall back
     // to a bare existence check, so `hasInfo` tells the two "no meta" cases apart.
+    // The signal stops the lookup if the client leaves mid-request
+    const read = { signal: ctx.signal };
     const info = file.info?.bind(file);
-    const meta = info ? await info() : null;
-    if (info ? !meta : !(await file.exists())) return;
+    const meta = info ? await info(read) : null;
+    if (info ? !meta : !(await file.exists(read))) return;
 
     // Our own MIME table wins over the bucket's, since it carries the charset
     // for text types; the bucket's type covers extensions we don't know.
-    const ext = ctx.url.pathname.split(".").pop()?.toLowerCase();
-    const ctype = mimeOf(ctx.url.pathname) || meta?.type || ext;
+    // With neither, send no type at all rather than guessing one.
+    const ctype = mimeOf(ctx.url.pathname) || meta?.type || undefined;
     const headers: Record<string, string> = {
       "cache-control": resolveCache(ctx.options.cache) ?? DEFAULT_CACHE,
     };
@@ -78,12 +80,12 @@ export default async function assets(ctx: Context) {
               "content-length": String(end - start + 1),
             })
             // slice() is a file view (end exclusive); stream just that range.
-            .send(file.slice(start, end + 1).stream())
+            .send(file.slice(start, end + 1).stream(read))
         );
       }
     }
 
-    return type(ctype).headers(headers).send(file.stream());
+    return type(ctype).headers(headers).send(file.stream(read));
   } catch {
     // NO-OP; if there's no file, keep going the normal flow
   }

@@ -66,7 +66,8 @@ describe("parseBody", () => {
 
     expect(body.profile).toMatchObject({
       name: "profile.md",
-      path: expect.stringMatching(/^\w{16}$/),
+      // The bytes say nothing, so the declared type names it
+      path: expect.stringMatching(/^\w+\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
     });
@@ -75,7 +76,7 @@ describe("parseBody", () => {
     expect(body.gallery).toHaveLength(2);
     expect(body.gallery[0]).toMatchObject({
       name: "A.txt",
-      path: expect.stringMatching(/^\w{16}$/),
+      path: expect.stringMatching(/^\w+\.txt$/),
       type: "text/plain",
       size: expect.any(Number),
     });
@@ -98,7 +99,7 @@ describe("parseBody", () => {
     body += `--${BOUNDARY}--\r\n`;
 
     const result = await parseBody(
-      Buffer.from(body, "utf-8"),
+      Buffer.from(body, "latin1"),
       CONTENT_TYPE,
       mockBucket(),
     );
@@ -112,11 +113,11 @@ describe("parseBody", () => {
     body +=
       'Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n';
     body += "content-type: image/jpeg\r\n\r\n"; // lowercase
-    body += "fakejpegdata\r\n";
+    body += "\xff\xd8\xff\xe0jpegdata\r\n";
     body += `--${BOUNDARY}--\r\n`;
 
     const result = await parseBody(
-      Buffer.from(body, "utf-8"),
+      Buffer.from(body, "latin1"),
       CONTENT_TYPE,
       mockBucket(),
     );
@@ -129,11 +130,11 @@ describe("parseBody", () => {
     body +=
       'Content-Disposition: form-data; name="photo"; filename="my photo (1).jpeg"\r\n';
     body += "Content-Type: image/jpeg\r\n\r\n";
-    body += "fakejpegdata\r\n";
+    body += "\xff\xd8\xff\xe0jpegdata\r\n";
     body += `--${BOUNDARY}--\r\n`;
 
     const result = await parseBody(
-      Buffer.from(body, "utf-8"),
+      Buffer.from(body, "latin1"),
       CONTENT_TYPE,
       mockBucket(),
     );

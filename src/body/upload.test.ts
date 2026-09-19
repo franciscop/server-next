@@ -1,7 +1,6 @@
 import server from "..";
 import { cleanupBuckets, realBucket } from "../tests/realBucket";
 import parseBody from "./parseBody";
-import { getExt } from "./upload";
 
 afterAll(cleanupBuckets);
 
@@ -37,35 +36,17 @@ function makeMultipart(
   };
 }
 
-describe("getExt", () => {
-  it("returns extension with leading dot, lowercased", () => {
-    expect(getExt("photo.jpg")).toBe(".jpg");
-    expect(getExt("document.PDF")).toBe(".pdf");
-    expect(getExt("Photo.JPG")).toBe(".jpg");
-  });
-
-  it("uses the last segment for multi-dot filenames", () => {
-    expect(getExt("archive.tar.gz")).toBe(".gz");
-  });
-
-  it("falls back to .bin for no extension", () => {
-    expect(getExt("Makefile")).toBe(".bin");
-  });
-});
-
-// The stored key is named by what the bytes are, never by what the client
-// called the file, so a client cannot pick the extension it lands under.
 describe("the stored key", () => {
   it("uses the sniffed format, not the client's filename", async () => {
     const bucket = mockBucket();
     const { raw, contentType } = makeMultipart("Photo.JPG", JPEG, "image/jpeg");
     const body = await parseBody(raw, contentType, bucket);
-    expect(body.file.path).toMatch(/^\w{16}\.jpg$/);
+    expect(body.file.path).toMatch(/^\w+\.jpg$/);
     // ...while the client's own name is kept alongside it
     expect(body.file.name).toBe("Photo.JPG");
   });
 
-  it("has no extension when the bytes say nothing", async () => {
+  it("takes the declared type when the bytes say nothing", async () => {
     const bucket = mockBucket();
     const { raw, contentType } = makeMultipart(
       "doc.txt",
@@ -73,7 +54,7 @@ describe("the stored key", () => {
       "text/plain",
     );
     const body = await parseBody(raw, contentType, bucket);
-    expect(body.file.path).toMatch(/^\w{16}$/);
+    expect(body.file.path).toMatch(/^\w+\.txt$/);
     expect(body.file.type).toBe("text/plain");
   });
 
@@ -215,7 +196,7 @@ describe("upload validation", () => {
     it("still parses text fields when a file is validated and stored", async () => {
       const { raw, contentType } = makeMultipart(
         "photo.jpg",
-        "imgdata",
+        `${JPEG}imgdata`,
         "image/jpeg",
       );
       const body = await parseBody(
@@ -247,7 +228,10 @@ describe("uploads option (object form)", () => {
     type = "image/jpeg",
     name = "photo.jpg",
   ) => {
-    const { raw, contentType } = makeMultipart(name, file, type);
+    // Real signature bytes, so the declared type is not a lie the sniffer
+    // would (rightly) refuse before any limit is reached
+    const body = type === "image/jpeg" ? JPEG + file : file;
+    const { raw, contentType } = makeMultipart(name, body, type);
     return server({ uploads })
       .post("/", (ctx) => ({ ok: !!(ctx.body as any).file }))
       .test()
@@ -294,7 +278,7 @@ describe("uploads option (object form)", () => {
     let seen: any;
     const { raw, contentType } = makeMultipart(
       "photo.jpg",
-      "a".repeat(100),
+      JPEG + "a".repeat(100),
       "image/jpeg",
     );
     const res = await server({
@@ -342,5 +326,42 @@ describe("uploads option", () => {
       const res = await app.test().get("/");
       expect(await res.text()).toBe("file:function");
     }
+  });
+});
+
+describe("fileType matching", () => {
+  // latin1, like JPEG above, so the signature bytes survive
+  const PNG = "\x89PNG\r\n\x1a\n";
+
+  const store = async (
+    fileType: string[],
+    name: string,
+    type: string,
+    body: string,
+  ) => {
+    const { raw, contentType } = makeMultipart(name, body, type);
+    return parseBody(raw, contentType, { bucket: mockBucket(), fileType });
+  };
+
+  it("takes an extension with or without the dot, and a MIME type", async () => {
+    for (const entry of ["csv", ".csv", "text/csv"]) {
+      const body = await store([entry], "data.csv", "text/csv", "id,name");
+      expect(body.file.path).toMatch(/\.csv$/);
+    }
+  });
+
+  it("matches a whole family with `image/*`", async () => {
+    const ok = await store(["image/*"], "a.png", "image/png", PNG);
+    expect(ok.file.path).toMatch(/\.png$/);
+    await expect(store(["image/*"], "a.csv", "text/csv", "id")).rejects.toThrow(
+      /not allowed/i,
+    );
+  });
+
+  it("checks the stored type, so a matching filename cannot slip past", async () => {
+    // Named .csv to satisfy a `csv` whitelist, but declared as HTML
+    await expect(
+      store(["csv"], "evil.csv", "text/html", "<script>"),
+    ).rejects.toThrow(/not allowed/i);
   });
 });

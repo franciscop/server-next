@@ -1,7 +1,5 @@
 import ServerError from "../errors";
 import type { Bucket, BucketFile } from "..";
-import createId from "../util/createId";
-import mimes from "../http/mimes";
 import sniff, { HEAD_SIZE, resolveType } from "./sniff";
 import { parseBytes } from "../util/bytes";
 import { type LimitOptions, validateFile } from "./upload";
@@ -27,12 +25,6 @@ function isProbablyText(buffer: Buffer): boolean {
   return true;
 }
 
-// http/mimes.ts maps extension → MIME; reverse it (last mapping wins, so the
-// canonical extension like `jpg`/`html` beats `jpeg`/`htm`) to name a raw
-// single-file body that has no filename of its own.
-const extByMime: Record<string, string> = {};
-for (const ext in mimes) extByMime[mimes[ext]] = ext;
-
 // A repeated field name collects its values into an array, whether they are text
 // fields (e.g. checkboxes) or files (e.g. a gallery). The first value is kept as
 // a scalar; a second occurrence turns it into an array.
@@ -56,9 +48,9 @@ export function addField(
 // What the sniff decided, and the open write it produced
 type Opened = {
   type: string;
-  file: BucketFile;
   controller: ReadableStreamDefaultController;
-  write: Promise<void>;
+  // Resolves to the stored file once every byte is in
+  write: Promise<BucketFile>;
 };
 
 export type Part =
@@ -74,6 +66,8 @@ export type Part =
       bucket: Bucket;
       limits: LimitOptions;
       budget: Budget;
+      // Aborts the write when the client hangs up mid-upload
+      signal?: AbortSignal;
       // Held until there is enough to sniff, then flushed into the write
       head: Buffer[];
       headSize: number;
@@ -90,6 +84,7 @@ export function makeFilePart(
   bucket: Bucket,
   limits: LimitOptions,
   budget: Budget,
+  signal?: AbortSignal,
 ): Part & { kind: "file" } {
   return {
     kind: "file",
@@ -99,6 +94,7 @@ export function makeFilePart(
     bucket,
     limits,
     budget,
+    signal,
     head: [],
     headSize: 0,
     opened: null,
@@ -111,6 +107,7 @@ export function startPart(
   bucket: Bucket | null | undefined | false,
   limits: LimitOptions,
   budget: Budget,
+  signal?: AbortSignal,
 ): Part {
   const name = getMatching(headerStr, /name="(.+?)"/)
     .trim()
@@ -135,7 +132,7 @@ export function startPart(
     throw ServerError.UPLOAD_TOO_MANY_FILES({ limit: String(maxFiles) });
   }
 
-  return makeFilePart(name, filename, type, bucket, limits, budget);
+  return makeFilePart(name, filename, type, bucket, limits, budget, signal);
 }
 
 // Stop a half-written file and take the partial bytes back out of the bucket
@@ -146,11 +143,11 @@ async function abortFile(
   if (part.opened) {
     try {
       part.opened.controller.error(error);
+      // The write rejects and the bucket discards whatever it had taken
       await part.opened.write.catch(() => {});
     } catch {
       // the stream was already closed
     }
-    await part.opened.file.remove().catch(() => {});
   }
   throw error;
 }
@@ -194,20 +191,17 @@ function openFile(part: Part & { kind: "file" }): void {
 
   validateFile(part.filename, type, part.limits, sniffed);
 
-  const ext = sniffed ? extByMime[type] : undefined;
-  const id = `${createId()}${ext ? `.${ext}` : ""}`;
   let controller!: ReadableStreamDefaultController;
   const readable = new ReadableStream({
     start(c) {
       controller = c;
     },
   });
-  const file = part.bucket.file(id);
+  // The bucket names it: a random id, plus the extension `type` implies
   part.opened = {
     type,
-    file,
     controller,
-    write: file.write(readable, { type }),
+    write: part.bucket.create(readable, { type, signal: part.signal }),
   };
 }
 
@@ -261,12 +255,12 @@ export async function endPart(
   }
   const opened = part.opened!;
   opened.controller.close();
-  await opened.write;
+  const file = await opened.write;
 
   // Only knowable once it is all in, so an undersized file is written first
   const { minSize } = part.limits;
   if (minSize != null && part.size < parseBytes(minSize)) {
-    await opened.file.remove().catch(() => {});
+    await file.remove().catch(() => {});
     throw ServerError.UPLOAD_TOO_SMALL({
       name: part.filename,
       size: String(part.size),
@@ -276,7 +270,7 @@ export async function endPart(
 
   addField(body, part.name, {
     name: part.filename,
-    path: opened.file.path,
+    path: file.path,
     type: opened.type,
     size: part.size,
   });

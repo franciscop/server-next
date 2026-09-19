@@ -10,6 +10,9 @@ export type FileInfo = {
 };
 
 // Mirrors the `bucket` library's BucketFile: a handle to a single object.
+// Every method that does I/O takes one, so an abandoned request stops reading
+export type ReadOptions = { signal?: AbortSignal };
+
 export type BucketFile = {
   // The file's key within the bucket, like "avatars/me.jpg". Not a filesystem
   // path, so it reads the same whether the bucket is local or in the cloud.
@@ -18,21 +21,23 @@ export type BucketFile = {
   readonly name: string;
   // The file's MIME type, when the bucket knows it (like Blob/File.type).
   readonly type?: string;
-  exists(): Promise<boolean>;
+  exists(opts?: ReadOptions): Promise<boolean>;
   // Optional: metadata in one call, or null when the file doesn't exist.
   // `bucket` files provide it; used for conditional-request caching of assets.
-  info?(): Promise<FileInfo | null>;
+  info?(opts?: ReadOptions): Promise<FileInfo | null>;
+  // Resolves to the written file in `bucket`, but an adapter of your own may
+  // resolve to anything: nothing here reads it.
   write(
     content: string | Buffer | ReadableStream,
-    options?: { type?: string },
-  ): Promise<void>;
-  stream(): ReadableStream;
+    options?: { type?: string } & ReadOptions,
+  ): Promise<unknown>;
+  stream(opts?: ReadOptions): ReadableStream;
   // Optional: a read-only view of the byte range `[start, end)` (end exclusive
   // and optional, like Blob.slice), whose stream()/bytes() read just that range.
   // Used to answer HTTP Range requests for static assets.
   slice?(start: number, end?: number): BucketFile;
-  bytes(): Promise<Uint8Array>;
-  remove(): Promise<void>;
+  bytes(opts?: ReadOptions): Promise<Uint8Array>;
+  remove(opts?: ReadOptions): Promise<unknown>;
 };
 
 // Mirrors the `bucket` library's IBucket. The framework only ever needs
@@ -41,6 +46,12 @@ export type BucketFile = {
 // of a backend the framework is handed.
 export type Bucket = {
   file(name: string): BucketFile;
+  // Writes under a name of the bucket's choosing, with the extension taken
+  // from `type`, and resolves to the stored file
+  create(
+    content: string | Buffer | ReadableStream,
+    options?: { type?: string } & ReadOptions,
+  ): Promise<BucketFile>;
   folder?(prefix: string): Bucket;
 };
 

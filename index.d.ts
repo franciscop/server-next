@@ -7,22 +7,28 @@ type FileInfo = {
     type: string | null;
     modified: Date;
 };
+type ReadOptions = {
+    signal?: AbortSignal;
+};
 type BucketFile = {
     readonly path: string;
     readonly name: string;
     readonly type?: string;
-    exists(): Promise<boolean>;
-    info?(): Promise<FileInfo | null>;
+    exists(opts?: ReadOptions): Promise<boolean>;
+    info?(opts?: ReadOptions): Promise<FileInfo | null>;
     write(content: string | Buffer | ReadableStream, options?: {
         type?: string;
-    }): Promise<void>;
-    stream(): ReadableStream;
+    } & ReadOptions): Promise<unknown>;
+    stream(opts?: ReadOptions): ReadableStream;
     slice?(start: number, end?: number): BucketFile;
-    bytes(): Promise<Uint8Array>;
-    remove(): Promise<void>;
+    bytes(opts?: ReadOptions): Promise<Uint8Array>;
+    remove(opts?: ReadOptions): Promise<unknown>;
 };
 type Bucket = {
     file(name: string): BucketFile;
+    create(content: string | Buffer | ReadableStream, options?: {
+        type?: string;
+    } & ReadOptions): Promise<BucketFile>;
     folder?(prefix: string): Bucket;
 };
 

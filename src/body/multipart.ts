@@ -39,6 +39,7 @@ export default async function parseMultipart(
   bucket: Bucket | null | undefined | false,
   limits: LimitOptions,
   max: number = INF,
+  signal?: AbortSignal,
 ): Promise<Record<string, any>> {
   // Shared by every part, so `maxTotalSize` bounds the request, not each file
   const budget: Budget = { used: 0, max: INF, files: 0 };
@@ -93,6 +94,7 @@ export default async function parseMultipart(
           bucket,
           limits,
           budget,
+          signal,
         );
         buf = buf.subarray(i + BREAK.length);
         state = "body";

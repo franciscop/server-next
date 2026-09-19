@@ -1,6 +1,7 @@
 import ServerError from "../errors";
 import { parseBytes } from "../util/bytes";
 import { isSniffable } from "./sniff";
+import mimes from "../http/mimes";
 import type { Settings } from "../types";
 import Bucket_, { type Bucket } from "./bucket";
 
@@ -68,14 +69,6 @@ export function resolveUploads(
   };
 }
 
-// Returns the lowercase extension including the leading dot, e.g. ".jpg".
-// Falls back to ".bin" for files with no extension or dotfiles.
-export function getExt(filename: string): string {
-  const i = filename.lastIndexOf(".");
-  if (i <= 0) return ".bin";
-  return filename.slice(i).toLowerCase();
-}
-
 // Checks what a file claims to be against the `fileType` whitelist. The type
 // is the sniffed one where the bytes said something, and the client's claim
 // otherwise, so this is a real check for formats with a signature.
@@ -86,23 +79,34 @@ export function validateFile(
   sniffed?: string | null,
 ): void {
   const { fileType } = limits;
-  if (!fileType || fileType.length === 0) return;
 
-  // Claiming a format we know how to recognise, while the bytes are not it,
-  // is the case the whitelist exists to catch: a real one would have sniffed.
+  // Claiming a format we can recognise while the bytes are not it is a
+  // provable lie, so it is refused whether or not a whitelist is configured.
   if (sniffed === null && isSniffable(contentType)) {
     throw ServerError.UPLOAD_TYPE_NOT_ALLOWED({
       name: originalName,
       type: contentType,
-      allowed: fileType,
+      allowed: fileType ?? [contentType],
     });
   }
 
-  const ext = getExt(originalName);
-  const mime = contentType.toLowerCase();
-  const allowed = fileType.some(
-    (t) => t.toLowerCase() === mime || t.toLowerCase() === ext,
-  );
+  if (!fileType || fileType.length === 0) return;
+
+  // Checked against the one type we determined, never against the client's
+  // filename: the value that passes here is the value the file is stored as.
+  // A "/" marks a MIME type ("text/csv"); anything else is an extension,
+  // with or without the dot ("csv", ".csv").
+  // Compared without parameters, since our table carries charsets
+  const base = (value: string) => value.split(";")[0].trim().toLowerCase();
+  const type = base(contentType);
+  const allowed = fileType.some((one) => {
+    const entry = one.trim().toLowerCase();
+    // "image/*" matches every type in that family
+    if (entry.endsWith("/*")) return type.startsWith(entry.slice(0, -1));
+    if (entry.includes("/")) return base(entry) === type;
+    const mapped = mimes[entry.replace(/^\./, "")];
+    return Boolean(mapped) && base(mapped) === type;
+  });
   if (!allowed) {
     throw ServerError.UPLOAD_TYPE_NOT_ALLOWED({
       name: originalName,
