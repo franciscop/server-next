@@ -1,8 +1,32 @@
 import ServerError from "../errors";
 import type { Bucket, BucketFile } from "..";
+import createId from "../util/createId";
+import mimes from "../http/mimes";
 import sniff, { HEAD_SIZE, resolveType } from "./sniff";
 import { parseBytes } from "../util/bytes";
 import { type LimitOptions, validateFile } from "./upload";
+
+// Only for buckets that cannot name a file themselves; the last extension for
+// a type wins, so "image/jpeg" is ".jpg" rather than ".jpeg"
+const extByMime: Record<string, string> = {};
+for (const ext in mimes) extByMime[mimes[ext].split(";")[0].trim()] = ext;
+
+// A random key with the extension the type implies, matching what create()
+// would have named it
+function keyFor(type: string): string {
+  const ext = extByMime[type.split(";")[0].trim()];
+  return `${createId()}${ext ? `.${ext}` : ""}`;
+}
+
+// Best effort: a file we cannot delete is not worth failing the request over.
+// Most buckets remove(), some adapters (Bun's S3) call it delete().
+async function discard(file: BucketFile): Promise<void> {
+  try {
+    await (file.remove ? file.remove() : file.delete?.());
+  } catch {
+    // it was never written, or the bucket refused
+  }
+}
 
 // The per-request file budget, shared by every part so `maxTotalSize` counts
 // across all of them rather than per file.
@@ -51,6 +75,9 @@ type Opened = {
   controller: ReadableStreamDefaultController;
   // Resolves to the stored file once every byte is in
   write: Promise<BucketFile>;
+  // Only set when we named the file ourselves, since then a failed write
+  // leaves the partial bytes behind for us to clean up
+  handle?: BucketFile;
 };
 
 export type Part =
@@ -148,6 +175,8 @@ async function abortFile(
     } catch {
       // the stream was already closed
     }
+    // A bucket we named the file for keeps the partial bytes instead
+    if (part.opened.handle) await discard(part.opened.handle);
   }
   throw error;
 }
@@ -197,11 +226,25 @@ function openFile(part: Part & { kind: "file" }): void {
       controller = c;
     },
   });
-  // The bucket names it: a random id, plus the extension `type` implies
+
+  const write = { type, signal: part.signal };
+  // The bucket names it: a random id, plus the extension `type` implies. An
+  // older bucket, or an adapter of your own, may not have create(): then we
+  // pick the same kind of name and write to that handle instead.
+  if (part.bucket.create) {
+    part.opened = {
+      type,
+      controller,
+      write: part.bucket.create(readable, write),
+    };
+    return;
+  }
+  const handle = part.bucket.file(keyFor(type));
   part.opened = {
     type,
     controller,
-    write: part.bucket.create(readable, { type, signal: part.signal }),
+    handle,
+    write: handle.write(readable, write).then(() => handle),
   };
 }
 
@@ -260,7 +303,7 @@ export async function endPart(
   // Only knowable once it is all in, so an undersized file is written first
   const { minSize } = part.limits;
   if (minSize != null && part.size < parseBytes(minSize)) {
-    await file.remove().catch(() => {});
+    await discard(file);
     throw ServerError.UPLOAD_TOO_SMALL({
       name: part.filename,
       size: String(part.size),

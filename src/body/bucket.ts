@@ -37,7 +37,10 @@ export type BucketFile = {
   // Used to answer HTTP Range requests for static assets.
   slice?(start: number, end?: number): BucketFile;
   bytes(opts?: ReadOptions): Promise<Uint8Array>;
-  remove(opts?: ReadOptions): Promise<unknown>;
+  // Deleting is spelled remove() by `bucket` and delete() by some adapters
+  // (Bun's S3 client); whichever one is there is the one we call.
+  remove?(opts?: ReadOptions): Promise<unknown>;
+  delete?(opts?: ReadOptions): Promise<unknown>;
 };
 
 // Mirrors the `bucket` library's IBucket. The framework only ever needs
@@ -47,8 +50,9 @@ export type BucketFile = {
 export type Bucket = {
   file(name: string): BucketFile;
   // Writes under a name of the bucket's choosing, with the extension taken
-  // from `type`, and resolves to the stored file
-  create(
+  // from `type`, and resolves to the stored file. Optional: a bucket without
+  // it gets a name picked for it and the write goes through file().write().
+  create?(
     content: string | Buffer | ReadableStream,
     options?: { type?: string } & ReadOptions,
   ): Promise<BucketFile>;

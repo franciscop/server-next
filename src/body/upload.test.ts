@@ -365,3 +365,76 @@ describe("fileType matching", () => {
     ).rejects.toThrow(/not allowed/i);
   });
 });
+
+// Not every bucket names files for you: `create()` is recent, and an adapter
+// of your own may only have `file()`. Deleting is spelled both ways too.
+describe("a bucket without create()", () => {
+  // Shaped like Bun's S3 client: file() and delete(), no create(), no remove()
+  const legacyBucket = () => {
+    const store = new Map<string, Buffer>();
+    return {
+      store,
+      file: (key: string) => ({
+        path: key,
+        name: key,
+        async write(content: any) {
+          const parts: Buffer[] = [];
+          for await (const chunk of content) parts.push(Buffer.from(chunk));
+          store.set(key, Buffer.concat(parts));
+        },
+        async delete() {
+          store.delete(key);
+        },
+        stream: () => new ReadableStream(),
+        bytes: async () => store.get(key)!,
+        exists: async () => store.has(key),
+      }),
+    };
+  };
+
+  it("names the file itself and writes it through file()", async () => {
+    const bucket = legacyBucket();
+    const { raw, contentType } = makeMultipart("Photo.JPG", JPEG, "image/jpeg");
+    const body = await parseBody(raw, contentType, bucket as any);
+
+    expect(body.file.path).toMatch(/^\w+\.jpg$/);
+    expect(body.file.name).toBe("Photo.JPG");
+    expect([...bucket.store.keys()]).toEqual([body.file.path]);
+  });
+
+  it("cleans up through delete() when remove() is missing", async () => {
+    const bucket = legacyBucket();
+    const { raw, contentType } = makeMultipart("tiny.csv", "a,b", "text/csv");
+    await expect(
+      parseBody(raw, contentType, { bucket, minSize: 100 } as any),
+    ).rejects.toThrow(/too small/i);
+    expect(bucket.store.size).toBe(0);
+  });
+
+  it("leaves nothing behind when the file is aborted mid-write", async () => {
+    const bucket = legacyBucket();
+    const { raw, contentType } = makeMultipart(
+      "big.csv",
+      "a".repeat(5000),
+      "text/csv",
+    );
+    await expect(
+      parseBody(raw, contentType, { bucket, maxFileSize: 4 } as any),
+    ).rejects.toThrow(/too large/i);
+    expect(bucket.store.size).toBe(0);
+  });
+
+  it("survives a bucket that cannot delete at all", async () => {
+    const bucket = legacyBucket();
+    const bare = {
+      file: (key: string) => {
+        const { delete: _drop, ...rest } = bucket.file(key);
+        return rest;
+      },
+    };
+    const { raw, contentType } = makeMultipart("tiny.csv", "a,b", "text/csv");
+    await expect(
+      parseBody(raw, contentType, { bucket: bare, minSize: 100 } as any),
+    ).rejects.toThrow(/too small/i);
+  });
+});

@@ -2395,6 +2395,18 @@ async function socketUser(app, headers2, cookies2) {
 }
 
 // src/body/bodyParts.ts
+var extByMime = {};
+for (const ext in mimes_default) extByMime[mimes_default[ext].split(";")[0].trim()] = ext;
+function keyFor(type2) {
+  const ext = extByMime[type2.split(";")[0].trim()];
+  return `${createId()}${ext ? `.${ext}` : ""}`;
+}
+async function discard(file2) {
+  try {
+    await (file2.remove ? file2.remove() : file2.delete?.());
+  } catch {
+  }
+}
 var asIterable = (s) => s;
 function getMatching(string, regex) {
   const matches2 = string.match(regex);
@@ -2455,6 +2467,7 @@ async function abortFile(part, error) {
       });
     } catch {
     }
+    if (part.opened.handle) await discard(part.opened.handle);
   }
   throw error;
 }
@@ -2493,10 +2506,21 @@ function openFile(part) {
       controller = c;
     }
   });
+  const write = { type: type2, signal: part.signal };
+  if (part.bucket.create) {
+    part.opened = {
+      type: type2,
+      controller,
+      write: part.bucket.create(readable, write)
+    };
+    return;
+  }
+  const handle = part.bucket.file(keyFor(type2));
   part.opened = {
     type: type2,
     controller,
-    write: part.bucket.create(readable, { type: type2, signal: part.signal })
+    handle,
+    write: handle.write(readable, write).then(() => handle)
   };
 }
 async function feedPart(part, data) {
@@ -2543,8 +2567,7 @@ async function endPart(part, body) {
   const file2 = await opened.write;
   const { minSize } = part.limits;
   if (minSize != null && part.size < parseBytes(minSize)) {
-    await file2.remove().catch(() => {
-    });
+    await discard(file2);
     throw errors_default.UPLOAD_TOO_SMALL({
       name: part.filename,
       size: String(part.size),

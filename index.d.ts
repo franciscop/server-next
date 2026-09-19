@@ -22,11 +22,12 @@ type BucketFile = {
     stream(opts?: ReadOptions): ReadableStream;
     slice?(start: number, end?: number): BucketFile;
     bytes(opts?: ReadOptions): Promise<Uint8Array>;
-    remove(opts?: ReadOptions): Promise<unknown>;
+    remove?(opts?: ReadOptions): Promise<unknown>;
+    delete?(opts?: ReadOptions): Promise<unknown>;
 };
 type Bucket = {
     file(name: string): BucketFile;
-    create(content: string | Buffer | ReadableStream, options?: {
+    create?(content: string | Buffer | ReadableStream, options?: {
         type?: string;
     } & ReadOptions): Promise<BucketFile>;
     folder?(prefix: string): Bucket;
