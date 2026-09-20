@@ -168,6 +168,13 @@ ServerError.extend({
     message: 'File "{name}" is too small ({size} bytes, minimum is {limit})',
     hint: "Set or lower `uploads: { bucket, minSize: '1kb' }`.",
   },
+  UPLOAD_NOT_ALLOWED: {
+    status: 403,
+    message: "Not allowed to upload files here",
+    hint:
+      "`uploads: { bucket, validate }` refused this request. Throw your own " +
+      "error from `validate` to say more, or return anything but `false` to allow it.",
+  },
   UPLOAD_TYPE_NOT_ALLOWED: {
     status: 415,
     message:

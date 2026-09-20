@@ -1,5 +1,7 @@
 import type { Context, Server } from "..";
+import { resolveUser } from "../auth";
 import { resolveBody } from "../body/body";
+import { storesFiles } from "../body/parseBody";
 import isValidMethod from "../context/isValidMethod";
 import ServerError from "../errors";
 import { checkTraversal } from "../http/security";
@@ -31,6 +33,20 @@ export default async function handleRequest(
     res = new Response(null, { status: res.status, headers: res.headers });
   }
   return res;
+}
+
+// `uploads.validate`, asked once per request that would store files, after
+// `ctx.user` is known and before a byte of the body is read.
+async function checkUploads(ctx: Context): Promise<void> {
+  const { uploads, parser } = ctx.options;
+  // `false` is "no files here", so there is nothing to allow or refuse
+  if (!uploads || parser !== "parse") return;
+  const { validate } = uploads;
+  if (!validate) return;
+  if (!storesFiles(String(ctx.headers["content-type"] || ""))) return;
+  if ((await validate(ctx)) === false) {
+    throw ServerError.UPLOAD_NOT_ALLOWED();
+  }
 }
 
 async function getResponse(
@@ -80,9 +96,17 @@ async function getResponse(
       // Reject '../' in params before any handler (or body) touches them
       checkTraversal(params, ctx);
 
+      // Who is asking, before what they sent: a route that stores uploads can
+      // then be refused without a byte reaching the bucket.
+      await resolveUser(app, ctx);
+
+      // The one place a request can be refused before its files exist, since
+      // `.use()` middleware only run once the body has been read.
+      await checkUploads(ctx);
+
       // Now that the route (and its `parser` mode) is known, read the body
-      // once. A `stream` route gets the unread stream; the middleware in `fns`
-      // (auth, etc.) still run first, since they sit before the handler.
+      // once. A `stream` route gets the unread stream; everything else in
+      // `fns` runs after this, so middleware of your own see a read body.
       ctx.body = await resolveBody(
         ctx,
         ctx.options.parser,

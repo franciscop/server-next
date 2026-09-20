@@ -2,8 +2,13 @@ import ServerError from "../errors";
 import { parseBytes } from "../util/bytes";
 import { isSniffable } from "./sniff";
 import mimes from "../http/mimes";
-import type { Settings } from "../types";
+import type { Context, Settings } from "../types";
 import Bucket_, { type Bucket } from "./bucket";
+
+// Decides whether a request may store files at all, before its body is read:
+// return `false` to refuse it, or throw for an error of your own. Runs after
+// `ctx.user` is resolved, so authentication is the common check.
+export type UploadValidate = (ctx: Context) => unknown | Promise<unknown>;
 
 export type LimitOptions = {
   maxFileSize?: number | string;
@@ -17,6 +22,7 @@ export type LimitOptions = {
 // per-file validation. A bare path/Bucket streams files through unvalidated.
 export type UploadOptions = LimitOptions & {
   bucket: string | Bucket;
+  validate?: UploadValidate;
 };
 
 export type UploadedFile = {
@@ -47,8 +53,15 @@ export function resolveUploads(
   if (up === false) return false;
   if (!up) return null;
   if (typeof up === "object" && "bucket" in up) {
-    const { bucket, maxFileSize, maxTotalSize, maxFiles, minSize, fileType } =
-      up as UploadOptions;
+    const {
+      bucket,
+      maxFileSize,
+      maxTotalSize,
+      maxFiles,
+      minSize,
+      fileType,
+      validate,
+    } = up as UploadOptions;
     if (maxFileSize != null) parseBytes(maxFileSize);
     if (maxTotalSize != null) parseBytes(maxTotalSize);
     if (minSize != null) parseBytes(minSize);
@@ -59,6 +72,7 @@ export function resolveUploads(
       maxFiles: maxFiles ?? DEFAULT_FILES,
       minSize,
       fileType,
+      validate,
     };
   }
   return {

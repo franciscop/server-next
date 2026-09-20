@@ -3,7 +3,11 @@
 // Through this file, "options" refers to the ones that are accepted
 // by the user while "settings" refers to the final parsed value
 import type { Server } from ".";
-import type { LimitOptions, UploadOptions } from "./body/upload";
+import type {
+  LimitOptions,
+  UploadOptions,
+  UploadValidate,
+} from "./body/upload";
 import type { Bucket, BucketFile } from "./body/bucket";
 import type { CorsOptions, CorsSettings } from "./http/cors";
 import type { Logger, LogLevel } from "./boot/logger";
@@ -20,7 +24,11 @@ export type {
   SchemaOutput,
 } from "./pipeline/standardSchema";
 export type { FileInfo, BucketFile, Bucket } from "./body/bucket";
-export type { UploadOptions, UploadedFile } from "./body/upload";
+export type {
+  UploadOptions,
+  UploadValidate,
+  UploadedFile,
+} from "./body/upload";
 export type { CorsSettings } from "./http/cors";
 export type { Logger, LogLevel } from "./boot/logger";
 export type { SecurityOptions, SecuritySettings } from "./http/security";
@@ -160,7 +168,10 @@ export type Settings = {
   // Every key accepted when verifying; the first is the one that signs
   secrets: string[];
   public?: Bucket;
-  uploads?: ({ bucket: Bucket } & LimitOptions) | null | false;
+  uploads?:
+    | ({ bucket: Bucket; validate?: UploadValidate } & LimitOptions)
+    | null
+    | false;
   cors?: CorsSettings;
   auth?: AuthSettings;
   openapi?: {

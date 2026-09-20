@@ -92,6 +92,11 @@ ServerError.extend({
     message: 'File "{name}" is too small ({size} bytes, minimum is {limit})',
     hint: "Set or lower `uploads: { bucket, minSize: '1kb' }`."
   },
+  UPLOAD_NOT_ALLOWED: {
+    status: 403,
+    message: "Not allowed to upload files here",
+    hint: "`uploads: { bucket, validate }` refused this request. Throw your own error from `validate` to say more, or return anything but `false` to allow it."
+  },
   UPLOAD_TYPE_NOT_ALLOWED: {
     status: 415,
     message: 'File type not allowed for "{name}" (got "{type}", allowed: {allowed})',
@@ -464,9 +469,9 @@ function iteratorToReadable(iterable) {
   return new ReadableStream({
     async pull(controller) {
       try {
-        const { value, done } = await iterator.next();
+        const { value, done: done2 } = await iterator.next();
         if (cancelled) return;
-        if (done) {
+        if (done2) {
           controller.close();
           return;
         }
@@ -742,7 +747,15 @@ function resolveUploads(up) {
   if (up === false) return false;
   if (!up) return null;
   if (typeof up === "object" && "bucket" in up) {
-    const { bucket: bucket2, maxFileSize, maxTotalSize, maxFiles, minSize, fileType: fileType2 } = up;
+    const {
+      bucket: bucket2,
+      maxFileSize,
+      maxTotalSize,
+      maxFiles,
+      minSize,
+      fileType: fileType2,
+      validate: validate2
+    } = up;
     if (maxFileSize != null) parseBytes(maxFileSize);
     if (maxTotalSize != null) parseBytes(maxTotalSize);
     if (minSize != null) parseBytes(minSize);
@@ -752,7 +765,8 @@ function resolveUploads(up) {
       maxTotalSize: maxTotalSize ?? DEFAULT_TOTAL_SIZE,
       maxFiles: maxFiles ?? DEFAULT_FILES,
       minSize,
-      fileType: fileType2
+      fileType: fileType2,
+      validate: validate2
     };
   }
   return {
@@ -2106,10 +2120,16 @@ function getMachine() {
 }
 
 // src/auth/index.ts
+var done = /* @__PURE__ */ new WeakSet();
+async function resolveUser(app, ctx) {
+  if (!app.settings.auth || done.has(ctx)) return;
+  done.add(ctx);
+  ctx.user = await app.settings.auth.user(ctx);
+}
 function auth(app) {
   const entry = app.settings.auth;
   app.use(async function middle(ctx) {
-    ctx.user = await entry.user(ctx);
+    await resolveUser(app, ctx);
   });
   if (entry.routes) app.use(entry.routes());
 }
@@ -2720,6 +2740,14 @@ async function streamRawToBucket(stream, type2, bucket2, limits, signal) {
   await endPart(part, body);
   return part.size ? body.body : void 0;
 }
+function storesFiles(type2) {
+  if (!type2) return false;
+  if (/multipart\/form-data/i.test(type2)) return true;
+  if (/^text\//i.test(type2)) return false;
+  if (/^application\/([\w.+-]+\+)?json\b/i.test(type2)) return false;
+  if (/application\/x-www-form-urlencoded/i.test(type2)) return false;
+  return true;
+}
 async function parseBody(input, contentType, dest, max = INF, length, signal) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
   let bucket2;
@@ -2973,6 +3001,16 @@ async function handleRequest(app, ctx) {
   }
   return res;
 }
+async function checkUploads(ctx) {
+  const { uploads, parser } = ctx.options;
+  if (!uploads || parser !== "parse") return;
+  const { validate: validate2 } = uploads;
+  if (!validate2) return;
+  if (!storesFiles(String(ctx.headers["content-type"] || ""))) return;
+  if (await validate2(ctx) === false) {
+    throw errors_default.UPLOAD_NOT_ALLOWED();
+  }
+}
 async function getResponse(app, ctx) {
   try {
     if (!isValidMethod(ctx.method)) {
@@ -2993,6 +3031,8 @@ async function getResponse(app, ctx) {
         if (uploads !== void 0) ctx.options.uploads = uploads;
       }
       checkTraversal(params, ctx);
+      await resolveUser(app, ctx);
+      await checkUploads(ctx);
       ctx.body = await resolveBody(
         ctx,
         ctx.options.parser,
@@ -3077,8 +3117,8 @@ async function writeResponse(out, response) {
       response.on("close", () => reader.cancel().catch(() => {
       }));
       while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
+        const { value, done: done2 } = await reader.read();
+        if (done2) break;
         response.write(value);
       }
     } else {

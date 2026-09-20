@@ -82,6 +82,19 @@ async function streamRawToBucket(
   return part.size ? body.body : undefined;
 }
 
+// Whether a body of this type becomes stored files, so `validate` is only
+// asked about requests that would store some. Mirrors the dispatch in
+// parseBody below: multipart holds file parts, the buffered types never do,
+// and anything left over is Case B, the raw body as a single file.
+export function storesFiles(type?: string): boolean {
+  if (!type) return false;
+  if (/multipart\/form-data/i.test(type)) return true;
+  if (/^text\//i.test(type)) return false;
+  if (/^application\/([\w.+-]+\+)?json\b/i.test(type)) return false;
+  if (/application\/x-www-form-urlencoded/i.test(type)) return false;
+  return true;
+}
+
 // Turns a request body into `ctx.body`. Accepts a Buffer or a web ReadableStream
 // (the streaming modes pass the stream so files are never fully buffered; the
 // buffered call sites and tests pass a Buffer, which is wrapped as a one-chunk

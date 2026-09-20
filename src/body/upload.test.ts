@@ -1,4 +1,5 @@
 import server from "..";
+import ServerError from "../errors";
 import { cleanupBuckets, realBucket } from "../tests/realBucket";
 import parseBody from "./parseBody";
 
@@ -436,5 +437,92 @@ describe("a bucket without create()", () => {
     await expect(
       parseBody(raw, contentType, { bucket: bare, minSize: 100 } as any),
     ).rejects.toThrow(/too small/i);
+  });
+});
+
+// The one check that runs before the body is read, so an upload nobody is
+// allowed to make never reaches the bucket.
+describe("uploads validate", () => {
+  const app = (validate: any) =>
+    server({
+      auth: (ctx: any) => (ctx.headers["x-key"] === "good" ? { id: 1 } : null),
+      uploads: { bucket: mockBucket(), validate },
+    })
+      .post("/", (ctx) => ctx.body ?? "no body")
+      .test();
+
+  const upload = (api: any, headers: Record<string, string> = {}) => {
+    const { raw, contentType } = makeMultipart("a.csv", "id,name", "text/csv");
+    return api.post("/", raw, {
+      headers: { ...headers, "content-type": contentType },
+    });
+  };
+
+  it("refuses the request with a 403 when it returns false", async () => {
+    const api = app((ctx: any) => Boolean(ctx.user));
+    const res = await upload(api);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toMatch(/not allowed to upload/i);
+  });
+
+  it("stores nothing when it refuses", async () => {
+    const bucket = mockBucket();
+    const api = server({ uploads: { bucket, validate: () => false } })
+      .post("/", (ctx) => ctx.body)
+      .test();
+    await upload(api);
+    expect(await bucket.count()).toBe(0);
+  });
+
+  it("lets the request through for anything else", async () => {
+    const api = app((ctx: any) => Boolean(ctx.user));
+    const res = await upload(api, { "x-key": "good" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).file.name).toBe("a.csv");
+  });
+
+  it("sees the user, since it runs after auth and before the body", async () => {
+    let seen: any = "never called";
+    const api = app((ctx: any) => {
+      seen = ctx.user;
+      return true;
+    });
+    await upload(api, { "x-key": "good" });
+    expect(seen).toEqual({ id: 1 });
+  });
+
+  it("surfaces an error it throws instead of the generic 403", async () => {
+    const api = app(() => {
+      throw ServerError.AUTH_INVALID_TOKEN();
+    });
+    const res = await upload(api);
+    expect(res.status).toBe(401);
+  });
+
+  it("is not called for a body that stores no files", async () => {
+    let calls = 0;
+    const api = app(() => {
+      calls++;
+      return true;
+    });
+    await api.post("/", { hello: "world" });
+    expect(calls).toBe(0);
+  });
+
+  it("is called for a raw body, which is stored as one file", async () => {
+    let calls = 0;
+    const api = app(() => {
+      calls++;
+      return false;
+    });
+    const res = await api.post(
+      "/",
+      Buffer.from("\x89PNG\r\n\x1a\ndata", "latin1"),
+      {
+        headers: { "content-type": "image/png" },
+      },
+    );
+    expect(calls).toBe(1);
+    expect(res.status).toBe(403);
   });
 });

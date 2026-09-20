@@ -1,0 +1,232 @@
+# Server.js (`@server/next`)
+
+> HTTP server for Node, Bun, Cloudflare Workers and Netlify. One default
+> export, a chainable router, and a `ctx` object. Handlers return values, not
+> `res.send()`. Full docs: https://server-js.com/documentation
+
+## Entry
+
+```js
+import server from "@server/next";
+
+export default server(options)
+  .get('/', (ctx) => 'hello')
+  .post('/users', (ctx) => db.users.create(ctx.body));
+```
+
+The default export of your file is the server. Node runs it with `node index.js`,
+Bun with `bun index.js`; Workers and Netlify import it as their handler.
+https://server-js.com/documentation#getting-started
+
+## Package exports
+
+| Export | Type | Description |
+|---|---|---|
+| `server` | `(options?: Options) => Server` | Default export. Creates the server |
+| `router` | `() => Router` | Standalone route chain, merged with `.use()`. https://server-js.com/documentation/router#router |
+| `ServerError` | class | `new ServerError(code, status, message)`, plus `ServerError.<CODE>(vars)` and `ServerError.extend({})`. https://server-js.com/documentation/errors#throwing-your-own |
+| `ValidationError` | class | Thrown by a failing route schema; has `source` and `issues` |
+| `bucket` | object | Re-export of [`bucket`](https://bucketjs.com): `bucket.FS()`, `.S3()`, `.R2()`, `.GCS()`, `.Azure()`, `.B2()`, `.Memory()` |
+| `status` `headers` `type` `cache` `download` `cookies` `send` `json` `file` `redirect` | functions | Reply helpers, chainable. https://server-js.com/documentation/reply |
+
+Types are exported too: `Context`, `Options`, `RouteOptions`, `Settings`,
+`Middleware`, `UploadOptions`, `UploadedFile`, `UploadValidate`, `Bucket`,
+`BucketFile`, `SecurityOptions`, `CorsOptions`, `CacheOption`, `BodyMode`,
+`LogLevel`, `AuthMeta`, `AuthOption`.
+
+## Server methods
+
+| Method | Description |
+|---|---|
+| `.test()` | In-memory client, no port. https://server-js.com/documentation/testing |
+| `.node()` | Force the Node adapter |
+| `.fetch(request, env?)` | Winter-style handler (Bun, Cloudflare Workers) |
+| `.callback(request, context)` | Netlify handler |
+
+Plus every router method below.
+
+## Router
+
+`.get()` `.head()` `.post()` `.put()` `.patch()` `.delete()` `.options()`
+`.socket()` `.use()`, each returning the server for chaining.
+https://server-js.com/documentation/router
+
+```
+.get(path?, options?, ...middleware)
+.use(...middleware)
+.use(router)
+```
+
+`path` is optional (same as `'*'`). Four shapes: exact (`/info`), named
+parameter (`/posts/:id`), typed parameter (`/posts/:id(number)`), wildcard
+(`/files/*`). Matching is exact, so `/info` never matches `/info/extra`.
+https://server-js.com/documentation/router#path
+
+`options` is a per-route object that overrides the root ones for this route:
+
+| Field | Type | Description |
+|---|---|---|
+| `body` `query` `params` `response` | `StandardSchema` | Zod, Valibot, ArkType. Validated before the route's own middleware. https://server-js.com/documentation/router#validation |
+| `parser` | `'parse' \| 'raw' \| 'stream'` | Overrides the root `parser` |
+| `uploads` | `path \| Bucket \| object \| false` | Replaces the root `uploads` wholesale |
+| `cache` | `string \| number \| false` | `Cache-Control` for this route |
+| `schema` | `object \| false` | OpenAPI metadata (tags, summary); `false` hides the route |
+
+https://server-js.com/documentation/router#options
+
+## Options
+
+`server(options)`. `PORT`, `SECRETS`, `PUBLIC`, `CORS`, `AUTH` and `LOG_LEVEL`
+are read from the environment when the option is not passed; an explicit option
+always wins. https://server-js.com/documentation/options#environment-variables
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | `3000` (`PORT`) | https://server-js.com/documentation/options#optionsport |
+| `secrets` | `string \| string[]` | random | Signs credentials; the first signs, all verify. https://server-js.com/documentation/options#optionssecrets |
+| `public` | `string \| Bucket` | off | Folder or bucket served as static assets, before routes. https://server-js.com/documentation/options#optionspublic |
+| `uploads` | `string \| Bucket \| UploadOptions \| false` | off | Where uploaded files are stored. https://server-js.com/documentation/options#optionsuploads |
+| `auth` | `string \| function \| object` | off (`AUTH`) | Resolves `ctx.user`; mounts login routes when it owns the flow. https://server-js.com/documentation/options#optionsauth |
+| `cors` | `boolean \| string \| string[] \| object` | off | `{ origin, methods, headers, credentials }`. https://server-js.com/documentation/options#optionscors |
+| `parser` | `'parse' \| 'raw' \| 'stream'` | `'parse'` | How bodies are read into `ctx.body`. https://server-js.com/documentation/options#optionsparser |
+| `cache` | `string \| number \| false` | off | Default `Cache-Control`. https://server-js.com/documentation/options#optionscache |
+| `security` | `boolean \| SecurityOptions` | on | https://server-js.com/documentation/options#optionssecurity |
+| `openapi` | `boolean \| string \| object` | off | Serves the generated spec at `/openapi.json`. https://server-js.com/documentation/options#optionsopenapi |
+| `onError` | `(error, ctx) => Response` | built-in | https://server-js.com/documentation/options#optionsonerror |
+| `onResponse` | `(response, ctx) => Response \| void` | none | Runs on every finalized response. https://server-js.com/documentation/options#optionsonresponse |
+| `log` | `boolean \| 'info'` | off (`LOG_LEVEL`) | Startup, connection and request lines. https://server-js.com/documentation/options#optionslog |
+
+### uploads
+
+Object form: `{ bucket, maxFileSize, maxTotalSize, maxFiles, minSize, fileType, validate }`.
+https://server-js.com/documentation/options#optionsuploads
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `bucket` | `path \| Bucket` | required | Destination |
+| `maxFileSize` | `number \| string` | `'10mb'` | Per file, enforced while streaming (`413`) |
+| `maxTotalSize` | `number \| string` | `'100mb'` | Across one request (`413`) |
+| `maxFiles` | `number` | `100` | Per request (`413`) |
+| `minSize` | `number \| string` | none | Checked after the write, file removed (`400`) |
+| `fileType` | `string[]` | none | Extensions (`.jpg`), MIME types (`image/jpeg`), bare names (`csv`), wildcards (`image/*`). Checked against the stored type (`415`) |
+| `validate` | `(ctx) => unknown` | none | Runs before the body is read, with `ctx.user` resolved. `false` refuses with `403`; throw for your own error |
+
+Stored files are named by the server: a random key plus the extension of the
+type they are stored as. That type is what the bytes are when the format has a
+signature, and the declared `Content-Type` otherwise. The client's filename is
+kept as `ctx.body.<field>.name` and never reaches the bucket.
+
+### security
+
+`{ trustProxy, frameguard, noSniff, referrerPolicy, hsts, xssProtection,
+traversalProtection, maxBodySize, csp, coop, corp, permissionsPolicy }`.
+`maxBodySize` (default `'1mb'`) caps only buffered bytes; uploaded files stream
+and follow the `uploads` limits instead.
+https://server-js.com/documentation/options#optionssecurity
+
+## ctx
+
+The single argument every handler and middleware receives.
+https://server-js.com/documentation/context
+
+| Field | Type | Description |
+|---|---|---|
+| `ctx.method` | `string` | Lowercase. https://server-js.com/documentation/context#ctxmethod |
+| `ctx.url` | `URL & { params, query }` | https://server-js.com/documentation/context#ctxurl |
+| `ctx.body` | parsed value | Object, string, `Buffer` or `ReadableStream` by mode. https://server-js.com/documentation/context#ctxbody |
+| `ctx.headers` | `Record<string, string \| string[]>` | Lowercased keys. https://server-js.com/documentation/context#ctxheaders |
+| `ctx.cookies` | `Record<string, string>` | https://server-js.com/documentation/context#ctxcookies |
+| `ctx.ip` | `string` | https://server-js.com/documentation/context#ctxip |
+| `ctx.user` | any | Set by `auth`, resolved before the body is read. https://server-js.com/documentation/context#ctxuser |
+| `ctx.auth` | `{ issuedAt, expiresAt, strategy, provider }` | https://server-js.com/documentation/context#ctxauth |
+| `ctx.signal` | `AbortSignal` | Aborts when the client disconnects. https://server-js.com/documentation/context#ctxsignal |
+| `ctx.options` | `Settings` | Resolved config for this request |
+| `ctx.platform` | `{ provider, runtime, production }` | https://server-js.com/documentation/context#ctxplatform |
+| `ctx.time` | object | Server-Timing marks. https://server-js.com/documentation/context#ctxtime |
+| `ctx.socket` / `ctx.sockets` | `WebSocket` | Inside `.socket()` handlers only |
+| `ctx.app` | `Server` | The server itself |
+
+An uploaded file on `ctx.body` is `{ name, path, type, size }`; a repeated
+field name gives an array. https://server-js.com/documentation#file-handling
+
+## Replies
+
+Return a value and it is serialized: a string (HTML when it opens with a tag,
+text otherwise), an object or array (JSON), a `Buffer`, a `ReadableStream`, a
+JSX element, a `Response`, or a bucket file handle (streamed with its type,
+`404` when missing). Return a number for a bare status.
+https://server-js.com/documentation/reply#inline-replies
+
+Helpers, all chainable, terminal ones return a `Response`:
+
+| Helper | Signature | Description |
+|---|---|---|
+| `send(body?)` | terminal | https://server-js.com/documentation/reply#send |
+| `json(body)` | terminal | https://server-js.com/documentation/reply#json |
+| `file(path \| BucketFile)` | terminal | Streams it. https://server-js.com/documentation/reply#file |
+| `redirect(path)` | terminal | `302` by default. https://server-js.com/documentation/reply#redirect |
+| `status(code)` | chainable | https://server-js.com/documentation/reply#status |
+| `type(mime \| ext)` | chainable | https://server-js.com/documentation/reply#type |
+| `headers(obj)` | chainable | https://server-js.com/documentation/reply#headers |
+| `cookies(obj)` | chainable | https://server-js.com/documentation/reply#cookies |
+| `cache(value)` | chainable | https://server-js.com/documentation/reply#cache |
+| `download(name?)` | chainable | `Content-Disposition: attachment`. Use it for untrusted uploads. https://server-js.com/documentation/reply#download |
+
+## Errors
+
+Throw anything and `onError` turns it into a response. `ServerError` carries a
+stable `code`, a `status` and a `hint`.
+https://server-js.com/documentation/errors
+
+Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `PATH_TRAVERSAL`,
+`INVALID_REQUEST`, `VALIDATION_FAILED`, `BODY_TOO_LARGE`,
+`BODY_INVALID_MULTIPART`, `UPLOAD_NOT_CONFIGURED`, `UPLOAD_TOO_LARGE`,
+`UPLOAD_TOO_MANY_FILES`, `UPLOAD_TOO_SMALL`, `UPLOAD_NOT_ALLOWED`,
+`UPLOAD_TYPE_NOT_ALLOWED`, `AUTH_INVALID_TOKEN`, `AUTH_INVALID_HEADER`,
+`AUTH_INVALID_STATE`, `AUTH_ISSUER_UNREACHABLE`, `AUTH_NO_CODE`.
+https://server-js.com/documentation/errors#reference
+
+## Authentication
+
+`auth` loads the user, it never gates a route. Guard with `ctx.user` in the
+handler; guard uploads with `uploads.validate`, since handlers and middleware
+both run after the body has been parsed.
+https://server-js.com/documentation/authentication#protecting-routes
+
+String form is `'<strategy>:<name>'` (`'cookie:github'`, `'jwt:clerk'`).
+Object form takes `{ providers, strategy, expires, onLogin, getUser,
+toPublicUser, onLogout, redirect }`. A plain function `(ctx) => user` works,
+as does an auth library instance.
+https://server-js.com/documentation/authentication
+
+## Testing
+
+`.test()` returns a client with `get`, `head`, `post`, `put`, `patch`,
+`delete`, `options`, each resolving to a real `Response`. It keeps a cookie jar
+across calls (`api.cookies`, `api.clear()`), so signing in then calling a
+protected route works.
+https://server-js.com/documentation/testing
+
+## Pipeline order
+
+Per request: route match, `ctx.user`, `uploads.validate`, body parsing, the
+route's schemas, then its chain (the built-in middleware, yours, the handler).
+A request matching no route parses its body and falls through to the global
+middleware, which is how static assets answer. On the way out: shared response
+headers (CORS, security, cache and ETag), then `onResponse`. Middleware always
+see a parsed `ctx.body`.
+https://server-js.com/documentation/concepts
+
+## Pages
+
+- https://server-js.com/documentation (getting started, file handling, WebSockets, JSX, platforms)
+- https://server-js.com/documentation/options
+- https://server-js.com/documentation/router
+- https://server-js.com/documentation/context
+- https://server-js.com/documentation/reply
+- https://server-js.com/documentation/authentication
+- https://server-js.com/documentation/testing
+- https://server-js.com/documentation/concepts
+- https://server-js.com/documentation/errors
+- https://server-js.com/documentation/faq
+- https://server-js.com/tutorials

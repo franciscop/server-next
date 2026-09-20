@@ -33,6 +33,7 @@ type Bucket = {
     folder?(prefix: string): Bucket;
 };
 
+type UploadValidate = (ctx: Context) => unknown | Promise<unknown>;
 type LimitOptions = {
     maxFileSize?: number | string;
     maxTotalSize?: number | string;
@@ -42,6 +43,7 @@ type LimitOptions = {
 };
 type UploadOptions = LimitOptions & {
     bucket: string | Bucket;
+    validate?: UploadValidate;
 };
 type UploadedFile = {
     name: string;
@@ -391,6 +393,7 @@ type Settings = {
     public?: Bucket;
     uploads?: ({
         bucket: Bucket;
+        validate?: UploadValidate;
     } & LimitOptions) | null | false;
     cors?: CorsSettings;
     auth?: AuthSettings;
@@ -613,4 +616,4 @@ declare function server<U>(options: Omit<Options, "auth"> & {
 }>;
 declare function server<C extends ContextTypes = {}>(options?: Options): Server<C>;
 
-export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type BodyMode, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type BodyMode, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadValidate, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
