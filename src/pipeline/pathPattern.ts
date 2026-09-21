@@ -1,3 +1,5 @@
+import ServerError from "../errors";
+
 // Type-level mirror of the runtime matching below: infers the params object
 // (names, `(type)` annotations, `?` optionals) from a route path literal.
 export type ExtractPathParams<Path extends string> =
@@ -54,6 +56,9 @@ export type PathToParams<Path extends string> = ParamsToObject<
 export default function pathPattern(
   pattern: string,
   path: string,
+  // Whether a value that fails its cast is an error. CORS preflight asks only
+  // whether the shape matches, so it must not refuse a request over a value.
+  cast: boolean = true,
 ): Record<string, any> | null {
   if (pattern === "*" && path === "/") return {};
 
@@ -71,6 +76,9 @@ export default function pathPattern(
   const pattParts = pattern.split("/").slice(1);
 
   let allSame = true;
+  // A cast that failed, held until we know this route is the one that matched:
+  // a pattern we walk past on the way to another route must not refuse it.
+  let invalid: { name: string; type: string; value: string } | null = null;
 
   for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {
     const patt = pattParts[i] || "";
@@ -87,15 +95,21 @@ export default function pathPattern(
     if (patt.startsWith(":")) {
       params[key] = part;
 
-      if (/\(\w*\)/.test(patt)) {
-        if (patt.includes("(number)")) {
-          const value = Number(part);
-          params[key] = Number.isNaN(value) ? undefined : value;
+      // A typed parameter is cast here, and the route matched on shape alone,
+      // so a value that cannot be cast is a 400 on this route rather than an
+      // `undefined` the handler has to check for.
+      const type = patt.match(/\((\w+)\)/)?.[1];
+      if (type === "number" || type === "date") {
+        const value = type === "number" ? Number(part) : new Date(part);
+        const failed =
+          type === "number"
+            ? Number.isNaN(value)
+            : Number.isNaN((value as Date).getTime());
+        if (failed) {
+          invalid ??= { name: key, type, value: part };
+          continue;
         }
-        if (patt.includes("(date)")) {
-          const value = new Date(part);
-          params[key] = Number.isNaN(value.getTime()) ? undefined : value;
-        }
+        params[key] = value;
       }
       continue;
     }
@@ -109,7 +123,7 @@ export default function pathPattern(
     allSame = false;
   }
 
-  if (allSame) return params;
-
-  return null;
+  if (!allSame) return null;
+  if (invalid && cast) throw ServerError.INVALID_PARAM(invalid);
+  return params;
 }

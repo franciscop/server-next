@@ -47,6 +47,11 @@ ServerError.extend({
     message: 'The HTTP method "{method}" is not supported',
     hint: "Only GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS are routed. A client sending anything else is usually a proxy or a scanner."
   },
+  INVALID_PARAM: {
+    status: 400,
+    message: 'Invalid parameter "{name}": expected {type}, got "{value}"',
+    hint: "A typed route parameter (':id(number)', ':day(date)') is cast from the URL, and a value that cannot be cast is refused here instead of reaching the handler as `undefined`. Drop the type to accept it as a string."
+  },
   PATH_TRAVERSAL: {
     status: 400,
     message: "The route param '{param}' tries to climb the path ('{value}')",
@@ -424,7 +429,8 @@ function resolveSecurity(security) {
     if (value) headers2[key] = value;
   }
   return {
-    trustProxy: o.trustProxy ?? true,
+    // 'true'/'false' arrive from an environment variable, which has no booleans
+    trustProxy: o.trustProxy === "true" ? true : o.trustProxy === "false" ? false : o.trustProxy ?? true,
     traversalProtection: off ? false : o.traversalProtection !== false,
     // Cap on the bytes buffered per request (see bodyLimit). `false` (or
     // turning security off entirely) resolves to Infinity, meaning no limit.
@@ -2098,6 +2104,9 @@ function createWebsocket(sockets, handlers) {
 // src/boot/getMachine.ts
 function getProvider() {
   if (typeof globalThis.Netlify !== "undefined") return "netlify";
+  if (globalThis.navigator?.userAgent === "Cloudflare-Workers") {
+    return "cloudflare";
+  }
   return null;
 }
 function getRuntime() {
@@ -2331,7 +2340,7 @@ var openapi_default = async (ctx) => {
 };
 
 // src/pipeline/pathPattern.ts
-function pathPattern(pattern, path) {
+function pathPattern(pattern, path, cast = true) {
   if (pattern === "*" && path === "/") return {};
   pattern = `/${pattern.replace(/^\//, "")}`;
   pattern = pattern.replace(/\/$/, "") || "/";
@@ -2341,6 +2350,7 @@ function pathPattern(pattern, path) {
   const pathParts = path.split("/").slice(1).map((u) => decodeURIComponent(u));
   const pattParts = pattern.split("/").slice(1);
   let allSame = true;
+  let invalid = null;
   for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {
     const patt = pattParts[i] || "";
     const part = pathParts[i] || "";
@@ -2350,15 +2360,15 @@ function pathPattern(pattern, path) {
     if (patt.endsWith("?") && !part) continue;
     if (patt.startsWith(":")) {
       params[key] = part;
-      if (/\(\w*\)/.test(patt)) {
-        if (patt.includes("(number)")) {
-          const value = Number(part);
-          params[key] = Number.isNaN(value) ? void 0 : value;
+      const type2 = patt.match(/\((\w+)\)/)?.[1];
+      if (type2 === "number" || type2 === "date") {
+        const value = type2 === "number" ? Number(part) : new Date(part);
+        const failed = type2 === "number" ? Number.isNaN(value) : Number.isNaN(value.getTime());
+        if (failed) {
+          invalid ??= { name: key, type: type2, value: part };
+          continue;
         }
-        if (patt.includes("(date)")) {
-          const value = new Date(part);
-          params[key] = Number.isNaN(value.getTime()) ? void 0 : value;
-        }
+        params[key] = value;
       }
       continue;
     }
@@ -2369,8 +2379,9 @@ function pathPattern(pattern, path) {
     }
     allSame = false;
   }
-  if (allSame) return params;
-  return null;
+  if (!allSame) return null;
+  if (invalid && cast) throw errors_default.INVALID_PARAM(invalid);
+  return params;
 }
 
 // src/middle/preflight.ts
@@ -2378,7 +2389,7 @@ function preflight(ctx) {
   if (ctx.method !== "options") return;
   if (!ctx.headers["access-control-request-method"]) return;
   const handled = ctx.app.handlers.options.some(
-    (route) => pathPattern(route.path, ctx.url.pathname)
+    (route) => pathPattern(route.path, ctx.url.pathname, false)
   );
   if (handled) return;
   return 204;
@@ -3328,20 +3339,33 @@ import { TLSSocket } from "tls";
 
 // src/http/clientIp.ts
 var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
-var normalize = (ip) => ip.replace(/^::ffff:/, "");
+var normalize = (ip = "") => ip.trim().toLowerCase().replace(/^\[(.+)\](:\d+)?$/, "$1").replace(/^::ffff:/, "").replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, "$1");
+var PRIVATE = /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
+var isPrivate = (raw) => {
+  const ip = normalize(raw);
+  if (!ip) return false;
+  if (PRIVATE.test(ip)) return true;
+  return ip === "::1" || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip);
+};
+function isTrusted(peer, trustProxy) {
+  return trustProxy === false ? false : isPrivate(peer);
+}
 function clientIp(headers2, opts = {}) {
-  const { remoteAddress = "", trustProxy = false } = opts;
-  const cf = first(headers2["cf-connecting-ip"]);
-  if (cf) return normalize(cf);
-  const nf = first(headers2["x-nf-client-connection-ip"]);
-  if (nf) return normalize(nf);
-  if (trustProxy) {
-    const xff = first(headers2["x-forwarded-for"]);
-    if (xff) return normalize(xff.split(",")[0].trim());
-    const real = first(headers2["x-real-ip"]);
-    if (real) return normalize(real);
+  const { remoteAddress = "", trustProxy = true, platformHeader } = opts;
+  const peer = normalize(remoteAddress);
+  if (!peer && platformHeader) {
+    const value = normalize(first(headers2[platformHeader]));
+    if (value) return value;
   }
-  return normalize(remoteAddress);
+  if (!isTrusted(peer, trustProxy)) return peer;
+  if (typeof trustProxy === "string") {
+    return normalize(first(headers2[trustProxy])) || peer;
+  }
+  const chain = first(headers2["x-forwarded-for"]).split(",").map(normalize).filter(Boolean);
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (!isPrivate(chain[i])) return chain[i];
+  }
+  return peer;
 }
 
 // src/http/forwarded.ts
@@ -3349,8 +3373,8 @@ var first2 = (value) => {
   const one = Array.isArray(value) ? value[0] : value;
   return one?.split(",")[0].trim() || void 0;
 };
-function forwarded(url, headers2, trustProxy) {
-  if (!trustProxy) return;
+function forwarded(url, headers2, trusted) {
+  if (!trusted) return;
   const proto = first2(headers2["x-forwarded-proto"]);
   if (proto === "http" || proto === "https") url.protocol = `${proto}:`;
   const host = first2(headers2["x-forwarded-host"]);
@@ -3366,6 +3390,10 @@ function forwarded(url, headers2, trustProxy) {
 }
 
 // src/context/create.ts
+var PLATFORM_IP = {
+  cloudflare: "cf-connecting-ip",
+  netlify: "x-nf-client-connection-ip"
+};
 function createContext(app, {
   method: rawMethod,
   headers: rawHeaders,
@@ -3379,7 +3407,9 @@ function createContext(app, {
   const headers2 = parseHeaders_default(rawHeaders);
   const cookies2 = parseCookies(headers2.cookie);
   const url = new URL(rawUrl.replace(/\/$/, ""));
-  forwarded(url, headers2, app.settings.security.trustProxy);
+  const { trustProxy } = app.settings.security;
+  const platformHeader = PLATFORM_IP[app.platform.provider ?? ""];
+  forwarded(url, headers2, isTrusted(normalize(remoteAddress), trustProxy));
   define(
     url,
     "query",
@@ -3397,10 +3427,7 @@ function createContext(app, {
     signal,
     init,
     app,
-    ip: clientIp(headers2, {
-      remoteAddress,
-      trustProxy: app.settings.security.trustProxy
-    })
+    ip: clientIp(headers2, { remoteAddress, trustProxy, platformHeader })
   };
   setBodySource(ctx, source);
   return ctx;
@@ -3562,7 +3589,11 @@ function ServerTest(app) {
         method,
         headers: headers2,
         body
-      })
+      }),
+      // A test request comes from the machine running it, so the peer is
+      // loopback: forwarding headers a test sends are trusted, as they would
+      // be behind a real proxy.
+      { requestIP: () => ({ address: "127.0.0.1" }) }
     );
     if (res) keep(res);
     return res;

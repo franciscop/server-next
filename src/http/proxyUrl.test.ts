@@ -101,3 +101,32 @@ describe("the OAuth redirect_uri behind a proxy", () => {
     );
   });
 });
+
+// The same question ctx.ip asks: whoever connected wrote these headers, so
+// they are only the visitor's when our own proxy is the one who connected.
+describe("ctx.url from an untrusted peer", () => {
+  const where = (options = {}) =>
+    server(options)
+      .get("/where", (ctx) => ({ origin: ctx.url.origin }))
+      .test();
+
+  it("ignores the forwarded scheme and host with trustProxy false", async () => {
+    const res = await where({ security: { trustProxy: false } }).get("/where", {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "evil.com",
+      },
+    });
+    expect((await res.json()).origin).toBe("http://localhost:3000");
+  });
+
+  it("takes them from loopback, which is where a proxy connects from", async () => {
+    const res = await where().get("/where", {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "uptimecore.com",
+      },
+    });
+    expect((await res.json()).origin).toBe("https://uptimecore.com");
+  });
+});

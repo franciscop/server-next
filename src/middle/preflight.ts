@@ -9,8 +9,10 @@ export default function preflight(ctx: Context) {
   if (ctx.method !== "options") return;
   if (!ctx.headers["access-control-request-method"]) return;
 
+  // Shape only: a preflight for a path whose typed parameter cannot be cast
+  // still needs its headers, and the real request is where that is refused.
   const handled = ctx.app.handlers.options.some((route) =>
-    pathPattern(route.path, ctx.url.pathname),
+    pathPattern(route.path, ctx.url.pathname, false),
   );
   if (handled) return;
 

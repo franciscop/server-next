@@ -3,7 +3,8 @@ type Headers = Record<string, string | string[]>;
 // A proxy that terminates TLS forwards plain HTTP, so the scheme and host on
 // the wire are not the ones the visitor used. These headers carry the
 // originals, and `trustProxy` decides whether to believe them: an app exposed
-// directly to the internet must not, since anyone can send them.
+// directly to the internet must not, since anyone can send them. The caller
+// resolves that into the `trusted` flag, from the option and who connected.
 //
 // When proxies chain, each appends, so the value is a comma-separated list
 // oldest-first. The visitor's own hop is the leftmost one; trusting the last
@@ -18,9 +19,9 @@ const first = (value: string | string[] | undefined): string | undefined => {
 export default function forwarded(
   url: URL,
   headers: Headers,
-  trustProxy: boolean,
+  trusted: boolean,
 ): void {
-  if (!trustProxy) return;
+  if (!trusted) return;
 
   const proto = first(headers["x-forwarded-proto"]);
   if (proto === "http" || proto === "https") url.protocol = `${proto}:`;

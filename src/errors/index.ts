@@ -104,6 +104,14 @@ ServerError.extend({
       "Only GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS are routed. A " +
       "client sending anything else is usually a proxy or a scanner.",
   },
+  INVALID_PARAM: {
+    status: 400,
+    message: 'Invalid parameter "{name}": expected {type}, got "{value}"',
+    hint:
+      "A typed route parameter (':id(number)', ':day(date)') is cast from the " +
+      "URL, and a value that cannot be cast is refused here instead of reaching " +
+      "the handler as `undefined`. Drop the type to accept it as a string.",
+  },
   PATH_TRAVERSAL: {
     status: 400,
     message: "The route param '{param}' tries to climb the path ('{value}')",

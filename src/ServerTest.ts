@@ -90,6 +90,10 @@ export default function ServerTest(app: Server) {
         headers,
         body: body as BodyInit,
       }),
+      // A test request comes from the machine running it, so the peer is
+      // loopback: forwarding headers a test sends are trusted, as they would
+      // be behind a real proxy.
+      { requestIP: () => ({ address: "127.0.0.1" }) } as any,
     );
     if (res) keep(res);
     return res;

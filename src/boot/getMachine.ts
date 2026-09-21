@@ -1,5 +1,9 @@
 function getProvider(): string | null {
   if (typeof (globalThis as any).Netlify !== "undefined") return "netlify";
+  // What the Workers runtime reports; there is no global of its own to check
+  if ((globalThis as any).navigator?.userAgent === "Cloudflare-Workers") {
+    return "cloudflare";
+  }
   return null;
 }
 

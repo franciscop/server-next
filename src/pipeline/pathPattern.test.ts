@@ -54,9 +54,29 @@ describe("pathPattern.js", () => {
     });
   });
 
-  it("will still match, but not parse it if it's an invalid number", () => {
-    expect(pathPattern("/:id(number)", "/hi")).toEqual({});
-    expect(pathPattern("/users/:id(number)", "/users/hi")).toEqual({});
+  it("refuses a value that cannot be cast", () => {
+    expect(() => pathPattern("/:id(number)", "/hi")).toThrow(/expected number/);
+    expect(() => pathPattern("/users/:id(number)", "/users/hi")).toThrow(
+      /Invalid parameter "id"/,
+    );
+    expect(() => pathPattern("/:day(date)", "/nope")).toThrow(/expected date/);
+  });
+
+  // The cast runs while walking the pattern, so a route we pass over on the
+  // way to the one that matches must not refuse the request
+  it("only refuses on the route that actually matched", () => {
+    expect(pathPattern("/users/:id(number)", "/posts/hi")).toEqual(null);
+    expect(pathPattern("/users/:id(number)/edit", "/users/hi")).toEqual(null);
+  });
+
+  it("leaves an absent optional parameter alone", () => {
+    expect(pathPattern("/:id(number)?", "/")).toEqual({});
+    expect(pathPattern("/users/:id(number)?", "/users")).toEqual({});
+  });
+
+  // CORS preflight asks whether the shape matches, not whether the value is good
+  it("skips the cast when asked for a shape-only match", () => {
+    expect(pathPattern("/:id(number)", "/hi", false)).toEqual({ id: "hi" });
   });
 
   it("requires a part for the asterisk", () => {

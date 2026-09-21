@@ -58,8 +58,10 @@ https://server-js.com/documentation/router
 ```
 
 `path` is optional (same as `'*'`). Four shapes: exact (`/info`), named
-parameter (`/posts/:id`), typed parameter (`/posts/:id(number)`), wildcard
-(`/files/*`). Matching is exact, so `/info` never matches `/info/extra`.
+parameter (`/posts/:id`), typed parameter (`/posts/:id(number)`, cast to
+`number` or `Date`; an uncastable value is a `400 INVALID_PARAM` on the matched
+route), wildcard (`/files/*`). Matching is exact, so `/info` never matches
+`/info/extra`.
 https://server-js.com/documentation/router#path
 
 `options` is a per-route object that overrides the root ones for this route:
@@ -121,7 +123,10 @@ kept as `ctx.body.<field>.name` and never reaches the bucket.
 `{ trustProxy, frameguard, noSniff, referrerPolicy, hsts, xssProtection,
 traversalProtection, maxBodySize, csp, coop, corp, permissionsPolicy }`.
 `maxBodySize` (default `'1mb'`) caps only buffered bytes; uploaded files stream
-and follow the `uploads` limits instead.
+and follow the `uploads` limits instead. `trustProxy` (`boolean | string`,
+default `true`) believes `x-forwarded-*` for `ctx.ip` and `ctx.url` only when
+the peer is private or loopback, taking the last public hop of the chain; a
+header name reads the IP from there instead, for a CDN in front of a proxy.
 https://server-js.com/documentation/options#optionssecurity
 
 ## ctx
@@ -178,7 +183,8 @@ Throw anything and `onError` turns it into a response. `ServerError` carries a
 stable `code`, a `status` and a `hint`.
 https://server-js.com/documentation/errors
 
-Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `PATH_TRAVERSAL`,
+Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_PARAM`,
+`PATH_TRAVERSAL`,
 `INVALID_REQUEST`, `VALIDATION_FAILED`, `BODY_TOO_LARGE`,
 `BODY_INVALID_MULTIPART`, `UPLOAD_NOT_CONFIGURED`, `UPLOAD_TOO_LARGE`,
 `UPLOAD_TOO_MANY_FILES`, `UPLOAD_TOO_SMALL`, `UPLOAD_NOT_ALLOWED`,

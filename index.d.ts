@@ -73,8 +73,9 @@ type Logger = {
     request: (ctx: Context, res: Response) => void;
 };
 
+type TrustProxy = boolean | (string & {});
 type SecurityOptions = {
-    trustProxy?: boolean;
+    trustProxy?: TrustProxy;
     frameguard?: boolean | string;
     noSniff?: boolean;
     referrerPolicy?: boolean | string;
@@ -88,7 +89,7 @@ type SecurityOptions = {
     permissionsPolicy?: string;
 };
 type SecuritySettings = {
-    trustProxy: boolean;
+    trustProxy: TrustProxy;
     traversalProtection: boolean;
     maxBodySize: number;
     headers: Record<string, string>;

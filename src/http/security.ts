@@ -3,9 +3,16 @@ import { INF, resolveMax } from "../body/bodyLimit";
 import setIfAbsent from "./setIfAbsent";
 import type { Context, Options } from "..";
 
+// Whether the X-Forwarded-* headers can be believed, and where the client IP
+// is read from. `true` (the default) believes them when the peer is on a
+// private network, which is where your own proxy connects from; `false` never
+// does. A header name ('cf-connecting-ip') is `true` plus reading the IP from
+// there rather than from the chain, for a CDN in front of your proxy.
+export type TrustProxy = boolean | (string & {});
+
 export type SecurityOptions = {
-  // Trust X-Forwarded-* headers for ctx.ip (on by default)
-  trustProxy?: boolean;
+  // Whether to believe X-Forwarded-* for ctx.ip and ctx.url (on by default)
+  trustProxy?: TrustProxy;
   // Secure-by-default response headers. Each accepts `false` to turn it off, or
   // a string to override the value. The first group is on by default.
   frameguard?: boolean | string; // X-Frame-Options, default 'SAMEORIGIN'
@@ -26,7 +33,7 @@ export type SecurityOptions = {
 };
 
 export type SecuritySettings = {
-  trustProxy: boolean;
+  trustProxy: TrustProxy;
   // Reject route params containing a '..' path segment
   traversalProtection: boolean;
   // Resolved byte cap for buffered request bytes (Infinity when disabled)
@@ -75,7 +82,13 @@ export function resolveSecurity(
   }
 
   return {
-    trustProxy: o.trustProxy ?? true,
+    // 'true'/'false' arrive from an environment variable, which has no booleans
+    trustProxy:
+      o.trustProxy === "true"
+        ? true
+        : o.trustProxy === "false"
+          ? false
+          : (o.trustProxy ?? true),
     traversalProtection: off ? false : o.traversalProtection !== false,
     // Cap on the bytes buffered per request (see bodyLimit). `false` (or
     // turning security off entirely) resolves to Infinity, meaning no limit.
