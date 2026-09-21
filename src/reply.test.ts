@@ -53,8 +53,9 @@ describe("Reply", () => {
     });
 
     it("renders a JSX element as html", async () => {
-      // JSX elements are thunks, the same ones a route can return directly
-      const element = () => "<div>Hi</div>";
+      // A JSX element is a thunk carrying `html`, which is what the runtime
+      // marks its output with; a bare thunk is just a lazy value
+      const element = Object.assign(() => "<div>Hi</div>", { html: true });
       const res = await send(element);
       expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
       expect(await res.text()).toBe("<div>Hi</div>");
@@ -63,7 +64,7 @@ describe("Reply", () => {
     it("keeps the status and headers set before a JSX body", async () => {
       const res = await status(201)
         .headers("x-a", "1")
-        .send(() => "<p>ok</p>");
+        .send(Object.assign(() => "<p>ok</p>", { html: true }));
       expect(res.status).toBe(201);
       expect(res.headers.get("x-a")).toBe("1");
       expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
@@ -94,18 +95,30 @@ describe("Reply", () => {
       expect(res.headers.get("content-type")).not.toContain("json");
     });
 
-    it("only sniffs markup-like strings as HTML", async () => {
-      // '<' alone isn't markup: '<3' must stay plain text, tags stay HTML
+    // A string is never guessed to be markup: user input that happens to open
+    // with a tag would otherwise be served as a page the browser executes
+    it("sends every string as text, tags and all", async () => {
       expect((await send("<3 you all")).headers.get("content-type")).toBe(
         "text/plain; charset=utf-8",
       );
       expect((await send("<h1>hi</h1>")).headers.get("content-type")).toBe(
-        "text/html; charset=utf-8",
+        "text/plain; charset=utf-8",
       );
       const res = await server()
-        .get("/", () => "<3 you all")
+        .get("/", () => "<h1>hi</h1>")
         .test()
         .get("/");
+      expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    });
+
+    it("sends markup when asked, with type('html')", async () => {
+      const res = await type("html").send("<h1>hi</h1>");
+      expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    });
+
+    it("lets an explicit type win over a JSX element", async () => {
+      const element = Object.assign(() => "<p>ok</p>", { html: true });
+      const res = await type("text").send(element);
       expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     });
   });

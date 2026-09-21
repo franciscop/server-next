@@ -4,13 +4,6 @@ import mimes from "../http/mimes";
 import setIfAbsent from "../http/setIfAbsent";
 import toWeb from "../util/toWeb";
 
-// Whether a string body should be sent as HTML instead of plain text. It must
-// open with something tag-like: a tag name, a closing tag, or a doctype/comment.
-// A bare '<' isn't enough, or text like "<3 you all" would be sent as markup
-// (and rendered as such when it comes from user input).
-const TAG = /^\s*<[a-zA-Z!/]/;
-const isHtml = (body: string): boolean => TAG.test(body);
-
 // Fill-if-absent, so an explicit type()/headers() content-type always wins
 function fill(headers: Headers, type?: string | null, length?: number): void {
   setIfAbsent(headers, "content-type", type);
@@ -26,12 +19,11 @@ export default function serialize(body: any, headers: Headers): BodyInit {
     return body;
   }
 
+  // Always text. Markup comes from JSX, which says so, or from `type('html')`:
+  // guessing it from the string would serve any user input starting with "<"
+  // as a page the browser executes.
   if (typeof body === "string") {
-    fill(
-      headers,
-      isHtml(body) ? mimes.html : mimes.text,
-      Buffer.byteLength(body),
-    );
+    fill(headers, mimes.text, Buffer.byteLength(body));
     return body;
   }
 

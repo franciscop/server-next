@@ -1,4 +1,4 @@
-import server, { status } from "../..";
+import server, { status, type } from "../..";
 import z from "zod";
 
 // A note-taking API with its docs UI: any viewer is a static shell pointing
@@ -85,7 +85,7 @@ export default server({
   })
 
   // The docs UI: Scalar's shell over /openapi.json
-  .get("/docs", { schema: false }, () => `<!doctype html>
+  .get("/docs", { schema: false }, () => type("html").send(`<!doctype html>
 <html>
   <head>
     <title>Notes API Docs</title>
@@ -95,4 +95,4 @@ export default server({
     <script id="api-reference" data-url="/openapi.json"></script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   </body>
-</html>`);
+</html>`));

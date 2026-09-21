@@ -149,11 +149,11 @@ if (typeof process !== "undefined") {
 }
 
 // src/body/bucket.ts
-import FileSystem from "bucket/fs";
+import { FS } from "bucket";
 var isBucketFile = (value) => Boolean(value) && typeof value.stream === "function" && typeof value.bytes === "function" && typeof value.exists === "function" && typeof value.name === "string";
 function bucket(root) {
   if (!root) return null;
-  if (typeof root === "string") return FileSystem(root);
+  if (typeof root === "string") return FS(root);
   if (typeof root.file === "function") return root;
   throw new Error(
     "Invalid bucket: pass a directory path or a `bucket` instance (with .file())"
@@ -265,87 +265,12 @@ function createCookies(key, val) {
 }
 
 // src/http/mimes.ts
-var mimes = {
-  aac: "audio/aac",
-  abw: "application/x-abiword",
-  arc: "application/x-freearc",
-  avif: "image/avif",
-  avi: "video/x-msvideo",
-  azw: "application/vnd.amazon.ebook",
-  bin: "application/octet-stream",
-  bmp: "image/bmp",
-  bz: "application/x-bzip",
-  bz2: "application/x-bzip2",
-  cda: "application/x-cdf",
-  csh: "application/x-csh",
-  css: "text/css; charset=utf-8",
-  csv: "text/csv; charset=utf-8",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  eot: "application/vnd.ms-fontobject",
-  epub: "application/epub+zip",
-  gz: "application/gzip",
-  heic: "image/heic",
-  gif: "image/gif",
-  htm: "text/html; charset=utf-8",
-  html: "text/html; charset=utf-8",
-  ico: "image/vnd.microsoft.icon",
-  ics: "text/calendar; charset=utf-8",
-  jar: "application/java-archive",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "text/javascript; charset=utf-8",
-  json: "application/json",
-  jsonld: "application/ld+json",
-  md: "text/markdown; charset=utf-8",
-  mid: "audio/midi",
-  midi: "audio/midi",
-  mjs: "text/javascript; charset=utf-8",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  mpeg: "video/mpeg",
-  mpkg: "application/vnd.apple.installer+xml",
-  odp: "application/vnd.oasis.opendocument.presentation",
-  ods: "application/vnd.oasis.opendocument.spreadsheet",
-  odt: "application/vnd.oasis.opendocument.text",
-  oga: "audio/ogg",
-  ogv: "video/ogg",
-  ogx: "application/ogg",
-  opus: "audio/opus",
-  otf: "font/otf",
-  png: "image/png",
-  pdf: "application/pdf",
-  php: "application/x-httpd-php",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  rar: "application/vnd.rar",
-  rtf: "application/rtf",
-  sh: "application/x-sh",
-  svg: "image/svg+xml",
-  tar: "application/x-tar",
-  text: "text/plain; charset=utf-8",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  ts: "video/mp2t",
-  ttf: "font/ttf",
-  txt: "text/plain; charset=utf-8",
-  vsd: "application/vnd.visio",
-  wav: "audio/wav",
-  weba: "audio/webm",
-  webm: "video/webm",
-  webp: "image/webp",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xml: "application/xml",
-  xul: "application/vnd.mozilla.xul+xml",
-  zip: "application/zip",
-  "3gp": "video/3gpp",
-  "3g2": "video/3gpp2",
-  "7z": "application/x-7z-compressed"
-};
+import { mimes as base } from "bucket";
+var mimes = {};
+for (const ext in base) {
+  const type2 = base[ext];
+  mimes[ext] = type2.startsWith("text/") ? `${type2}; charset=utf-8` : type2;
+}
 var mimes_default = mimes;
 var mimeOf = (path) => {
   const ext = path.split(".").pop()?.toLowerCase();
@@ -513,8 +438,6 @@ function toWeb(nodeStream) {
 }
 
 // src/pipeline/serialize.ts
-var TAG = /^\s*<[a-zA-Z!/]/;
-var isHtml = (body) => TAG.test(body);
 function fill(headers2, type2, length) {
   setIfAbsent(headers2, "content-type", type2);
   if (length != null) setIfAbsent(headers2, "content-length", String(length));
@@ -525,11 +448,7 @@ function serialize(body, headers2) {
     return body;
   }
   if (typeof body === "string") {
-    fill(
-      headers2,
-      isHtml(body) ? mimes_default.html : mimes_default.text,
-      Buffer.byteLength(body)
-    );
+    fill(headers2, mimes_default.text, Buffer.byteLength(body));
     return body;
   }
   if (body instanceof Uint8Array) {
@@ -647,7 +566,11 @@ var Reply = class _Reply {
     }
     if (body === null) body = "";
     if (typeof body?.then === "function") body = await body;
-    if (typeof body === "function") body = body();
+    if (typeof body === "function") {
+      const markup = body.html === true;
+      body = body();
+      if (markup) setIfAbsent(headers2, "content-type", mimes_default.html);
+    }
     if (typeof body?.then === "function") {
       throw new Error(
         "Cannot render an async component: components must be synchronous. Await the data before rendering and pass it in as props."
@@ -792,14 +715,14 @@ function validateFile(originalName, contentType, limits, sniffed) {
     });
   }
   if (!fileType2 || fileType2.length === 0) return;
-  const base = (value) => value.split(";")[0].trim().toLowerCase();
-  const type2 = base(contentType);
+  const base2 = (value) => value.split(";")[0].trim().toLowerCase();
+  const type2 = base2(contentType);
   const allowed = fileType2.some((one) => {
     const entry = one.trim().toLowerCase();
     if (entry.endsWith("/*")) return type2.startsWith(entry.slice(0, -1));
-    if (entry.includes("/")) return base(entry) === type2;
+    if (entry.includes("/")) return base2(entry) === type2;
     const mapped = mimes_default[entry.replace(/^\./, "")];
-    return Boolean(mapped) && base(mapped) === type2;
+    return Boolean(mapped) && base2(mapped) === type2;
   });
   if (!allowed) {
     throw errors_default.UPLOAD_TYPE_NOT_ALLOWED({
@@ -859,8 +782,8 @@ var Router = class _Router {
     if (options.uploads !== void 0) {
       options.uploads = resolveUploads(options.uploads);
     }
-    const base = method === "socket" ? [] : this.middleware;
-    const fns = [...base, ...rest].filter((fn) => fn != null);
+    const base2 = method === "socket" ? [] : this.middleware;
+    const fns = [...base2, ...rest].filter((fn) => fn != null);
     this.handlers[method].push({
       path,
       options,
@@ -898,11 +821,11 @@ var Router = class _Router {
         for (const m of Object.keys(arg.handlers)) {
           for (const route of arg.handlers[m]) {
             checkParserConflict(route.options, this.settings?.parser);
-            const base = m === "socket" ? [] : this.middleware;
+            const base2 = m === "socket" ? [] : this.middleware;
             this.handlers[m].push({
               path: route.path,
               options: route.options,
-              fns: [...base, ...route.fns]
+              fns: [...base2, ...route.fns]
             });
           }
         }
@@ -1179,12 +1102,12 @@ var passthrough = (options) => {
 var scopeOf = (options, fallback) => toArray(options.scope ?? fallback).join(" ");
 var callbackPath = (name) => `/auth/callback/${name}`;
 var callbackUrl = (ctx, name) => `${ctx.url.origin}${callbackPath(name)}`;
-var search = (base, params) => {
+var search = (base2, params) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value) query.set(key, String(value));
   }
-  return `${base}?${query}`;
+  return `${base2}?${query}`;
 };
 
 // src/auth/providers/antarctic.ts
@@ -1254,16 +1177,16 @@ function createId(size = 16) {
 var bare = (url) => url.replace(/\/+$/, "");
 var discovered = /* @__PURE__ */ new Map();
 function discover(issuer) {
-  const base = bare(issuer);
-  let doc = discovered.get(base);
+  const base2 = bare(issuer);
+  let doc = discovered.get(base2);
   if (!doc) {
-    const url = `${base}/.well-known/openid-configuration`;
+    const url = `${base2}/.well-known/openid-configuration`;
     doc = fetch(url).catch(() => null).then((r2) => {
       if (!r2?.ok) throw errors_default.AUTH_ISSUER_UNREACHABLE({ url });
       return r2.json();
     });
-    doc.catch(() => discovered.delete(base));
-    discovered.set(base, doc);
+    doc.catch(() => discovered.delete(base2));
+    discovered.set(base2, doc);
   }
   return doc;
 }
@@ -2434,7 +2357,8 @@ function keyFor(type2) {
 }
 async function discard(file2) {
   try {
-    await (file2.remove ? file2.remove() : file2.delete?.());
+    const drop = file2.remove ?? file2.delete;
+    await drop?.call(file2);
   } catch {
   }
 }
@@ -2929,8 +2853,10 @@ function applyCors(res, ctx) {
 async function parseResponse(out, ctx) {
   if (!out && typeof out !== "string") return null;
   if (typeof out === "function") {
+    const markup = out.html === true;
     out = await out(ctx);
     if (!out && typeof out !== "string") return null;
+    if (markup) return await type("html").send(out);
   }
   if (typeof out === "number") {
     return new Response(null, { status: out });

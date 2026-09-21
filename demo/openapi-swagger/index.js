@@ -1,4 +1,4 @@
-import server, { status } from "../..";
+import server, { status, type } from "../..";
 import z from "zod";
 
 // The same note-taking API as ../openapi-scalar, with Swagger UI instead:
@@ -85,7 +85,7 @@ export default server({
   })
 
   // The docs UI: Swagger UI's shell over /openapi.json
-  .get("/docs", { schema: false }, () => `<!doctype html>
+  .get("/docs", { schema: false }, () => type("html").send(`<!doctype html>
 <html>
   <head>
     <title>Notes API Docs</title>
@@ -99,4 +99,4 @@ export default server({
       SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });
     </script>
   </body>
-</html>`);
+</html>`));

@@ -1,4 +1,4 @@
-import FileSystem from "bucket/fs";
+import { FS } from "bucket";
 
 // Subset of the `bucket` library's FileInfo: file metadata used to build cheap
 // cache validators (ETag / Last-Modified) without reading the bytes. `info()`
@@ -37,10 +37,10 @@ export type BucketFile = {
   // Used to answer HTTP Range requests for static assets.
   slice?(start: number, end?: number): BucketFile;
   bytes(opts?: ReadOptions): Promise<Uint8Array>;
-  // Deleting is spelled remove() by `bucket` and delete() by some adapters
-  // (Bun's S3 client); whichever one is there is the one we call.
+  // Deleting is spelled remove() by `bucket`. Some adapters (Bun's S3 client)
+  // call it delete() instead, which is looked up at runtime rather than typed:
+  // `bucket`'s own files keep a protected `delete`, which cannot be widened.
   remove?(opts?: ReadOptions): Promise<unknown>;
-  delete?(opts?: ReadOptions): Promise<unknown>;
 };
 
 // Mirrors the `bucket` library's IBucket. The framework only ever needs
@@ -72,11 +72,11 @@ export const isBucketFile = (value: any): value is BucketFile =>
 // a string path becomes a local-filesystem bucket, and any object exposing
 // `file()` (a `bucket` instance, or your own adapter) is used as-is.
 //
-// `bucket/fs` is the one provider imported here, so the S3/GCS/Azure/R2/B2
-// clients are never loaded for an app that only stores files locally.
+// FS is the provider a path resolves to; the others are only reachable through
+// a bucket instance the app built itself.
 export default function bucket(root?: string | Bucket): Bucket | null {
   if (!root) return null;
-  if (typeof root === "string") return FileSystem(root) as Bucket;
+  if (typeof root === "string") return FS(root) as Bucket;
   if (typeof (root as Bucket).file === "function") return root as Bucket;
   throw new Error(
     "Invalid bucket: pass a directory path or a `bucket` instance (with .file())",

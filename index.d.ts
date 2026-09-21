@@ -23,7 +23,6 @@ type BucketFile = {
     slice?(start: number, end?: number): BucketFile;
     bytes(opts?: ReadOptions): Promise<Uint8Array>;
     remove?(opts?: ReadOptions): Promise<unknown>;
-    delete?(opts?: ReadOptions): Promise<unknown>;
 };
 type Bucket = {
     file(name: string): BucketFile;

@@ -22,7 +22,8 @@ function keyFor(type: string): string {
 // Most buckets remove(), some adapters (Bun's S3) call it delete().
 async function discard(file: BucketFile): Promise<void> {
   try {
-    await (file.remove ? file.remove() : file.delete?.());
+    const drop = file.remove ?? (file as any).delete;
+    await drop?.call(file);
   } catch {
     // it was never written, or the bucket refused
   }

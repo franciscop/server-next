@@ -156,10 +156,11 @@ field name gives an array. https://server-js.com/documentation#file-handling
 
 ## Replies
 
-Return a value and it is serialized: a string (HTML when it opens with a tag,
-text otherwise), an object or array (JSON), a `Buffer`, a `ReadableStream`, a
-JSX element, a `Response`, or a bucket file handle (streamed with its type,
-`404` when missing). Return a number for a bare status.
+Return a value and it is serialized: a string (always `text/plain`; use
+`type('html')` for markup), an object or array (JSON), a `Buffer`, a
+`ReadableStream`, a JSX element (`text/html`), a `Response`, or a bucket file
+handle (streamed with its type, `404` when missing). Return a number for a
+bare status.
 https://server-js.com/documentation/reply#inline-replies
 
 Helpers, all chainable, terminal ones return a `Response`:

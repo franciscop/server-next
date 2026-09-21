@@ -1,4 +1,4 @@
-import server from "../..";
+import server, { type } from "../..";
 
 const rows = [
   // {
@@ -163,16 +163,17 @@ const onResponse = async (res, ctx) => {
 export default server({ onError, onResponse })
   .get(
     "/",
-    () => `<!DOCTYPE html>
+    () => type("html").send(`<!DOCTYPE html>
     <html>
       <body>
         <a href="/html">HTML</a>
         <a href="/obj">Object</a>
         <a href="/error">Error</a>
       </body>
-    </html>`,
+    </html>`),
   )
-  .get("/html", () => "<div>Hello world</div>")
+  // A string is text; markup says so with type('html')
+  .get("/html", () => type("html").send("<div>Hello world</div>"))
   .get("/obj", () => ({ hello: "world" }))
   .get("/error", () => {
     throw new Error("This is an error!");

@@ -2,7 +2,7 @@ import { applyCache } from "../http/cache";
 import { applyCors } from "../http/cors";
 import { applySecurity } from "../http/security";
 import { clearCookie, toClear } from "../http/createCookies";
-import { send } from "../reply";
+import { send, type } from "../reply";
 
 import type { Context } from "../index";
 
@@ -18,8 +18,11 @@ export default async function parseResponse(
   // A lazy handler: a function returned from a route is called with the
   // context. (A JSX element is also a function, and simply ignores the arg.)
   if (typeof out === "function") {
+    const markup = out.html === true;
     out = await out(ctx);
     if (!out && typeof out !== "string") return null;
+    // A JSX element: its output is markup, which a plain string is not
+    if (markup) return await type("html").send(out);
   }
 
   // A bare number is a status code, the one place `return x` and `send(x)`

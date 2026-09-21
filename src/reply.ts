@@ -196,8 +196,14 @@ class Reply {
     if (typeof body?.then === "function") body = await body;
 
     // A JSX element is a thunk: call it for the HTML, the same as returning it
-    // from a route does. The string branch below then types it as `text/html`.
-    if (typeof body === "function") body = body();
+    // from a route does. Only an element is markup; a plain function is a lazy
+    // value, and the string it returns is text like any other.
+    if (typeof body === "function") {
+      const markup = body.html === true;
+      body = body();
+      // Absent-only, so an explicit `type('text')` on the chain still wins
+      if (markup) setIfAbsent(headers, "content-type", mimes.html);
+    }
 
     // A thunk that returns a promise is an async component. The renderer has no
     // async support anywhere (a nested one renders nothing), so say so.

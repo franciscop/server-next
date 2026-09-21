@@ -92,14 +92,14 @@ const renderChild = (child) => {
   if (typeof child === "object" && RAW in child) return child[RAW];
 
   if (isReactElement(child)) {
-    return jsx(child.type, child.props || {})();
+    return build(child.type, child.props || {})();
   }
 
   console.warn("Unknown child:", child);
   return "";
 };
 
-const jsx = (tag, { children, ...props } = {}) => {
+const build = (tag, { children, ...props } = {}) => {
   // Fragment. It is the registered React symbol, so a compiled React library
   // matches whether it imports Fragment or inlines Symbol.for("react.fragment")
   if (tag === Fragment) {
@@ -206,5 +206,11 @@ const jsx = (tag, { children, ...props } = {}) => {
 };
 
 const Fragment = Symbol.for("react.fragment");
+
+// Every element is a thunk, and this flag is what says the string it returns
+// is markup. Without it the server would have to guess from the string, and a
+// route returning user input that happens to start with "<" would be served
+// as a page instead of as text.
+const jsx = (tag, props) => Object.assign(build(tag, props), { html: true });
 
 export { jsx, jsx as jsxs, jsx as jsxDEV, Fragment };
