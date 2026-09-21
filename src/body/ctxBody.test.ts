@@ -123,6 +123,20 @@ describe("ctx.body parse: url-encoded", () => {
     expect((await res.json()).body).toEqual({ tag: ["x", "y", "z"] });
   });
 
+  // A browser names repeated fields "tags[]", and multipart strips that too,
+  // so one form reads the same whichever way it was posted
+  it("strips a trailing [] from the field name", async () => {
+    const res = await echo.post("/", "tags[]=a&tags[]=b&name=x", {
+      headers: form,
+    });
+    expect((await res.json()).body).toEqual({ tags: ["a", "b"], name: "x" });
+  });
+
+  it("keeps brackets that are not the repeat suffix", async () => {
+    const res = await echo.post("/", "a[b]=1&c[]d=2", { headers: form });
+    expect((await res.json()).body).toEqual({ "a[b]": "1", "c[]d": "2" });
+  });
+
   it("decodes percent-encoding and plus", async () => {
     const res = await echo.post("/", "q=a%20b+c&e=a%40b.com", {
       headers: form,

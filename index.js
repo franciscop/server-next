@@ -2650,7 +2650,8 @@ async function toBuffer(input, max = INF) {
 }
 function parseUrlEncoded(text) {
   const out = {};
-  for (const [key, value] of new URLSearchParams(text)) {
+  for (const [raw, value] of new URLSearchParams(text)) {
+    const key = raw.replace(/\[\]$/, "");
     const existing = out[key];
     if (existing === void 0) out[key] = value;
     else if (Array.isArray(existing)) existing.push(value);

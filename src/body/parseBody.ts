@@ -45,7 +45,10 @@ async function toBuffer(input: Input, max: number = INF): Promise<Buffer> {
 // application/x-www-form-urlencoded → object, arraying repeated keys like multipart
 function parseUrlEncoded(text: string): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
-  for (const [key, value] of new URLSearchParams(text)) {
+  for (const [raw, value] of new URLSearchParams(text)) {
+    // A browser sends "tags[]" for a repeated field, and multipart strips the
+    // suffix too, so the same form posted either way reads the same here
+    const key = raw.replace(/\[\]$/, "");
     const existing = out[key];
     if (existing === undefined) out[key] = value;
     else if (Array.isArray(existing)) existing.push(value);
