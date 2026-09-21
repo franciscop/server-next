@@ -4,6 +4,7 @@ import { resolveBody } from "../body/body";
 import { storesFiles } from "../body/parseBody";
 import isValidMethod from "../context/isValidMethod";
 import ServerError from "../errors";
+import { defaultOnError } from "../errors/render";
 import { checkTraversal } from "../http/security";
 import define from "../util/define";
 import parseResponse, { finalize } from "./parseResponse";
@@ -22,8 +23,14 @@ export default async function handleRequest(
   // over every finalized HTTP response, routes, static, 404s, onError output.
   // Return a Response to replace it (sent verbatim), or nothing to leave it as is.
   if (res && ctx.options.onResponse) {
-    const replaced = await ctx.options.onResponse(res, ctx);
-    if (replaced) res = replaced; // a returned Response replaces; nothing keeps it
+    try {
+      const replaced = await ctx.options.onResponse(res, ctx);
+      if (replaced) res = replaced; // a returned Response replaces; nothing keeps it
+    } catch (error) {
+      // It runs after finalize, so its own failure is answered here and the
+      // error response is finalized in its place
+      res = await finalize(await runOnError(error, ctx), ctx);
+    }
   }
   // Log the request once the final response is known (no-op unless `log` is on)
   if (res) ctx.options.log.request(ctx, res);
@@ -151,12 +158,29 @@ async function getResponse(
 
     // In other environments, a non-response is wrong and we should 404 then
     throw ServerError.NOT_FOUND();
-  } catch (error: any) {
+  } catch (error) {
     // A disconnect cancels whatever was in flight, so what it threw (an
     // AbortError from a fetch, a killed query) is a consequence of leaving,
     // not a fault to render for someone who is no longer listening.
     if (ctx.signal.aborted) return;
     // The error response goes through the same finalize() as everything else
-    return ctx.options.onError(error, ctx);
+    return runOnError(error, ctx);
   }
+}
+
+// `onError` is app code and can fail like any other. When it does, or when it
+// answers with something that is not a Response, the built-in handler answers
+// instead: a broken hook must not escape the pipeline, since everything past
+// this point (CORS, security headers, onResponse) would be skipped with it.
+async function runOnError(error: any, ctx: Context): Promise<Response> {
+  try {
+    const out = await ctx.options.onError(error, ctx);
+    if (out instanceof Response) return out;
+    console.error("[server:error] onError did not return a Response");
+  } catch (hookError) {
+    console.error(
+      `[server:error] onError itself threw: ${(hookError as Error)?.message}`,
+    );
+  }
+  return defaultOnError(error, ctx);
 }

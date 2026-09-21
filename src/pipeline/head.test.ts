@@ -1,4 +1,4 @@
-import server from "../index";
+import server, { status } from "../index";
 
 // HEAD is GET without the body (RFC 9110): GET routes answer HEAD requests
 // with the same headers and an empty body, unless an explicit .head() matches
@@ -26,7 +26,7 @@ describe("HEAD requests", () => {
 
   it("an explicit .head() route wins over the GET fallback", async () => {
     const api = server()
-      .head("/hello", () => 204)
+      .head("/hello", () => status(204))
       .get("/hello", () => "with a body")
       .test();
     expect((await api.head("/hello")).status).toBe(204);
@@ -35,7 +35,7 @@ describe("HEAD requests", () => {
 
   it("does not answer for other methods", async () => {
     const api = server()
-      .post("/submit", () => 201)
+      .post("/submit", () => status(201))
       .test();
     expect((await api.head("/submit")).status).toBe(404);
   });

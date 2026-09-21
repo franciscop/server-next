@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import server from "../index";
+import server, { status } from "../index";
 
 // Throwaway dirs under the gitignored src/tests/uploads/, cleaned up after
 const ROOT = new URL("./tests/uploads/", import.meta.url).pathname;
@@ -89,7 +89,7 @@ describe("per-route uploads", () => {
       server().post(
         "/x",
         { uploads: { bucket: `${ROOT}_avatars`, maxFileSize: "5megs" } },
-        () => 200,
+        () => status(200),
       ),
     ).toThrow();
   });

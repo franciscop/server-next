@@ -1,4 +1,3 @@
-import * as fsp from "node:fs/promises";
 import type { Context } from "../types";
 
 const getConfig = (options: any = {}): any => {
@@ -45,11 +44,12 @@ async function toJsonSchema(schema: any): Promise<any> {
 }
 
 // Read once, on the first spec request, not at import time: the module loads
-// with the framework whether or not openapi is enabled.
+// with the framework whether or not openapi is enabled, and `fs` is imported
+// only then, so a runtime without one (Workers) can still load the bundle.
 let pkgProm: Promise<Record<string, any>> | undefined;
 const getPkg = () =>
-  (pkgProm ??= fsp
-    .readFile("package.json", "utf-8")
+  (pkgProm ??= import("node:fs/promises")
+    .then((fsp) => fsp.readFile("package.json", "utf-8"))
     .then((data) => JSON.parse(data))
     .catch(() => ({})));
 
@@ -163,17 +163,17 @@ export default async (ctx: Context): Promise<Record<string, any>> => {
   const pkg = await getPkg();
   // The root option wins; the app's own package.json fills the rest
   const { title, description, version } = ctx.options.openapi ?? {};
-  const domain = (pkg as any).homepage || ctx.url.origin;
+  const domain = pkg.homepage || ctx.url.origin;
   return {
     openapi: "3.0.0",
     info: {
-      title: title || (pkg as any).name || "API Documentation",
-      version: version || (pkg as any).version || "1.0.0",
-      description: description ?? ((pkg as any).description || ""),
+      title: title || pkg.name || "API Documentation",
+      version: version || pkg.version || "1.0.0",
+      description: description ?? (pkg.description || ""),
     },
     servers: domain ? [{ url: domain }] : [],
     paths: await generateOpenApiPaths(
-      (ctx as any).app.handlers,
+      ctx.app.handlers,
       ctx.options.openapi?.path ?? "",
     ),
   };

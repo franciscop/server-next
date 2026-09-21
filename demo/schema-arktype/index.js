@@ -47,11 +47,11 @@ export default server()
     return notes.get(ctx.url.params.id) ?? 404;
   })
   .put("/notes/:id", { params: Id, body: Note }, (ctx) => {
-    if (!notes.has(ctx.url.params.id)) return 404;
+    if (!notes.has(ctx.url.params.id)) return status(404);
     notes.set(ctx.url.params.id, ctx.body);
     return { id: ctx.url.params.id, ...ctx.body };
   })
   .delete("/notes/:id", { params: Id }, (ctx) => {
     notes.delete(ctx.url.params.id);
-    return 204;
+    return status(204);
   });

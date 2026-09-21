@@ -1,4 +1,4 @@
-import server from "../..";
+import server, { status } from "../..";
 import { signRS256, testIssuer } from "../../src/auth/tests/issuer.ts";
 
 // The whole hosted-auth path against a local issuer: its own RSA key pair, its
@@ -14,10 +14,10 @@ describe("verifying hosted-auth JWTs", () => {
   afterAll(() => issuer.restore());
 
   const app = server({ auth: { issuer: ISSUER, audience: AUDIENCE } })
-    .get("/me", (ctx) => ctx.user ?? 401)
+    .get("/me", (ctx) => ctx.user ?? status(401))
     .get("/admin", (ctx) => {
-      if (!ctx.user) return 401;
-      if (ctx.user.app_metadata?.role !== "admin") return 403;
+      if (!ctx.user) return status(401);
+      if (ctx.user.app_metadata?.role !== "admin") return status(403);
       return "welcome";
     });
 

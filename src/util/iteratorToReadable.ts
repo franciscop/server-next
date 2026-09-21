@@ -3,12 +3,12 @@ const enc = new TextEncoder();
 // Any sync or async iterable streams its chunks as they are produced.
 // Pull-based so the producer follows the consumer (backpressure), and cancel
 // forwards to the iterator so a generator's `finally` releases its resources.
-export default function iteratorToReadable(
-  iterable: Iterable<any> | AsyncIterable<any>,
+export default function iteratorToReadable<T>(
+  iterable: Iterable<T> | AsyncIterable<T>,
 ): ReadableStream {
   const iterator =
-    (iterable as any)[Symbol.asyncIterator]?.() ??
-    (iterable as any)[Symbol.iterator]();
+    (iterable as Partial<AsyncIterable<T>>)[Symbol.asyncIterator]?.() ??
+    (iterable as Iterable<T>)[Symbol.iterator]();
   let cancelled = false;
   return new ReadableStream({
     async pull(controller) {

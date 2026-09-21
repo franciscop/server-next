@@ -1,7 +1,7 @@
 // Compile-time only: `ctx.user` is inferred from the `auth` option, so an app
 // never declares a User type. Checked by `tsc --noEmit` like the other
 // .test-d files. See docs/5. Authentication.md.
-import server from ".";
+import server, { status } from ".";
 
 type User = { id: string; email: string; role: "admin" | "user" };
 
@@ -100,7 +100,7 @@ server({
     getUser: (id) => db.users.find(id),
   },
 }).get("/admin", (ctx) => {
-  if (!ctx.user) return 401;
+  if (!ctx.user) return status(401);
   const role: "admin" | "user" = ctx.user.role;
   return { role };
 });

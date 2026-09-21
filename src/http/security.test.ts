@@ -1,9 +1,9 @@
-import server from "..";
+import server, { status } from "..";
 
 describe("security headers", () => {
   it("sets the secure-by-default headers", async () => {
     const { headers } = await server()
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
 
@@ -17,7 +17,7 @@ describe("security headers", () => {
 
   it("leaves the opt-in headers off by default", async () => {
     const { headers } = await server()
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
 
@@ -29,7 +29,7 @@ describe("security headers", () => {
 
   it("does not send HSTS outside production", async () => {
     const { headers } = await server()
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
     expect(headers.get("strict-transport-security")).toBe(null);
@@ -37,7 +37,7 @@ describe("security headers", () => {
 
   it("disables every header with security: false", async () => {
     const { headers } = await server({ security: false })
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
 
@@ -50,7 +50,7 @@ describe("security headers", () => {
 
   it("turns off a single header with false", async () => {
     const { headers } = await server({ security: { frameguard: false } })
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
 
@@ -61,7 +61,7 @@ describe("security headers", () => {
 
   it("overrides a header value with a string", async () => {
     const { headers } = await server({ security: { frameguard: "DENY" } })
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
     expect(headers.get("x-frame-options")).toBe("DENY");
@@ -76,7 +76,7 @@ describe("security headers", () => {
         permissionsPolicy: "geolocation=()",
       },
     })
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/");
 
@@ -87,7 +87,7 @@ describe("security headers", () => {
 
   it("applies headers to 404s and other non-route responses", async () => {
     const { status, headers } = await server()
-      .get("/", () => 200)
+      .get("/", () => status(200))
       .test()
       .get("/missing");
 
@@ -178,7 +178,7 @@ describe("traversal protection", () => {
 
   it("is off when all security is disabled", async () => {
     const res = await server({ security: false })
-      .get("/files/:id", () => 200)
+      .get("/files/:id", () => status(200))
       .test()
       .get("/files/..%2F.env");
     expect(res.status).toBe(200);

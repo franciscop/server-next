@@ -25,10 +25,14 @@ export default async function parseResponse(
     if (markup) return await type("html").send(out);
   }
 
-  // A bare number is a status code, the one place `return x` and `send(x)`
-  // differ: `send(201)` means "this is the body", `return 201` means the status
+  // A number is ambiguous: 201 reads as a status, 42 as an answer. Neither is
+  // guessed, so both are spelled out.
   if (typeof out === "number") {
-    return new Response(null, { status: out });
+    throw new Error(
+      `Cannot return a bare number (${out}): it is ambiguous. Return ` +
+        `status(${out}) for the status code, or json(${out}) to send the ` +
+        "number itself as the body.",
+    );
   }
 
   // Everything else is a body, and `send()` is the single place that knows how

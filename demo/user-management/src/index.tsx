@@ -1,4 +1,4 @@
-import server, { type AuthOption, type Context } from "../../..";
+import server, { status, type AuthOption, type Context } from "../../..";
 import { users } from "./db.ts";
 import Docs from "./Docs.tsx";
 import Home from "./Home.tsx";
@@ -17,11 +17,11 @@ import {
 
 // Guards: auth only loads ctx.user, so routes protect themselves
 const requireUser = (ctx: Context<{ user: User }>) => {
-  if (!ctx.user) return 401;
+  if (!ctx.user) return status(401);
 };
 const requireAdmin = (ctx: Context<{ user: User }>) => {
-  if (!ctx.user) return 401;
-  if (ctx.user.role !== "admin") return 403;
+  if (!ctx.user) return status(401);
+  if (ctx.user.role !== "admin") return status(403);
 };
 
 const auth: AuthOption = {
@@ -73,7 +73,7 @@ export default server<{ user: User }>({
     { response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      return users.find(ctx.url.params.id) ?? 404;
+      return users.find(ctx.url.params.id) ?? status(404);
     },
   )
   .put(
@@ -81,12 +81,12 @@ export default server<{ user: User }>({
     { body: UserPatch, response: PublicUser },
     requireAdmin,
     async (ctx) => {
-      if (!users.find(ctx.url.params.id)) return 404;
+      if (!users.find(ctx.url.params.id)) return status(404);
       users.update(ctx.url.params.id, ctx.body);
       return users.find(ctx.url.params.id);
     },
   )
   .delete("/api/users/:id", requireAdmin, (ctx) => {
     users.del(ctx.url.params.id);
-    return 204;
+    return status(204);
   });

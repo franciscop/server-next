@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import server, { ServerError } from "..";
+import server, { status, ServerError } from "..";
 
 describe("the second fetch argument", () => {
   it("does not merge Bun's server object into the process env", async () => {
@@ -87,7 +87,7 @@ describe("handleRequest onError", () => {
     const onError = mock(() => new Response("Not found!", { status: 404 }));
 
     const res = await server({ onError })
-      .get("/other", () => 200)
+      .get("/other", () => status(200))
       .test()
       .get("/");
 
@@ -118,7 +118,7 @@ describe("handleRequest onError", () => {
 
   it("uses default error handler for 404 when onError is not provided", async () => {
     const res = await server()
-      .get("/other", () => 200)
+      .get("/other", () => status(200))
       .test()
       .get("/");
 

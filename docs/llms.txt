@@ -159,8 +159,8 @@ field name gives an array. https://server-js.com/documentation#file-handling
 Return a value and it is serialized: a string (always `text/plain`; use
 `type('html')` for markup), an object or array (JSON), a `Buffer`, a
 `ReadableStream`, a JSX element (`text/html`), a `Response`, or a bucket file
-handle (streamed with its type, `404` when missing). Return a number for a
-bare status.
+handle (streamed with its type, `404` when missing). A bare number throws:
+use `status(201)` for the code, `json(201)` for the body.
 https://server-js.com/documentation/reply#inline-replies
 
 Helpers, all chainable, terminal ones return a `Response`:
@@ -181,11 +181,13 @@ Helpers, all chainable, terminal ones return a `Response`:
 ## Errors
 
 Throw anything and `onError` turns it into a response. `ServerError` carries a
-stable `code`, a `status` and a `hint`.
+stable `code`, a `status` and a `hint`. An error's status is used only when it
+is 400-599; anything else, including a thrown `Response`, is a plain 500. A
+hook that throws or returns a non-Response (`onError`, `onResponse`) falls back
+to the built-in handler rather than escaping.
 https://server-js.com/documentation/errors
 
-Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_PARAM`,
-`PATH_TRAVERSAL`,
+Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_PARAM`, `PATH_TRAVERSAL`,
 `INVALID_REQUEST`, `VALIDATION_FAILED`, `BODY_TOO_LARGE`,
 `BODY_INVALID_MULTIPART`, `UPLOAD_NOT_CONFIGURED`, `UPLOAD_TOO_LARGE`,
 `UPLOAD_TOO_MANY_FILES`, `UPLOAD_TOO_SMALL`, `UPLOAD_NOT_ALLOWED`,

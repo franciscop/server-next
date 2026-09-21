@@ -73,10 +73,22 @@ function devPage(error: any, ctx: Context): string {
 // generic: the real one, its hint and its stack go to the log. In development
 // the whole thing is rendered instead, since the only reader is the person
 // building the app.
-export function defaultOnError(error: any, ctx: Context): Response {
-  // Coerced: a thrown value can carry anything as its status, and a bad
-  // one must not blow up the handler that exists to answer for it
-  const status = Number(error?.status) || 500;
+export function defaultOnError(thrown: any, ctx: Context): Response {
+  // A Response is something to return, not to throw: taking its status here
+  // would answer with its code and none of its body, so it is a plain bug.
+  const error =
+    thrown instanceof Response
+      ? new Error("A Response was thrown; return it instead of throwing it")
+      : thrown;
+
+  // A thrown value can carry any status: one `new Response` would refuse
+  // (99, 999, 200.5) or one that would answer a failure with a success. Only
+  // a real error status is honoured, and anything else is ours to own.
+  const claimed = Number(error?.status);
+  const status =
+    Number.isInteger(claimed) && claimed >= 400 && claimed <= 599
+      ? claimed
+      : 500;
   if (status >= 500) console.error(`[server:error] ${logLines(error)}`);
 
   if (env.NODE_ENV !== "production" && wantsHtml(ctx)) {

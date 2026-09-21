@@ -137,15 +137,13 @@ var TypedServerError = ServerError;
 var errors_default = TypedServerError;
 
 // src/boot/polyfill.ts
-globalThis.env = {};
-if (typeof globalThis.Netlify !== "undefined") {
-  Object.assign(
-    globalThis.env,
-    globalThis.Netlify.env.toObject()
-  );
+var runtime = globalThis;
+runtime.env = {};
+if (typeof runtime.Netlify !== "undefined") {
+  Object.assign(runtime.env, runtime.Netlify.env.toObject());
 }
 if (typeof process !== "undefined") {
-  Object.assign(globalThis.env, process.env);
+  Object.assign(runtime.env, process.env);
 }
 
 // src/body/bucket.ts
@@ -1846,8 +1844,10 @@ function devPage(error, ctx) {
   <footer>You are seeing this because the app is in development. In production this is a plain ${status2}.</footer>
 </main></body></html>`;
 }
-function defaultOnError(error, ctx) {
-  const status2 = Number(error?.status) || 500;
+function defaultOnError(thrown, ctx) {
+  const error = thrown instanceof Response ? new Error("A Response was thrown; return it instead of throwing it") : thrown;
+  const claimed = Number(error?.status);
+  const status2 = Number.isInteger(claimed) && claimed >= 400 && claimed <= 599 ? claimed : 500;
   if (status2 >= 500) console.error(`[server:error] ${logLines(error)}`);
   if (env.NODE_ENV !== "production" && wantsHtml(ctx)) {
     return new Response(devPage(error, ctx), {
@@ -2025,22 +2025,21 @@ function createWebsocket(sockets, handlers) {
 }
 
 // src/boot/getMachine.ts
+var runtime2 = globalThis;
 function getProvider() {
-  if (typeof globalThis.Netlify !== "undefined") return "netlify";
-  if (globalThis.navigator?.userAgent === "Cloudflare-Workers") {
+  if (typeof runtime2.Netlify !== "undefined") return "netlify";
+  if (runtime2.navigator?.userAgent === "Cloudflare-Workers")
     return "cloudflare";
-  }
   return null;
 }
 function getRuntime() {
   if (typeof Bun !== "undefined") return "bun";
-  if (typeof globalThis.Deno !== "undefined") return "deno";
-  if (globalThis.process?.versions?.node) return "node";
+  if (typeof runtime2.Deno !== "undefined") return "deno";
+  if (runtime2.process?.versions?.node) return "node";
   return null;
 }
 function getProduction() {
-  if (typeof globalThis.Netlify !== "undefined")
-    return globalThis.Netlify.env.get("NETLIFY_DEV") !== "true";
+  if (runtime2.Netlify) return runtime2.Netlify.env.get("NETLIFY_DEV") !== "true";
   return process.env.NODE_ENV === "production";
 }
 function getMachine() {
@@ -2140,7 +2139,6 @@ async function assets(ctx) {
 }
 
 // src/middle/openapi.ts
-import * as fsp from "fs/promises";
 var getConfig = (options = {}) => {
   const config2 = { ...options };
   if (config2.tags) {
@@ -2174,7 +2172,7 @@ async function toJsonSchema(schema) {
   return void 0;
 }
 var pkgProm;
-var getPkg = () => pkgProm ??= fsp.readFile("package.json", "utf-8").then((data) => JSON.parse(data)).catch(() => ({}));
+var getPkg = () => pkgProm ??= import("fs/promises").then((fsp) => fsp.readFile("package.json", "utf-8")).then((data) => JSON.parse(data)).catch(() => ({}));
 var generateOpenApiPaths = async (handlers, specPath) => {
   const paths = {};
   for (const [method, routes] of Object.entries(handlers)) {
@@ -2315,7 +2313,7 @@ function preflight(ctx) {
     (route) => pathPattern(route.path, ctx.url.pathname, false)
   );
   if (handled) return;
-  return 204;
+  return status(204).send();
 }
 
 // src/middle/timer.ts
@@ -2860,7 +2858,9 @@ async function parseResponse(out, ctx) {
     if (markup) return await type("html").send(out);
   }
   if (typeof out === "number") {
-    return new Response(null, { status: out });
+    throw new Error(
+      `Cannot return a bare number (${out}): it is ambiguous. Return status(${out}) for the status code, or json(${out}) to send the number itself as the body.`
+    );
   }
   if (!(out instanceof Response) || out.url) {
     out = await send(out);
@@ -2928,8 +2928,12 @@ async function handleRequest(app, ctx) {
   let res = await getResponse(app, ctx);
   if (res) res = await finalize(res, ctx);
   if (res && ctx.options.onResponse) {
-    const replaced = await ctx.options.onResponse(res, ctx);
-    if (replaced) res = replaced;
+    try {
+      const replaced = await ctx.options.onResponse(res, ctx);
+      if (replaced) res = replaced;
+    } catch (error) {
+      res = await finalize(await runOnError(error, ctx), ctx);
+    }
   }
   if (res) ctx.options.log.request(ctx, res);
   if (res?.body && ctx.method === "head") {
@@ -3002,8 +3006,20 @@ async function getResponse(app, ctx) {
     throw errors_default.NOT_FOUND();
   } catch (error) {
     if (ctx.signal.aborted) return;
-    return ctx.options.onError(error, ctx);
+    return runOnError(error, ctx);
   }
+}
+async function runOnError(error, ctx) {
+  try {
+    const out = await ctx.options.onError(error, ctx);
+    if (out instanceof Response) return out;
+    console.error("[server:error] onError did not return a Response");
+  } catch (hookError) {
+    console.error(
+      `[server:error] onError itself threw: ${hookError?.message}`
+    );
+  }
+  return defaultOnError(error, ctx);
 }
 
 // src/http/parseCookies.ts
@@ -3218,7 +3234,6 @@ var NodeWebSocket = class {
   }
 };
 async function attachWebsocket(server2, app) {
-  const { createHash } = await import("crypto");
   server2.on("upgrade", async (req, socket, head) => {
     const key = req.headers["sec-websocket-key"];
     const upgrade = String(req.headers.upgrade || "").toLowerCase();
@@ -3237,7 +3252,11 @@ async function attachWebsocket(server2, app) {
       socket.destroy();
       return;
     }
-    const accept = createHash("sha1").update(key + GUID).digest("base64");
+    const hash = await crypto.subtle.digest(
+      "SHA-1",
+      new TextEncoder().encode(key + GUID)
+    );
+    const accept = Buffer.from(hash).toString("base64");
     socket.write(
       `HTTP/1.1 101 Switching Protocols\r
 Upgrade: websocket\r
@@ -3260,9 +3279,6 @@ Sec-WebSocket-Accept: ${accept}\r
     socket.on("error", () => ws.shutdown());
   });
 }
-
-// src/context/node.ts
-import { TLSSocket } from "tls";
 
 // src/http/clientIp.ts
 var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
@@ -3364,7 +3380,7 @@ function createContext(app, {
 var chunkArray = (arr) => arr.length > 2 ? [[arr[0], arr[1]], ...chunkArray(arr.slice(2))] : [arr];
 async function createNode(req, app, signal = new AbortController().signal) {
   const headers2 = new Headers(chunkArray(req.rawHeaders));
-  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
+  const scheme = req.socket?.encrypted ? "https" : "http";
   const host = headers2.get("host") || `localhost:${app.settings.port}`;
   return createContext(app, {
     method: req.method || "get",

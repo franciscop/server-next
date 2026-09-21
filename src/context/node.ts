@@ -1,5 +1,4 @@
 import type { IncomingMessage } from "node:http";
-import { TLSSocket } from "node:tls";
 import type { Context, Server } from "..";
 import toWeb from "../util/toWeb";
 import createContext from "./create";
@@ -20,7 +19,11 @@ export default async function createNode(
   const headers = new Headers(chunkArray(req.rawHeaders));
   // The socket only knows whether *this* hop was TLS, which behind a proxy is
   // not what the visitor used; createContext rewrites the URL from Forwarded
-  const scheme = req.socket instanceof TLSSocket ? "https" : "http";
+  // Duck-typed rather than `instanceof TLSSocket`, which would mean importing
+  // node:tls into a bundle that also runs where there is no such module
+  const scheme = (req.socket as { encrypted?: boolean })?.encrypted
+    ? "https"
+    : "http";
   const host = headers.get("host") || `localhost:${app.settings.port}`;
 
   return createContext(app, {

@@ -37,7 +37,7 @@ describe("return different types", () => {
     .get("/text", () => "Hello world")
     .get("/array", () => ["Hello world"])
     .get("/object", () => ({ hello: "world" }))
-    .get("/status", () => 201)
+    .get("/status", () => status(201))
     .test();
 
   it("can get the plain text", async () => {

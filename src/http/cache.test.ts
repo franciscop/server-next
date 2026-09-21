@@ -1,4 +1,4 @@
-import server, { cache } from "../index";
+import server, { cache, status } from "../index";
 
 describe("cache() reply helper", () => {
   it("sets Cache-Control from a duration string", async () => {
@@ -36,7 +36,7 @@ describe("cache option", () => {
 
   it("does not cache non-200 responses", async () => {
     const res = await server({ cache: "1h" })
-      .get("/", () => 201)
+      .get("/", () => status(201))
       .test()
       .get("/");
     expect(res.status).toBe(201);

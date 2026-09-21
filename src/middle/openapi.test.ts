@@ -1,7 +1,7 @@
 import { type } from "arktype";
 import * as v from "valibot";
 import { z } from "zod";
-import server from "..";
+import server, { status } from "..";
 
 const User = z.object({ name: z.string(), age: z.number() });
 
@@ -100,7 +100,7 @@ describe("openapi option", () => {
             description: "Adds one",
           },
         },
-        () => 201,
+        () => status(201),
       )
       .test();
     const spec = await (await api.get("/openapi.json")).json();
@@ -147,7 +147,7 @@ describe("openapi option", () => {
       .post(
         "/tags",
         { body: v.object({ label: v.string() }) }, // valibot
-        () => 201,
+        () => status(201),
       )
       .get("/posts", { query: Posts as never }, () => []) // arktype
       .test();

@@ -4,10 +4,8 @@ import parseCookies from "../http/parseCookies";
 
 // Node has no built-in WebSocket server, so we implement the bits of RFC 6455
 // we need: the upgrade handshake plus a frame codec (masking, fragmentation,
-// ping/pong/close, and 7/16/64-bit lengths). This module is imported normally
-// (bundled into index.js), but its only Node-specific dependency (`node:crypto`)
-// is imported lazily inside attachWebsocket, so it never loads on other runtimes
-// (attachWebsocket only ever runs on the Node path).
+// ping/pong/close, and 7/16/64-bit lengths). Only the socket plumbing is
+// Node's; the handshake hash is Web Crypto, like the rest of the library.
 
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -199,9 +197,7 @@ export class NodeWebSocket {
 // Attaches WebSocket upgrade handling to a Node http.Server. On a valid upgrade
 // it completes the handshake and bridges the connection to the shared
 // `app.websocket` handlers (open/message/close) used by `.socket()` routes.
-// `node:crypto` is imported here (lazily) so this module stays runtime-agnostic.
 export async function attachWebsocket(server: any, app: Server): Promise<void> {
-  const { createHash } = await import("node:crypto");
   server.on("upgrade", async (req: any, socket: any, head: Buffer) => {
     const key = req.headers["sec-websocket-key"];
     const upgrade = String(req.headers.upgrade || "").toLowerCase();
@@ -230,9 +226,12 @@ export async function attachWebsocket(server: any, app: Server): Promise<void> {
       return;
     }
 
-    const accept = createHash("sha1")
-      .update(key + GUID)
-      .digest("base64");
+    // RFC 6455: base64 of sha1(key + GUID) proves we read the request
+    const hash = await crypto.subtle.digest(
+      "SHA-1",
+      new TextEncoder().encode(key + GUID),
+    );
+    const accept = Buffer.from(hash).toString("base64");
     socket.write(
       "HTTP/1.1 101 Switching Protocols\r\n" +
         "Upgrade: websocket\r\n" +

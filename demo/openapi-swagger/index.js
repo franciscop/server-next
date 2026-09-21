@@ -42,14 +42,14 @@ export default server({
     "/users/:id",
     { body: User, response: withId(User), schema: { tags: "users" } },
     (ctx) => {
-      if (!users.has(ctx.url.params.id)) return 404;
+      if (!users.has(ctx.url.params.id)) return status(404);
       users.set(ctx.url.params.id, ctx.body);
       return { id: ctx.url.params.id, ...ctx.body };
     },
   )
   .delete("/users/:id", { schema: { tags: "users" } }, (ctx) => {
     users.delete(ctx.url.params.id);
-    return 204;
+    return status(204);
   })
 
   // Notes
@@ -74,14 +74,14 @@ export default server({
     "/notes/:id",
     { body: Note, response: withId(Note), schema: { tags: "notes" } },
     (ctx) => {
-      if (!notes.has(ctx.url.params.id)) return 404;
+      if (!notes.has(ctx.url.params.id)) return status(404);
       notes.set(ctx.url.params.id, ctx.body);
       return { id: ctx.url.params.id, ...ctx.body };
     },
   )
   .delete("/notes/:id", { schema: { tags: "notes" } }, (ctx) => {
     notes.delete(ctx.url.params.id);
-    return 204;
+    return status(204);
   })
 
   // The docs UI: Swagger UI's shell over /openapi.json

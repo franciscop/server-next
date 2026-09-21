@@ -7,13 +7,13 @@ Build an avatar endpoint: accept an image, validate its size and type, store it,
 Point [`uploads`](/documentation/options#optionsuploads) at a folder, and file fields on a multipart form land on `ctx.body`:
 
 ```js
-import server from "@server/next";
+import server, { status } from "@server/next";
 
 export default server({ uploads: './uploads' })
   .post('/avatar', (ctx) => {
     console.log(ctx.body.avatar);
     // { name, path, type, size }
-    return 201;
+    return status(201);
   });
 ```
 

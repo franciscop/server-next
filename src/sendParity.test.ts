@@ -127,11 +127,16 @@ describe("send() and return accept the same values", () => {
 });
 
 describe("where they deliberately differ", () => {
-  it("a number is a status when returned, a JSON body when sent", async () => {
-    const [a, b] = await bothWays(() => 201);
-    expect(a.status).toBe(201);
-    expect(a.body).toBe("");
-    expect(b.status).toBe(200);
-    expect(b.body).toBe("201");
+  // Returning it would be ambiguous (a status or an answer?), so it throws;
+  // send() has no such doubt, since it is explicitly "this is the body"
+  it("refuses a returned number, and sends one as JSON", async () => {
+    const api = server()
+      .get("/", () => 201 as any)
+      .test();
+    expect((await api.get("/")).status).toBe(500);
+
+    const sent = await send(201);
+    expect(sent.status).toBe(200);
+    expect(await sent.text()).toBe("201");
   });
 });

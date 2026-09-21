@@ -232,3 +232,86 @@ describe("the development page is inert", () => {
     expect(csp).toContain("base-uri 'none'");
   });
 });
+
+// Everything past the error handler (CORS, security headers, onResponse) is
+// skipped if an error escapes it, so nothing here is allowed to escape.
+describe("a failing hook", () => {
+  const boom = () => {
+    throw new Error("boom");
+  };
+  const ask = (options: any, handler: any = boom) =>
+    server({ cors: "*", ...options })
+      .get("/", handler)
+      .test()
+      .get("/", { headers: { origin: "https://a.com" } });
+
+  it("answers with the built-in handler when onError throws", async () => {
+    const res = await ask({
+      onError: () => {
+        throw new Error("the hook itself broke");
+      },
+    });
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe("Server Error");
+    // Still finalized: the response keeps the headers it would have had
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("does the same when onError returns something else", async () => {
+    const res = await ask({ onError: () => ({ oops: true }) as any });
+    expect(res.status).toBe(500);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("catches a throwing onResponse too", async () => {
+    const res = await ask(
+      {
+        onResponse: () => {
+          throw new Error("after the fact");
+        },
+      },
+      () => "ok",
+    );
+    expect(res.status).toBe(500);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+});
+
+describe("the status an error claims", () => {
+  const thrown = (status: any) =>
+    server()
+      .get("/", () => {
+        const error: any = new Error("boom");
+        error.status = status;
+        throw error;
+      })
+      .test()
+      .get("/");
+
+  it("is used when it is a real error status", async () => {
+    expect((await thrown(418)).status).toBe(418);
+  });
+
+  it("falls back to 500 when a Response could not carry it", async () => {
+    expect((await thrown(999)).status).toBe(500);
+    expect((await thrown(99)).status).toBe(500);
+    expect((await thrown(200.5)).status).toBe(500);
+  });
+
+  // An error answering with a success would tell the client it worked
+  it("falls back to 500 for a 2xx or 3xx", async () => {
+    expect((await thrown(200)).status).toBe(500);
+    expect((await thrown(302)).status).toBe(500);
+  });
+
+  it("ignores a thrown Response, which is meant to be returned", async () => {
+    const res = await server()
+      .get("/", () => {
+        throw new Response("teapot", { status: 418 });
+      })
+      .test()
+      .get("/");
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe("Server Error");
+  });
+});

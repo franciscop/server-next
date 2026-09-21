@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import server, { file, type } from ".";
+import server, { file, status, type } from ".";
 import localBucket from "./body/bucket";
 import createId from "./util/createId";
 
@@ -97,7 +97,7 @@ describe("serving bucket files", () => {
   it("only the guarded route can reach it (auth pattern)", async () => {
     const bucket = await seed("private.txt", "secret");
     const app = server().get("/file", (ctx) => {
-      if (ctx.url.query.token !== "ok") return 401;
+      if (ctx.url.query.token !== "ok") return status(401);
       return bucket.file("private.txt");
     });
     expect((await app.test().get("/file")).status).toBe(401);

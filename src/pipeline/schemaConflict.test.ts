@@ -1,4 +1,4 @@
-import server, { router } from "../index";
+import server, { status, router } from "../index";
 
 const schema = {
   "~standard": {
@@ -14,24 +14,30 @@ const schema = {
 describe("parser/schema conflicts fail at boot", () => {
   it("rejects parser: 'raw' with a body schema on the same route", () => {
     expect(() => {
-      server().post("/hook", { parser: "raw", body: schema }, () => 200);
+      server().post("/hook", { parser: "raw", body: schema }, () =>
+        status(200),
+      );
     }).toThrow(/parser/);
   });
 
   it("rejects parser: 'stream' with a body schema on the same route", () => {
     expect(() => {
-      server().post("/up", { parser: "stream", body: schema }, () => 200);
+      server().post("/up", { parser: "stream", body: schema }, () =>
+        status(200),
+      );
     }).toThrow(/parser/);
   });
 
   it("rejects a global parser with a route body schema", () => {
     expect(() => {
-      server({ parser: "raw" }).post("/hook", { body: schema }, () => 200);
+      server({ parser: "raw" }).post("/hook", { body: schema }, () =>
+        status(200),
+      );
     }).toThrow(/parser/);
   });
 
   it("rejects the conflict when a router is merged in", () => {
-    const routes = router().post("/hook", { body: schema }, () => 200);
+    const routes = router().post("/hook", { body: schema }, () => status(200));
     expect(() => {
       server({ parser: "raw" }).use(routes);
     }).toThrow(/parser/);
@@ -42,17 +48,15 @@ describe("parser/schema conflicts fail at boot", () => {
     const app = server({ parser: "raw" }).post(
       "/json",
       { parser: "parse", body: schema },
-      () => 200,
+      () => status(200),
     );
     expect(app).toBeDefined();
   });
 
   it("allows query/params schemas on raw and stream routes", () => {
     // Only the body is unreadable there; the URL is always available
-    const app = server({ parser: "raw" }).post(
-      "/hook",
-      { query: schema },
-      () => 200,
+    const app = server({ parser: "raw" }).post("/hook", { query: schema }, () =>
+      status(200),
     );
     expect(app).toBeDefined();
   });

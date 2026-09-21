@@ -1,4 +1,4 @@
-import server from "../..";
+import server, { status } from "../..";
 
 // Hosted auth (Supabase, Auth0, Cognito, Keycloak, Zitadel, Logto, Okta,
 // Google...) all end the same way on the server: the client signs in over
@@ -20,12 +20,12 @@ const auth = { issuer: ISSUER, audience: AUDIENCE };
 
 export default server({ auth })
   // No token is anonymous; a broken one is a 401 before this runs
-  .get("/me", (ctx) => ctx.user ?? 401)
+  .get("/me", (ctx) => ctx.user ?? status(401))
 
   .get("/admin", (ctx) => {
-    if (!ctx.user) return 401;
+    if (!ctx.user) return status(401);
     // Supabase puts app-controlled claims in `app_metadata`, Auth0 in a
     // namespaced claim; either way it is a plain read off ctx.user
-    if (ctx.user.app_metadata?.role !== "admin") return 403;
+    if (ctx.user.app_metadata?.role !== "admin") return status(403);
     return "welcome";
   });

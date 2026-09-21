@@ -1,7 +1,11 @@
 import { type } from "arktype";
 import * as v from "valibot";
 import { z } from "zod";
-import server, { ValidationError, type StandardSchemaV1 } from "../index";
+import server, {
+  status,
+  ValidationError,
+  type StandardSchemaV1,
+} from "../index";
 
 // Any object with `~standard` is a Standard Schema; these stubs prove the
 // protocol alone is enough, with no library involved.
@@ -40,7 +44,9 @@ describe("request validation", () => {
   });
 
   it("responds 422 to an invalid body, without leaking the field", async () => {
-    const app = server().post("/", { body: requires("password") }, () => 200);
+    const app = server().post("/", { body: requires("password") }, () =>
+      status(200),
+    );
     const res = await app.test().post("/", { password: 42 });
     expect(res.status).toBe(422);
     const text = await res.text();
@@ -86,7 +92,7 @@ describe("request validation", () => {
         ? { value }
         : { issues: [{ message: "Not ok", path: ["ok"] }] };
     });
-    const app = server().post("/", { body: slow }, () => 201);
+    const app = server().post("/", { body: slow }, () => status(201));
     expect((await app.test().post("/", { ok: true })).status).toBe(201);
     expect((await app.test().post("/", {})).status).toBe(422);
   });
@@ -123,7 +129,7 @@ describe("response validation", () => {
 
   it("skips returns that are not a JSON payload", async () => {
     // A bare status is not the resource the schema describes
-    const app = server().post("/", { response: shape }, () => 201);
+    const app = server().post("/", { response: shape }, () => status(201));
     expect((await app.test().post("/")).status).toBe(201);
   });
 });
@@ -136,7 +142,7 @@ describe("onError receives a ValidationError", () => {
         seen = error;
         return new Response("custom", { status: 400 });
       },
-    }).post("/", { body: requires("name") }, () => 200);
+    }).post("/", { body: requires("name") }, () => status(200));
 
     const res = await app.test().post("/", {});
     expect(res.status).toBe(400);
