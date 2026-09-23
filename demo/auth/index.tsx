@@ -1,4 +1,4 @@
-import server, { Context, redirect } from "@server/next";
+import server, { Context, redirect, status } from "@server/next";
 import { AccountPage, LoginPage } from "./App";
 
 // Every provider this demo supports, in display order. All but GitHub speak
@@ -20,6 +20,6 @@ const requireUser = (ctx: Context) => {
 };
 
 export default server({ public: "public", auth })
-  .head("/", () => 200)
+  .head("/", () => status(200))
   .get("/login", () => <LoginPage providers={providers} />)
   .get("/", requireUser, (ctx) => <AccountPage user={ctx.user} />);

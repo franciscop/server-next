@@ -36,7 +36,7 @@ export default server({
     },
   )
   .get("/users/:id", { schema: { tags: "users" } }, (ctx) => {
-    return users.get(ctx.url.params.id) ?? 404;
+    return users.get(ctx.url.params.id) ?? status(404);
   })
   .put(
     "/users/:id",
@@ -68,7 +68,7 @@ export default server({
     },
   )
   .get("/notes/:id", { schema: { tags: "notes" } }, (ctx) => {
-    return notes.get(ctx.url.params.id) ?? 404;
+    return notes.get(ctx.url.params.id) ?? status(404);
   })
   .put(
     "/notes/:id",

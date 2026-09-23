@@ -44,7 +44,7 @@ export default server()
   //   curl localhost:3000/notes/1
   //   curl localhost:3000/notes/abc
   .get("/notes/:id", { params: Id }, (ctx) => {
-    return notes.get(ctx.url.params.id) ?? 404;
+    return notes.get(ctx.url.params.id) ?? status(404);
   })
   .put("/notes/:id", { params: Id, body: Note }, (ctx) => {
     if (!notes.has(ctx.url.params.id)) return status(404);

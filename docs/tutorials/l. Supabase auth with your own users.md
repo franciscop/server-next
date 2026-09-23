@@ -7,10 +7,10 @@ This is the opposite arrangement to [signing in with GitHub](/tutorials/b-sign-i
 ## 1. Verify the token
 
 ```js
-import server from "@server/next";
+import server, { status } from "@server/next";
 
 export default server({ auth: 'jwt:supabase' })
-  .get('/api/me', (ctx) => ctx.user ?? 401);
+  .get('/api/me', (ctx) => ctx.user ?? status(401));
 ```
 
 ```sh
@@ -70,8 +70,8 @@ That is enough for a check that only needs a flag on the token:
 
 ```js
   .get('/admin', (ctx) => {
-    if (!ctx.user) return 401;
-    if (ctx.user.app_metadata?.role !== 'admin') return 403;
+    if (!ctx.user) return status(401);
+    if (ctx.user.app_metadata?.role !== 'admin') return status(403);
     return db.reports.all();
   })
 ```
@@ -94,10 +94,10 @@ const auth = {
 
 export default server({ auth })
   .get('/files/:id', async (ctx) => {
-    if (!ctx.user) return 401;
+    if (!ctx.user) return status(401);
     const file = await db.files.find(ctx.url.params.id);
-    if (!file) return 404;
-    if (file.userId !== ctx.user.id) return 403;
+    if (!file) return status(404);
+    if (file.userId !== ctx.user.id) return status(403);
     return file;
   });
 ```

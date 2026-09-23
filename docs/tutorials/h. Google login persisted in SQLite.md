@@ -9,7 +9,7 @@ This uses SQLite through Bun because it needs no server to run, but the shape is
 ## 1. The two callbacks
 
 ```js
-import server from "@server/next";
+import server, { status } from "@server/next";
 import db from "./db.js";
 
 const auth = {
@@ -29,7 +29,7 @@ const auth = {
 };
 
 export default server({ auth })
-  .get('/me', (ctx) => ctx.user ?? 401);
+  .get('/me', (ctx) => ctx.user ?? status(401));
 ```
 
 This assumes a `users` table of your own with a unique `email` and a `role` column, and the two functions above it. Neither is prescribed by the framework: there is no schema to inherit and no column that has to be named a certain way, because auth never touches your database itself.
@@ -58,8 +58,8 @@ Returning `undefined` from `getUser` is how you say "this credential is no longe
 
 ```js
   .get('/admin', (ctx) => {
-    if (!ctx.user) return 401;
-    if (ctx.user.role !== 'admin') return 403;
+    if (!ctx.user) return status(401);
+    if (ctx.user.role !== 'admin') return status(403);
     return db.users.all();
   })
 ```

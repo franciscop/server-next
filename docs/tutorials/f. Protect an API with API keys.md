@@ -7,7 +7,7 @@ Protect a machine-to-machine API with a shared secret key. No auth config needed
 Compare the `Authorization` header against a key from the environment. Read it once at startup and throw if it's missing, so a misconfigured deploy fails at boot instead of running unprotected:
 
 ```js
-import server from "@server/next";
+import server, { status } from "@server/next";
 
 // API_KEY=a-long-random-string in the environment
 const API_KEY = process.env.API_KEY;
@@ -15,11 +15,11 @@ if (!API_KEY) throw new Error('Set the API_KEY environment variable');
 
 const requireKey = (ctx) => {
   const [type, key] = String(ctx.headers.authorization || '').split(' ');
-  if (type !== 'Bearer' || key !== API_KEY) return 401;
+  if (type !== 'Bearer' || key !== API_KEY) return status(401);
 };
 ```
 
-Returning `401` stops the request right there; returning nothing lets it through, like any [middleware](/documentation/router#middleware).
+Returning `status(401)` stops the request right there; returning nothing lets it through, like any [middleware](/documentation/router#middleware).
 
 ## 2. Protect the routes
 
@@ -79,7 +79,7 @@ const clients = new Map([
 const requireKey = (ctx) => {
   const [type, key] = String(ctx.headers.authorization || '').split(' ');
   const client = type === 'Bearer' && clients.get(key);
-  if (!client) return 401;
+  if (!client) return status(401);
   ctx.user = client;
 };
 

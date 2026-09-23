@@ -32,7 +32,7 @@ In development that is all you need: the profile is signed into the cookie, so t
 When you want your own user records, add two callbacks. `onLogin` stores whoever just logged in and returns the id the cookie points at; `getUser` turns that id back into the user on every request:
 
 ```js
-import server from "@server/next";
+import server, { status } from "@server/next";
 import db from "./db.js";
 
 export default server({
@@ -56,7 +56,7 @@ The signed-in user is on [`ctx.user`](/documentation/context#ctxuser) on every r
 
 ```js
 const requireUser = (ctx) => {
-  if (!ctx.user) return 401;
+  if (!ctx.user) return status(401);
 };
 
 export default server({ auth: 'cookie:github' })

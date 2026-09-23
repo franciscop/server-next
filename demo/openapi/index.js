@@ -34,7 +34,7 @@ export default server({ openapi: true })
       response: User,
       schema: { tags: "users", title: "Create a user" },
     },
-    () => 201,
+    () => status(201),
   )
   .put(
     "/users/:id(number)",

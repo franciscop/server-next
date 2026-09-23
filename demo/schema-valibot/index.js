@@ -38,7 +38,7 @@ export default server()
     return status(201).json({ id, ...ctx.body });
   })
   .get("/notes/:id", (ctx) => {
-    return notes.get(ctx.url.params.id) ?? 404;
+    return notes.get(ctx.url.params.id) ?? status(404);
   })
   .put("/notes/:id", { body: Note }, (ctx) => {
     if (!notes.has(ctx.url.params.id)) return status(404);

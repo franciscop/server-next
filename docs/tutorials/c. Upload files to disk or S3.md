@@ -41,13 +41,13 @@ An oversized or wrong-type file is rejected automatically, the handler never run
 Build the bucket yourself and pass it as `uploads`, so your routes can read from it too. Return a stored file and it streams back with the right `Content-Type`. Guard it however you like first, an auth check, an ownership check:
 
 ```js
-import server, { bucket } from "@server/next";
+import server, { bucket, status } from "@server/next";
 
 const uploads = bucket.FS('./uploads');
 
 export default server({ uploads })
   .get('/avatar/:id', (ctx) => {
-    // if (!ctx.user) return 401;
+    // if (!ctx.user) return status(401);
     return uploads.file(ctx.url.params.id);
   });
 ```

@@ -14,17 +14,21 @@ const fragment = Handlebars.compile(
   await readFile("./views/fragment.hbs", "utf8"),
 );
 
+// A rendered template is a string, and a string is text until it says it's
+// markup, so every engine's output goes through type("html")
 export default server()
   // Pug
-  .get("/", () => home({ name: "World" }))
+  .get("/", () => type("html").send(home({ name: "World" })))
 
   // Handlebars
-  .get("/hello", () => hello({ name: "World" }))
+  .get("/hello", () => type("html").send(hello({ name: "World" })))
 
-  // EJS — renderFile returns a promise, so just return it
+  // EJS: renderFile returns a promise, which send() awaits
   .get("/users/:id", (ctx) =>
-    ejs.renderFile("./views/user.ejs", { id: ctx.url.params.id }),
+    type("html").send(
+      ejs.renderFile("./views/user.ejs", { id: ctx.url.params.id }),
+    ),
   )
 
-  // The rendered output doesn't start with "<", so set the type explicitly
+  // A partial, for HTMX or any other fragment swap
   .get("/fragment", () => type("html").send(fragment({ name: "World" })));
