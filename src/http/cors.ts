@@ -46,6 +46,17 @@ export function resolveCors(
     if (option.credentials) settings.credentials = true;
   }
 
+  // Reflecting any origin with credentials lets every website make logged-in
+  // requests and read the answers
+  const origins = String(settings.origin).split(/\s*,\s*/);
+  if (settings.credentials && origins.includes("*")) {
+    throw new Error(
+      "CORS `credentials: true` needs the exact origins allowed, like " +
+        "`cors: { origin: 'https://app.example.com', credentials: true }`; " +
+        "with any origin, every website could make logged-in requests.",
+    );
+  }
+
   if (typeof settings.origin === "string") {
     settings.origin = settings.origin.toLowerCase();
   }
@@ -91,15 +102,8 @@ export function applyCors(res: Response, ctx: Context): void {
   if (!settings) return;
 
   const requestOrigin = (ctx.headers.origin as string) || "";
-  let origin = cors(settings.origin, requestOrigin, ctx.platform.production);
+  const origin = cors(settings.origin, requestOrigin, ctx.platform.production);
   if (!origin) return;
-
-  // Credentialed requests can't use the "*" wildcard; the spec requires the
-  // exact origin to be reflected, so fall back to the request's own origin.
-  if (settings.credentials && origin === "*") {
-    if (!requestOrigin) return;
-    origin = requestOrigin.toLowerCase();
-  }
 
   res.headers.set("Access-Control-Allow-Origin", origin);
   res.headers.set("Access-Control-Allow-Methods", settings.methods);

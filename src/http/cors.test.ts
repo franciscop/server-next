@@ -81,16 +81,28 @@ describe("cors", () => {
     expect(prod.headers.get("access-control-allow-origin")).toBe(null);
   });
 
-  it("reflects the origin and sets credentials (no wildcard)", async () => {
+  it("reflects an allowed origin and sets credentials", async () => {
+    const allowed = "https://app.example.com";
     const { headers } = await server({
-      cors: { origin: "*", credentials: true },
+      cors: { origin: allowed, credentials: true },
     })
       .get("/", () => status(200))
       .test()
-      .get("/", { headers: { origin } });
-    // With credentials the "*" wildcard is forbidden, so the origin is echoed
-    expect(headers.get("access-control-allow-origin")).toBe(origin);
+      .get("/", { headers: { origin: allowed } });
+    expect(headers.get("access-control-allow-origin")).toBe(allowed);
     expect(headers.get("access-control-allow-credentials")).toBe("true");
+  });
+
+  it("refuses credentials for any origin at boot", () => {
+    expect(() => server({ cors: { credentials: true } })).toThrow(
+      "needs the exact origins",
+    );
+    expect(() => server({ cors: { origin: "*", credentials: true } })).toThrow(
+      "needs the exact origins",
+    );
+    expect(() =>
+      server({ cors: { origin: ["https://a.com", "*"], credentials: true } }),
+    ).toThrow("needs the exact origins");
   });
 
   it("auto-handles the preflight OPTIONS request", async () => {

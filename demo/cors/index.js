@@ -27,8 +27,8 @@ import server from "../..";
 //
 //   curl -i -H 'Origin: https://evil.com' localhost:3000/data         → no CORS header
 //
-// With `credentials: true` the exact origin is reflected instead of the `*`
-// wildcard (which the spec forbids alongside credentials).
+// `credentials: true` needs the exact origins listed; with `*` the server
+// refuses to start, since every website could make logged-in requests.
 
 export default server({
   cors: { origin: "https://example.com", credentials: true },

@@ -63,10 +63,23 @@ function failureCode(error: any, name: string): string {
   return "LOGIN_FAILED";
 }
 
-// The provider's own refusal is an OAuth error code, like `access_denied`.
-// Anything else in that parameter is not the provider's to say.
+// The provider's refusal, from the standard OAuth 2.0 and OpenID Connect codes
+// only: it is read before the state check, so anyone can craft this parameter
+const PROVIDER_CODES = new Set([
+  "invalid_request",
+  "unauthorized_client",
+  "access_denied",
+  "unsupported_response_type",
+  "invalid_scope",
+  "server_error",
+  "temporarily_unavailable",
+  "interaction_required",
+  "login_required",
+  "account_selection_required",
+  "consent_required",
+]);
 const providerCode = (value: string) =>
-  /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value.toUpperCase() : "LOGIN_FAILED";
+  PROVIDER_CODES.has(value) ? value.toUpperCase() : "LOGIN_FAILED";
 
 // One-time use: the state is spent
 const spendState = (res: any) => {

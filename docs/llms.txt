@@ -90,7 +90,7 @@ always wins. https://server-js.com/documentation/options#environment-variables
 | `public` | `string \| Bucket` | off | Folder or bucket served as static assets, before routes. https://server-js.com/documentation/options#optionspublic |
 | `uploads` | `string \| Bucket \| UploadOptions \| false` | off | Where uploaded files are stored. https://server-js.com/documentation/options#optionsuploads |
 | `auth` | `string \| function \| object` | off (`AUTH`) | Resolves `ctx.user`; mounts login routes when it owns the flow. https://server-js.com/documentation/options#optionsauth |
-| `cors` | `boolean \| string \| string[] \| object` | off | `{ origin, methods, headers, credentials }`. https://server-js.com/documentation/options#optionscors |
+| `cors` | `boolean \| string \| string[] \| object` | off | `{ origin, methods, headers, credentials }`; `credentials: true` needs exact origins, never `*`. https://server-js.com/documentation/options#optionscors |
 | `parser` | `'auto' \| 'raw' \| 'stream'` | `'auto'` | How bodies are read into `ctx.body`. https://server-js.com/documentation/options#optionsparser |
 | `cache` | `string \| number \| false` | off | Default `Cache-Control`. https://server-js.com/documentation/options#optionscache |
 | `security` | `boolean \| SecurityOptions` | on | https://server-js.com/documentation/options#optionssecurity |

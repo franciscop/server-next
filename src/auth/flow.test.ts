@@ -420,8 +420,8 @@ describe("what the visitor sees when a login fails", () => {
     expect(logged.join(" ")).toContain("github callback failed");
   });
 
-  // The provider may only name an OAuth error code; free text is dropped
-  it("passes the provider's error code, never its text", async () => {
+  // Only the standard OAuth codes pass; anyone can craft this parameter
+  it("passes the provider's standard error code, nothing else", async () => {
     const api = server({ secrets: "s", auth: "cookie:github" }).test();
     const denied = await api.get("/auth/callback/github?error=access_denied");
     expect(denied.headers.get("location")).toBe("/?error=ACCESS_DENIED");
@@ -429,6 +429,8 @@ describe("what the visitor sees when a login fails", () => {
       "/auth/callback/github?error=Your%20account%20is%20locked",
     );
     expect(forged.headers.get("location")).toBe("/?error=LOGIN_FAILED");
+    const made = await api.get("/auth/callback/github?error=account_hacked");
+    expect(made.headers.get("location")).toBe("/?error=LOGIN_FAILED");
   });
 
   it("hides an internal failure behind a generic code, and logs it", async () => {

@@ -1399,7 +1399,20 @@ function failureCode(error, name) {
   console.error(`[server:auth] ${name} callback failed:`, error);
   return "LOGIN_FAILED";
 }
-var providerCode = (value) => /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value.toUpperCase() : "LOGIN_FAILED";
+var PROVIDER_CODES = /* @__PURE__ */ new Set([
+  "invalid_request",
+  "unauthorized_client",
+  "access_denied",
+  "unsupported_response_type",
+  "invalid_scope",
+  "server_error",
+  "temporarily_unavailable",
+  "interaction_required",
+  "login_required",
+  "account_selection_required",
+  "consent_required"
+]);
+var providerCode = (value) => PROVIDER_CODES.has(value) ? value.toUpperCase() : "LOGIN_FAILED";
 var spendState = (res) => {
   res.headers.append("set-cookie", clearCookie(NAME2));
   return res;
@@ -1829,6 +1842,12 @@ function resolveCors(option) {
     if ("headers" in option) settings.headers = csv(option.headers);
     if (option.credentials) settings.credentials = true;
   }
+  const origins = String(settings.origin).split(/\s*,\s*/);
+  if (settings.credentials && origins.includes("*")) {
+    throw new Error(
+      "CORS `credentials: true` needs the exact origins allowed, like `cors: { origin: 'https://app.example.com', credentials: true }`; with any origin, every website could make logged-in requests."
+    );
+  }
   if (typeof settings.origin === "string") {
     settings.origin = settings.origin.toLowerCase();
   }
@@ -1850,12 +1869,8 @@ function applyCors(res, ctx) {
   const settings = ctx.options.cors;
   if (!settings) return;
   const requestOrigin = ctx.headers.origin || "";
-  let origin = cors(settings.origin, requestOrigin, ctx.platform.production);
+  const origin = cors(settings.origin, requestOrigin, ctx.platform.production);
   if (!origin) return;
-  if (settings.credentials && origin === "*") {
-    if (!requestOrigin) return;
-    origin = requestOrigin.toLowerCase();
-  }
   res.headers.set("Access-Control-Allow-Origin", origin);
   res.headers.set("Access-Control-Allow-Methods", settings.methods);
   res.headers.set("Access-Control-Allow-Headers", settings.headers);
