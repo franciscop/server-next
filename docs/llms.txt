@@ -202,7 +202,7 @@ https://server-js.com/documentation/errors#reference
 `auth` loads the user, it never gates a route. Guard with `ctx.user` in the
 handler; guard uploads with `uploads.validate`, since handlers and middleware
 both run after the body has been parsed.
-https://server-js.com/documentation/authentication#protecting-routes
+https://server-js.com/documentation/concepts#authorization
 
 String form is `'<strategy>:<name>'` (`'cookie:github'`, `'jwt:clerk'`).
 Object form takes `{ providers, strategy, expires, onLogin, getUser,
