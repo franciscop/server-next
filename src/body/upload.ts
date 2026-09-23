@@ -14,7 +14,7 @@ export type LimitOptions = {
   maxFileSize?: number | string;
   maxTotalSize?: number | string;
   maxFiles?: number;
-  minSize?: number | string;
+  minFileSize?: number | string;
   fileType?: string[];
 };
 
@@ -41,7 +41,7 @@ const DEFAULT_TOTAL_SIZE = "100mb";
 const DEFAULT_FILES = 100;
 
 // Normalize an `uploads` option (root or per-route) into the resolved shape
-// the request path consumes: every form becomes `{ bucket, maxFileSize, minSize,
+// the request path consumes: every form becomes `{ bucket, maxFileSize, minFileSize,
 // fileType }` with the bucket built, or null when off. Idempotent, so a route
 // merged twice (a `router()` into a server) resolves cleanly. Bad size
 // strings ('5megs') fail here, at boot, not on the first upload.
@@ -58,19 +58,19 @@ export function resolveUploads(
       maxFileSize,
       maxTotalSize,
       maxFiles,
-      minSize,
+      minFileSize,
       fileType,
       validate,
     } = up as UploadOptions;
     if (maxFileSize != null) parseBytes(maxFileSize);
     if (maxTotalSize != null) parseBytes(maxTotalSize);
-    if (minSize != null) parseBytes(minSize);
+    if (minFileSize != null) parseBytes(minFileSize);
     return {
       bucket: Bucket_(bucket)!,
       maxFileSize: maxFileSize ?? DEFAULT_FILE_SIZE,
       maxTotalSize: maxTotalSize ?? DEFAULT_TOTAL_SIZE,
       maxFiles: maxFiles ?? DEFAULT_FILES,
-      minSize,
+      minFileSize,
       fileType,
       validate,
     };

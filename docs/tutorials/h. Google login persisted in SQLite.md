@@ -9,7 +9,7 @@ This uses SQLite through Bun because it needs no server to run, but the shape is
 ## 1. The two callbacks
 
 ```js
-import server from "@server/next";
+import server, { ServerError } from "@server/next";
 import db from "./db.js";
 
 const auth = {
@@ -70,18 +70,18 @@ Auth deliberately does none of this for you. It resolves who someone is and stop
 
 ## 4. Refuse a login
 
-Some people should not get an account at all. Throwing from `onLogin` stops the login before any row is written, and the message reaches your error page:
+Some people should not get an account at all. Throwing a `ServerError` from `onLogin` stops the login before any row is written, and its code reaches your error page:
 
 ```js
   onLogin: (profile) => {
     if (!profile.email.endsWith('@company.com')) {
-      throw new Error('Use your work account');
+      throw new ServerError('NOT_WORK_ACCOUNT', 403);
     }
     // ...the upsert
   },
 ```
 
-The visitor is redirected to `redirect.error` with `?error=Use%20your%20work%20account`, so the page they land on can show them something better than a blank failure. Write the message for the person reading it, not for your logs.
+The visitor is redirected to `redirect.error` with `?error=NOT_WORK_ACCOUNT`, and the page they land on turns that code into something better than a blank failure: "Sign in with your company account". Only the code travels, so nobody can craft a link that shows their own text on your page.
 
 ## Next steps
 

@@ -68,7 +68,7 @@ afterAll(async () => {
 });
 
 // --------------------------------------------------------------------------
-// parse mode, by content-type (integration: real request -> ctx.body)
+// auto mode, by content-type (integration: real request -> ctx.body)
 // --------------------------------------------------------------------------
 
 describe("ctx.body parse: JSON", () => {
@@ -275,7 +275,7 @@ describe("ctx.body parse: multipart files", () => {
 });
 
 // --------------------------------------------------------------------------
-// parse mode, Case B: a single raw file as the whole body
+// auto mode, Case B: a single raw file as the whole body
 // --------------------------------------------------------------------------
 
 describe("ctx.body parse: raw single file (Case B)", () => {

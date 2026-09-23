@@ -81,7 +81,7 @@ describe("the stored key", () => {
 });
 
 // Validation is exercised at the parseBody layer with the same
-// `{ bucket, maxFileSize, minSize, fileType }` shape the `uploads` option
+// `{ bucket, maxFileSize, minFileSize, fileType }` shape the `uploads` option
 // resolves to (see the public tests further down).
 describe("upload validation", () => {
   const dest = (limits: any) => ({ bucket: mockBucket(), ...limits });
@@ -112,17 +112,17 @@ describe("upload validation", () => {
     });
   });
 
-  describe("minSize", () => {
-    it("rejects files below minSize", async () => {
+  describe("minFileSize", () => {
+    it("rejects files below minFileSize", async () => {
       const { raw, contentType } = makeMultipart("photo.jpg", "tiny");
       await expect(
-        parseBody(raw, contentType, dest({ minSize: "1mb" })),
+        parseBody(raw, contentType, dest({ minFileSize: "1mb" })),
       ).rejects.toThrow(/too small/i);
     });
 
-    it("accepts files meeting minSize", async () => {
+    it("accepts files meeting minFileSize", async () => {
       const { raw, contentType } = makeMultipart("photo.jpg", "four");
-      const body = await parseBody(raw, contentType, dest({ minSize: 4 }));
+      const body = await parseBody(raw, contentType, dest({ minFileSize: 4 }));
       expect(body.file).toBeDefined();
     });
   });
@@ -263,8 +263,8 @@ describe("uploads option (object form)", () => {
     expect(await res.text()).toMatch(/too large/);
   });
 
-  it("rejects a file under minSize with a 400", async () => {
-    const res = await post({ bucket: mockBucket(), minSize: "1kb" }, "a");
+  it("rejects a file under minFileSize with a 400", async () => {
+    const res = await post({ bucket: mockBucket(), minFileSize: "1kb" }, "a");
     expect(res.status).toBe(400);
     expect(await res.text()).toMatch(/too small/);
   });
@@ -407,7 +407,7 @@ describe("a bucket without create()", () => {
     const bucket = legacyBucket();
     const { raw, contentType } = makeMultipart("tiny.csv", "a,b", "text/csv");
     await expect(
-      parseBody(raw, contentType, { bucket, minSize: 100 } as any),
+      parseBody(raw, contentType, { bucket, minFileSize: 100 } as any),
     ).rejects.toThrow(/too small/i);
     expect(bucket.store.size).toBe(0);
   });
@@ -435,7 +435,7 @@ describe("a bucket without create()", () => {
     };
     const { raw, contentType } = makeMultipart("tiny.csv", "a,b", "text/csv");
     await expect(
-      parseBody(raw, contentType, { bucket: bare, minSize: 100 } as any),
+      parseBody(raw, contentType, { bucket: bare, minFileSize: 100 } as any),
     ).rejects.toThrow(/too small/i);
   });
 });

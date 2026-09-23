@@ -27,14 +27,14 @@ https://server-js.com/documentation#platforms
 |---|---|---|
 | `server` | `(options?: Options) => Server` | Default export. Creates the server |
 | `router` | `() => Router` | Standalone route chain, merged with `.use()`. https://server-js.com/documentation/router#router |
-| `ServerError` | class | `new ServerError(code, status, message)`, plus `ServerError.<CODE>(vars)` and `ServerError.extend({})`. https://server-js.com/documentation/errors#throwing-your-own |
+| `ServerError` | class | `new ServerError(code, status, message)`. For codes you reuse, register them once with `ServerError.extend({})`, then throw `ServerError.<CODE>(vars)`. https://server-js.com/documentation/errors#throwing-your-own |
 | `ValidationError` | class | Thrown by a failing route schema; has `source` and `issues` |
 | `bucket` | object | Re-export of [`bucket`](https://bucketjs.com): `bucket.FS()`, `.S3()`, `.R2()`, `.GCS()`, `.Azure()`, `.B2()`, `.Memory()` |
 | `status` `headers` `type` `cache` `download` `cookies` `send` `json` `file` `redirect` | functions | Reply helpers, chainable. https://server-js.com/documentation/reply |
 
 Types are exported too: `Context`, `Options`, `RouteOptions`, `Settings`,
 `Middleware`, `UploadOptions`, `UploadedFile`, `UploadValidate`, `Bucket`,
-`BucketFile`, `SecurityOptions`, `CorsOptions`, `CacheOption`, `BodyMode`,
+`BucketFile`, `SecurityOptions`, `CorsOptions`, `CacheOption`, `Parser`,
 `LogLevel`, `AuthMeta`, `AuthOption`.
 
 ## Server methods
@@ -70,7 +70,7 @@ https://server-js.com/documentation/router#path
 | Field | Type | Description |
 |---|---|---|
 | `body` `query` `params` `response` | `StandardSchema` | Zod, Valibot, ArkType. Validated before the route's own middleware. https://server-js.com/documentation/router#validation |
-| `parser` | `'parse' \| 'raw' \| 'stream'` | Overrides the root `parser` |
+| `parser` | `'auto' \| 'raw' \| 'stream'` | Overrides the root `parser` |
 | `uploads` | `path \| Bucket \| object \| false` | Replaces the root `uploads` wholesale |
 | `cache` | `string \| number \| false` | `Cache-Control` for this route |
 | `schema` | `object \| false` | OpenAPI metadata (tags, summary); `false` hides the route |
@@ -91,7 +91,7 @@ always wins. https://server-js.com/documentation/options#environment-variables
 | `uploads` | `string \| Bucket \| UploadOptions \| false` | off | Where uploaded files are stored. https://server-js.com/documentation/options#optionsuploads |
 | `auth` | `string \| function \| object` | off (`AUTH`) | Resolves `ctx.user`; mounts login routes when it owns the flow. https://server-js.com/documentation/options#optionsauth |
 | `cors` | `boolean \| string \| string[] \| object` | off | `{ origin, methods, headers, credentials }`. https://server-js.com/documentation/options#optionscors |
-| `parser` | `'parse' \| 'raw' \| 'stream'` | `'parse'` | How bodies are read into `ctx.body`. https://server-js.com/documentation/options#optionsparser |
+| `parser` | `'auto' \| 'raw' \| 'stream'` | `'auto'` | How bodies are read into `ctx.body`. https://server-js.com/documentation/options#optionsparser |
 | `cache` | `string \| number \| false` | off | Default `Cache-Control`. https://server-js.com/documentation/options#optionscache |
 | `security` | `boolean \| SecurityOptions` | on | https://server-js.com/documentation/options#optionssecurity |
 | `openapi` | `boolean \| string \| object` | off | Serves the generated spec at `/openapi.json`. https://server-js.com/documentation/options#optionsopenapi |
@@ -101,7 +101,7 @@ always wins. https://server-js.com/documentation/options#environment-variables
 
 ### uploads
 
-Object form: `{ bucket, maxFileSize, maxTotalSize, maxFiles, minSize, fileType, validate }`.
+Object form: `{ bucket, maxFileSize, maxTotalSize, maxFiles, minFileSize, fileType, validate }`.
 https://server-js.com/documentation/options#optionsuploads
 
 | Field | Type | Default | Description |
@@ -110,7 +110,7 @@ https://server-js.com/documentation/options#optionsuploads
 | `maxFileSize` | `number \| string` | `'10mb'` | Per file, enforced while streaming (`413`) |
 | `maxTotalSize` | `number \| string` | `'100mb'` | Across one request (`413`) |
 | `maxFiles` | `number` | `100` | Per request (`413`) |
-| `minSize` | `number \| string` | none | Checked after the write, file removed (`400`) |
+| `minFileSize` | `number \| string` | none | Checked after the write, file removed (`400`) |
 | `fileType` | `string[]` | none | Extensions (`.jpg`), MIME types (`image/jpeg`), bare names (`csv`), wildcards (`image/*`). Checked against the stored type (`415`) |
 | `validate` | `(ctx) => unknown` | none | Runs before the body is read, with `ctx.user` resolved. `false` refuses with `403`; throw for your own error |
 
@@ -161,7 +161,8 @@ Return a value and it is serialized: a string (always `text/plain`; use
 `type('html')` for markup), an object or array (JSON), a `Buffer`, a
 `ReadableStream`, a JSX element (`text/html`), a `Response`, or a bucket file
 handle (streamed with its type, `404` when missing). A returned number is a
-status code (`return 201`); to send a number as the body, `return json(42)`.
+status code from 200 to 599 with an empty body (`return 201`); to send a number
+as the body, `return json(42)`.
 https://server-js.com/documentation/reply#inline-replies
 
 Helpers, all chainable, terminal ones return a `Response`:
@@ -183,9 +184,9 @@ Helpers, all chainable, terminal ones return a `Response`:
 
 Throw anything and `onError` turns it into a response. `ServerError` carries a
 stable `code`, a `status` and a `hint`. An error's status is used only when it
-is 400-599; anything else, including a thrown `Response`, is a plain 500. A
-hook that throws or returns a non-Response (`onError`, `onResponse`) falls back
-to the built-in handler rather than escaping.
+is 400-599; anything else, including a thrown `Response`, is a plain 500. An
+`onResponse` that throws goes through `onError`; an `onError` that throws or
+returns a non-Response falls back to the built-in handler rather than escaping.
 https://server-js.com/documentation/errors
 
 Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_PARAM`, `PATH_TRAVERSAL`,
@@ -206,7 +207,9 @@ https://server-js.com/documentation/authentication#protecting-routes
 String form is `'<strategy>:<name>'` (`'cookie:github'`, `'jwt:clerk'`).
 Object form takes `{ providers, strategy, expires, onLogin, getUser,
 toPublicUser, onLogout, redirect }`. A plain function `(ctx) => user` works,
-as does an auth library instance.
+as does an auth library instance. Email and password is out of scope: pass a
+Better Auth instance for that.
+https://server-js.com/documentation/authentication#a-library
 
 Each provider reads `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`
 (`GITHUB_CLIENT_ID`, `MICROSOFT_ENTRA_ID_CLIENT_ID`), or takes

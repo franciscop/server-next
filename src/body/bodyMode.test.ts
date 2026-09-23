@@ -22,7 +22,7 @@ describe("body mode resolution", () => {
   it("per-route body overrides the global default", async () => {
     const api = server({ parser: "raw" })
       .post("/raw", (ctx) => ({ isBuffer: Buffer.isBuffer(ctx.body) }))
-      .post("/parsed", { parser: "parse" }, (ctx) => ctx.body)
+      .post("/parsed", { parser: "auto" }, (ctx) => ctx.body)
       .test();
 
     const raw = await api.post("/raw", JSON.stringify({ a: 1 }), {

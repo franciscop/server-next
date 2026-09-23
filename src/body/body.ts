@@ -1,4 +1,4 @@
-import type { BodyMode, Context } from "../types";
+import type { Parser, Context } from "../types";
 import { INF, resolveMax, tooLarge } from "./bodyLimit";
 import bodyKind from "./bodyKind";
 import parseBody from "./parseBody";
@@ -28,7 +28,7 @@ export function setBody(ctx: Context, body?: ReadableStream | null): void {
 // ReadableStream, so ctx.body is the same shape on Node and the web runtimes.
 export async function resolveBody(
   ctx: Context,
-  mode: BodyMode = "parse",
+  mode: Parser = "auto",
   max: number = resolveMax(undefined),
 ): Promise<any> {
   const stream = bodies.get(ctx);
@@ -59,7 +59,7 @@ export async function resolveBody(
     return raw;
   }
 
-  // parse: hand parseBody the stream so multipart and raw-file uploads are
+  // auto: hand parseBody the stream so multipart and raw-file uploads are
   // written to `uploads` as they arrive instead of being buffered whole.
   // Tally the bytes flowing past only to backfill Content-Length (for an
   // accurate request log) when the client didn't send it. The size *limit* is

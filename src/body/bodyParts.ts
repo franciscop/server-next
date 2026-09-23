@@ -298,13 +298,13 @@ export async function endPart(
   const file = await opened.write;
 
   // Only knowable once it is all in, so an undersized file is written first
-  const { minSize } = part.limits;
-  if (minSize != null && part.size < parseBytes(minSize)) {
+  const { minFileSize } = part.limits;
+  if (minFileSize != null && part.size < parseBytes(minFileSize)) {
     await discard(file);
     throw ServerError.UPLOAD_TOO_SMALL({
       name: part.filename,
       size: String(part.size),
-      limit: String(minSize),
+      limit: String(minFileSize),
     });
   }
 

@@ -105,8 +105,8 @@ export default async function parseBody(
   let limits: LimitOptions = {};
   if (dest && typeof dest === "object" && "bucket" in dest) {
     bucket = dest.bucket;
-    const { maxFileSize, maxTotalSize, maxFiles, minSize, fileType } = dest;
-    limits = { maxFileSize, maxTotalSize, maxFiles, minSize, fileType };
+    const { maxFileSize, maxTotalSize, maxFiles, minFileSize, fileType } = dest;
+    limits = { maxFileSize, maxTotalSize, maxFiles, minFileSize, fileType };
   } else {
     bucket = dest as Bucket | null | undefined | false;
   }

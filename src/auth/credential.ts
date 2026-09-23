@@ -172,14 +172,7 @@ export async function credentialPayload(
 ) {
   const { onLogin, getUser, toPublicUser } = config;
   if (!getUser) return { user: publicProfile(profile) };
-  let id: string | number | undefined;
-  try {
-    id = await onLogin!(profile, ctx);
-  } catch (error) {
-    // A refusal, and its message is meant for the person reading it
-    (error as any).expose = true;
-    throw error;
-  }
+  const id: string | number | undefined = await onLogin!(profile, ctx);
   if (id === undefined || id === null) {
     throw new Error("`onLogin` must return the id the credential points at");
   }

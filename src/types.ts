@@ -82,9 +82,9 @@ type Field<C, K extends keyof ContextTypes, Fallback> = K extends keyof C
   ? SchemaOutput<C[K], C[K]>
   : Fallback;
 
-// How the request body is read into ctx.body: parsed (the default), the raw
-// bytes as a Buffer, or the unread stream itself (a web ReadableStream).
-export type BodyMode = "parse" | "raw" | "stream";
+// How the request body is read into ctx.body: parsed by its Content-Type (the
+// default), the raw bytes as a Buffer, or the unread stream (a web ReadableStream).
+export type Parser = "auto" | "raw" | "stream";
 
 // How responses are cached: a duration ('1h'), a number of seconds, or `false`
 // (`0`) for no-store. Sets `Cache-Control`; for anything fancier, use headers().
@@ -101,9 +101,9 @@ export type RouteOptions = {
   // `false` hides the route from the spec
   schema?: RouteSchema | false;
   // How this route reads its body, overriding the root `parser`
-  parser?: BodyMode;
+  parser?: Parser;
   // Standard Schemas validating each part of the request, and the response.
-  // A `body` schema needs `parser: 'parse'` (the default); combining it with
+  // A `body` schema needs `parser: 'auto'` (the default); combining it with
   // `raw`/`stream` throws at boot.
   body?: StandardSchemaV1<any, any>;
   query?: StandardSchemaV1<any, any>;
@@ -158,8 +158,8 @@ export type Options<A = AuthOption> = {
   onResponse?: OnResponse;
   log?: LogLevel | boolean;
   security?: boolean | SecurityOptions;
-  // How request bodies are read into ctx.body (default 'parse')
-  parser?: BodyMode;
+  // How request bodies are read into ctx.body (default 'auto')
+  parser?: Parser;
   cache?: CacheOption;
 };
 
@@ -184,7 +184,7 @@ export type Settings = {
   onResponse?: OnResponse;
   log: Logger;
   security: SecuritySettings;
-  parser: BodyMode;
+  parser: Parser;
   cache?: CacheOption;
 };
 

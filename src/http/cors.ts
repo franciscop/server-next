@@ -56,7 +56,11 @@ const localhost = /^https?:\/\/localhost(:\d+)?$/;
 
 // Based on https://expressjs.com/en/resources/middleware/cors.html#configuration-options
 // Arrays never arrive here: resolveCors() joins every array form to a CSV.
-function cors(config: boolean | string, origin: string = ""): string | null {
+function cors(
+  config: boolean | string,
+  origin: string = "",
+  production = false,
+): string | null {
   origin = origin?.toLowerCase();
 
   // When it's true, reflect the origin
@@ -68,8 +72,9 @@ function cors(config: boolean | string, origin: string = ""): string | null {
   // No origin, it's okay since that means we don't need CORS
   if (!origin) return null;
 
-  // Coming from localhost
-  if (localhost.test(origin)) return origin;
+  // Local development just works; in production localhost is any origin,
+  // and a page on someone's machine must not reach a credentialed API
+  if (!production && localhost.test(origin)) return origin;
 
   const arr = typeof config === "string" ? config.split(/\s*,\s*/g) : [];
   if (arr.includes(origin)) return origin;
@@ -86,7 +91,7 @@ export function applyCors(res: Response, ctx: Context): void {
   if (!settings) return;
 
   const requestOrigin = (ctx.headers.origin as string) || "";
-  let origin = cors(settings.origin, requestOrigin);
+  let origin = cors(settings.origin, requestOrigin, ctx.platform.production);
   if (!origin) return;
 
   // Credentialed requests can't use the "*" wildcard; the spec requires the

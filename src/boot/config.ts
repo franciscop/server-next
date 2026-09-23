@@ -123,7 +123,7 @@ export default function config(options: Options = {}): Settings {
     port: options.port || Number(env.PORT) || 3000,
     secrets: resolveSecrets(options.secrets),
     log: createLogger(resolveLogLevel(options.log ?? env.LOG_LEVEL)),
-    parser: options.parser ?? "parse",
+    parser: options.parser ?? "auto",
     security: resolveSecurity(options.security),
     // Kept raw, resolved per request in applyCache, so a route can override it
     cache: options.cache,

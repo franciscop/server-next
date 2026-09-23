@@ -1,4 +1,4 @@
-import server from "..";
+import server, { ServerError } from "..";
 
 // The login flow we run ourselves: the four strategies, the callbacks, and
 // what each of them stores. See docs/5. Authentication.md.
@@ -365,7 +365,8 @@ describe("what the visitor sees when a login fails", () => {
     });
   };
 
-  it("shows an onLogin refusal verbatim", async () => {
+  // A refusal is a ServerError, and only its code travels: the app owns the words
+  it("sends an onLogin refusal as its code", async () => {
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
       if (one.includes("access_token"))
@@ -381,19 +382,56 @@ describe("what the visitor sees when a login fails", () => {
       auth: {
         providers: "github",
         onLogin: () => {
-          throw new Error("Use your work account");
+          throw new ServerError("NOT_STAFF", 403, "Use your work account");
         },
         getUser: (id: string) => ({ id }),
       },
     }).test();
 
     const res = await login(api);
-    expect(res.headers.get("location")).toContain(
-      `error=${encodeURIComponent("Use your work account")}`,
-    );
+    expect(res.headers.get("location")).toBe("/?error=NOT_STAFF");
   });
 
-  it("hides an internal failure behind a generic message, and logs it", async () => {
+  // Any other throw is a bug, whatever its message says
+  it("keeps a bug in onLogin out of the URL", async () => {
+    globalThis.fetch = (async (url: any, opts: any) => {
+      const one = url instanceof Request ? url.url : String(url);
+      if (one.includes("access_token"))
+        return Response.json({ access_token: "t" });
+      if (one.includes("api.github.com/user")) {
+        return Response.json({ id: 1, email: "a@b.c", name: "Ada" });
+      }
+      return realFetch(url, opts);
+    }) as typeof fetch;
+    const logged: any[] = [];
+    console.error = (...args: any[]) => logged.push(args.join(" "));
+
+    const api = server({
+      secrets: "s",
+      auth: {
+        providers: "github",
+        onLogin: () => (undefined as any).id,
+        getUser: (id: string) => ({ id }),
+      },
+    }).test();
+
+    const res = await login(api);
+    expect(res.headers.get("location")).toBe("/?error=LOGIN_FAILED");
+    expect(logged.join(" ")).toContain("github callback failed");
+  });
+
+  // The provider may only name an OAuth error code; free text is dropped
+  it("passes the provider's error code, never its text", async () => {
+    const api = server({ secrets: "s", auth: "cookie:github" }).test();
+    const denied = await api.get("/auth/callback/github?error=access_denied");
+    expect(denied.headers.get("location")).toBe("/?error=ACCESS_DENIED");
+    const forged = await api.get(
+      "/auth/callback/github?error=Your%20account%20is%20locked",
+    );
+    expect(forged.headers.get("location")).toBe("/?error=LOGIN_FAILED");
+  });
+
+  it("hides an internal failure behind a generic code, and logs it", async () => {
     // The token exchange itself blows up: a bad client secret, an outage
     globalThis.fetch = (async () => {
       throw new Error("connect ECONNREFUSED 10.0.0.5:443");
@@ -406,8 +444,7 @@ describe("what the visitor sees when a login fails", () => {
     const res = await login(api);
 
     const location = res.headers.get("location");
-    expect(location).toContain(encodeURIComponent("Could not sign you in"));
-    expect(location).not.toContain("ECONNREFUSED");
+    expect(location).toBe("/?error=LOGIN_FAILED");
     // The operator gets the real error object (its cause carries the
     // network detail); the visitor gets none of it
     expect(logged.join(" ")).toContain("github callback failed");
@@ -438,9 +475,7 @@ describe("what the visitor sees when a login fails", () => {
 
     const res = await login(api);
     // A generic failure, and no session cookie: not a silent anonymous login
-    expect(res.headers.get("location")).toContain(
-      encodeURIComponent("Could not sign you in"),
-    );
+    expect(res.headers.get("location")).toBe("/?error=LOGIN_FAILED");
     expect(res.headers.get("set-cookie") ?? "").not.toContain("session=ey");
   });
 });

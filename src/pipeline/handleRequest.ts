@@ -51,7 +51,7 @@ export default async function handleRequest(
 async function checkUploads(ctx: Context): Promise<void> {
   const { uploads, parser } = ctx.options;
   // `false` is "no files here", so there is nothing to allow or refuse
-  if (!uploads || parser !== "parse") return;
+  if (!uploads || parser === "raw" || parser === "stream") return;
   const { validate } = uploads;
   if (!validate) return;
   // Only the kinds that can become stored files: multipart parts, or the

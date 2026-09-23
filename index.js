@@ -90,7 +90,7 @@ ServerError.extend({
   UPLOAD_TOO_SMALL: {
     status: 400,
     message: 'File "{name}" is too small ({size} bytes, minimum is {limit})',
-    hint: "Set or lower `uploads: { bucket, minSize: '1kb' }`."
+    hint: "Set or lower `uploads: { bucket, minFileSize: '1kb' }`."
   },
   UPLOAD_NOT_ALLOWED: {
     status: 403,
@@ -674,19 +674,19 @@ function resolveUploads(up) {
       maxFileSize,
       maxTotalSize,
       maxFiles,
-      minSize,
+      minFileSize,
       fileType: fileType2,
       validate: validate2
     } = up;
     if (maxFileSize != null) parseBytes(maxFileSize);
     if (maxTotalSize != null) parseBytes(maxTotalSize);
-    if (minSize != null) parseBytes(minSize);
+    if (minFileSize != null) parseBytes(minFileSize);
     return {
       bucket: bucket(bucket2),
       maxFileSize: maxFileSize ?? DEFAULT_FILE_SIZE,
       maxTotalSize: maxTotalSize ?? DEFAULT_TOTAL_SIZE,
       maxFiles: maxFiles ?? DEFAULT_FILES,
-      minSize,
+      minFileSize,
       fileType: fileType2,
       validate: validate2
     };
@@ -728,10 +728,10 @@ function validateFile(originalName, contentType, limits, sniffed) {
 
 // src/router.ts
 function checkParserConflict(options, globalParser) {
-  const parser = options.parser ?? globalParser ?? "parse";
-  if (options.body && parser !== "parse") {
+  const parser = options.parser ?? globalParser ?? "auto";
+  if (options.body && (parser === "raw" || parser === "stream")) {
     throw new Error(
-      `A \`parser: '${parser}'\` route never parses the body, so its \`body\` schema cannot run. Remove one, or set \`parser: 'parse'\` on the route.`
+      `A \`parser: '${parser}'\` route never parses the body, so its \`body\` schema cannot run. Remove one, or set \`parser: 'auto'\` on the route.`
     );
   }
 }
@@ -991,13 +991,7 @@ var publicProfile = ({ id, email, name, avatar }) => ({
 async function credentialPayload(config2, strategy, ctx, profile) {
   const { onLogin, getUser, toPublicUser } = config2;
   if (!getUser) return { user: publicProfile(profile) };
-  let id;
-  try {
-    id = await onLogin(profile, ctx);
-  } catch (error) {
-    error.expose = true;
-    throw error;
-  }
+  const id = await onLogin(profile, ctx);
   if (id === void 0 || id === null) {
     throw new Error("`onLogin` must return the id the credential points at");
   }
@@ -1395,15 +1389,17 @@ async function readState(ctx, received) {
 var SPEC = { schema: { tags: "auth" } };
 var wantsJson = (ctx) => String(ctx.headers.accept || "").includes("application/json");
 var target = async (where, fallback, user, ctx) => typeof where === "function" ? where(user, ctx) : where ?? fallback;
-var errorRedirect = async (redirects, ctx, message) => {
+var errorRedirect = async (redirects, ctx, code) => {
   const to = await target(redirects.error, "/", null, ctx);
-  return redirect(`${to}?error=${encodeURIComponent(message)}`);
+  return redirect(`${to}${to.includes("?") ? "&" : "?"}error=${code}`);
 };
-function failureMessage(error, name) {
-  if (error?.expose) return error.message;
+var CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+function failureCode(error, name) {
+  if (error instanceof errors_default && CODE.test(error.code)) return error.code;
   console.error(`[server:auth] ${name} callback failed:`, error);
-  return "Could not sign you in";
+  return "LOGIN_FAILED";
 }
+var providerCode = (value) => /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value.toUpperCase() : "LOGIN_FAILED";
 var spendState = (res) => {
   res.headers.append("set-cookie", clearCookie(NAME2));
   return res;
@@ -1418,7 +1414,9 @@ var loginRoute = ({ provider, options }) => async (ctx) => {
 };
 var callbackRoute = ({ name, options, provider }, redirects, finish) => async (ctx) => {
   const query = ctx.url.query;
-  if (query.error) return errorRedirect(redirects, ctx, query.error);
+  if (query.error) {
+    return errorRedirect(redirects, ctx, providerCode(query.error));
+  }
   const pending = await readState(ctx, query.state);
   if (!query.code) throw errors_default.AUTH_NO_CODE();
   try {
@@ -1430,8 +1428,8 @@ var callbackRoute = ({ name, options, provider }, redirects, finish) => async (c
     );
     return spendState(await finish(ctx, profile));
   } catch (error) {
-    const message = failureMessage(error, name);
-    return spendState(await errorRedirect(redirects, ctx, message));
+    const code = failureCode(error, name);
+    return spendState(await errorRedirect(redirects, ctx, code));
   }
 };
 function flowEntry(config2) {
@@ -1837,12 +1835,12 @@ function resolveCors(option) {
   return settings;
 }
 var localhost = /^https?:\/\/localhost(:\d+)?$/;
-function cors(config2, origin = "") {
+function cors(config2, origin = "", production = false) {
   origin = origin?.toLowerCase();
   if (config2 === true) return origin || null;
   if (config2 === "*") return "*";
   if (!origin) return null;
-  if (localhost.test(origin)) return origin;
+  if (!production && localhost.test(origin)) return origin;
   const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
   if (arr.includes(origin)) return origin;
   console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
@@ -1852,7 +1850,7 @@ function applyCors(res, ctx) {
   const settings = ctx.options.cors;
   if (!settings) return;
   const requestOrigin = ctx.headers.origin || "";
-  let origin = cors(settings.origin, requestOrigin);
+  let origin = cors(settings.origin, requestOrigin, ctx.platform.production);
   if (!origin) return;
   if (settings.credentials && origin === "*") {
     if (!requestOrigin) return;
@@ -2020,7 +2018,7 @@ function config(options = {}) {
     port: options.port || Number(env.PORT) || 3e3,
     secrets: resolveSecrets(options.secrets),
     log: createLogger(resolveLogLevel(options.log ?? env.LOG_LEVEL)),
-    parser: options.parser ?? "parse",
+    parser: options.parser ?? "auto",
     security: resolveSecurity(options.security),
     // Kept raw, resolved per request in applyCache, so a route can override it
     cache: options.cache,
@@ -2587,13 +2585,13 @@ async function endPart(part, body) {
   const opened = part.opened;
   opened.controller.close();
   const file2 = await opened.write;
-  const { minSize } = part.limits;
-  if (minSize != null && part.size < parseBytes(minSize)) {
+  const { minFileSize } = part.limits;
+  if (minFileSize != null && part.size < parseBytes(minFileSize)) {
     await discard(file2);
     throw errors_default.UPLOAD_TOO_SMALL({
       name: part.filename,
       size: String(part.size),
-      limit: String(minSize)
+      limit: String(minFileSize)
     });
   }
   addField(body, part.name, {
@@ -2749,8 +2747,8 @@ async function parseBody(input, contentType, dest, max = INF, length, signal) {
   let limits = {};
   if (dest && typeof dest === "object" && "bucket" in dest) {
     bucket2 = dest.bucket;
-    const { maxFileSize: maxFileSize2, maxTotalSize, maxFiles, minSize, fileType: fileType2 } = dest;
-    limits = { maxFileSize: maxFileSize2, maxTotalSize, maxFiles, minSize, fileType: fileType2 };
+    const { maxFileSize: maxFileSize2, maxTotalSize, maxFiles, minFileSize, fileType: fileType2 } = dest;
+    limits = { maxFileSize: maxFileSize2, maxTotalSize, maxFiles, minFileSize, fileType: fileType2 };
   } else {
     bucket2 = dest;
   }
@@ -2801,7 +2799,7 @@ var bodies = /* @__PURE__ */ new WeakMap();
 function setBody(ctx, body) {
   if (body) bodies.set(ctx, body);
 }
-async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
+async function resolveBody(ctx, mode = "auto", max = resolveMax(void 0)) {
   const stream = bodies.get(ctx);
   if (!stream) return void 0;
   const contentType = String(ctx.headers["content-type"] || "");
@@ -3103,7 +3101,7 @@ async function handleRequest(app, reqInfo) {
 }
 async function checkUploads(ctx) {
   const { uploads, parser } = ctx.options;
-  if (!uploads || parser !== "parse") return;
+  if (!uploads || parser === "raw" || parser === "stream") return;
   const { validate: validate2 } = uploads;
   if (!validate2) return;
   const kind = bodyKind(String(ctx.headers["content-type"] || ""));

@@ -41,24 +41,32 @@ const target = async (
 ): Promise<string> =>
   typeof where === "function" ? where(user, ctx) : (where ?? fallback);
 
-// Where a failed login lands, with the reason in the query string
+// Where a failed login lands. Only a code goes in the URL, never text: a
+// message there could leak internals, and anyone could link to the page with
+// one of their own. The app turns the code into words.
 const errorRedirect = async (
   redirects: RedirectTargets,
   ctx: Context,
-  message: string,
+  code: string,
 ) => {
   const to = await target(redirects.error, "/", null, ctx);
-  return redirect(`${to}?error=${encodeURIComponent(message)}`);
+  return redirect(`${to}${to.includes("?") ? "&" : "?"}error=${code}`);
 };
 
-// Only a deliberate refusal (an `onLogin` throw) reaches the visitor;
-// anything else could leak internals, so it is logged for the operator and
-// shown as a generic failure
-function failureMessage(error: any, name: string): string {
-  if (error?.expose) return (error as Error).message;
+const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+// A ServerError is a deliberate refusal and names its own code; anything else
+// is a failure (a bug, the provider down) and is logged for the operator
+function failureCode(error: any, name: string): string {
+  if (error instanceof ServerError && CODE.test(error.code)) return error.code;
   console.error(`[server:auth] ${name} callback failed:`, error);
-  return "Could not sign you in";
+  return "LOGIN_FAILED";
 }
+
+// The provider's own refusal is an OAuth error code, like `access_denied`.
+// Anything else in that parameter is not the provider's to say.
+const providerCode = (value: string) =>
+  /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value.toUpperCase() : "LOGIN_FAILED";
 
 // One-time use: the state is spent
 const spendState = (res: any) => {
@@ -90,7 +98,9 @@ const callbackRoute =
   ) =>
   async (ctx: Context) => {
     const query = ctx.url.query as Record<string, string>;
-    if (query.error) return errorRedirect(redirects, ctx, query.error);
+    if (query.error) {
+      return errorRedirect(redirects, ctx, providerCode(query.error));
+    }
 
     // Always, whatever the credential is. The callback is a browser
     // navigation under every strategy, so without this an attacker can
@@ -108,8 +118,8 @@ const callbackRoute =
       );
       return spendState(await finish(ctx, profile));
     } catch (error) {
-      const message = failureMessage(error, name);
-      return spendState(await errorRedirect(redirects, ctx, message));
+      const code = failureCode(error, name);
+      return spendState(await errorRedirect(redirects, ctx, code));
     }
   };
 

@@ -168,7 +168,7 @@ ServerError.extend({
   UPLOAD_TOO_SMALL: {
     status: 400,
     message: 'File "{name}" is too small ({size} bytes, minimum is {limit})',
-    hint: "Set or lower `uploads: { bucket, minSize: '1kb' }`.",
+    hint: "Set or lower `uploads: { bucket, minFileSize: '1kb' }`.",
   },
   UPLOAD_NOT_ALLOWED: {
     status: 403,

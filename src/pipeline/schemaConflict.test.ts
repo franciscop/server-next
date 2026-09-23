@@ -44,10 +44,10 @@ describe("parser/schema conflicts fail at boot", () => {
   });
 
   it("allows a route parser override alongside a global one", () => {
-    // The route says `parse`, so the schema is fine even with a raw default
+    // The route says `auto`, so the schema is fine even with a raw default
     const app = server({ parser: "raw" }).post(
       "/json",
-      { parser: "parse", body: schema },
+      { parser: "auto", body: schema },
       () => status(200),
     );
     expect(app).toBeDefined();

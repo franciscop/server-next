@@ -36,7 +36,7 @@ type LimitOptions = {
     maxFileSize?: number | string;
     maxTotalSize?: number | string;
     maxFiles?: number;
-    minSize?: number | string;
+    minFileSize?: number | string;
     fileType?: string[];
 };
 type UploadOptions = LimitOptions & {
@@ -335,7 +335,7 @@ type ContextTypes = {
     body?: any;
 };
 type Field<C, K extends keyof ContextTypes, Fallback> = K extends keyof C ? SchemaOutput<C[K], C[K]> : Fallback;
-type BodyMode = "parse" | "raw" | "stream";
+type Parser = "auto" | "raw" | "stream";
 type CacheOption = string | number | false;
 type RouteSchema = {
     tags?: string | string[];
@@ -344,7 +344,7 @@ type RouteSchema = {
 };
 type RouteOptions = {
     schema?: RouteSchema | false;
-    parser?: BodyMode;
+    parser?: Parser;
     body?: StandardSchemaV1<any, any>;
     query?: StandardSchemaV1<any, any>;
     params?: StandardSchemaV1<any, any>;
@@ -382,7 +382,7 @@ type Options<A = AuthOption> = {
     onResponse?: OnResponse;
     log?: LogLevel | boolean;
     security?: boolean | SecurityOptions;
-    parser?: BodyMode;
+    parser?: Parser;
     cache?: CacheOption;
 };
 type Settings = {
@@ -405,7 +405,7 @@ type Settings = {
     onResponse?: OnResponse;
     log: Logger;
     security: SecuritySettings;
-    parser: BodyMode;
+    parser: Parser;
     cache?: CacheOption;
 };
 type Platform = {
@@ -611,4 +611,4 @@ declare function server<U>(options: Omit<Options, "auth"> & {
 }>;
 declare function server<C extends ContextTypes = {}>(options?: Options): Server<C>;
 
-export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type BodyMode, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadValidate, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type Parser, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadValidate, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
