@@ -196,7 +196,7 @@
 <section class="hero">
   <div>
     <div style="display: flex; align-items: center; gap: 20px">
-      <h1>Server Next</h1>
+      <h1>Server JS</h1>
       <a
         href="https://github.com/franciscop/server-next/actions"
         style="display: flex"
@@ -379,14 +379,15 @@ export default server()
     >
   </div>
   <div>
-    <pre><code class="language-js">// Sign in at /auth/login/github. No database, no store,
+    <pre><code class="language-js">import server, { json } from "@server/next";
+
+// Sign in at /auth/login/github. No database, no store,
 // no callbacks: the profile is signed into the cookie.
 export default server({ auth: "cookie:github" })
-  .get("/me", ctx =&gt; ctx.user || 401)
-  .get("/users", ctx =&gt; {
+  .get("/me", ctx =&gt; {
     if (!ctx.user) return 401;
     if (ctx.user.email !== "...") return 403;
-    return Users.list();
+    return json(ctx.user);
   });</code></pre>
   </div>
 </section>
@@ -432,10 +433,10 @@ export default server({ auth: "cookie:github" })
   </div>
   <div>
     <pre><code class="language-js">export default server()
-  .get("/", () =&gt; (
+  .get("/:name", ctx =&gt; (
     &lt;html lang="en"&gt;
       &lt;body&gt;
-        &lt;h1&gt;Hello {name}&lt;/h1&gt;
+        &lt;h1&gt;Hello {ctx.url.params.name}&lt;/h1&gt;
       &lt;/body&gt;
     &lt;/html&gt;
   ));</code></pre>
@@ -486,7 +487,7 @@ export default server()
   // ctx.url.params.name is a string
   .get("/user/:name", ...)
   // ctx.url.params.id is a number
-  .get("/user/:id(number)", ...)
+  .get("/books/:id(number)", ...)
   // ctx.url.params.cId is optional
   .get("/books/:id/comments/:cId?", ...);</code></pre>
   </div>
@@ -508,10 +509,16 @@ export default server()
     >
   </div>
   <div>
-    <pre><code class="language-js">export default server()
-  .get("/gh/*", ctx =&gt;
-    fetch(`https://api.github.com${ctx.url.pathname.slice(3)}`)
-  );</code></pre>
+    <pre><code class="language-js">const headers = {
+  authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+};
+
+// Same path as GitHub's, and the token stays server-side
+export default server()
+  .get("/users/:user/repos", ctx =&gt; fetch(
+    `https://api.github.com${ctx.url.pathname}`,
+    { headers },
+  ));</code></pre>
   </div>
 </section>
 
@@ -545,7 +552,7 @@ export default server()
       handler.
     </p>
     <p>
-      Server.js infers the response, content type and headers, so handlers just
+      Server JS infers the response, content type and headers, so handlers just
       return data.
     </p>
     <a class="button ghost" href="/documentation/reply">Read more &rarr;</a>

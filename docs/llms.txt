@@ -1,4 +1,4 @@
-# Server.js (`@server/next`)
+# Server JS (`@server/next`)
 
 > HTTP server for Node, Bun, Cloudflare Workers and Netlify. One default
 > export, a chainable router, and a `ctx` object. Handlers return values, not
