@@ -53,6 +53,49 @@ export type PathToParams<Path extends string> = ParamsToObject<
   ExtractPathParams<Path>
 >;
 
+// One segment of a route pattern, parsed from its text once
+type Segment = {
+  text: string;
+  // The param name, without its `:`, `?` or `(type)`
+  key: string;
+  param: boolean;
+  optional: boolean;
+  type?: string;
+};
+
+type Compiled = { path: string; segments: Segment[]; wildcardTail: boolean };
+
+// Route patterns come from code, so there are only as many as there are
+// routes; each is parsed the first time it is matched and reused after that.
+const compiled = new Map<string, Compiled>();
+
+function compile(pattern: string): Compiled {
+  const cached = compiled.get(pattern);
+  if (cached) return cached;
+  const path = `/${pattern.replace(/^\//, "")}`.replace(/\/$/, "") || "/";
+  const segments = path
+    .split("/")
+    .slice(1)
+    .map((text) => ({
+      text,
+      key: text
+        .replace(/^:/, "")
+        .replace(/\?$/, "")
+        .replace(/\(\w*\)/, ""),
+      param: text.startsWith(":"),
+      optional: text.endsWith("?"),
+      type: text.match(/\((\w+)\)/)?.[1],
+    }));
+  const result = {
+    path,
+    segments,
+    // `/files/*` also takes every segment past its own end
+    wildcardTail: segments[segments.length - 1]?.text === "*",
+  };
+  compiled.set(pattern, result);
+  return result;
+}
+
 export default function pathPattern(
   pattern: string,
   path: string,
@@ -62,43 +105,36 @@ export default function pathPattern(
 ): Record<string, any> | null {
   if (pattern === "*" && path === "/") return {};
 
-  pattern = `/${pattern.replace(/^\//, "")}`;
-  pattern = pattern.replace(/\/$/, "") || "/";
+  const { path: normalized, segments, wildcardTail } = compile(pattern);
   path = path.replace(/\/$/, "") || "/";
-
-  if (pattern === path) return {};
+  if (normalized === path) return {};
 
   const params: Record<string, any> = {};
-  const pathParts = path
+  const parts = path
     .split("/")
     .slice(1)
     .map((u) => decodeURIComponent(u));
-  const pattParts = pattern.split("/").slice(1);
 
-  let allSame = true;
   // A cast that failed, held until we know this route is the one that matched:
   // a pattern we walk past on the way to another route must not refuse it.
   let invalid: { name: string; type: string; value: string } | null = null;
 
-  for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {
-    const patt = pattParts[i] || "";
-    const part = pathParts[i] || "";
-    const last = pattParts[pattParts.length - 1];
-    const key = patt
-      .replace(/^:/, "")
-      .replace(/\?$/, "")
-      .replace(/\(\w*\)/, "");
+  for (let i = 0; i < Math.max(parts.length, segments.length); i++) {
+    const segment = segments[i];
+    const text = segment?.text ?? "";
+    const part = parts[i] || "";
 
-    if (patt === part) continue;
-    if (patt.endsWith("?") && !part) continue;
+    if (text === part) continue;
+    if (segment?.optional && !part) continue;
 
-    if (patt.startsWith(":")) {
-      params[key] = part;
+    if (segment?.param) {
+      if (!part) return null;
+      params[segment.key] = part;
 
       // A typed parameter is cast here, and the route matched on shape alone,
       // so a value that cannot be cast is a 400 on this route rather than an
       // `undefined` the handler has to check for.
-      const type = patt.match(/\((\w+)\)/)?.[1];
+      const { type } = segment;
       if (type === "number" || type === "date") {
         const value = type === "number" ? Number(part) : new Date(part);
         const failed =
@@ -106,24 +142,23 @@ export default function pathPattern(
             ? Number.isNaN(value)
             : Number.isNaN((value as Date).getTime());
         if (failed) {
-          invalid ??= { name: key, type, value: part };
+          invalid ??= { name: segment.key, type, value: part };
           continue;
         }
-        params[key] = value;
+        params[segment.key] = value;
       }
       continue;
     }
 
-    if ((!patt && last === "*" && part) || (patt === "*" && part)) {
-      params["*"] = params["*"] || [];
-      params["*"].push(part);
+    if ((!text && wildcardTail && part) || (text === "*" && part)) {
+      params["*"] = [...(params["*"] ?? []), part];
       continue;
     }
 
-    allSame = false;
+    // This segment cannot match, so neither can the route
+    return null;
   }
 
-  if (!allSame) return null;
   if (invalid && cast) throw ServerError.INVALID_PARAM(invalid);
   return params;
 }

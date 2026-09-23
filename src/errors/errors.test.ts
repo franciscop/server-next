@@ -315,3 +315,18 @@ describe("the status an error claims", () => {
     expect(await res.text()).toBe("Server Error");
   });
 });
+
+// Values often come from the client (a URL segment, a filename), and
+// String.replace treats `$&` and `` $` `` in a replacement as patterns
+describe("message placeholders", () => {
+  it("insert a value literally, dollar signs and all", () => {
+    const error = ServerError.INVALID_PARAM({
+      name: "id",
+      type: "number",
+      value: "$&$`",
+    });
+    expect(error.message).toBe(
+      'Invalid parameter "id": expected number, got "$&$`"',
+    );
+  });
+});

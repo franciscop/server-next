@@ -1,9 +1,10 @@
 import server from "../index";
+import { Node } from "../context/handlers";
 
 // Regression for the Node adapter not wrapping its streaming write: when a
 // response body stream errors mid-flight, `iterate()` throws and the request
 // callback rejects (unhandled), and response.end() is never called so the
-// response hangs. Expected to FAIL until handlers.Node guards the stream write.
+// response hangs. Expected to FAIL until Node guards the stream write.
 describe("streaming response errors (Node adapter)", () => {
   it("does not hang or leave an unhandled rejection when a body stream errors", async () => {
     const port = 8788;
@@ -19,7 +20,7 @@ describe("streaming response errors (Node adapter)", () => {
           },
         }),
     );
-    const httpServer: any = await (app as any).node();
+    const httpServer: any = await Node(app);
 
     const rejections: unknown[] = [];
     const onRej = (e: unknown) => rejections.push(e);

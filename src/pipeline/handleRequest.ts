@@ -1,7 +1,8 @@
-import type { Context, Server } from "..";
+import type { Context, Route, Server, Settings } from "..";
 import { resolveUser } from "../auth";
 import { resolveBody } from "../body/body";
-import { storesFiles } from "../body/parseBody";
+import bodyKind from "../body/bodyKind";
+import createContext, { type ContextParts } from "../context/createContext";
 import isValidMethod from "../context/isValidMethod";
 import ServerError from "../errors";
 import { defaultOnError } from "../errors/render";
@@ -13,16 +14,19 @@ import { validateRequest, validateResponse } from "./validate";
 
 export default async function handleRequest(
   app: Server,
-  ctx: Context,
-): Promise<Response | undefined> {
+  reqInfo: ContextParts,
+): Promise<Response> {
+  const ctx = createContext(app, reqInfo);
   let res = await getResponse(app, ctx);
+  // Nobody is left to read it, so there is nothing to finalize, hook or log
+  if (ctx.signal.aborted) return res;
   // One exit for every response, routes and onError output alike: CORS,
   // security headers, cache/ETag, credential clearing and Server-Timing.
-  if (res) res = await finalize(res, ctx);
+  res = await finalize(res, ctx);
   // The one "after the response" position (linear middleware has none): a hook
   // over every finalized HTTP response, routes, static, 404s, onError output.
   // Return a Response to replace it (sent verbatim), or nothing to leave it as is.
-  if (res && ctx.options.onResponse) {
+  if (ctx.options.onResponse) {
     try {
       const replaced = await ctx.options.onResponse(res, ctx);
       if (replaced) res = replaced; // a returned Response replaces; nothing keeps it
@@ -33,9 +37,9 @@ export default async function handleRequest(
     }
   }
   // Log the request once the final response is known (no-op unless `log` is on)
-  if (res) ctx.options.log.request(ctx, res);
+  ctx.options.log.request(ctx, res);
   // HEAD keeps the headers (type, cache, ETag...) and drops the body
-  if (res?.body && ctx.method === "head") {
+  if (res.body && ctx.method === "head") {
     res.body.cancel().catch(() => {});
     res = new Response(null, { status: res.status, headers: res.headers });
   }
@@ -50,24 +54,37 @@ async function checkUploads(ctx: Context): Promise<void> {
   if (!uploads || parser !== "parse") return;
   const { validate } = uploads;
   if (!validate) return;
-  if (!storesFiles(String(ctx.headers["content-type"] || ""))) return;
+  // Only the kinds that can become stored files: multipart parts, or the
+  // whole raw body as one file
+  const kind = bodyKind(String(ctx.headers["content-type"] || ""));
+  if (kind !== "multipart" && kind !== "file") return;
   if ((await validate(ctx)) === false) {
     throw ServerError.UPLOAD_NOT_ALLOWED();
   }
 }
 
-async function getResponse(
-  app: Server,
-  ctx: Context,
-): Promise<Response | undefined> {
+// The settings a route may set for itself, over the global ones (local wins).
+// The route's schemas stay on route.options, so ctx.options carries what its
+// Settings type says and nothing else.
+const ROUTE_SETTINGS = ["parser", "cache", "uploads"] as const;
+
+function settingsFor(app: Server, route: Route): Settings {
+  const local = ROUTE_SETTINGS.filter(
+    (key) => route.options[key] !== undefined,
+  );
+  if (!local.length) return app.settings;
+  const merged = { ...app.settings };
+  for (const key of local) Object.assign(merged, { [key]: route.options[key] });
+  return merged;
+}
+
+async function getResponse(app: Server, ctx: Context): Promise<Response> {
   try {
     // Checked here, not in the context builders, so the 405 goes through
     // onError and finalize (CORS headers included) like any other error
     if (!isValidMethod(ctx.method)) {
       throw ServerError.METHOD_NOT_ALLOWED({ method: ctx.method });
     }
-
-    let matched = false;
 
     // HEAD is GET without the body (RFC 9110 requires supporting both): an
     // explicit .head() route wins, then GET routes answer with the body
@@ -77,92 +94,62 @@ async function getResponse(
         ? [...app.handlers.head, ...app.handlers.get]
         : app.handlers[ctx.method];
 
-    // 1. Find the matching route. Its `fns` already include the middleware that
-    //    were registered before it, so we just run the list in order.
-    for (const route of routes) {
-      const params = pathPattern(route.path, ctx.url.pathname || "/");
+    // The first route whose path matches wins; its `fns` already include the
+    // middleware registered before it, so the list just runs in order.
+    let route: Route | undefined;
+    for (const candidate of routes) {
+      const params = pathPattern(candidate.path, ctx.url.pathname || "/");
       if (!params) continue;
-      matched = true;
+      route = candidate;
       define(ctx.url, "params", () => params);
-
-      // The per-route settings, merged over the global ones (local wins).
-      // Only real settings: the route's schemas stay on route.options, so
-      // ctx.options carries what its Settings type says and nothing else.
-      const { parser, cache, uploads } = route.options;
-      if (
-        parser !== undefined ||
-        cache !== undefined ||
-        uploads !== undefined
-      ) {
-        ctx.options = { ...app.settings };
-        if (parser !== undefined) ctx.options.parser = parser;
-        if (cache !== undefined) ctx.options.cache = cache;
-        if (uploads !== undefined) ctx.options.uploads = uploads;
-      }
-
+      ctx.options = settingsFor(app, route);
       // Reject '../' in params before any handler (or body) touches them
       checkTraversal(params, ctx);
-
       // Who is asking, before what they sent: a route that stores uploads can
       // then be refused without a byte reaching the bucket.
       await resolveUser(app, ctx);
-
       // The one place a request can be refused before its files exist, since
       // `.use()` middleware only run once the body has been read.
       await checkUploads(ctx);
-
-      // Now that the route (and its `parser` mode) is known, read the body
-      // once. A `stream` route gets the unread stream; everything else in
-      // `fns` runs after this, so middleware of your own see a read body.
-      ctx.body = await resolveBody(
-        ctx,
-        ctx.options.parser,
-        ctx.options.security.maxBodySize,
-      );
-
-      // Run the route's schemas (body/query/params) before any of its fns, so
-      // even the middleware only ever see validated, typed values.
-      await validateRequest(ctx, route.options);
-
-      for (const cb of route.fns) {
-        const res = await cb(ctx);
-        // A plain object/array return is the JSON payload the `response`
-        // schema describes, so it's checked here before being serialized.
-        const out = await parseResponse(
-          await validateResponse(res, route.options),
-          ctx,
-        );
-        if (out) return out;
-      }
-
-      // A method matched; do not fall through to other routes
       break;
     }
 
-    // 2. No route matched: run the global middleware (this is how static files
-    //    via `assets` answer requests that are not routes).
-    if (!matched) {
-      ctx.body = await resolveBody(
-        ctx,
-        ctx.options.parser,
-        ctx.options.security.maxBodySize,
-      );
+    // Now that the route (and its `parser` mode) is known, read the body once.
+    // A `stream` route gets the unread stream; every middleware runs after
+    // this, so they all see a read body.
+    ctx.body = await resolveBody(
+      ctx,
+      ctx.options.parser,
+      ctx.options.security.maxBodySize,
+    );
+
+    if (route) {
+      // The route's schemas run before any of its fns, so even the middleware
+      // only ever see validated, typed values.
+      await validateRequest(ctx, route.options);
+      for (const cb of route.fns) {
+        // A plain object/array return is the JSON payload the `response`
+        // schema describes, so it's checked before being serialized.
+        const res = await validateResponse(await cb(ctx), route.options);
+        const out = await parseResponse(res, ctx);
+        if (out) return out;
+      }
+    } else {
+      // No route matched: the global middleware answer (this is how static
+      // files via `assets` answer requests that are not routes)
       for (const mw of app.middleware) {
         const out = await parseResponse(await mw(ctx), ctx);
         if (out) return out;
       }
     }
 
-    // In Netlify, a non-response passes through to the original resource
-    if (ctx.platform.provider === "netlify") return;
-
-    // In other environments, a non-response is wrong and we should 404 then
     throw ServerError.NOT_FOUND();
   } catch (error) {
     // A disconnect cancels whatever was in flight, so what it threw (an
     // AbortError from a fetch, a killed query) is a consequence of leaving,
     // not a fault to render for someone who is no longer listening.
-    if (ctx.signal.aborted) return;
+    // 499 is "client closed request": never sent, only a valid Response
+    if (ctx.signal.aborted) return new Response(null, { status: 499 });
     // The error response goes through the same finalize() as everything else
     return runOnError(error, ctx);
   }

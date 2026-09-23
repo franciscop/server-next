@@ -53,11 +53,7 @@ function isProbablyText(buffer: Buffer): boolean {
 // A repeated field name collects its values into an array, whether they are text
 // fields (e.g. checkboxes) or files (e.g. a gallery). The first value is kept as
 // a scalar; a second occurrence turns it into an array.
-export function addField(
-  body: Record<string, any>,
-  name: string,
-  value: any,
-): void {
+function addField(body: Record<string, any>, name: string, value: any): void {
   if (body[name] === undefined) {
     body[name] = value;
     return;

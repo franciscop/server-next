@@ -6,19 +6,14 @@ var ServerError = class _ServerError extends Error {
   status;
   hint;
   constructor(code, status2, message, vars = {}) {
-    let messageStr;
-    if (typeof message === "function") {
-      messageStr = message(vars);
-    } else {
-      messageStr = message;
-    }
+    let messageStr = message;
     if (typeof messageStr !== "string")
       throw Error(`Invalid error ${messageStr}`);
     for (const key in vars) {
       let value = vars[key];
       value = Array.isArray(value) ? value.join(",") : value;
       const regex = new RegExp(`\\{${key}\\}`, "g");
-      messageStr = messageStr.replace(regex, value);
+      messageStr = messageStr.replace(regex, () => value);
     }
     super(messageStr);
     this.code = code;
@@ -713,14 +708,14 @@ function validateFile(originalName, contentType, limits, sniffed) {
     });
   }
   if (!fileType2 || fileType2.length === 0) return;
-  const base2 = (value) => value.split(";")[0].trim().toLowerCase();
-  const type2 = base2(contentType);
+  const base3 = (value) => value.split(";")[0].trim().toLowerCase();
+  const type2 = base3(contentType);
   const allowed = fileType2.some((one) => {
     const entry = one.trim().toLowerCase();
     if (entry.endsWith("/*")) return type2.startsWith(entry.slice(0, -1));
-    if (entry.includes("/")) return base2(entry) === type2;
+    if (entry.includes("/")) return base3(entry) === type2;
     const mapped = mimes_default[entry.replace(/^\./, "")];
-    return Boolean(mapped) && base2(mapped) === type2;
+    return Boolean(mapped) && base3(mapped) === type2;
   });
   if (!allowed) {
     throw errors_default.UPLOAD_TYPE_NOT_ALLOWED({
@@ -757,11 +752,6 @@ var Router = class _Router {
     delete: [],
     options: []
   };
-  // For the router we can just return itself since it's not the final export,
-  // but then on the root it'll return some fancy wrappers
-  self() {
-    return this;
-  }
   // Registers one route: bakes the current middleware + the route's own
   // functions into a single flat `fns` list. A plain options object may sit
   // between the path and the handlers, and it's pulled out here.
@@ -780,14 +770,14 @@ var Router = class _Router {
     if (options.uploads !== void 0) {
       options.uploads = resolveUploads(options.uploads);
     }
-    const base2 = method === "socket" ? [] : this.middleware;
-    const fns = [...base2, ...rest].filter((fn) => fn != null);
+    const base3 = method === "socket" ? [] : this.middleware;
+    const fns = [...base3, ...rest].filter((fn) => fn != null);
     this.handlers[method].push({
       path,
       options,
       fns
     });
-    return this.self();
+    return this;
   }
   socket(pathOrMid, optionsOrMid, ...middleware) {
     return this.handle("socket", pathOrMid, optionsOrMid, ...middleware);
@@ -819,11 +809,11 @@ var Router = class _Router {
         for (const m of Object.keys(arg.handlers)) {
           for (const route of arg.handlers[m]) {
             checkParserConflict(route.options, this.settings?.parser);
-            const base2 = m === "socket" ? [] : this.middleware;
+            const base3 = m === "socket" ? [] : this.middleware;
             this.handlers[m].push({
               path: route.path,
               options: route.options,
-              fns: [...base2, ...route.fns]
+              fns: [...base3, ...route.fns]
             });
           }
         }
@@ -831,7 +821,7 @@ var Router = class _Router {
         this.middleware.push(arg);
       }
     }
-    return this.self();
+    return this;
   }
 };
 function router() {
@@ -1100,12 +1090,12 @@ var passthrough = (options) => {
 var scopeOf = (options, fallback) => toArray(options.scope ?? fallback).join(" ");
 var callbackPath = (name) => `/auth/callback/${name}`;
 var callbackUrl = (ctx, name) => `${ctx.url.origin}${callbackPath(name)}`;
-var search = (base2, params) => {
+var search = (base3, params) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value) query.set(key, String(value));
   }
-  return `${base2}?${query}`;
+  return `${base3}?${query}`;
 };
 
 // src/auth/providers/antarctic.ts
@@ -1175,16 +1165,16 @@ function createId(size = 16) {
 var bare = (url) => url.replace(/\/+$/, "");
 var discovered = /* @__PURE__ */ new Map();
 function discover(issuer) {
-  const base2 = bare(issuer);
-  let doc = discovered.get(base2);
+  const base3 = bare(issuer);
+  let doc = discovered.get(base3);
   if (!doc) {
-    const url = `${base2}/.well-known/openid-configuration`;
+    const url = `${base3}/.well-known/openid-configuration`;
     doc = fetch(url).catch(() => null).then((r2) => {
       if (!r2?.ok) throw errors_default.AUTH_ISSUER_UNREACHABLE({ url });
       return r2.json();
     });
-    doc.catch(() => discovered.delete(base2));
-    discovered.set(base2, doc);
+    doc.catch(() => discovered.delete(base3));
+    discovered.set(base3, doc);
   }
   return doc;
 }
@@ -1801,6 +1791,65 @@ function resolveSecrets(option) {
   return list.length ? list : [`unsafe-${createId()}`];
 }
 
+// src/http/cors.ts
+var DEFAULT_METHODS = "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS";
+var csv = (value) => Array.isArray(value) ? value.join(",") : value;
+function resolveCors(option) {
+  if (!option) return void 0;
+  const settings = {
+    origin: "",
+    methods: DEFAULT_METHODS,
+    headers: "*"
+  };
+  if (option === true) {
+    settings.origin = true;
+  } else if (typeof option === "string" || Array.isArray(option)) {
+    settings.origin = csv(option);
+  } else if (typeof option === "object") {
+    settings.origin = option.origin ? csv(option.origin) : "*";
+    if ("methods" in option) settings.methods = csv(option.methods);
+    if ("headers" in option) settings.headers = csv(option.headers);
+    if (option.credentials) settings.credentials = true;
+  }
+  if (typeof settings.origin === "string") {
+    settings.origin = settings.origin.toLowerCase();
+  }
+  return settings;
+}
+var localhost = /^https?:\/\/localhost(:\d+)?$/;
+function cors(config2, origin = "") {
+  origin = origin?.toLowerCase();
+  if (config2 === true) return origin || null;
+  if (config2 === "*") return "*";
+  if (!origin) return null;
+  if (localhost.test(origin)) return origin;
+  const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
+  if (arr.includes(origin)) return origin;
+  console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
+  return null;
+}
+function applyCors(res, ctx) {
+  const settings = ctx.options.cors;
+  if (!settings) return;
+  const requestOrigin = ctx.headers.origin || "";
+  let origin = cors(settings.origin, requestOrigin);
+  if (!origin) return;
+  if (settings.credentials && origin === "*") {
+    if (!requestOrigin) return;
+    origin = requestOrigin.toLowerCase();
+  }
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Access-Control-Allow-Methods", settings.methods);
+  res.headers.set("Access-Control-Allow-Headers", settings.headers);
+  if (settings.credentials) {
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  if (origin !== "*") res.headers.append("Vary", "Origin");
+  if (ctx.method === "options") {
+    res.headers.set("Access-Control-Max-Age", "86400");
+  }
+}
+
 // src/errors/render.ts
 var DOCS = "https://server-js.com/documentation/errors";
 var wantsHtml = (ctx) => String(ctx?.headers?.accept || "").includes("text/html");
@@ -1876,9 +1925,7 @@ function announceDevelopment() {
     "[server:app] Running in development mode. Set NODE_ENV=production when you deploy."
   );
 }
-function config(options = {}) {
-  announceDevelopment();
-  const env2 = globalThis.env;
+function rejectMisplacedOptions(options) {
   const opts = options;
   if (typeof opts.body === "string") {
     throw new Error(
@@ -1903,84 +1950,32 @@ function config(options = {}) {
       "The `secret` option is now `secrets`, and takes one key or several: `secrets: [current, previous]` signs with the first and verifies with any, so rotating a key no longer signs everyone out."
     );
   }
-  if (env2.SECRET && !env2.SECRETS) {
+  if (env.SECRET && !env.SECRETS) {
     throw new Error(
       "The SECRET environment variable is now SECRETS, a comma-separated list. Rename it, or every token signed with the old key breaks."
     );
   }
-  const raw = options.log ?? env2.LOG_LEVEL;
-  const level = raw === true ? "info" : raw === false ? void 0 : raw;
-  const log = createLogger(level);
-  const settings = {
-    // `env.PORT` is a string, so coerce it: `settings.port` is a number
-    port: options.port || Number(env2.PORT) || 3e3,
-    secrets: resolveSecrets(options.secrets),
-    log,
-    // How request bodies are read: parsed into ctx.body by default; `raw` keeps
-    // the Buffer, `stream` hands the handler the unread web ReadableStream.
-    parser: options.parser ?? "parse",
-    // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
-    // the added headers off; see resolveSecurity for the defaults.
-    security: resolveSecurity(options.security)
-  };
-  if (options.cache !== void 0) settings.cache = options.cache;
-  options.cors = options.cors || env2.CORS || null;
-  if (options.cors) {
-    const cors2 = {
-      origin: "",
-      methods: "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
-      headers: "*"
-    };
-    if (options.cors === true) {
-      cors2.origin = true;
-    } else if (typeof options.cors === "string") {
-      cors2.origin = options.cors;
-    } else if (Array.isArray(options.cors)) {
-      cors2.origin = options.cors.join(",");
-    } else if (typeof options.cors === "object") {
-      if (!options.cors.origin) {
-        cors2.origin = "*";
-      } else if (typeof options.cors.origin === "string") {
-        cors2.origin = options.cors.origin;
-      } else if (Array.isArray(options.cors.origin)) {
-        cors2.origin = options.cors.origin.join(",");
-      }
-      if ("methods" in options.cors) {
-        cors2.methods = Array.isArray(options.cors.methods) ? options.cors.methods.join(",") : options.cors.methods;
-      }
-      if ("headers" in options.cors) {
-        cors2.headers = Array.isArray(options.cors.headers) ? options.cors.headers.join(",") : options.cors.headers;
-      }
-      if (options.cors.credentials) {
-        cors2.credentials = true;
-      }
-    }
-    if (typeof cors2.origin === "string") {
-      cors2.origin = cors2.origin.toLowerCase();
-    }
-    settings.cors = cors2;
-  }
-  const publicDir = options.public || env2.PUBLIC;
-  settings.public = publicDir ? bucket(publicDir) : null;
-  settings.uploads = resolveUploads(options.uploads);
-  if (options.auth || env2.AUTH) {
-    settings.auth = parseAuth(
-      options.auth || env2.AUTH || null
-    );
-  }
-  if (settings.auth?.name === "flow" && settings.secrets[0].startsWith("unsafe-")) {
-    const message = "Auth needs a stable secret: credentials are signed with it, and the random per-process fallback breaks them on restart and across instances. Set the SECRETS environment variable (or the `secrets` option).";
-    if (env2.NODE_ENV === "production") throw new Error(message);
-    console.warn(`[server:auth] ${message}`);
-  }
-  if (options.openapi) {
-    const o = options.openapi;
-    if (o === true) settings.openapi = { path: "/openapi.json" };
-    else if (typeof o === "string") settings.openapi = { path: o };
-    else settings.openapi = { path: "/openapi.json", ...o };
-  }
-  settings.onError = options.onError || defaultOnError;
-  settings.onResponse = options.onResponse;
+}
+function resolveLogLevel(raw) {
+  if (raw === true) return "info";
+  if (raw === false) return void 0;
+  return raw;
+}
+function resolveOpenapi(option) {
+  if (!option) return void 0;
+  if (option === true) return { path: "/openapi.json" };
+  if (typeof option === "string") return { path: option };
+  return { path: "/openapi.json", ...option };
+}
+function checkAuthSecret(settings) {
+  if (settings.auth?.name !== "flow") return;
+  if (!settings.secrets[0].startsWith("unsafe-")) return;
+  const message = "Auth needs a stable secret: credentials are signed with it, and the random per-process fallback breaks them on restart and across instances. Set the SECRETS environment variable (or the `secrets` option).";
+  if (env.NODE_ENV === "production") throw new Error(message);
+  console.warn(`[server:auth] ${message}`);
+}
+function logSummary(settings, options) {
+  const { log } = settings;
   const loc = (v) => typeof v === "string" ? v : "enabled";
   if (settings.auth) {
     const { name, providers: providers2 } = settings.auth;
@@ -1989,11 +1984,37 @@ function config(options = {}) {
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {
-    const origin = settings.cors.origin === true ? "*" : String(settings.cors.origin);
-    log.message("cors", origin);
+    const { origin } = settings.cors;
+    log.message("cors", origin === true ? "*" : String(origin));
   }
   if (settings.cache !== void 0) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path);
+}
+function config(options = {}) {
+  announceDevelopment();
+  rejectMisplacedOptions(options);
+  const publicDir = options.public || env.PUBLIC;
+  const auth2 = options.auth || env.AUTH;
+  const settings = {
+    // `env.PORT` is a string, so coerce it: `settings.port` is a number
+    port: options.port || Number(env.PORT) || 3e3,
+    secrets: resolveSecrets(options.secrets),
+    log: createLogger(resolveLogLevel(options.log ?? env.LOG_LEVEL)),
+    parser: options.parser ?? "parse",
+    security: resolveSecurity(options.security),
+    // Kept raw, resolved per request in applyCache, so a route can override it
+    cache: options.cache,
+    public: publicDir ? bucket(publicDir) : null,
+    uploads: resolveUploads(options.uploads),
+    cors: resolveCors(options.cors || env.CORS),
+    // The env string is validated (and rejected) inside parseAuth
+    auth: auth2 ? parseAuth(auth2) : void 0,
+    openapi: resolveOpenapi(options.openapi),
+    onError: options.onError || defaultOnError,
+    onResponse: options.onResponse
+  };
+  checkAuthSecret(settings);
+  logSummary(settings, options);
   return settings;
 }
 
@@ -2261,46 +2282,62 @@ var openapi_default = async (ctx) => {
 };
 
 // src/pipeline/pathPattern.ts
+var compiled = /* @__PURE__ */ new Map();
+function compile(pattern) {
+  const cached = compiled.get(pattern);
+  if (cached) return cached;
+  const path = `/${pattern.replace(/^\//, "")}`.replace(/\/$/, "") || "/";
+  const segments = path.split("/").slice(1).map((text) => ({
+    text,
+    key: text.replace(/^:/, "").replace(/\?$/, "").replace(/\(\w*\)/, ""),
+    param: text.startsWith(":"),
+    optional: text.endsWith("?"),
+    type: text.match(/\((\w+)\)/)?.[1]
+  }));
+  const result = {
+    path,
+    segments,
+    // `/files/*` also takes every segment past its own end
+    wildcardTail: segments[segments.length - 1]?.text === "*"
+  };
+  compiled.set(pattern, result);
+  return result;
+}
 function pathPattern(pattern, path, cast = true) {
   if (pattern === "*" && path === "/") return {};
-  pattern = `/${pattern.replace(/^\//, "")}`;
-  pattern = pattern.replace(/\/$/, "") || "/";
+  const { path: normalized, segments, wildcardTail } = compile(pattern);
   path = path.replace(/\/$/, "") || "/";
-  if (pattern === path) return {};
+  if (normalized === path) return {};
   const params = {};
-  const pathParts = path.split("/").slice(1).map((u) => decodeURIComponent(u));
-  const pattParts = pattern.split("/").slice(1);
-  let allSame = true;
+  const parts = path.split("/").slice(1).map((u) => decodeURIComponent(u));
   let invalid = null;
-  for (let i = 0; i < Math.max(pathParts.length, pattParts.length); i++) {
-    const patt = pattParts[i] || "";
-    const part = pathParts[i] || "";
-    const last = pattParts[pattParts.length - 1];
-    const key = patt.replace(/^:/, "").replace(/\?$/, "").replace(/\(\w*\)/, "");
-    if (patt === part) continue;
-    if (patt.endsWith("?") && !part) continue;
-    if (patt.startsWith(":")) {
-      params[key] = part;
-      const type2 = patt.match(/\((\w+)\)/)?.[1];
+  for (let i = 0; i < Math.max(parts.length, segments.length); i++) {
+    const segment = segments[i];
+    const text = segment?.text ?? "";
+    const part = parts[i] || "";
+    if (text === part) continue;
+    if (segment?.optional && !part) continue;
+    if (segment?.param) {
+      if (!part) return null;
+      params[segment.key] = part;
+      const { type: type2 } = segment;
       if (type2 === "number" || type2 === "date") {
         const value = type2 === "number" ? Number(part) : new Date(part);
         const failed = type2 === "number" ? Number.isNaN(value) : Number.isNaN(value.getTime());
         if (failed) {
-          invalid ??= { name: key, type: type2, value: part };
+          invalid ??= { name: segment.key, type: type2, value: part };
           continue;
         }
-        params[key] = value;
+        params[segment.key] = value;
       }
       continue;
     }
-    if (!patt && last === "*" && part || patt === "*" && part) {
-      params["*"] = params["*"] || [];
-      params["*"].push(part);
+    if (!text && wildcardTail && part || text === "*" && part) {
+      params["*"] = [...params["*"] ?? [], part];
       continue;
     }
-    allSame = false;
+    return null;
   }
-  if (!allSame) return null;
   if (invalid && cast) throw errors_default.INVALID_PARAM(invalid);
   return params;
 }
@@ -2344,6 +2381,18 @@ async function socketUser(app, headers2, cookies2) {
     app
   };
   return app.settings.auth.user(ctx);
+}
+
+// src/body/bodyKind.ts
+var base2 = (type2) => type2.split(";")[0].trim().toLowerCase();
+var JSON_TYPE = base2(mimes_default.json);
+function bodyKind(contentType) {
+  const type2 = base2(contentType || "");
+  if (!type2 || type2.startsWith("text/")) return "text";
+  if (type2 === "multipart/form-data") return "multipart";
+  if (type2 === "application/x-www-form-urlencoded") return "form";
+  if (type2 === JSON_TYPE || type2.endsWith("+json")) return "json";
+  return "file";
 }
 
 // src/body/bodyParts.ts
@@ -2674,14 +2723,6 @@ async function streamRawToBucket(stream, type2, bucket2, limits, signal) {
   await endPart(part, body);
   return part.size ? body.body : void 0;
 }
-function storesFiles(type2) {
-  if (!type2) return false;
-  if (/multipart\/form-data/i.test(type2)) return true;
-  if (/^text\//i.test(type2)) return false;
-  if (/^application\/([\w.+-]+\+)?json\b/i.test(type2)) return false;
-  if (/application\/x-www-form-urlencoded/i.test(type2)) return false;
-  return true;
-}
 async function parseBody(input, contentType, dest, max = INF, length, signal) {
   const type2 = Array.isArray(contentType) ? contentType[0] : contentType;
   let bucket2;
@@ -2693,7 +2734,8 @@ async function parseBody(input, contentType, dest, max = INF, length, signal) {
   } else {
     bucket2 = dest;
   }
-  if (type2 && /multipart\/form-data/i.test(type2)) {
+  const kind = bodyKind(type2);
+  if (kind === "multipart") {
     const boundary = getBoundary(type2);
     if (!boundary) throw errors_default.BODY_INVALID_MULTIPART();
     return parseMultipart(
@@ -2705,15 +2747,15 @@ async function parseBody(input, contentType, dest, max = INF, length, signal) {
       signal
     );
   }
-  if (!type2 || /^text\//i.test(type2)) {
+  if (kind === "text") {
     const buf = await toBuffer(input, max);
     return buf.length ? buf.toString("utf-8") : void 0;
   }
-  if (/^application\/([\w.+-]+\+)?json\b/i.test(type2)) {
+  if (kind === "json") {
     const buf = await toBuffer(input, max);
     return buf.length ? JSON.parse(buf.toString("utf-8")) : void 0;
   }
-  if (/application\/x-www-form-urlencoded/i.test(type2)) {
+  if (kind === "form") {
     const buf = await toBuffer(input, max);
     return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : void 0;
   }
@@ -2735,21 +2777,21 @@ async function parseBody(input, contentType, dest, max = INF, length, signal) {
 }
 
 // src/body/body.ts
-var sources = /* @__PURE__ */ new WeakMap();
-function setBodySource(ctx, source) {
-  sources.set(ctx, source);
+var bodies = /* @__PURE__ */ new WeakMap();
+function setBody(ctx, body) {
+  if (body) bodies.set(ctx, body);
 }
 async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
-  const source = sources.get(ctx);
-  if (!source) return void 0;
+  const stream = bodies.get(ctx);
+  if (!stream) return void 0;
   const contentType = String(ctx.headers["content-type"] || "");
-  const isMultipart = /multipart\/form-data/i.test(contentType);
+  const isMultipart = bodyKind(contentType) === "multipart";
   const declared = Number(ctx.headers["content-length"]);
   const trustDeclared = !isMultipart && !ctx.options.uploads;
   if (max !== INF && trustDeclared && declared > max) throw tooLarge(max);
-  if (mode === "stream") return source.getStream();
+  if (mode === "stream") return stream;
   if (mode === "raw") {
-    const raw = await source.getBuffer();
+    const raw = Buffer.from(await new Response(stream).arrayBuffer());
     if (raw.length > max) throw tooLarge(max);
     if (!raw.length) return void 0;
     if (!ctx.headers["content-length"]) {
@@ -2757,8 +2799,6 @@ async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
     }
     return raw;
   }
-  const stream = source.getStream();
-  if (!stream) return void 0;
   let size = 0;
   const counted = stream.pipeThrough(
     new TransformStream({
@@ -2782,19 +2822,52 @@ async function resolveBody(ctx, mode = "parse", max = resolveMax(void 0)) {
   return parsed;
 }
 
-// src/context/isValidMethod.ts
-var methods = [
-  "get",
-  "post",
-  "put",
-  "patch",
-  "delete",
-  "head",
-  "options",
-  "socket"
-];
-function isValidMethod(method) {
-  return methods.includes(method);
+// src/http/parseHeaders.ts
+var headerValue = (value) => (Array.isArray(value) ? value[0] : value) || "";
+var parseHeaders_default = (raw) => {
+  const headers2 = {};
+  raw.forEach((value, originalKey) => {
+    const key = originalKey.toLowerCase();
+    if (headers2[key]) {
+      if (!Array.isArray(headers2[key])) {
+        headers2[key] = [headers2[key]];
+      }
+      headers2[key].push(value);
+    } else {
+      headers2[key] = value;
+    }
+  });
+  return headers2;
+};
+
+// src/http/clientIp.ts
+var normalize = (ip = "") => ip.trim().toLowerCase().replace(/^\[(.+)\](:\d+)?$/, "$1").replace(/^::ffff:/, "").replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, "$1");
+var PRIVATE = /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
+var isPrivate = (raw) => {
+  const ip = normalize(raw);
+  if (!ip) return false;
+  if (PRIVATE.test(ip)) return true;
+  return ip === "::1" || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip);
+};
+function isTrusted(peer, trustProxy) {
+  return trustProxy === false ? false : isPrivate(peer);
+}
+function clientIp(headers2, opts = {}) {
+  const { remoteAddress = "", trustProxy = true, platformHeader } = opts;
+  const peer = normalize(remoteAddress);
+  if (!peer && platformHeader) {
+    const value = normalize(headerValue(headers2[platformHeader]));
+    if (value) return value;
+  }
+  if (!isTrusted(peer, trustProxy)) return peer;
+  if (typeof trustProxy === "string") {
+    return normalize(headerValue(headers2[trustProxy])) || peer;
+  }
+  const chain = headerValue(headers2["x-forwarded-for"]).split(",").map(normalize).filter(Boolean);
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (!isPrivate(chain[i])) return chain[i];
+  }
+  return peer;
 }
 
 // src/util/define.ts
@@ -2813,39 +2886,99 @@ function define(obj, key, cb) {
   });
 }
 
-// src/http/cors.ts
-var localhost = /^https?:\/\/localhost(:\d+)?$/;
-function cors(config2, origin = "") {
-  origin = origin?.toLowerCase();
-  if (config2 === true) return origin || null;
-  if (config2 === "*") return "*";
-  if (!origin) return null;
-  if (localhost.test(origin)) return origin;
-  const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
-  if (arr.includes(origin)) return origin;
-  console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
-  return null;
+// src/http/forwarded.ts
+var firstHop = (value) => headerValue(value).split(",")[0].trim() || void 0;
+function forwarded(url, headers2, trusted) {
+  if (!trusted) return;
+  const proto = firstHop(headers2["x-forwarded-proto"]);
+  if (proto === "http" || proto === "https") url.protocol = `${proto}:`;
+  const host = firstHop(headers2["x-forwarded-host"]);
+  const port = firstHop(headers2["x-forwarded-port"]);
+  if (host?.includes(":")) {
+    url.host = host;
+  } else if (host) {
+    url.hostname = host;
+    url.port = port ?? "";
+  } else if (port) {
+    url.port = port;
+  }
 }
-function applyCors(res, ctx) {
-  const settings = ctx.options.cors;
-  if (!settings) return;
-  const requestOrigin = ctx.headers.origin || "";
-  let origin = cors(settings.origin, requestOrigin);
-  if (!origin) return;
-  if (settings.credentials && origin === "*") {
-    if (!requestOrigin) return;
-    origin = requestOrigin.toLowerCase();
-  }
-  res.headers.set("Access-Control-Allow-Origin", origin);
-  res.headers.set("Access-Control-Allow-Methods", settings.methods);
-  res.headers.set("Access-Control-Allow-Headers", settings.headers);
-  if (settings.credentials) {
-    res.headers.set("Access-Control-Allow-Credentials", "true");
-  }
-  if (origin !== "*") res.headers.append("Vary", "Origin");
-  if (ctx.method === "options") {
-    res.headers.set("Access-Control-Max-Age", "86400");
-  }
+
+// src/http/parseCookies.ts
+function parseCookies(cookies2) {
+  if (!cookies2) return {};
+  const cookieStr = Array.isArray(cookies2) ? cookies2[0] : cookies2;
+  if (!cookieStr) return {};
+  return Object.fromEntries(
+    cookieStr.split(/;\s*/).map((part) => {
+      const [key, ...rest] = part.split("=");
+      const value = rest.join("=");
+      try {
+        return [key, decodeURIComponent(value)];
+      } catch {
+        return [key, value];
+      }
+    })
+  );
+}
+
+// src/context/createContext.ts
+var PLATFORM_IP = {
+  cloudflare: "cf-connecting-ip",
+  netlify: "x-nf-client-connection-ip"
+};
+function createContext(app, {
+  method: rawMethod,
+  headers: rawHeaders,
+  url: rawUrl,
+  signal,
+  remoteAddress,
+  body
+}) {
+  const init = performance.now();
+  const method = rawMethod?.toLowerCase() || "get";
+  const headers2 = parseHeaders_default(rawHeaders);
+  const cookies2 = parseCookies(headers2.cookie);
+  const url = new URL(rawUrl.replace(/\/$/, ""));
+  const { trustProxy } = app.settings.security;
+  const platformHeader = PLATFORM_IP[app.platform.provider ?? ""];
+  forwarded(url, headers2, isTrusted(normalize(remoteAddress), trustProxy));
+  define(
+    url,
+    "query",
+    (url2) => Object.fromEntries(url2.searchParams.entries())
+  );
+  const ctx = {
+    options: app.settings,
+    platform: app.platform,
+    url,
+    // Possibly not a real Method: handleRequest rejects it inside its boundary
+    method,
+    body: void 0,
+    headers: headers2,
+    cookies: cookies2,
+    signal,
+    init,
+    app,
+    ip: clientIp(headers2, { remoteAddress, trustProxy, platformHeader })
+  };
+  setBody(ctx, body);
+  return ctx;
+}
+
+// src/context/isValidMethod.ts
+var methods = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "socket"
+];
+function isValidMethod(method) {
+  return methods.includes(method);
 }
 
 // src/pipeline/parseResponse.ts
@@ -2924,10 +3057,12 @@ function replace2(target2, values) {
 }
 
 // src/pipeline/handleRequest.ts
-async function handleRequest(app, ctx) {
+async function handleRequest(app, reqInfo) {
+  const ctx = createContext(app, reqInfo);
   let res = await getResponse(app, ctx);
-  if (res) res = await finalize(res, ctx);
-  if (res && ctx.options.onResponse) {
+  if (ctx.signal.aborted) return res;
+  res = await finalize(res, ctx);
+  if (ctx.options.onResponse) {
     try {
       const replaced = await ctx.options.onResponse(res, ctx);
       if (replaced) res = replaced;
@@ -2935,8 +3070,8 @@ async function handleRequest(app, ctx) {
       res = await finalize(await runOnError(error, ctx), ctx);
     }
   }
-  if (res) ctx.options.log.request(ctx, res);
-  if (res?.body && ctx.method === "head") {
+  ctx.options.log.request(ctx, res);
+  if (res.body && ctx.method === "head") {
     res.body.cancel().catch(() => {
     });
     res = new Response(null, { status: res.status, headers: res.headers });
@@ -2948,64 +3083,61 @@ async function checkUploads(ctx) {
   if (!uploads || parser !== "parse") return;
   const { validate: validate2 } = uploads;
   if (!validate2) return;
-  if (!storesFiles(String(ctx.headers["content-type"] || ""))) return;
+  const kind = bodyKind(String(ctx.headers["content-type"] || ""));
+  if (kind !== "multipart" && kind !== "file") return;
   if (await validate2(ctx) === false) {
     throw errors_default.UPLOAD_NOT_ALLOWED();
   }
+}
+var ROUTE_SETTINGS = ["parser", "cache", "uploads"];
+function settingsFor(app, route) {
+  const local = ROUTE_SETTINGS.filter(
+    (key) => route.options[key] !== void 0
+  );
+  if (!local.length) return app.settings;
+  const merged = { ...app.settings };
+  for (const key of local) Object.assign(merged, { [key]: route.options[key] });
+  return merged;
 }
 async function getResponse(app, ctx) {
   try {
     if (!isValidMethod(ctx.method)) {
       throw errors_default.METHOD_NOT_ALLOWED({ method: ctx.method });
     }
-    let matched = false;
     const routes = ctx.method === "head" ? [...app.handlers.head, ...app.handlers.get] : app.handlers[ctx.method];
-    for (const route of routes) {
-      const params = pathPattern(route.path, ctx.url.pathname || "/");
+    let route;
+    for (const candidate of routes) {
+      const params = pathPattern(candidate.path, ctx.url.pathname || "/");
       if (!params) continue;
-      matched = true;
+      route = candidate;
       define(ctx.url, "params", () => params);
-      const { parser, cache: cache3, uploads } = route.options;
-      if (parser !== void 0 || cache3 !== void 0 || uploads !== void 0) {
-        ctx.options = { ...app.settings };
-        if (parser !== void 0) ctx.options.parser = parser;
-        if (cache3 !== void 0) ctx.options.cache = cache3;
-        if (uploads !== void 0) ctx.options.uploads = uploads;
-      }
+      ctx.options = settingsFor(app, route);
       checkTraversal(params, ctx);
       await resolveUser(app, ctx);
       await checkUploads(ctx);
-      ctx.body = await resolveBody(
-        ctx,
-        ctx.options.parser,
-        ctx.options.security.maxBodySize
-      );
-      await validateRequest(ctx, route.options);
-      for (const cb of route.fns) {
-        const res = await cb(ctx);
-        const out = await parseResponse(
-          await validateResponse(res, route.options),
-          ctx
-        );
-        if (out) return out;
-      }
       break;
     }
-    if (!matched) {
-      ctx.body = await resolveBody(
-        ctx,
-        ctx.options.parser,
-        ctx.options.security.maxBodySize
-      );
+    ctx.body = await resolveBody(
+      ctx,
+      ctx.options.parser,
+      ctx.options.security.maxBodySize
+    );
+    if (route) {
+      await validateRequest(ctx, route.options);
+      for (const cb of route.fns) {
+        const res = await validateResponse(await cb(ctx), route.options);
+        const out = await parseResponse(res, ctx);
+        if (out) return out;
+      }
+    } else {
       for (const mw of app.middleware) {
         const out = await parseResponse(await mw(ctx), ctx);
         if (out) return out;
       }
     }
-    if (ctx.platform.provider === "netlify") return;
     throw errors_default.NOT_FOUND();
   } catch (error) {
-    if (ctx.signal.aborted) return;
+    if (ctx.signal.aborted) return new Response(null, { status: 499 });
     return runOnError(error, ctx);
   }
 }
@@ -3021,41 +3153,6 @@ async function runOnError(error, ctx) {
   }
   return defaultOnError(error, ctx);
 }
-
-// src/http/parseCookies.ts
-function parseCookies(cookies2) {
-  if (!cookies2) return {};
-  const cookieStr = Array.isArray(cookies2) ? cookies2[0] : cookies2;
-  if (!cookieStr) return {};
-  return Object.fromEntries(
-    cookieStr.split(/;\s*/).map((part) => {
-      const [key, ...rest] = part.split("=");
-      const value = rest.join("=");
-      try {
-        return [key, decodeURIComponent(value)];
-      } catch {
-        return [key, value];
-      }
-    })
-  );
-}
-
-// src/http/parseHeaders.ts
-var parseHeaders_default = (raw) => {
-  const headers2 = {};
-  raw.forEach((value, originalKey) => {
-    const key = originalKey.toLowerCase();
-    if (headers2[key]) {
-      if (!Array.isArray(headers2[key])) {
-        headers2[key] = [headers2[key]];
-      }
-      headers2[key].push(value);
-    } else {
-      headers2[key] = value;
-    }
-  });
-  return headers2;
-};
 
 // src/context/writeResponse.ts
 async function writeResponse(out, response) {
@@ -3280,143 +3377,13 @@ Sec-WebSocket-Accept: ${accept}\r
   });
 }
 
-// src/http/clientIp.ts
-var first = (v) => (Array.isArray(v) ? v[0] : v) || "";
-var normalize = (ip = "") => ip.trim().toLowerCase().replace(/^\[(.+)\](:\d+)?$/, "$1").replace(/^::ffff:/, "").replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, "$1");
-var PRIVATE = /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
-var isPrivate = (raw) => {
-  const ip = normalize(raw);
-  if (!ip) return false;
-  if (PRIVATE.test(ip)) return true;
-  return ip === "::1" || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip);
-};
-function isTrusted(peer, trustProxy) {
-  return trustProxy === false ? false : isPrivate(peer);
-}
-function clientIp(headers2, opts = {}) {
-  const { remoteAddress = "", trustProxy = true, platformHeader } = opts;
-  const peer = normalize(remoteAddress);
-  if (!peer && platformHeader) {
-    const value = normalize(first(headers2[platformHeader]));
-    if (value) return value;
-  }
-  if (!isTrusted(peer, trustProxy)) return peer;
-  if (typeof trustProxy === "string") {
-    return normalize(first(headers2[trustProxy])) || peer;
-  }
-  const chain = first(headers2["x-forwarded-for"]).split(",").map(normalize).filter(Boolean);
-  for (let i = chain.length - 1; i >= 0; i--) {
-    if (!isPrivate(chain[i])) return chain[i];
-  }
-  return peer;
-}
-
-// src/http/forwarded.ts
-var first2 = (value) => {
-  const one = Array.isArray(value) ? value[0] : value;
-  return one?.split(",")[0].trim() || void 0;
-};
-function forwarded(url, headers2, trusted) {
-  if (!trusted) return;
-  const proto = first2(headers2["x-forwarded-proto"]);
-  if (proto === "http" || proto === "https") url.protocol = `${proto}:`;
-  const host = first2(headers2["x-forwarded-host"]);
-  const port = first2(headers2["x-forwarded-port"]);
-  if (host?.includes(":")) {
-    url.host = host;
-  } else if (host) {
-    url.hostname = host;
-    url.port = port ?? "";
-  } else if (port) {
-    url.port = port;
-  }
-}
-
-// src/context/create.ts
-var PLATFORM_IP = {
-  cloudflare: "cf-connecting-ip",
-  netlify: "x-nf-client-connection-ip"
-};
-function createContext(app, {
-  method: rawMethod,
-  headers: rawHeaders,
-  url: rawUrl,
-  signal,
-  remoteAddress,
-  source
-}) {
-  const init = performance.now();
-  const method = rawMethod?.toLowerCase() || "get";
-  const headers2 = parseHeaders_default(rawHeaders);
-  const cookies2 = parseCookies(headers2.cookie);
-  const url = new URL(rawUrl.replace(/\/$/, ""));
-  const { trustProxy } = app.settings.security;
-  const platformHeader = PLATFORM_IP[app.platform.provider ?? ""];
-  forwarded(url, headers2, isTrusted(normalize(remoteAddress), trustProxy));
-  define(
-    url,
-    "query",
-    (url2) => Object.fromEntries(url2.searchParams.entries())
-  );
-  const ctx = {
-    options: app.settings,
-    platform: app.platform,
-    url,
-    // Possibly not a real Method: handleRequest rejects it inside its boundary
-    method,
-    body: void 0,
-    headers: headers2,
-    cookies: cookies2,
-    signal,
-    init,
-    app,
-    ip: clientIp(headers2, { remoteAddress, trustProxy, platformHeader })
-  };
-  setBodySource(ctx, source);
-  return ctx;
-}
-
-// src/context/node.ts
-var chunkArray = (arr) => arr.length > 2 ? [[arr[0], arr[1]], ...chunkArray(arr.slice(2))] : [arr];
-async function createNode(req, app, signal = new AbortController().signal) {
-  const headers2 = new Headers(chunkArray(req.rawHeaders));
-  const scheme = req.socket?.encrypted ? "https" : "http";
-  const host = headers2.get("host") || `localhost:${app.settings.port}`;
-  return createContext(app, {
-    method: req.method || "get",
-    headers: headers2,
-    url: `${scheme}://${host}${req.url || "/"}`,
-    signal,
-    remoteAddress: req.socket.remoteAddress || "",
-    source: {
-      getBuffer: () => new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on("data", (chunk) => chunks.push(chunk)).on("end", () => resolve(Buffer.concat(chunks))).on("error", reject);
-      }),
-      // Normalize the node stream to the web ReadableStream every reader expects
-      getStream: () => toWeb(req)
-    }
-  });
-}
-
-// src/context/winter.ts
-async function createWinter(req, app, server2) {
-  return createContext(app, {
-    method: req.method,
-    headers: req.headers,
-    url: req.url,
-    signal: req.signal,
-    remoteAddress: server2?.requestIP?.(req)?.address || "",
-    source: {
-      // req.body is already a web ReadableStream, so no conversion is needed
-      getBuffer: async () => Buffer.from(await req.arrayBuffer()),
-      getStream: () => req.body ?? void 0
-    }
-  });
+// src/util/chunkArray.ts
+function chunkArray(arr) {
+  return arr.length >= 2 ? [[arr[0], arr[1]], ...chunkArray(arr.slice(2))] : [];
 }
 
 // src/context/handlers.ts
-var Winter = async (app, request, env2) => {
+var Fetchable = async (app, request, env2) => {
   if (env2?.upgrade) {
     const wantsWs = String(request.headers.get("upgrade") || "").toLowerCase() === "websocket";
     if (wantsWs) {
@@ -3428,14 +3395,25 @@ var Winter = async (app, request, env2) => {
       } catch {
         return new Response("Unauthorized", { status: 401 });
       }
-      if (env2.upgrade(request, { data: { user } })) return;
+      if (env2.upgrade(request, { data: { user } })) {
+        return new Response(null, { status: 101 });
+      }
     }
   }
-  const isRuntimeServer = typeof env2?.upgrade === "function" || typeof env2?.requestIP === "function";
-  if (env2 && !isRuntimeServer) Object.assign(globalThis.env, env2);
+  if (env2 && app.platform.provider === "cloudflare") {
+    Object.assign(globalThis.env, env2);
+  }
   try {
-    const ctx = await createWinter(request, app, env2);
-    return await handleRequest(app, ctx);
+    const reqInfo = {
+      method: request.method,
+      headers: request.headers,
+      url: request.url,
+      signal: request.signal,
+      // Bun passes its server here, which is where the socket IP comes from
+      remoteAddress: env2?.requestIP?.(request)?.address || "",
+      body: request.body
+    };
+    return await handleRequest(app, reqInfo);
   } catch {
     return new Response("Server Error", { status: 500 });
   }
@@ -3450,15 +3428,25 @@ var Node = async (app) => {
       });
       let out;
       try {
-        const ctx = await createNode(request, app, controller.signal);
-        out = await handleRequest(app, ctx);
+        const headers2 = new Headers(chunkArray(request.rawHeaders));
+        const tls = request.socket.encrypted;
+        const host = headers2.get("host") || `localhost:${app.settings.port}`;
+        const reqInfo = {
+          method: request.method || "get",
+          headers: headers2,
+          url: `${tls ? "https" : "http"}://${host}${request.url || "/"}`,
+          signal: controller.signal,
+          remoteAddress: request.socket.remoteAddress || "",
+          // Pull-based, so nothing leaves the socket until resolveBody reads it
+          body: ReadableStream.from(request)
+        };
+        out = await handleRequest(app, reqInfo);
       } catch {
         response.writeHead(500);
         response.end("Server Error");
         return;
       }
-      if (out) await writeResponse(out, response);
-      else if (!response.destroyed) response.destroy();
+      await writeResponse(out, response);
     }
   );
   await attachWebsocket(server2, app);
@@ -3466,14 +3454,6 @@ var Node = async (app) => {
     app.settings.log.start(`http://localhost:${app.settings.port}/`);
   });
   return server2;
-};
-var Netlify = async (app, request, _context) => {
-  try {
-    const ctx = await createWinter(request, app);
-    return await handleRequest(app, ctx);
-  } catch {
-    return new Response("Server Error", { status: 500 });
-  }
 };
 
 // src/ServerTest.ts
@@ -3538,7 +3518,7 @@ function ServerTest(app) {
       // be behind a real proxy.
       { requestIP: () => ({ address: "127.0.0.1" }) }
     );
-    if (res) keep(res);
+    keep(res);
     return res;
   };
   return {
@@ -3574,7 +3554,7 @@ var Server = class extends Router {
     this.sockets = [];
     this.websocket = createWebsocket(this.sockets, this.handlers);
     if (this.platform.runtime === "node") {
-      this.node().catch((error) => console.error("[server:start]", error));
+      Node(this).catch((error) => console.error("[server:start]", error));
     } else if (this.platform.runtime === "bun") {
       this.settings.log.start(`http://localhost:${this.settings.port}/`);
     }
@@ -3589,34 +3569,13 @@ var Server = class extends Router {
       app.get(this.settings.openapi.path, openapi_default);
     }
   }
-  self() {
-    const cb = this.callback.bind(this);
-    const proto = Object.getPrototypeOf(this);
-    const keys = Object.keys({ ...this.handlers, ...proto, ...this });
-    for (const key of ["use", "node", "fetch", "callback", "test", ...keys]) {
-      if (typeof this[key] === "function") {
-        cb[key] = this[key].bind(this);
-      } else {
-        cb[key] = this[key];
-      }
-    }
-    return cb;
-  }
-  node() {
-    return Node(this);
-  }
-  fetch(request, env2) {
-    return Winter(this, request, env2);
-  }
-  callback(request, context) {
-    return Netlify(this, request, context);
-  }
-  test() {
-    return ServerTest(this);
-  }
+  // Bound fields, not methods: a runtime that plucks the handler off the app
+  // (`const { fetch } = app`) still gets one that knows its server.
+  fetch = (req, env2) => Fetchable(this, req, env2);
+  test = () => ServerTest(this);
 };
 function server(options) {
-  return new Server(options).self();
+  return new Server(options);
 }
 export {
   Server,

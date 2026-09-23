@@ -1,8 +1,7 @@
+import { once } from "node:events";
 import fsp from "node:fs/promises";
-import { Readable } from "node:stream";
 import server, { status } from "../index";
-import createNode from "../context/node";
-import { resolveBody } from "./body";
+import { Node } from "../context/handlers";
 import { cleanupBuckets, realBucket } from "../tests/realBucket";
 
 afterAll(cleanupBuckets);
@@ -142,36 +141,55 @@ describe("body: stream", () => {
   });
 });
 
-// The web runtimes go through .test() above (createWinter). Drive the Node
-// builder directly with a mock IncomingMessage to prove ctx.body matches.
-describe("Node builder parity", () => {
-  const app = server();
+// The web runtimes go through .test() above (the Fetchable handler). The Node
+// adapter builds its body differently, so a real Node server proves ctx.body
+// comes out the same in every mode.
+describe("Node adapter parity", () => {
+  const port = 8796;
+  let http: any;
 
-  const mockReq = (body: string, contentType = "application/json") => {
-    const req = Readable.from([Buffer.from(body)]) as any;
-    req.method = "POST";
-    req.url = "/";
-    req.rawHeaders = ["content-type", contentType, "host", "localhost"];
-    req.socket = { remoteAddress: "127.0.0.1" };
-    return req;
+  beforeAll(async () => {
+    const app = server({ port, log: false })
+      .post("/parse", (ctx) => ctx.body)
+      .post("/raw", { parser: "raw" }, (ctx) => ({
+        isBuffer: Buffer.isBuffer(ctx.body),
+        text: String(ctx.body),
+      }))
+      .post("/stream", { parser: "stream" }, async (ctx) => ({
+        isStream: ctx.body instanceof ReadableStream,
+        text: await new Response(ctx.body as ReadableStream).text(),
+      }));
+    http = await Node(app);
+    if (!http.listening) await once(http, "listening");
+  });
+
+  afterAll(() => http?.close());
+
+  const post = async (path: string, body: string, type: string) => {
+    const res = await fetch(`http://localhost:${port}${path}`, {
+      method: "POST",
+      body,
+      headers: { "content-type": type },
+    });
+    return res.json();
   };
 
   it("parse → parsed object, like the web runtime", async () => {
-    const ctx = await createNode(mockReq(JSON.stringify({ a: 1 })), app as any);
-    expect(await resolveBody(ctx, "parse")).toEqual({ a: 1 });
+    const out = await post(
+      "/parse",
+      JSON.stringify({ a: 1 }),
+      "application/json",
+    );
+    expect(out).toEqual({ a: 1 });
   });
 
   it("raw → Buffer", async () => {
-    const ctx = await createNode(mockReq("hello", "text/plain"), app as any);
-    const out = await resolveBody(ctx, "raw");
-    expect(Buffer.isBuffer(out)).toBe(true);
-    expect((out as Buffer).toString()).toBe("hello");
+    const out = await post("/raw", "hello", "text/plain");
+    expect(out).toEqual({ isBuffer: true, text: "hello" });
   });
 
   it("stream → web ReadableStream", async () => {
-    const ctx = await createNode(mockReq("hi", "text/plain"), app as any);
-    const out = await resolveBody(ctx, "stream");
-    expect(out).toBeInstanceOf(ReadableStream);
-    expect(await new Response(out as ReadableStream).text()).toBe("hi");
+    const out = await post("/stream", "hi", "text/plain");
+    expect(out).toEqual({ isStream: true, text: "hi" });
   });
 });

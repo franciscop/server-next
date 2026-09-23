@@ -1,4 +1,3 @@
-import * as http from 'http';
 import { Readable } from 'node:stream';
 export { default as bucket } from 'bucket';
 
@@ -113,7 +112,6 @@ declare class Router<C extends ContextTypes = {}> {
     protected settings?: Settings;
     middleware: Middleware[];
     handlers: Record<Method, Route[]>;
-    self(): this;
     handle(method: Method, pathOrFn?: any, ...rest: any[]): this;
     socket<Path extends string>(path: Path, ...middleware: Mids<C, Path>): this;
     socket(...middleware: Fn<C>[]): this;
@@ -269,7 +267,7 @@ declare class ServerError extends Error {
     code: string;
     status: number;
     hint?: string;
-    constructor(code: string, status: number, message: string | ((vars: Variables) => string), vars?: Variables);
+    constructor(code: string, status: number, message: string, vars?: Variables);
     static extend(errors: Record<string, ExtendError>): Record<string, ExtendError>;
 }
 declare const TypedServerError: typeof ServerError & ServerErrorConstructor;
@@ -472,120 +470,117 @@ declare class Server<C extends ContextTypes = {}> extends Router<C> {
     websocket: any;
     port?: number;
     constructor(options?: Options);
-    self(): this;
-    node(): Promise<http.Server<typeof http.IncomingMessage, typeof http.ServerResponse>>;
-    fetch(request: Request, env?: BunEnv): Promise<Response>;
-    callback(request: Request, context: unknown): Promise<Response>;
-    test(): {
+    fetch: (req: Request, env?: BunEnv) => Promise<Response>;
+    test: () => {
         get: (path: string, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         head: (path: string, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         post: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         put: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         patch: (path: string, body?: string | number | boolean | ArrayBuffer | {
             [key: string]: SerializableValue;
         } | SerializableValue[] | ReadableStream<any> | Blob | ArrayBufferView<ArrayBuffer> | FormData | URLSearchParams, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         delete: (path: string, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         options: (path: string, options?: {
-            method?: string;
-            signal?: AbortSignal | null;
-            headers?: HeadersInit;
             cache?: RequestCache;
-            redirect?: RequestRedirect;
             credentials?: RequestCredentials;
+            headers?: HeadersInit;
             integrity?: string;
             keepalive?: boolean;
+            method?: string;
             mode?: RequestMode;
             priority?: RequestPriority;
+            redirect?: RequestRedirect;
             referrer?: string;
             referrerPolicy?: ReferrerPolicy;
+            signal?: AbortSignal | null;
             window?: null;
         }) => Promise<Response>;
         readonly cookies: {

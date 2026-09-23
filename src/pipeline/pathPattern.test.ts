@@ -127,3 +127,16 @@ describe("pathPattern.js", () => {
     });
   });
 });
+
+// `:id?` is the optional form; a plain `:id` needs a segment to capture
+describe("a required parameter", () => {
+  it("does not match a missing segment", () => {
+    expect(pathPattern("/users/:id", "/users")).toBe(null);
+    expect(pathPattern("/users/:id", "/users/")).toBe(null);
+    expect(pathPattern("/:name", "/")).toBe(null);
+  });
+
+  it("still matches when the segment is there", () => {
+    expect(pathPattern("/users/:id", "/users/7")).toEqual({ id: "7" });
+  });
+});

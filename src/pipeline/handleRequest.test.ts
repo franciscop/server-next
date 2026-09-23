@@ -19,13 +19,26 @@ describe("the second fetch argument", () => {
     expect(typeof (globalThis.env as any).upgrade).not.toBe("function");
   });
 
-  it("merges worker-style env vars", async () => {
+  it("merges env vars on Workers, the one runtime that passes them", async () => {
     const app = server({ log: false }).get("/", () => "hi");
+    app.platform.provider = "cloudflare";
     await app.fetch(new Request("http://localhost/"), {
       MY_TEST_VAR: "yes",
     } as any);
     expect(globalThis.env.MY_TEST_VAR).toBe("yes");
     delete (globalThis.env as any).MY_TEST_VAR;
+  });
+
+  // Netlify passes its request context in the same position: not env at all
+  it("ignores the second argument everywhere else", async () => {
+    const app = server({ log: false }).get("/", () => "hi");
+    app.platform.provider = "netlify";
+    await app.fetch(new Request("http://localhost/"), {
+      requestId: "abc",
+      geo: { city: "Tokyo" },
+    } as any);
+    expect((globalThis.env as any).requestId).toBeUndefined();
+    expect((globalThis.env as any).geo).toBeUndefined();
   });
 });
 

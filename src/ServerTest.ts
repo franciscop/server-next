@@ -30,7 +30,7 @@ const deletes = (attrs: string[]): boolean =>
 type NoBodyRequest = Omit<RequestInit, "body">;
 
 // A function that can be triggered for testing
-export default function ServerTest(app: Server) {
+export default function ServerTest(app: Server<any>) {
   const port = app.settings.port;
 
   // A cookie jar, so a login survives across calls the way it does in a
@@ -95,7 +95,7 @@ export default function ServerTest(app: Server) {
       // be behind a real proxy.
       { requestIP: () => ({ address: "127.0.0.1" }) } as any,
     );
-    if (res) keep(res);
+    keep(res);
     return res;
   };
 

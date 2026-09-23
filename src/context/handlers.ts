@@ -6,10 +6,13 @@ import parseCookies from "../http/parseCookies";
 import parseHeaders from "../http/parseHeaders";
 import writeResponse from "./writeResponse";
 import { attachWebsocket } from "../ws/wsNode";
-import createNode from "./node";
-import createWinter from "./winter";
+import chunkArray from "../util/chunkArray";
 
-export const Winter = async (app: Server, request: Request, env: BunEnv) => {
+export const Fetchable = async (
+  app: Server<any>,
+  request: Request,
+  env: BunEnv,
+): Promise<Response> => {
   // A WebSocket upgrade (Bun): resolve the auth user from the request and pass
   // it along as the socket's `data`, so handlers see it as `ctx.user`. Only
   // actual upgrade requests are handed to `env.upgrade`; everything else falls
@@ -29,20 +32,30 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
       } catch {
         return new Response("Unauthorized", { status: 401 });
       }
-      if (env.upgrade(request, { data: { user } })) return;
+      // Bun owns the socket from here and discards whatever is returned
+      if (env.upgrade(request, { data: { user } })) {
+        return new Response(null, { status: 101 });
+      }
     }
   }
-  // The 2nd fetch argument is the env vars on the worker runtimes, but on Bun
-  // it is the runtime's Server object (.requestIP/.upgrade). Only real env may
-  // be merged into the process env: copying Bun's server onto globalThis.env
-  // would pollute it with functions, once per request, forever.
-  const isRuntimeServer =
-    typeof env?.upgrade === "function" || typeof env?.requestIP === "function";
-  if (env && !isRuntimeServer) Object.assign(globalThis.env, env);
+  // Only Workers pass their env vars as the 2nd argument. Bun passes its
+  // Server there and Netlify its request context, and copying either onto
+  // globalThis.env would pollute it once per request, forever.
+  if (env && app.platform.provider === "cloudflare") {
+    Object.assign(globalThis.env, env);
+  }
 
   try {
-    const ctx = await createWinter(request, app, env);
-    return await handleRequest(app, ctx);
+    const reqInfo = {
+      method: request.method,
+      headers: request.headers,
+      url: request.url,
+      signal: request.signal,
+      // Bun passes its server here, which is where the socket IP comes from
+      remoteAddress: env?.requestIP?.(request)?.address || "",
+      body: request.body,
+    };
+    return await handleRequest(app, reqInfo);
   } catch {
     // Building the context itself failed (handleRequest catches its own
     // errors), so there is no ctx for onError: answer with a bare 500
@@ -51,7 +64,10 @@ export const Winter = async (app: Server, request: Request, env: BunEnv) => {
   }
 };
 
-export const Node = async (app: Server) => {
+// The DOM lib this project compiles against does not declare the static yet
+type StreamFrom = { from(source: AsyncIterable<Uint8Array>): ReadableStream };
+
+export const Node = async (app: Server<any>) => {
   const http = await import("node:http");
 
   const server = http.createServer(
@@ -63,10 +79,22 @@ export const Node = async (app: Server) => {
         if (!response.writableFinished) controller.abort();
       });
 
-      let out: Response | undefined;
+      let out: Response;
       try {
-        const ctx = await createNode(request, app, controller.signal);
-        out = await handleRequest(app, ctx);
+        const headers = new Headers(chunkArray(request.rawHeaders));
+        // This hop's scheme; forwarded() swaps in the visitor's behind a proxy
+        const tls = (request.socket as { encrypted?: boolean }).encrypted;
+        const host = headers.get("host") || `localhost:${app.settings.port}`;
+        const reqInfo = {
+          method: request.method || "get",
+          headers,
+          url: `${tls ? "https" : "http"}://${host}${request.url || "/"}`,
+          signal: controller.signal,
+          remoteAddress: request.socket.remoteAddress || "",
+          // Pull-based, so nothing leaves the socket until resolveBody reads it
+          body: (ReadableStream as unknown as StreamFrom).from(request),
+        };
+        out = await handleRequest(app, reqInfo);
       } catch {
         // Building the context itself failed (handleRequest catches its own
         // errors), so there is no ctx for onError: answer with a bare 500
@@ -76,9 +104,8 @@ export const Node = async (app: Server) => {
         return;
       }
 
-      // No response means the request was abandoned mid-flight
-      if (out) await writeResponse(out, response);
-      else if (!response.destroyed) response.destroy();
+      // An abandoned request's socket is already gone: writeResponse sees that
+      await writeResponse(out, response);
     },
   );
 
@@ -90,18 +117,4 @@ export const Node = async (app: Server) => {
   });
 
   return server;
-};
-
-export const Netlify = async (
-  app: Server,
-  request: Request,
-  // Netlify's own context object; unused, but the platform always passes it
-  _context: unknown,
-) => {
-  try {
-    const ctx = await createWinter(request, app);
-    return await handleRequest(app, ctx);
-  } catch {
-    return new Response("Server Error", { status: 500 });
-  }
 };

@@ -70,12 +70,6 @@ export class Router<C extends ContextTypes = {}> {
     options: [],
   };
 
-  // For the router we can just return itself since it's not the final export,
-  // but then on the root it'll return some fancy wrappers
-  self(): this {
-    return this;
-  }
-
   // Registers one route: bakes the current middleware + the route's own
   // functions into a single flat `fns` list. A plain options object may sit
   // between the path and the handlers, and it's pulled out here.
@@ -108,7 +102,7 @@ export class Router<C extends ContextTypes = {}> {
       options: options as Route["options"],
       fns,
     });
-    return this.self();
+    return this;
   }
 
   socket<Path extends string>(path: Path, ...middleware: Mids<C, Path>): this;
@@ -256,7 +250,7 @@ export class Router<C extends ContextTypes = {}> {
         this.middleware.push(arg);
       }
     }
-    return this.self();
+    return this;
   }
 }
 

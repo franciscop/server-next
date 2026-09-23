@@ -2,6 +2,7 @@ import ServerError from "../errors";
 import type { Bucket } from "..";
 import { INF, tooLarge } from "./bodyLimit";
 import { asIterable, endPart, feedPart, makeFilePart } from "./bodyParts";
+import bodyKind from "./bodyKind";
 import parseMultipart, { getBoundary } from "./multipart";
 import { parseBytes } from "../util/bytes";
 import type { LimitOptions } from "./upload";
@@ -85,19 +86,6 @@ async function streamRawToBucket(
   return part.size ? body.body : undefined;
 }
 
-// Whether a body of this type becomes stored files, so `validate` is only
-// asked about requests that would store some. Mirrors the dispatch in
-// parseBody below: multipart holds file parts, the buffered types never do,
-// and anything left over is Case B, the raw body as a single file.
-export function storesFiles(type?: string): boolean {
-  if (!type) return false;
-  if (/multipart\/form-data/i.test(type)) return true;
-  if (/^text\//i.test(type)) return false;
-  if (/^application\/([\w.+-]+\+)?json\b/i.test(type)) return false;
-  if (/application\/x-www-form-urlencoded/i.test(type)) return false;
-  return true;
-}
-
 // Turns a request body into `ctx.body`. Accepts a Buffer or a web ReadableStream
 // (the streaming modes pass the stream so files are never fully buffered; the
 // buffered call sites and tests pass a Buffer, which is wrapped as a one-chunk
@@ -123,10 +111,12 @@ export default async function parseBody(
     bucket = dest as Bucket | null | undefined | false;
   }
 
+  const kind = bodyKind(type);
+
   // Multipart (Case A): stream-parse, files go to the bucket as they arrive;
   // only the buffered text fields count against `max`.
-  if (type && /multipart\/form-data/i.test(type)) {
-    const boundary = getBoundary(type);
+  if (kind === "multipart") {
+    const boundary = getBoundary(type as string);
     // Malformed per RFC 2046, and it must not fall through: this content type
     // misses every branch below and the raw body would be stored as a file.
     if (!boundary) throw ServerError.BODY_INVALID_MULTIPART();
@@ -142,18 +132,15 @@ export default async function parseBody(
 
   // Types that need the whole body in hand to make sense of it: all buffered, so
   // all counted against `max`.
-  if (!type || /^text\//i.test(type)) {
+  if (kind === "text") {
     const buf = await toBuffer(input, max);
     return buf.length ? buf.toString("utf-8") : undefined;
   }
-  // RFC 6839: anything with a "+json" structured syntax suffix is JSON too
-  // (JSON:API, JSON-LD, RFC 7807), and the match is anchored so a type that
-  // merely contains the word is not treated as one.
-  if (/^application\/([\w.+-]+\+)?json\b/i.test(type)) {
+  if (kind === "json") {
     const buf = await toBuffer(input, max);
     return buf.length ? JSON.parse(buf.toString("utf-8")) : undefined;
   }
-  if (/application\/x-www-form-urlencoded/i.test(type)) {
+  if (kind === "form") {
     const buf = await toBuffer(input, max);
     return buf.length ? parseUrlEncoded(buf.toString("utf-8")) : undefined;
   }

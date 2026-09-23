@@ -1,6 +1,6 @@
-import { Readable } from "node:stream";
+import { once } from "node:events";
 import server from "../index";
-import createNode from "./node";
+import { Node } from "./handlers";
 
 describe("ctx.signal", () => {
   it("is an AbortSignal, not aborted on a normal request", async () => {
@@ -32,23 +32,30 @@ describe("ctx.signal", () => {
     expect(seen?.aborted).toBe(true);
   });
 
-  it("the Node builder carries the caller's signal", async () => {
-    const req = Readable.from([]) as any;
-    req.method = "GET";
-    req.url = "/";
-    req.rawHeaders = ["host", "localhost"];
-    req.socket = { remoteAddress: "127.0.0.1" };
+  // Node's request has no signal of its own: the adapter aborts ctx.signal
+  // when the socket closes before the response is done
+  it("aborts on Node when the client hangs up", async () => {
+    let seen: AbortSignal | undefined;
+    const port = 8795;
+    const app = server({ port, log: false }).get("/", async (ctx) => {
+      seen = ctx.signal;
+      await new Promise((done) => setTimeout(done, 200));
+      return "too late";
+    });
+    const http = await Node(app);
+    if (!http.listening) await once(http, "listening");
 
     const controller = new AbortController();
-    const ctx = await createNode(req, server() as any, controller.signal);
-    expect(ctx.signal.aborted).toBe(false);
+    const req = fetch(`http://localhost:${port}/`, {
+      signal: controller.signal,
+    }).catch(() => {});
+    await new Promise((done) => setTimeout(done, 50));
+    expect(seen?.aborted).toBe(false);
     controller.abort();
-    expect(ctx.signal.aborted).toBe(true);
-
-    // Without one it still exposes a (never-aborting) signal
-    const bare = await createNode(req, server() as any);
-    expect(bare.signal).toBeInstanceOf(AbortSignal);
-    expect(bare.signal.aborted).toBe(false);
+    await req;
+    await new Promise((done) => setTimeout(done, 50));
+    expect(seen?.aborted).toBe(true);
+    http.close();
   });
 });
 
@@ -79,10 +86,11 @@ describe("an abandoned request", () => {
     expect(calls).toBe(1);
 
     // ...and is dropped once they are not
+    // The response is only there to be a Response: nobody reads it
     const res = await app.fetch(
       new Request("http://localhost/boom", { signal: gone() }),
     );
-    expect(res).toBeUndefined();
+    expect(res?.status).toBe(499);
     expect(calls).toBe(1);
   });
 

@@ -1,4 +1,4 @@
-type Headers = Record<string, string | string[]>;
+import { type HeaderMap, headerValue } from "./parseHeaders";
 
 // A proxy that terminates TLS forwards plain HTTP, so the scheme and host on
 // the wire are not the ones the visitor used. These headers carry the
@@ -9,25 +9,23 @@ type Headers = Record<string, string | string[]>;
 // When proxies chain, each appends, so the value is a comma-separated list
 // oldest-first. The visitor's own hop is the leftmost one; trusting the last
 // would let an inner hop (or a client) claim whatever it likes.
-const first = (value: string | string[] | undefined): string | undefined => {
-  const one = Array.isArray(value) ? value[0] : value;
-  return one?.split(",")[0].trim() || undefined;
-};
+const firstHop = (value?: string | string[]): string | undefined =>
+  headerValue(value).split(",")[0].trim() || undefined;
 
 // Rewrites the origin of an already-built URL, leaving the path and query
 // exactly as they are.
 export default function forwarded(
   url: URL,
-  headers: Headers,
+  headers: HeaderMap,
   trusted: boolean,
 ): void {
   if (!trusted) return;
 
-  const proto = first(headers["x-forwarded-proto"]);
+  const proto = firstHop(headers["x-forwarded-proto"]);
   if (proto === "http" || proto === "https") url.protocol = `${proto}:`;
 
-  const host = first(headers["x-forwarded-host"]);
-  const port = first(headers["x-forwarded-port"]);
+  const host = firstHop(headers["x-forwarded-host"]);
+  const port = firstHop(headers["x-forwarded-port"]);
 
   if (host?.includes(":")) {
     // Carries its own port, which is the more specific value

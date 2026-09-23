@@ -14,9 +14,12 @@ export default server(options)
   .post('/users', (ctx) => db.users.create(ctx.body));
 ```
 
-The default export of your file is the server. Node runs it with `node index.js`,
-Bun with `bun index.js`; Workers and Netlify import it as their handler.
-https://server-js.com/documentation#getting-started
+The default export is the `Server` itself, a [Fetchable](https://fetchable.org/)
+object: runtimes read `fetch(request)` off it. Node runs the file with
+`node index.js`, Bun with `bun index.js`; Cloudflare Workers and Netlify
+Functions import it as their handler. Netlify Edge Functions are not supported
+(they require a plain function and have no top-level await).
+https://server-js.com/documentation#platforms
 
 ## Package exports
 
@@ -39,9 +42,7 @@ Types are exported too: `Context`, `Options`, `RouteOptions`, `Settings`,
 | Method | Description |
 |---|---|
 | `.test()` | In-memory client, no port. https://server-js.com/documentation/testing |
-| `.node()` | Force the Node adapter |
-| `.fetch(request, env?)` | Winter-style handler (Bun, Cloudflare Workers) |
-| `.callback(request, context)` | Netlify handler |
+| `.fetch(request, env?)` | The Fetchable entry point (Bun, Cloudflare Workers) |
 
 Plus every router method below.
 

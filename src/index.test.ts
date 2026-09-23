@@ -1,12 +1,16 @@
-import server, { status } from ".";
+import server, { Server, status } from ".";
 
 describe("exports", () => {
-  it("exports as a function", () => {
-    expect(typeof server()).toBe("function");
+  // The export is the app itself: an object carrying `fetch`, which is what
+  // every runtime reads, rather than a callable facade built over it
+  it("exports the server instance", () => {
+    expect(typeof server()).toBe("object");
+    expect(server()).toBeInstanceOf(Server);
   });
 
-  it("nested is also a function", () => {
-    expect(typeof server().get("/", () => {})).toBe("function");
+  it("chaining returns the same instance", () => {
+    const app = server();
+    expect(app.get("/", () => {})).toBe(app);
   });
 
   it("export has a fetch", () => {

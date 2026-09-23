@@ -6,7 +6,7 @@ import createWebsocket from "./ws/createWebsocket";
 import getMachine from "./boot/getMachine";
 import { assets, auth, openapi, preflight, timer } from "./middle";
 
-import * as handlers from "./context/handlers";
+import { Fetchable, Node } from "./context/handlers";
 import { Router } from "./router";
 import ServerTest from "./ServerTest";
 import type {
@@ -47,7 +47,7 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     if (this.platform.runtime === "node") {
       // A failed boot (port in use, bad listen) must surface; unawaited it
       // would vanish as an unhandled rejection out of the constructor
-      this.node().catch((error) => console.error("[server:start]", error));
+      Node(this).catch((error) => console.error("[server:start]", error));
     } else if (this.platform.runtime === "bun") {
       // Bun serves the `export default` itself, so there's no listen callback to
       // hook, so log the startup banner here, since the port is already known.
@@ -70,33 +70,10 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
     }
   }
 
-  self(): this {
-    const cb = this.callback.bind(this) as any;
-    const proto = Object.getPrototypeOf(this);
-    const keys = Object.keys({ ...this.handlers, ...proto, ...this });
-    for (const key of ["use", "node", "fetch", "callback", "test", ...keys]) {
-      if (typeof this[key] === "function") {
-        cb[key] = (this as any)[key].bind(this);
-      } else {
-        cb[key] = (this as any)[key];
-      }
-    }
-    return cb;
-  }
-
-  node() {
-    return handlers.Node(this as unknown as Server);
-  }
-  fetch(request: Request, env?: BunEnv) {
-    return handlers.Winter(this as unknown as Server, request, env);
-  }
-  callback(request: Request, context: unknown) {
-    return handlers.Netlify(this as unknown as Server, request, context);
-  }
-
-  test() {
-    return ServerTest(this as unknown as Server);
-  }
+  // Bound fields, not methods: a runtime that plucks the handler off the app
+  // (`const { fetch } = app`) still gets one that knows its server.
+  fetch = (req: Request, env?: BunEnv) => Fetchable(this, req, env);
+  test = () => ServerTest(this);
 }
 
 // `ctx.user` is whatever the configured `auth` produces, so an app never
@@ -120,7 +97,7 @@ export default function server<C extends ContextTypes = {}>(
   options?: Options,
 ): Server<C>;
 export default function server(options?: Options) {
-  return new Server(options).self();
+  return new Server(options);
 }
 
 export * from "./reply";

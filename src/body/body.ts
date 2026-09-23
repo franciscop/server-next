@@ -1,19 +1,15 @@
 import type { BodyMode, Context } from "../types";
 import { INF, resolveMax, tooLarge } from "./bodyLimit";
+import bodyKind from "./bodyKind";
 import parseBody from "./parseBody";
 
-// The runtime-specific way to read the request body, attached by each context
-// builder (node.ts / winter.ts) and consumed once by resolveBody. Kept off the
-// public Context type via a WeakMap so handlers only ever see ctx.body.
-export type BodySource = {
-  getBuffer: () => Promise<Buffer>;
-  getStream: () => ReadableStream | undefined;
-};
+// The request body as an unread web stream, attached by each runtime adapter
+// and consumed once by resolveBody. Kept off the public Context type via a
+// WeakMap so handlers only ever see ctx.body.
+const bodies = new WeakMap<Context, ReadableStream>();
 
-const sources = new WeakMap<Context, BodySource>();
-
-export function setBodySource(ctx: Context, source: BodySource): void {
-  sources.set(ctx, source);
+export function setBody(ctx: Context, body?: ReadableStream | null): void {
+  if (body) bodies.set(ctx, body);
 }
 
 // Read the body the way the resolved `parser` mode asks for it:
@@ -35,8 +31,8 @@ export async function resolveBody(
   mode: BodyMode = "parse",
   max: number = resolveMax(undefined),
 ): Promise<any> {
-  const source = sources.get(ctx);
-  if (!source) return undefined;
+  const stream = bodies.get(ctx);
+  if (!stream) return undefined;
 
   // Fast-fail on a declared-too-large body before reading it, but only when
   // Content-Length reflects the bytes we'll actually buffer. Multipart bodies
@@ -44,15 +40,15 @@ export async function resolveBody(
   // stream straight to `uploads`, so we skip the pre-check there and let the
   // per-buffer counter enforce the limit on the buffered portion.
   const contentType = String(ctx.headers["content-type"] || "");
-  const isMultipart = /multipart\/form-data/i.test(contentType);
+  const isMultipart = bodyKind(contentType) === "multipart";
   const declared = Number(ctx.headers["content-length"]);
   const trustDeclared = !isMultipart && !ctx.options.uploads;
   if (max !== INF && trustDeclared && declared > max) throw tooLarge(max);
 
-  if (mode === "stream") return source.getStream();
+  if (mode === "stream") return stream;
 
   if (mode === "raw") {
-    const raw = await source.getBuffer();
+    const raw = Buffer.from(await new Response(stream).arrayBuffer());
     if (raw.length > max) throw tooLarge(max);
     if (!raw.length) return undefined;
     // Reflect the real received size when the client didn't send Content-Length
@@ -65,9 +61,6 @@ export async function resolveBody(
 
   // parse: hand parseBody the stream so multipart and raw-file uploads are
   // written to `uploads` as they arrive instead of being buffered whole.
-  const stream = source.getStream();
-  if (!stream) return undefined;
-
   // Tally the bytes flowing past only to backfill Content-Length (for an
   // accurate request log) when the client didn't send it. The size *limit* is
   // enforced inside parseBody, where it can tell buffered bytes from file bytes.

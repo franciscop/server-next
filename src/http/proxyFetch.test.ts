@@ -1,4 +1,5 @@
 import server, { headers } from "../index";
+import { Node } from "../context/handlers";
 
 // Returning (or sending) the result of fetch() is the proxy pattern, and it
 // takes a branch of its own: a real fetch Response carries a `url`, so it is
@@ -11,9 +12,9 @@ describe("proxying a fetch() response", () => {
   let upstream: any;
 
   beforeAll(async () => {
-    upstream = await (
-      server({ port }).get("/data", () => ({ from: "upstream" })) as any
-    ).node();
+    upstream = await Node(
+      server({ port }).get("/data", () => ({ from: "upstream" })),
+    );
   });
 
   afterAll(() => upstream?.close());
@@ -41,14 +42,14 @@ describe("proxying a fetch() response", () => {
 
   it("drops a content-encoding fetch already decoded", async () => {
     const gzPort = 8792;
-    const gz = await (
+    const gz = await Node(
       server({ port: gzPort }).get("/gz", () => {
         const body = Bun.gzipSync(new TextEncoder().encode("compressed"));
         return new Response(body, {
           headers: { "content-encoding": "gzip", "content-type": "text/plain" },
         });
-      }) as any
-    ).node();
+      }),
+    );
     try {
       const api = server()
         .get("/proxy", () => fetch(`http://localhost:${gzPort}/gz`))

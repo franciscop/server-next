@@ -48,16 +48,10 @@ class ServerError extends Error {
   constructor(
     code: string,
     status: number,
-    message: string | ((vars: Variables) => string),
+    message: string,
     vars: Variables = {},
   ) {
-    let messageStr: string;
-    if (typeof message === "function") {
-      messageStr = message(vars);
-    } else {
-      messageStr = message;
-    }
-
+    let messageStr = message;
     if (typeof messageStr !== "string")
       throw Error(`Invalid error ${messageStr}`);
 
@@ -65,7 +59,7 @@ class ServerError extends Error {
       let value = vars[key];
       value = Array.isArray(value) ? value.join(",") : value;
       const regex = new RegExp(`\\{${key}\\}`, "g");
-      messageStr = messageStr.replace(regex, value);
+      messageStr = messageStr.replace(regex, () => value);
     }
 
     super(messageStr);

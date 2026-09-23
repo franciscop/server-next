@@ -1,9 +1,5 @@
+import { type HeaderMap, headerValue } from "./parseHeaders";
 import type { TrustProxy } from "./security";
-
-type Headers = Record<string, string | string[]>;
-
-const first = (v: string | string[] | undefined): string =>
-  (Array.isArray(v) ? v[0] : v) || "";
 
 // One address, comparable: no port, no brackets, no IPv4-mapped IPv6 prefix
 export const normalize = (ip: string = ""): string =>
@@ -20,7 +16,7 @@ export const normalize = (ip: string = ""): string =>
 const PRIVATE =
   /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
 
-export const isPrivate = (raw: string): boolean => {
+const isPrivate = (raw: string): boolean => {
   const ip = normalize(raw);
   if (!ip) return false;
   if (PRIVATE.test(ip)) return true;
@@ -39,7 +35,7 @@ export function isTrusted(peer: string, trustProxy: TrustProxy): boolean {
 // every hop appends, so the rightmost public entry is the last address our own
 // infrastructure saw: earlier entries are whatever the client chose to send.
 export default function clientIp(
-  headers: Headers,
+  headers: HeaderMap,
   opts: {
     remoteAddress?: string;
     trustProxy?: TrustProxy;
@@ -53,7 +49,7 @@ export default function clientIp(
   // only address there is. It is set by the edge, which is the only thing that
   // can reach us there.
   if (!peer && platformHeader) {
-    const value = normalize(first(headers[platformHeader]));
+    const value = normalize(headerValue(headers[platformHeader]));
     if (value) return value;
   }
 
@@ -62,10 +58,10 @@ export default function clientIp(
   // A CDN in front of your proxy: the chain's rightmost public hop is the
   // CDN's edge, so the visitor is whatever header the CDN writes instead.
   if (typeof trustProxy === "string") {
-    return normalize(first(headers[trustProxy])) || peer;
+    return normalize(headerValue(headers[trustProxy])) || peer;
   }
 
-  const chain = first(headers["x-forwarded-for"])
+  const chain = headerValue(headers["x-forwarded-for"])
     .split(",")
     .map(normalize)
     .filter(Boolean);

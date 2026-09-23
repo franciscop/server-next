@@ -1,6 +1,5 @@
 import type { Context, Server } from "..";
-import type { BodySource } from "../body/body";
-import { setBodySource } from "../body/body";
+import { setBody } from "../body/body";
 import clientIp, { isTrusted, normalize } from "../http/clientIp";
 import define from "../util/define";
 import forwarded from "../http/forwarded";
@@ -17,14 +16,15 @@ const PLATFORM_IP: Record<string, string> = {
 
 // The five things a runtime adapter must provide; everything else about
 // building a Context is shared and lives here.
-type ContextParts = {
+export type ContextParts = {
   method: string;
   headers: Headers;
   // Absolute URL, as the wire saw it; forwarded() rewrites it below
   url: string;
   signal: AbortSignal;
   remoteAddress: string;
-  source: BodySource;
+  // Unread; nothing may consume it before resolveBody does
+  body?: ReadableStream | null;
 };
 
 export default function createContext(
@@ -35,7 +35,7 @@ export default function createContext(
     url: rawUrl,
     signal,
     remoteAddress,
-    source,
+    body,
   }: ContextParts,
 ): Context {
   const init = performance.now();
@@ -76,6 +76,6 @@ export default function createContext(
   };
   // The body is not read yet: handleRequest resolves it once the route (and
   // its `parser` mode) is known, so a `stream` route never buffers
-  setBodySource(ctx, source);
+  setBody(ctx, body);
   return ctx;
 }

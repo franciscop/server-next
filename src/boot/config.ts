@@ -2,10 +2,11 @@ import parseAuth from "../auth/parse";
 import Bucket from "../body/bucket";
 import createLogger from "./logger";
 import { resolveSecrets } from "./secrets";
+import { resolveCors } from "../http/cors";
 import { resolveSecurity } from "../http/security";
 import { resolveUploads } from "../body/upload";
 
-import type { CorsSettings, LogLevel, Options, Settings } from "..";
+import type { LogLevel, Options, Settings } from "..";
 import { defaultOnError } from "../errors/render";
 
 // One line, once, so nobody ships a development build by accident. Skipped
@@ -22,12 +23,9 @@ function announceDevelopment(): void {
   );
 }
 
-export default function config(options: Options = {}): Settings {
-  announceDevelopment();
-  const env = globalThis.env;
-
-  // Schemas are per-route only, and the old root `body` mode is now `parser`;
-  // both mistakes fail loudly here instead of being silently ignored.
+// Options that were renamed, or that only exist per route, fail loudly here
+// instead of being silently ignored.
+function rejectMisplacedOptions(options: Options): void {
   const opts = options as Record<string, unknown>;
   if (typeof opts.body === "string") {
     throw new Error(
@@ -43,7 +41,7 @@ export default function config(options: Options = {}): Settings {
     }
   }
 
-  const sec = opts.security as any;
+  const sec = opts.security as Record<string, unknown> | undefined;
   if (sec && typeof sec === "object" && sec.maxBody !== undefined) {
     throw new Error(
       "The `security.maxBody` option is now `security.maxBodySize`, to sit " +
@@ -63,133 +61,41 @@ export default function config(options: Options = {}): Settings {
         "list. Rename it, or every token signed with the old key breaks.",
     );
   }
+}
 
-  // Logging: off by default (undefined); `info` (or the LOG_LEVEL env var) turns
-  // on the startup + request logs.
-  const raw = options.log ?? env.LOG_LEVEL;
-  const level: LogLevel | undefined =
-    raw === true
-      ? "info"
-      : raw === false
-        ? undefined
-        : (raw as LogLevel | undefined);
-  const log = createLogger(level);
+// Off by default; `true` or `'info'` (option or LOG_LEVEL) turns logging on
+function resolveLogLevel(raw: unknown): LogLevel | undefined {
+  if (raw === true) return "info";
+  if (raw === false) return undefined;
+  return raw as LogLevel | undefined;
+}
 
-  const settings: Settings = {
-    // `env.PORT` is a string, so coerce it: `settings.port` is a number
-    port: options.port || Number(env.PORT) || 3000,
-    secrets: resolveSecrets(options.secrets),
-    log,
-    // How request bodies are read: parsed into ctx.body by default; `raw` keeps
-    // the Buffer, `stream` hands the handler the unread web ReadableStream.
-    parser: options.parser ?? "parse",
-    // Secure-by-default response headers + trustProxy for ctx.ip. `false` turns
-    // the added headers off; see resolveSecurity for the defaults.
-    security: resolveSecurity(options.security),
-  };
+// The generated spec, served at its conventional path unless told otherwise
+function resolveOpenapi(option: Options["openapi"]): Settings["openapi"] {
+  if (!option) return undefined;
+  if (option === true) return { path: "/openapi.json" };
+  if (typeof option === "string") return { path: option };
+  return { path: "/openapi.json", ...option };
+}
 
-  // Response caching: a default Cache-Control for GET responses, plus auto-ETag.
-  // Kept raw (resolved per-request in applyCache) so a route's `cache` option can
-  // override it the same way `body` does. Off by default.
-  if (options.cache !== undefined) settings.cache = options.cache;
+// Every credential is signed with the first `secrets` entry. With none set, a
+// random `unsafe-` one is generated per process, which invalidates every
+// credential on restart and across instances: a warning in development, a
+// refusal in production.
+function checkAuthSecret(settings: Settings): void {
+  if (settings.auth?.name !== "flow") return;
+  if (!settings.secrets[0].startsWith("unsafe-")) return;
+  const message =
+    "Auth needs a stable secret: credentials are signed with it, and the " +
+    "random per-process fallback breaks them on restart and across " +
+    "instances. Set the SECRETS environment variable (or the `secrets` option).";
+  if (env.NODE_ENV === "production") throw new Error(message);
+  console.warn(`[server:auth] ${message}`);
+}
 
-  // CORS
-  options.cors = options.cors || env.CORS || null;
-  if (options.cors) {
-    const cors: CorsSettings = {
-      origin: "",
-      methods: "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS",
-      headers: "*",
-    };
-
-    // TODO: replace '*' for request url
-    if (options.cors === true) {
-      cors.origin = true;
-    } else if (typeof options.cors === "string") {
-      cors.origin = options.cors;
-    } else if (Array.isArray(options.cors)) {
-      cors.origin = options.cors.join(",");
-    } else if (typeof options.cors === "object") {
-      if (!options.cors.origin) {
-        // cors is defined {}, but no explicit origin
-        cors.origin = "*";
-      } else if (typeof options.cors.origin === "string") {
-        cors.origin = options.cors.origin;
-      } else if (Array.isArray(options.cors.origin)) {
-        cors.origin = options.cors.origin.join(",");
-      }
-
-      if ("methods" in options.cors) {
-        cors.methods = Array.isArray(options.cors.methods)
-          ? options.cors.methods.join(",")
-          : options.cors.methods;
-      }
-
-      if ("headers" in options.cors) {
-        cors.headers = Array.isArray(options.cors.headers)
-          ? options.cors.headers.join(",")
-          : options.cors.headers;
-      }
-
-      if (options.cors.credentials) {
-        cors.credentials = true;
-      }
-    }
-
-    if (typeof cors.origin === "string") {
-      cors.origin = cors.origin.toLowerCase();
-    }
-
-    settings.cors = cors;
-  }
-
-  // Bucket
-  const publicDir = options.public || env.PUBLIC;
-  settings.public = publicDir ? Bucket(publicDir) : null;
-  // uploads: every form resolves to the same shape, `{ bucket, maxFileSize,
-  // minSize, fileType }`, with the bucket resolved and undefined leaves meaning
-  // "no limit". Limits make parseBody buffer each file to check it before
-  // writing; without them files stream straight through.
-  settings.uploads = resolveUploads(options.uploads);
-
-  if (options.auth || env.AUTH) {
-    // The env string is validated (and rejected) inside parseAuthOptions
-    settings.auth = parseAuth(
-      options.auth || (env.AUTH as Options["auth"]) || null,
-    );
-  }
-
-  // Every credential is signed with the first `secrets` entry. With none set,
-  // config generates a random `unsafe-` one per process, which would
-  // invalidate every credential on restart and across instances: a warning in
-  // development, a refusal in production.
-  if (
-    settings.auth?.name === "flow" &&
-    settings.secrets[0].startsWith("unsafe-")
-  ) {
-    const message =
-      "Auth needs a stable secret: credentials are signed with it, and the " +
-      "random per-process fallback breaks them on restart and across " +
-      "instances. Set the SECRETS environment variable (or the `secrets` option).";
-    if (env.NODE_ENV === "production") throw new Error(message);
-    console.warn(`[server:auth] ${message}`);
-  }
-
-  // OpenAPI: the generated spec, served at its conventional path by default.
-  // There's no built-in viewer; the docs show the copy-paste shell for one.
-  if (options.openapi) {
-    const o = options.openapi;
-    if (o === true) settings.openapi = { path: "/openapi.json" };
-    else if (typeof o === "string") settings.openapi = { path: o };
-    else settings.openapi = { path: "/openapi.json", ...o };
-  }
-
-  settings.onError = options.onError || defaultOnError;
-
-  // Optional "after the response" hook; undefined simply means no hook.
-  settings.onResponse = options.onResponse;
-
-  // Startup summary: one concise line per configured module (only with `log`)
+// One concise line per configured module, only when logging is on
+function logSummary(settings: Settings, options: Options): void {
+  const { log } = settings;
   const loc = (v: unknown) => (typeof v === "string" ? v : "enabled");
   if (settings.auth) {
     const { name, providers } = settings.auth;
@@ -198,12 +104,39 @@ export default function config(options: Options = {}): Settings {
   if (settings.public) log.message("public", loc(options.public));
   if (settings.uploads) log.message("uploads", loc(options.uploads));
   if (settings.cors) {
-    const origin =
-      settings.cors.origin === true ? "*" : String(settings.cors.origin);
-    log.message("cors", origin);
+    const { origin } = settings.cors;
+    log.message("cors", origin === true ? "*" : String(origin));
   }
   if (settings.cache !== undefined) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path);
+}
 
+export default function config(options: Options = {}): Settings {
+  announceDevelopment();
+  rejectMisplacedOptions(options);
+
+  const publicDir = options.public || env.PUBLIC;
+  const auth = options.auth || env.AUTH;
+
+  const settings: Settings = {
+    // `env.PORT` is a string, so coerce it: `settings.port` is a number
+    port: options.port || Number(env.PORT) || 3000,
+    secrets: resolveSecrets(options.secrets),
+    log: createLogger(resolveLogLevel(options.log ?? env.LOG_LEVEL)),
+    parser: options.parser ?? "parse",
+    security: resolveSecurity(options.security),
+    // Kept raw, resolved per request in applyCache, so a route can override it
+    cache: options.cache,
+    public: publicDir ? Bucket(publicDir) : null,
+    uploads: resolveUploads(options.uploads),
+    cors: resolveCors(options.cors || env.CORS),
+    // The env string is validated (and rejected) inside parseAuth
+    auth: auth ? parseAuth(auth as Options["auth"]) : undefined,
+    openapi: resolveOpenapi(options.openapi),
+    onError: options.onError || defaultOnError,
+    onResponse: options.onResponse,
+  };
+  checkAuthSecret(settings);
+  logSummary(settings, options);
   return settings;
 }

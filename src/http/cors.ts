@@ -18,10 +18,44 @@ export type CorsOptions =
       credentials?: boolean;
     };
 
+const DEFAULT_METHODS = "GET,POST,PUT,DELETE,PATCH,HEAD,OPTIONS";
+const csv = (value: string | string[]): string =>
+  Array.isArray(value) ? value.join(",") : value;
+
+// Every accepted form of the `cors` option resolved into one shape: origins
+// as a lowercase CSV, or `true` to reflect the request's own origin.
+export function resolveCors(
+  option?: CorsOptions | null,
+): CorsSettings | undefined {
+  if (!option) return undefined;
+  const settings: CorsSettings = {
+    origin: "",
+    methods: DEFAULT_METHODS,
+    headers: "*",
+  };
+
+  if (option === true) {
+    settings.origin = true;
+  } else if (typeof option === "string" || Array.isArray(option)) {
+    settings.origin = csv(option);
+  } else if (typeof option === "object") {
+    // An object with no origin is still "CORS on", for every origin
+    settings.origin = option.origin ? csv(option.origin) : "*";
+    if ("methods" in option) settings.methods = csv(option.methods as string);
+    if ("headers" in option) settings.headers = csv(option.headers as string);
+    if (option.credentials) settings.credentials = true;
+  }
+
+  if (typeof settings.origin === "string") {
+    settings.origin = settings.origin.toLowerCase();
+  }
+  return settings;
+}
+
 const localhost = /^https?:\/\/localhost(:\d+)?$/;
 
 // Based on https://expressjs.com/en/resources/middleware/cors.html#configuration-options
-// Arrays never arrive here: config() already joins every array form to a CSV.
+// Arrays never arrive here: resolveCors() joins every array form to a CSV.
 function cors(config: boolean | string, origin: string = ""): string | null {
   origin = origin?.toLowerCase();
 
