@@ -46,6 +46,7 @@ export type {
   AuthConfig,
   AuthVerify,
   AuthInstance,
+  InstanceUser,
   AuthFunction,
   AuthOption,
   AuthEntry,

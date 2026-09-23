@@ -12,6 +12,8 @@ import ServerTest from "./ServerTest";
 import type {
   AuthConfig,
   AuthFunction,
+  AuthInstance,
+  InstanceUser,
   AuthProfile,
   AuthClaims,
   AuthVerify,
@@ -93,6 +95,9 @@ export default function server<U = AuthClaims>(
 export default function server<U>(
   options: Omit<Options, "auth"> & { auth: AuthFunction<U> },
 ): Server<{ user: NonNullable<Awaited<U>> }>;
+export default function server<I extends AuthInstance>(
+  options: Omit<Options, "auth"> & { auth: I },
+): Server<{ user: InstanceUser<I> }>;
 export default function server<C extends ContextTypes = {}>(
   options?: Options,
 ): Server<C>;

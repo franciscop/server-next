@@ -27,7 +27,6 @@ for (const [key, value] of Object.entries(CREDENTIALS)) {
 // Each skip needs a reason. Without one, a demo that quietly stops exporting an
 // app would drop out of this suite instead of failing it.
 const SKIP: Record<string, string> = {
-  "auth-better-auth": "commented out on purpose: no third-party auth mode yet",
   // Its `db` is a module singleton bound at import, so booting it here would
   // pin the real file before its own tests can point DB_FILE at :memory:
   "user-management": "covered by its own tests in src/index.test.ts",

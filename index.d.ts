@@ -202,9 +202,22 @@ type AuthVerify<U = AuthClaims> = {
 };
 type AuthInstance = {
     handler: (request: Request) => Awaitable<Response>;
-    path?: string;
-    user?: (ctx: Context) => Awaitable<any>;
+    api: {
+        getSession: (context: {
+            headers: Headers;
+        }) => Promise<any>;
+    };
+    options?: {
+        basePath?: string;
+    } & Record<string, any>;
 };
+type InstanceUser<I> = I extends {
+    api: {
+        getSession: (...args: any[]) => infer R;
+    };
+} ? NonNullable<Awaited<R>> extends {
+    user: infer U;
+} ? U : Record<string, any> : Record<string, any>;
 type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
 type AuthOption = string | AuthFunction | AuthConfig<any> | AuthVerify<any> | AuthInstance;
 type AuthContext = Pick<Context, "options" | "headers" | "cookies" | "platform" | "app">;
@@ -609,6 +622,11 @@ declare function server<U>(options: Omit<Options, "auth"> & {
 }): Server<{
     user: NonNullable<Awaited<U>>;
 }>;
+declare function server<I extends AuthInstance>(options: Omit<Options, "auth"> & {
+    auth: I;
+}): Server<{
+    user: InstanceUser<I>;
+}>;
 declare function server<C extends ContextTypes = {}>(options?: Options): Server<C>;
 
-export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type Parser, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadValidate, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };
+export { type AuthClaims, type AuthConfig, type AuthEntry, type AuthFunction, type AuthInstance, type AuthMeta, type AuthOption, type AuthProfile, type AuthSettings, type AuthVerify, type BasicValue, type Bucket, type BucketFile, type BunEnv, type CacheOption, type Context, type ContextExtension, type ContextTypes, type Cookie, type CorsSettings, type ExtractPathParams, type FileInfo, type InferParamType, type InlineReply, type InstanceUser, type LogLevel, type Logger, type Method, type Middleware, type Options, type ParamTypeMap, type ParamsToObject, type Parser, type PathToParams, type Platform, type ProviderOptions, type RedirectOption, type RedirectTargets, type RequestError, type Route, type RouteOptions, type RouteSchema, type SchemaOutput, type SecurityOptions, type SecuritySettings, type SerializableValue, Server, TypedServerError as ServerError, type Settings, type StandardIssue, type StandardSchemaV1, type Strategy, type Time, type UploadOptions, type UploadValidate, type UploadedFile, ValidationError, cache, cookies, server as default, download, file, headers, json, redirect, router, send, status, type };

@@ -9,7 +9,7 @@ describe("a library instance gets the exact bytes", () => {
           seen = await request.text();
           return new Response("ok");
         },
-        user: () => undefined,
+        api: { getSession: async () => null },
       },
     });
 

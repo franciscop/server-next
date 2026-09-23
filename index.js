@@ -1499,7 +1499,7 @@ function flowEntry(config2) {
 
 // src/auth/instance.ts
 function instanceEntry(instance) {
-  const path = (instance.path ?? "/api/auth").replace(/\/$/, "");
+  const path = (instance.options?.basePath ?? "/api/auth").replace(/\/$/, "");
   const raw = { parser: "stream" };
   const forward = (ctx) => instance.handler(
     new Request(ctx.url.href, {
@@ -1512,7 +1512,17 @@ function instanceEntry(instance) {
   );
   return {
     name: `instance:${path}`,
-    user: async (ctx) => instance.user?.(ctx),
+    user: async (ctx) => {
+      const headers2 = new Headers();
+      for (const [key, value] of Object.entries(ctx.headers)) {
+        headers2.set(
+          key,
+          Array.isArray(value) ? value.join(", ") : String(value)
+        );
+      }
+      const session = await instance.api.getSession({ headers: headers2 });
+      return session?.user ?? void 0;
+    },
     routes: () => {
       const wildcard = `${path}/*`;
       return router().get(wildcard, raw, forward).post(wildcard, raw, forward).put(wildcard, raw, forward).patch(wildcard, raw, forward).delete(wildcard, raw, forward);
@@ -1713,7 +1723,7 @@ function toEntry(auth2) {
     if ("handler" in auth2) return instanceEntry(auth2);
   }
   throw new Error(
-    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ issuer, audience }`, or a library instance."
+    "Invalid `auth`: it takes a string, a function, `{ providers }`, `{ issuer, audience }`, or a Better Auth instance."
   );
 }
 

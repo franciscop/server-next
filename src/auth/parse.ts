@@ -45,6 +45,6 @@ function toEntry(auth: AuthOption): AuthEntry {
   }
   throw new Error(
     "Invalid `auth`: it takes a string, a function, `{ providers }`, " +
-      "`{ issuer, audience }`, or a library instance.",
+      "`{ issuer, audience }`, or a Better Auth instance.",
   );
 }

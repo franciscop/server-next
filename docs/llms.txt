@@ -207,9 +207,9 @@ https://server-js.com/documentation/concepts#authorization
 String form is `'<strategy>:<name>'` (`'cookie:github'`, `'jwt:clerk'`).
 Object form takes `{ providers, strategy, expires, onLogin, getUser,
 toPublicUser, onLogout, redirect }`. A plain function `(ctx) => user` works,
-as does an auth library instance. Email and password is out of scope: pass a
-Better Auth instance for that.
-https://server-js.com/documentation/authentication#a-library
+and so does a Better Auth instance, the one auth library supported directly
+(and the way to email and password sign-in).
+https://server-js.com/documentation/authentication#better-auth
 
 Each provider reads `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`
 (`GITHUB_CLIENT_ID`, `MICROSOFT_ENTRA_ID_CLIENT_ID`), or takes

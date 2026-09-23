@@ -1,11 +1,11 @@
 import router from "../router";
-import type { AuthEntry, Context } from "../types";
+import type { Context } from "../types";
+import type { AuthContext, AuthEntry, AuthInstance } from "./types";
 
-// A library that runs its own handshake and serves its own routes (the Better
-// Auth shape): everything under its path is forwarded to it verbatim, and its
-// own `user()` is what resolves ctx.user.
-export default function instanceEntry(instance: any): AuthEntry {
-  const path = (instance.path ?? "/api/auth").replace(/\/$/, "");
+// Better Auth: it runs its own handshake and serves its own routes. Everything
+// under its base path is forwarded to it verbatim, and its session is ctx.user.
+export default function instanceEntry(instance: AuthInstance): AuthEntry {
+  const path = (instance.options?.basePath ?? "/api/auth").replace(/\/$/, "");
   // A true passthrough: `parser: 'stream'` leaves the body unread, so the
   // library gets the exact bytes it signs and parses itself
   const raw = { parser: "stream" as const };
@@ -22,7 +22,17 @@ export default function instanceEntry(instance: any): AuthEntry {
 
   return {
     name: `instance:${path}`,
-    user: async (ctx: Context) => instance.user?.(ctx),
+    user: async (ctx: AuthContext) => {
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(ctx.headers)) {
+        headers.set(
+          key,
+          Array.isArray(value) ? value.join(", ") : String(value),
+        );
+      }
+      const session = await instance.api.getSession({ headers });
+      return session?.user ?? undefined;
+    },
     routes: () => {
       const wildcard = `${path}/*`;
       return router()

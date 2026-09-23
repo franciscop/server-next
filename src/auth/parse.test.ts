@@ -48,10 +48,10 @@ describe("the shapes of `auth`", () => {
   it("a library instance: its routes are mounted at its own path", async () => {
     const app = server({
       auth: {
-        path: "/api/auth",
+        options: { basePath: "/api/auth" },
         handler: (request: Request) =>
           new Response(`handled ${new URL(request.url).pathname}`),
-        user: () => ({ id: "1" }),
+        api: { getSession: async () => ({ user: { id: "1" } }) },
       },
     }).get("/me", (ctx) => ctx.user ?? "anonymous");
 

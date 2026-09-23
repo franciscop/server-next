@@ -1,7 +1,8 @@
-# Better Auth (not runnable yet)
+# Better Auth
 
-What using [Better Auth](https://better-auth.com) would look like if `auth`
-accepted a third-party auth system:
+Email and password sign-in with [Better Auth](https://better-auth.com), mounted
+on Server JS. Better Auth serves its own routes under `/api/auth/*` and its
+session becomes `ctx.user`:
 
 ```js
 const auth = betterAuth({ database, emailAndPassword: { enabled: true } });
@@ -10,11 +11,16 @@ export default server({ auth })
   .get('/me', (ctx) => ctx.user || 401);
 ```
 
-It would own the whole lifecycle: routes under `/api/auth/*`, session cookies,
-storage, 2FA, passkeys, organizations and account linking. The framework would
-mount its handler and resolve `ctx.user` from its session, WebSocket
-handshakes included.
+Run it with `bun install && bun .`, then:
 
-The framework has **no such mode today**. It was prototyped end to end against
-the real library (it works, in about 50 lines) and then reverted while the
-design settled. See `docs/5. Authentication.md` for the API that landed.
+```sh
+curl -c jar -H 'content-type: application/json' \
+  -d '{"name":"Ada","email":"ada@example.com","password":"a-long-password"}' \
+  localhost:3000/api/auth/sign-up/email
+
+curl -b jar localhost:3000/me
+```
+
+Users live in memory here, so they are gone on restart. Swap `memoryAdapter`
+for one of Better Auth's database adapters to keep them. Set
+`BETTER_AUTH_SECRET` to a long random string in production.

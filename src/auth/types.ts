@@ -94,12 +94,23 @@ export type AuthVerify<U = AuthClaims> = {
   getUser?: (id: string, ctx: Context) => Awaitable<U>;
 };
 
-// A library that runs its own handshake and serves its own routes
+// A Better Auth instance, which runs its own handshake and serves its own routes
 export type AuthInstance = {
   handler: (request: Request) => Awaitable<Response>;
-  path?: string;
-  user?: (ctx: Context) => Awaitable<any>;
+  api: {
+    getSession: (context: { headers: Headers }) => Promise<any>;
+  };
+  options?: { basePath?: string } & Record<string, any>;
 };
+
+// The user on a Better Auth session, typed from the instance itself
+export type InstanceUser<I> = I extends {
+  api: { getSession: (...args: any[]) => infer R };
+}
+  ? NonNullable<Awaited<R>> extends { user: infer U }
+    ? U
+    : Record<string, any>
+  : Record<string, any>;
 
 // Request in, user out, for a credential we did not mint
 export type AuthFunction<U = any> = (ctx: Context<any>) => Awaitable<U>;
