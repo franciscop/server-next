@@ -379,15 +379,13 @@ export default server()
     >
   </div>
   <div>
-    <pre><code class="language-js">import server, { json } from "@server/next";
+    <pre><code class="language-js">import server from "@server/next";
 
-// Sign in at /auth/login/github. No database, no store,
-// no callbacks: the profile is signed into the cookie.
 export default server({ auth: "cookie:github" })
   .get("/me", ctx =&gt; {
     if (!ctx.user) return 401;
     if (ctx.user.email !== "...") return 403;
-    return json(ctx.user);
+    return ctx.user;
   });</code></pre>
   </div>
 </section>
