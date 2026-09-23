@@ -117,4 +117,4 @@ The audience is the only claim that separates them, which is why it has no defau
 ## Next steps
 
 - [Firebase auth from a mobile app](/tutorials/n-firebase-auth-from-a-mobile-app): the same shape, different claims and a different id.
-- [Checking a token minted elsewhere](/documentation/authentication#checking-a-token-minted-elsewhere): the reference for any issuer.
+- [Checking a token minted elsewhere](/documentation/authentication#issuer): the reference for any issuer.

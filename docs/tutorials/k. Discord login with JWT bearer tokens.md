@@ -98,5 +98,5 @@ An app issues and reads one kind of credential. If yours is both a server-render
 
 ## Next steps
 
-- [Strategies in full](/documentation/authentication#strategies): what each of the four carries and what logout does to it.
+- [Strategies in full](/documentation/authentication#strategy): what each of the four carries and what logout does to it.
 - [Clerk auth in a same-origin cookie](/tutorials/m-clerk-auth-in-a-same-origin-cookie): when a vendor issues the token instead of you.
