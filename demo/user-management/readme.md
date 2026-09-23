@@ -11,8 +11,8 @@ Create a GitHub OAuth app with the callback URL set to
 `http://localhost:3000/auth/callback/github`, then:
 
 ```bash
-echo "GITHUB_ID=your-client-id" >> .env
-echo "GITHUB_SECRET=your-client-secret" >> .env
+echo "GITHUB_CLIENT_ID=your-client-id" >> .env
+echo "GITHUB_CLIENT_SECRET=your-client-secret" >> .env
 echo "SECRETS=a-long-random-string" >> .env
 echo "ADMIN_EMAIL=you@example.com" >> .env
 npm run dev   # bun with hot reloading; `npm start` for a plain run

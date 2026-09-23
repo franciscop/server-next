@@ -21,7 +21,10 @@ describe("openapi option", () => {
   });
 
   it("tags the built-in auth routes as auth", async () => {
-    Object.assign(globalThis.env, { GITHUB_ID: "id", GITHUB_SECRET: "secret" });
+    Object.assign(process.env, {
+      GITHUB_CLIENT_ID: "id",
+      GITHUB_CLIENT_SECRET: "secret",
+    });
     try {
       const api = server({
         openapi: true,
@@ -32,8 +35,8 @@ describe("openapi option", () => {
       expect(spec.paths["/auth/login/github"].get.tags).toEqual(["auth"]);
       expect(spec.paths["/auth/callback/github"].get.tags).toEqual(["auth"]);
     } finally {
-      delete globalThis.env.GITHUB_ID;
-      delete globalThis.env.GITHUB_SECRET;
+      delete process.env.GITHUB_CLIENT_ID;
+      delete process.env.GITHUB_CLIENT_SECRET;
     }
   });
 

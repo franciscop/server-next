@@ -6,8 +6,8 @@ export {};
 // The OAuth provider validates its env vars at construction; DB_FILE keeps
 // the dev database out of the tests
 Object.assign(process.env, {
-  GITHUB_ID: "test-id",
-  GITHUB_SECRET: "test-secret",
+  GITHUB_CLIENT_ID: "test-id",
+  GITHUB_CLIENT_SECRET: "test-secret",
   SECRETS: "test-secret-long",
   DB_FILE: ":memory:",
 });

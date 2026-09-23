@@ -1080,14 +1080,14 @@ import {
 
 // src/auth/providers/oauth.ts
 var credentials = (name, options) => ({
-  id: options.id ?? env[`${name.toUpperCase()}_ID`],
-  secret: options.secret ?? env[`${name.toUpperCase()}_SECRET`]
+  id: options.clientId ?? env[`${name.toUpperCase()}_CLIENT_ID`],
+  secret: options.clientSecret ?? env[`${name.toUpperCase()}_CLIENT_SECRET`]
 });
 var passthrough = (options) => {
-  const { id, secret, scope, issuer, ...rest } = options;
+  const { clientId, clientSecret, scopes, issuer, ...rest } = options;
   return rest;
 };
-var scopeOf = (options, fallback) => toArray(options.scope ?? fallback).join(" ");
+var scopeOf = (options, fallback) => toArray(options.scopes ?? fallback).join(" ");
 var callbackPath = (name) => `/auth/callback/${name}`;
 var callbackUrl = (ctx, name) => `${ctx.url.origin}${callbackPath(name)}`;
 var search = (base3, params) => {
@@ -1099,30 +1099,27 @@ var search = (base3, params) => {
 };
 
 // src/auth/providers/antarctic.ts
-var nowhere = {
-  get: async () => null,
-  set: async () => {
-  },
-  del: async () => {
-  }
-};
 function antarcticProvider(name, Client) {
-  const client = (ctx, options) => {
-    const { id, secret } = credentials(name, options);
-    return new Client({
-      // Whatever that provider needs beyond the standard four: Auth0 takes a
-      // `domain`, Keycloak a `realm`, Gitea a `baseURL`, Mastodon an
-      // `instance`. Unknown keys go straight through.
-      ...passthrough(options),
-      clientId: id,
-      clientSecret: secret,
-      redirectURI: callbackUrl(ctx, name),
-      // One list whether given as an array or a space-separated string
-      scopes: options.scope ? toArray(options.scope).flatMap((s) => s.split(" ")) : void 0,
-      store: nowhere
-    });
-  };
+  const build = (options, redirectURI) => new Client({
+    // Whatever that provider needs beyond the standard four: Auth0 takes a
+    // `domain`, Keycloak a `realm`, Gitea a `baseURL`, Mastodon an
+    // `instance`. Unknown keys go straight through.
+    ...passthrough(options),
+    clientId: options.clientId,
+    clientSecret: options.clientSecret,
+    redirectURI,
+    // One list whether given as an array or a space-separated string
+    scopes: options.scopes ? toArray(options.scopes).flatMap((s) => s.split(" ")) : void 0
+  });
+  const client = (ctx, options) => build(options, callbackUrl(ctx, name));
   return {
+    // The real callback URL needs a request; any valid one proves the config
+    check(options) {
+      build(
+        options,
+        callbackUrl({ url: new URL("http://localhost") }, name)
+      );
+    },
     async authorize(ctx, options) {
       const { url, state, payload } = await client(
         ctx,
@@ -1187,6 +1184,13 @@ var claims = (token) => {
 };
 function oidcProvider(name) {
   return {
+    check(options) {
+      if (credentials(name, options).id) return;
+      const key = name.toUpperCase();
+      throw new Error(
+        `Missing 'clientId': pass it in the options or set ${key}_CLIENT_ID (usually along ${key}_CLIENT_SECRET)`
+      );
+    },
     async authorize(ctx, options) {
       const doc = await discover(options.issuer);
       const state = createId();
@@ -1339,14 +1343,30 @@ function resolveProvider(name, options) {
     `Unknown provider "${name}". Give it an \`issuer\` to use any OIDC provider, or pick one of "${Object.keys(providers).join('", "')}".`
   );
 }
+var RENAMED = {
+  id: "clientId",
+  secret: "clientSecret",
+  scope: "scopes"
+};
 function parseProviders(given) {
   const map2 = normalizeProviders(given);
   const list = Object.entries(map2).map(([name, options]) => {
+    for (const [from, to] of Object.entries(RENAMED)) {
+      if (options[from] !== void 0) {
+        throw new Error(`Provider "${name}": \`${from}\` is now \`${to}\`.`);
+      }
+    }
     const provider = resolveProvider(name, options);
-    if (!credentials(name, options).id) {
-      throw new Error(
-        `Provider "${name}" has no client id: set the ${name.toUpperCase()}_ID environment variable (usually along ${name.toUpperCase()}_SECRET), or pass \`{ id, secret }\` in its options.`
+    try {
+      provider.check(options);
+    } catch (error) {
+      const old = `${name.toUpperCase()}_ID`;
+      const renamed = env[old] ? ` ${old} and ${name.toUpperCase()}_SECRET are no longer read; rename them.` : "";
+      const message = error.message.replace(
+        "in the constructor options",
+        "in this provider's options"
       );
+      throw new Error(`Provider "${name}": ${message}.${renamed}`);
     }
     return { name, options, provider };
   });

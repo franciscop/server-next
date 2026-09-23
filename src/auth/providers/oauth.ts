@@ -3,6 +3,9 @@ import toArray from "../../util/toArray";
 import type { Pending } from "../state";
 
 export type Provider = {
+  // Throws, at boot, when the options and environment cannot run a login:
+  // the message names the option or variable that is missing
+  check: (options: ProviderOptions) => void;
   // Where to send the person, plus the CSRF state and anything that must
   // survive the redirect without appearing in the URL (a PKCE verifier)
   authorize: (
@@ -18,21 +21,22 @@ export type Provider = {
   ) => Promise<AuthProfile>;
 };
 
-// Credentials come from the environment by name, and can be given explicitly
+// For an issuer found by discovery. Every named provider reads its own, under
+// the same <PROVIDER>_CLIENT_ID / <PROVIDER>_CLIENT_SECRET convention.
 export const credentials = (name: string, options: ProviderOptions) => ({
-  id: options.id ?? env[`${name.toUpperCase()}_ID`],
-  secret: options.secret ?? env[`${name.toUpperCase()}_SECRET`],
+  id: options.clientId ?? env[`${name.toUpperCase()}_CLIENT_ID`],
+  secret: options.clientSecret ?? env[`${name.toUpperCase()}_CLIENT_SECRET`],
 });
 
 // Anything we do not recognise is passed straight through to the provider,
 // which is how `prompt`, `team` and `tenant` work with no code here
 export const passthrough = (options: ProviderOptions) => {
-  const { id, secret, scope, issuer, ...rest } = options;
+  const { clientId, clientSecret, scopes, issuer, ...rest } = options;
   return rest as Record<string, string>;
 };
 
 export const scopeOf = (options: ProviderOptions, fallback: string) =>
-  toArray(options.scope ?? fallback).join(" ");
+  toArray(options.scopes ?? fallback).join(" ");
 
 // The mounted route and the redirect_uri sent to the provider must agree;
 // both derive from here so they cannot drift.

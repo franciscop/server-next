@@ -11,8 +11,8 @@ In GitHub, go to **Settings → Developer settings → OAuth Apps → New OAuth 
 There is no database to set up, so the credentials are the only configuration:
 
 ```bash
-GITHUB_ID=your-client-id
-GITHUB_SECRET=your-client-secret
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
 SECRETS=a-long-random-string  # signs the session cookie
 ```
 

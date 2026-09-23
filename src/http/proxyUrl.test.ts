@@ -85,8 +85,8 @@ describe("ctx.url behind a proxy", () => {
 // before any `.use()` the app adds.
 describe("the OAuth redirect_uri behind a proxy", () => {
   it("registers the https callback GitHub was configured with", async () => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
     const api = server({ secrets: "s", auth: "cookie:github" }).test();
 
     const res = await api.get("/auth/login/github", {

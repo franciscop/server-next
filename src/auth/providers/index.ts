@@ -64,7 +64,7 @@ import {
   FortyTwo,
 } from "antarctic";
 import antarcticProvider from "./antarctic";
-import { credentials, type Provider } from "./oauth";
+import type { Provider } from "./oauth";
 import oidcProvider from "./oidc";
 import type { AuthConfig, ProviderOptions } from "../../types";
 
@@ -153,9 +153,9 @@ const providers: Record<string, Provider> = Object.fromEntries(
   ]),
 );
 
-// An alias gets its own instance rather than sharing the target's, so its
-// credentials come from the name you actually typed (`COGNITO_ID`, not
-// `AMAZONCOGNITO_ID`).
+// An alias gets its own instance, so it mounts under the name you typed
+// (`/auth/login/cognito`); its credentials are the provider's own
+// (`AMAZON_COGNITO_CLIENT_ID`), since that is what they are.
 for (const [alias, target] of Object.entries(ALIASES)) {
   providers[alias] = antarcticProvider(alias, CLASSES[target]);
 }
@@ -207,18 +207,39 @@ function resolveProvider(name: string, options: ProviderOptions): Provider {
   );
 }
 
+// Options renamed to the OAuth terms, which fail loudly rather than being
+// passed through to the provider as unknown keys
+const RENAMED: Record<string, string> = {
+  id: "clientId",
+  secret: "clientSecret",
+  scope: "scopes",
+};
+
 export function parseProviders(given: AuthConfig["providers"]): Named[] {
   const map = normalizeProviders(given);
   const list = Object.entries(map).map(([name, options]) => {
+    for (const [from, to] of Object.entries(RENAMED)) {
+      if (options[from] !== undefined) {
+        throw new Error(`Provider "${name}": \`${from}\` is now \`${to}\`.`);
+      }
+    }
     const provider = resolveProvider(name, options);
     // Checked at boot like every other auth misconfiguration: left unchecked,
     // a missing client id only surfaces when someone clicks "Log in".
-    if (!credentials(name, options).id) {
-      throw new Error(
-        `Provider "${name}" has no client id: set the ` +
-          `${name.toUpperCase()}_ID environment variable (usually along ` +
-          `${name.toUpperCase()}_SECRET), or pass \`{ id, secret }\` in its options.`,
+    try {
+      provider.check(options);
+    } catch (error: any) {
+      // The variables were <NAME>_ID / <NAME>_SECRET before the rename
+      const old = `${name.toUpperCase()}_ID`;
+      const renamed = env[old]
+        ? ` ${old} and ${name.toUpperCase()}_SECRET are no longer read; rename them.`
+        : "";
+      // Antarctic speaks of its own constructor; here that is the provider's options
+      const message = error.message.replace(
+        "in the constructor options",
+        "in this provider's options",
       );
+      throw new Error(`Provider "${name}": ${message}.${renamed}`);
     }
     return { name, options, provider };
   });

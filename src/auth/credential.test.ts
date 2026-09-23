@@ -10,8 +10,8 @@ describe("broken credentials, by carrier", () => {
     getUser: (id: string) => ({ id }),
   };
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   it("a stale session cookie is anonymous, not a site-wide 401", async () => {
@@ -56,8 +56,8 @@ describe("a stale cookie clears itself", () => {
     getUser: (id: string) => ({ id }),
   };
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   it("is anonymous, and clears the cookie so a refresh is clean", async () => {
@@ -111,8 +111,8 @@ describe("logging a discarded cookie", () => {
   beforeEach(() => {
     lines = [];
     console.log = (...args: any[]) => lines.push(args.join(" "));
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
   afterEach(() => {
     console.log = realLog;
@@ -172,8 +172,8 @@ describe("ctx.auth", () => {
   };
 
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   const app = (extra: any = {}) =>
@@ -256,8 +256,8 @@ describe("rotating `secrets` with a live login", () => {
     instance.test().get("/me", { headers: { cookie: `session=${cookie}` } });
 
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   it("accepts a credential issued before the rotation", async () => {

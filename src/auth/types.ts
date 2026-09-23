@@ -36,9 +36,10 @@ export type AuthClaims = { sub: string } & Record<string, any>;
 // Only the handshake is configured per provider; everything else is app-wide.
 // Unknown keys pass through to that provider's authorize URL.
 export type ProviderOptions = {
-  id?: string;
-  secret?: string;
-  scope?: string | string[];
+  // Explicit credentials; otherwise <PROVIDER>_CLIENT_ID / _CLIENT_SECRET
+  clientId?: string;
+  clientSecret?: string;
+  scopes?: string | string[];
   // An OIDC issuer, which makes this a generic provider: discovery finds its
   // endpoints and the id_token claims become the profile
   issuer?: string;

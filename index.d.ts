@@ -172,9 +172,9 @@ type AuthClaims = {
     sub: string;
 } & Record<string, any>;
 type ProviderOptions = {
-    id?: string;
-    secret?: string;
-    scope?: string | string[];
+    clientId?: string;
+    clientSecret?: string;
+    scopes?: string | string[];
     issuer?: string;
 } & Record<string, any>;
 type RedirectTargets = {

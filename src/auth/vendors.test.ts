@@ -52,8 +52,8 @@ describe("verifying a vendor's token by name", () => {
 // log in with, so they are not also vendor shorthands.
 describe("provider and vendor names do not collide", () => {
   it("treats a login provider's name as a login", async () => {
-    env.AUTH0_ID = "id";
-    env.AUTH0_SECRET = "secret";
+    process.env.AUTH0_CLIENT_ID = "id";
+    process.env.AUTH0_CLIENT_SECRET = "secret";
     const api = server({
       secrets: "s",
       auth: {

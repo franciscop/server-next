@@ -10,8 +10,8 @@ describe("re-exported libraries", () => {
 
   it("the framework itself never asks for one", () => {
     // A whole app with auth, and not a store in sight
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
     expect(() => server({ secrets: "s", auth: "cookie:github" })).not.toThrow();
   });
 });

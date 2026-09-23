@@ -1,57 +1,85 @@
 import server from "../..";
 
-// The name you type drives the environment variables, so an alias must not
-// borrow the canonical provider's.
+// An alias is a shorter name for the same provider: it mounts under the name
+// you typed, and its credentials are the provider's own variables.
 describe("provider aliases", () => {
-  it("reads credentials from the name you used", async () => {
-    const env2 = globalThis.env as Record<string, string | undefined>;
-    env2.ENTRA_ID = "mine";
-    env2.ENTRA_SECRET = "secret";
-    try {
-      const api = server({
-        secrets: "s",
-        auth: {
-          providers: { entra: { tenant: "common" } },
-          onLogin: (p: any) => p.id,
-          getUser: (id: string) => ({ id }),
-        },
-      }).test();
-      const res = await api.get("/auth/login/entra");
-      expect(res.headers.get("location")).toContain("client_id=mine");
-    } finally {
-      delete env2.ENTRA_ID;
-      delete env2.ENTRA_SECRET;
-    }
-  });
-});
-
-// `cognito` and `microsoft` are the names people write, so those are the
-// variables they set. The long spellings must not shadow them.
-describe("the friendly names own their environment", () => {
-  const env2 = globalThis.env as Record<string, string | undefined>;
+  const vars = [
+    "MICROSOFT_ENTRA_ID_CLIENT_ID",
+    "MICROSOFT_ENTRA_ID_CLIENT_SECRET",
+    "AMAZON_COGNITO_CLIENT_ID",
+    "AMAZON_COGNITO_CLIENT_SECRET",
+  ];
   afterEach(() => {
-    for (const k of ["COGNITO_ID", "COGNITO_SECRET", "COGNITO_DOMAIN"]) {
-      delete env2[k];
-    }
+    for (const k of vars) delete process.env[k];
   });
 
-  it("cognito reads COGNITO_ID, never AMAZONCOGNITO_ID", async () => {
-    env2.COGNITO_ID = "mine";
-    env2.COGNITO_SECRET = "secret";
-    const api = server({
+  const login = (providers: Record<string, any>) =>
+    server({
       secrets: "s",
       auth: {
-        providers: {
-          cognito: { domain: "acme.auth.eu-west-1.amazoncognito.com" },
-        },
+        providers,
         onLogin: (p: any) => p.id,
         getUser: (id: string) => ({ id }),
       },
     }).test();
 
-    const res = await api.get("/auth/login/cognito");
-    expect(res.headers.get("location")).toContain("client_id=mine");
-    // ...and the route is named after what you typed
+  it("entra and microsoft read the Entra ID variables", async () => {
+    process.env.MICROSOFT_ENTRA_ID_CLIENT_ID = "mine";
+    process.env.MICROSOFT_ENTRA_ID_CLIENT_SECRET = "secret";
+    for (const name of ["entra", "microsoft"]) {
+      const res = await login({ [name]: { tenant: "common" } }).get(
+        `/auth/login/${name}`,
+      );
+      expect(res.headers.get("location")).toContain("client_id=mine");
+    }
+  });
+
+  it("cognito reads the Amazon Cognito variables, under its own route", async () => {
+    process.env.AMAZON_COGNITO_CLIENT_ID = "mine";
+    process.env.AMAZON_COGNITO_CLIENT_SECRET = "secret";
+    const res = await login({
+      cognito: { domain: "acme.auth.eu-west-1.amazoncognito.com" },
+    }).get("/auth/login/cognito");
     expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("client_id=mine");
+  });
+});
+
+describe("renamed credentials", () => {
+  afterEach(() => {
+    delete process.env.GITHUB_CLIENT_ID;
+    delete (globalThis.env as any).GITHUB_ID;
+  });
+
+  const boot = (providers: any) => () =>
+    server({
+      secrets: "s",
+      auth: {
+        providers,
+        onLogin: (p: any) => p.id,
+        getUser: (id: string) => ({ id }),
+      },
+    });
+
+  // Set under the old name, the message says what it is called now
+  it("names the variable to rename when only the old one is set", () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    (globalThis.env as any).GITHUB_ID = "old";
+    expect(boot("github")).toThrow(
+      /GITHUB_CLIENT_ID.*GITHUB_ID and GITHUB_SECRET are no longer read/,
+    );
+  });
+
+  it("refuses the old option names instead of passing them through", () => {
+    expect(boot({ github: { id: "x" } })).toThrow(/`id` is now `clientId`/);
+    expect(boot({ github: { scope: "repo" } })).toThrow(
+      /`scope` is now `scopes`/,
+    );
+  });
+
+  it("takes explicit credentials under the new option names", () => {
+    expect(
+      boot({ github: { clientId: "x", clientSecret: "y" } }),
+    ).not.toThrow();
   });
 });

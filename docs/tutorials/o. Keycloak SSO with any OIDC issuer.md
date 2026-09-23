@@ -24,13 +24,13 @@ export default server({ auth });
 
 ```sh
 SECRETS=a-long-random-string
-WORK_ID=my-client-id
-WORK_SECRET=...
+WORK_CLIENT_ID=my-client-id
+WORK_CLIENT_SECRET=...
 ```
 
 On first use the framework fetches `https://sso.company.com/realms/employees/.well-known/openid-configuration`, a small JSON document listing where to send people, where to exchange the code, and which keys sign the tokens. That document is why nothing else needs configuring, and why this same entry works for Okta, Zitadel, Authentik, FusionAuth, Ory and Entra with a tenant URL.
 
-**The key name is yours.** `work` names the route (`/auth/login/work`), the environment variables (`WORK_ID` and `WORK_SECRET`) and the value in `profile.provider`. Pick what makes sense to the people using it: `sso`, `staff`, `company`. It is the word that ends up in your login button's URL.
+**The key name is yours.** `work` names the route (`/auth/login/work`), the environment variables (`WORK_CLIENT_ID` and `WORK_CLIENT_SECRET`) and the value in `profile.provider`. Pick what makes sense to the people using it: `sso`, `staff`, `company`. It is the word that ends up in your login button's URL.
 
 ## 2. Register the redirect URI
 
@@ -44,8 +44,8 @@ Companies commonly separate staff from customers into different realms, with dif
 
 ```js
 providers: {
-  staff: 'https://sso.company.com/realms/employees',      // STAFF_ID, STAFF_SECRET
-  customers: 'https://sso.company.com/realms/customers',  // CUSTOMERS_ID, CUSTOMERS_SECRET
+  staff: 'https://sso.company.com/realms/employees',      // STAFF_CLIENT_ID, ...
+  customers: 'https://sso.company.com/realms/customers',  // CUSTOMERS_CLIENT_ID, ...
 },
 ```
 

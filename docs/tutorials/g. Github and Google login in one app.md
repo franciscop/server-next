@@ -22,8 +22,8 @@ This assumes a `users` table of your own with a unique email, which is what make
 
 ```sh
 SECRETS=a-long-random-string
-GITHUB_ID=...   GITHUB_SECRET=...
-GOOGLE_ID=...   GOOGLE_SECRET=...
+GITHUB_CLIENT_ID=...   GITHUB_CLIENT_SECRET=...
+GOOGLE_CLIENT_ID=...   GOOGLE_CLIENT_SECRET=...
 ```
 
 Each name mounts its own pair of routes, so the buttons are just links:
@@ -33,7 +33,7 @@ Each name mounts its own pair of routes, so the buttons are just links:
 <a href="/auth/login/google">Continue with Google</a>
 ```
 
-Every provider reads `<NAME>_ID` and `<NAME>_SECRET` from the environment, and the name you write is the name in the route, so adding a third is one array entry and two variables. There are [63 to choose from](/documentation/authentication#the-providers).
+Every provider reads `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET` from the environment, and the name you write is the name in the route, so adding a third is one array entry and two variables. There are [63 to choose from](/documentation/authentication#the-providers).
 
 Register each one's callback URL with that provider: `https://your-host/auth/callback/github` and `.../google`. A mismatch fails at their end, before your app is ever reached.
 

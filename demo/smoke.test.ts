@@ -15,7 +15,10 @@ const ENTRIES = ["index.js", "index.jsx", "index.ts", "index.tsx", "src/index.ts
 // only asks each demo for a page, and never completes a handshake. Set on
 // `process.env` (the framework snapshots it into `env` when a demo imports it)
 // and on `env` itself, in case another file loaded the framework first.
-const CREDENTIALS = { GITHUB_ID: "smoke-id", GITHUB_SECRET: "smoke-secret" };
+const CREDENTIALS = {
+  GITHUB_CLIENT_ID: "smoke-id",
+  GITHUB_CLIENT_SECRET: "smoke-secret",
+};
 for (const [key, value] of Object.entries(CREDENTIALS)) {
   process.env[key] ??= value;
   if (typeof globalThis.env === "object") globalThis.env[key] ??= value;

@@ -12,7 +12,7 @@ import server, { file } from "../../";
 // A fragment rather than a query string, because browsers never send it to a
 // server, so it stays out of access logs and referrer headers.
 //
-// Set GITHUB_ID and GITHUB_SECRET, and point the OAuth app's callback URL at
+// Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, and point the OAuth app's callback URL at
 // http://localhost:3000/auth/callback/github
 export default server({
   auth: { providers: "github", strategy: "jwt", redirect: "/" },

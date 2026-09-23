@@ -7,7 +7,11 @@ const ALL = ["github", "google", "microsoft", "discord", "slack", "twitch"];
 
 // Enable each provider that has credentials in .env, so the demo boots even if
 // you only configured a few of them (each enabled one then gets a button).
-const providers = ALL.filter((p) => process.env[`${p.toUpperCase()}_ID`]);
+// `microsoft` is Entra ID, so its variables carry the product's full name
+const PREFIX: Record<string, string> = { microsoft: "MICROSOFT_ENTRA_ID" };
+const providers = ALL.filter(
+  (p) => process.env[`${PREFIX[p] ?? p.toUpperCase()}_CLIENT_ID`],
+);
 
 // No callbacks, so no database: the profile is signed into the cookie, which
 // is all this demo needs. Add `onLogin`/`getUser` to keep your own rows.

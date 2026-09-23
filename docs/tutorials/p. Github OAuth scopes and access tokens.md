@@ -12,7 +12,7 @@ import server from "@server/next";
 const SCOPES = ['repo', 'read:user'];
 
 const auth = {
-  providers: { github: { scope: SCOPES } },
+  providers: { github: { scopes: SCOPES } },
   // Record whoever signed in, and return the id the cookie will carry
   onLogin: (profile) => db.users.upsert({ email: profile.email, name: profile.name }).id,
   // Turn that id back into the person, on every request
@@ -24,8 +24,8 @@ export default server({ auth });
 
 ```sh
 SECRETS=a-long-random-string
-GITHUB_ID=...
-GITHUB_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
 ```
 
 This assumes a `users` table of your own, and a place to keep tokens: somewhere keyed by user id, holding the token and the scopes you asked for. Keeping those in their own table rather than a column on `users` is worth doing, so that an ordinary query for a person never drags a live credential along with it. [Google login persisted in SQLite](/tutorials/h-google-login-persisted-in-sqlite) covers the two callbacks on their own if they are new to you.

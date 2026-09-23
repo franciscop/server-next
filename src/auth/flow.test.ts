@@ -22,8 +22,8 @@ describe("a login flow with your database", () => {
   beforeEach(() => {
     rows.clear();
     sessions.clear();
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   it("mounts login, callback and logout", async () => {
@@ -102,8 +102,8 @@ describe("a login flow with your database", () => {
 
 describe("providers", () => {
   it("takes a name, with no endpoints or issuer to look up", async () => {
-    env.GOOGLE_ID = "id";
-    env.GOOGLE_SECRET = "secret";
+    process.env.GOOGLE_CLIENT_ID = "id";
+    process.env.GOOGLE_CLIENT_SECRET = "secret";
     const api = server({
       secrets: "s",
       auth: {
@@ -119,7 +119,7 @@ describe("providers", () => {
   });
 
   it("refuses a provider with no client id at boot, not at login", () => {
-    delete env.DISCORD_ID;
+    delete process.env.DISCORD_CLIENT_ID;
     expect(() =>
       server({
         secrets: "s",
@@ -129,7 +129,7 @@ describe("providers", () => {
           getUser: (id) => ({ id }),
         },
       }),
-    ).toThrow(/DISCORD_ID/);
+    ).toThrow(/DISCORD_CLIENT_ID/);
   });
 
   it("takes an issuer URL for anything it does not ship", () => {
@@ -196,8 +196,8 @@ describe("login CSRF", () => {
 // it rides in the signed state cookie instead of a store.
 describe("PKCE providers", () => {
   it("puts the challenge in the URL and the verifier in the cookie", async () => {
-    env.TWITTER_ID = "id";
-    env.TWITTER_SECRET = "secret";
+    process.env.TWITTER_CLIENT_ID = "id";
+    process.env.TWITTER_CLIENT_SECRET = "secret";
     const api = server({
       secrets: "s",
       auth: {
@@ -242,8 +242,8 @@ describe("the login callback", () => {
 
   const realFetch = globalThis.fetch;
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
       if (one.includes("github.com/login/oauth/access_token")) {
@@ -454,8 +454,8 @@ describe("boot-time validation", () => {
     getUser: (id: string) => ({ id }),
   };
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
   });
 
   it("takes any duration the cookie parser takes", () => {
@@ -494,8 +494,8 @@ describe("onLogout across the strategies", () => {
   const realFetch = globalThis.fetch;
 
   beforeAll(() => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
     globalThis.fetch = (async (url: any, opts: any) => {
       const one = url instanceof Request ? url.url : String(url);
       if (one.includes("login/oauth/access_token")) {

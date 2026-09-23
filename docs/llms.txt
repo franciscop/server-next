@@ -207,6 +207,12 @@ String form is `'<strategy>:<name>'` (`'cookie:github'`, `'jwt:clerk'`).
 Object form takes `{ providers, strategy, expires, onLogin, getUser,
 toPublicUser, onLogout, redirect }`. A plain function `(ctx) => user` works,
 as does an auth library instance.
+
+Each provider reads `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`
+(`GITHUB_CLIENT_ID`, `MICROSOFT_ENTRA_ID_CLIENT_ID`), or takes
+`{ clientId, clientSecret, scopes }` per provider. Extra settings use the same
+prefix: `AUTH0_DOMAIN`, `GITHUB_SCOPES`.
+https://server-js.com/documentation/authentication#the-providers
 https://server-js.com/documentation/authentication
 
 ## Testing

@@ -15,7 +15,7 @@ it stays out of access logs and referrer headers. The page reads it on load and
 stores it. CSRF `state` is handled by the server through a short-lived signed
 cookie, which the login response sets even on the JSON answer.
 
-Set `GITHUB_ID` and `GITHUB_SECRET`, and point the OAuth app's callback URL at
+Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, and point the OAuth app's callback URL at
 `http://localhost:3000/auth/callback/github`. Then `cd` into here and run
 `bun .` (or `node .`).
 

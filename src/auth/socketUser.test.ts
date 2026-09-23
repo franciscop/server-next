@@ -11,8 +11,8 @@ describe("socket auth", () => {
   });
 
   it("resolves a signed session cookie", async () => {
-    env.GITHUB_ID = "id";
-    env.GITHUB_SECRET = "secret";
+    process.env.GITHUB_CLIENT_ID = "id";
+    process.env.GITHUB_CLIENT_SECRET = "secret";
     const rows = new Map([["u1", { id: "u1", email: "ada@x.com" }]]);
     const app = server({
       secrets: "s",

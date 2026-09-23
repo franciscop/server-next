@@ -26,6 +26,15 @@ const claims = (token: string): Record<string, any> => {
 
 export default function oidcProvider(name: string): Provider {
   return {
+    check(options) {
+      if (credentials(name, options).id) return;
+      const key = name.toUpperCase();
+      throw new Error(
+        `Missing 'clientId': pass it in the options or set ${key}_CLIENT_ID ` +
+          `(usually along ${key}_CLIENT_SECRET)`,
+      );
+    },
+
     async authorize(ctx: Context, options: ProviderOptions) {
       const doc = await discover(options.issuer as string);
       const state = createId();
