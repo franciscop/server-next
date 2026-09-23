@@ -16,6 +16,8 @@ jobs:
           node-version: "lts/*"
       - name: Install dependencies
         run: npm install
+      - name: Install the Better Auth demo dependencies
+        run: npm install --prefix demo/auth-better-auth
       - name: Run the tests
         run: npm test
         env:
