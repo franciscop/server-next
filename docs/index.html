@@ -405,15 +405,13 @@ export default server({ auth: "cookie:github" })
     >
   </div>
   <div>
-    <pre><code class="language-js">export default server({ uploads: "./uploads" })
-  .post("/avatar", ctx =&gt; {
+    <pre><code class="language-js">const uploads = "./uploads";
+// const uploads = { bucket: s3, fileType: ["image/*"] };
+
+export default server()
+  .post("/avatar", { uploads }, ctx =&gt; {
     console.log(ctx.body.avatar);
-    // {
-    //   name: "me.png",
-    //   path: "/home/.../uploads/f3a9c2e1.png",
-    //   type: "image/png",
-    //   size: 345465,
-    // }
+    // { name, path, type, size }
   });</code></pre>
   </div>
 </section>
