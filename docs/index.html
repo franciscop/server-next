@@ -393,26 +393,25 @@ export default server({ auth: "cookie:github" })
   <div class="content">
     <h2>File uploads</h2>
     <p>
-      Files stream straight to storage as they arrive, never held in memory, so
-      even large uploads stay fast and cheap.
+      Files stream straight to storage as they arrive, never held in memory,
+      and oversized or wrong-type files are rejected before your handler runs.
     </p>
     <p>
-      Point <code>uploads</code> at a local folder or an S3-compatible bucket,
-      and each stored file shows up on <code>ctx.body</code>.
+      Each stored file gets a random, unguessable id, so nothing is overwritten
+      or predictable.
     </p>
     <a class="button ghost" href="/documentation#file-handling"
       >Read more &rarr;</a
     >
   </div>
   <div>
-    <pre><code class="language-js">const uploads = "./uploads";
-// const uploads = { bucket: s3, fileType: ["image/*"] };
-
-export default server()
-  .post("/avatar", { uploads }, ctx =&gt; {
-    console.log(ctx.body.avatar);
-    // { name, path, type, size }
-  });</code></pre>
+    <pre><code class="language-js">export default server({
+  uploads: {
+    bucket: "./uploads",
+    maxFileSize: "5mb",
+    fileType: ["image/jpeg", "image/png"],
+  },
+}).post("/avatar", ctx =&gt; ctx.body.avatar);</code></pre>
   </div>
 </section>
 
@@ -488,32 +487,6 @@ export default server()
   .get("/user/:id(number)", ...)
   // ctx.url.params.cId is optional
   .get("/books/:id/comments/:cId?", ...);</code></pre>
-  </div>
-</section>
-
-<section class="row">
-  <div class="content">
-    <h2>Upload validation</h2>
-    <p>
-      Add size and type limits right on the <code>uploads</code> option, and
-      oversized or wrong-type files are rejected before your handler runs.
-    </p>
-    <p>
-      Each stored file gets a random, unguessable id, so nothing is overwritten
-      or predictable.
-    </p>
-    <a class="button ghost" href="/documentation#file-handling"
-      >Read more &rarr;</a
-    >
-  </div>
-  <div>
-    <pre><code class="language-js">export default server({
-  uploads: {
-    bucket: "./uploads",
-    maxFileSize: "5mb",
-    fileType: ["image/jpeg", "image/png"],
-  },
-}).post("/avatar", ctx =&gt; ctx.body.avatar);</code></pre>
   </div>
 </section>
 
@@ -603,15 +576,15 @@ server()
     <a class="button ghost" href="/documentation/testing">Read more &rarr;</a>
   </div>
   <div>
-    <pre><code class="language-js">const api = server()
-  .get("/hello", () =&gt; "Hi!")
-  .post("/echo", ctx =&gt; ctx.body)
-  .test();
+    <pre><code class="language-js">// index.test.ts
+import app from "./index.ts";
+const api = app.test();
 
-const res = await api.post("/echo", { name: "Francisco" });
-
-expect(res.status).toBe(200);
-expect(await res.json()).toEqual({ name: "Francisco" });</code></pre>
+it("can create a new user", async () =&gt; {
+  const res = await api.post("/echo", { name: "Francisco" });
+  expect(res.status).toBe(201);
+  expect(await res.json()).toEqual({ name: "Francisco" });
+});</code></pre>
   </div>
 </section>
 
