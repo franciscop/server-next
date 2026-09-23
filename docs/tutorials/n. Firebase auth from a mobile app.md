@@ -7,10 +7,10 @@ Worth being clear about what Firebase is, because the naming misleads. It is not
 ## 1. Verify the token
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 
 export default server({ auth: 'jwt:firebase' })
-  .get('/api/me', (ctx) => ctx.user ?? status(401));
+  .get('/api/me', (ctx) => ctx.user ?? 401);
 ```
 
 ```sh
@@ -93,8 +93,8 @@ Firebase can create real accounts for people who have not identified themselves 
 
 ```js
   .post('/orders', (ctx) => {
-    if (!ctx.user) return status(401);
-    if (ctx.user.firebase?.sign_in_provider === 'anonymous') return status(403);
+    if (!ctx.user) return 401;
+    if (ctx.user.firebase?.sign_in_provider === 'anonymous') return 403;
     return db.orders.create(ctx.body);
   })
 ```

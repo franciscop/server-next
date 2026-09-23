@@ -571,8 +571,8 @@ export default server()
   <div class="content">
     <h2>Simple responses</h2>
     <p>
-      Return a string, object, file or stream from any route handler, or a
-      bare status with <code>status()</code>.
+      Return a string, object, status code, file or stream from any route
+      handler.
     </p>
     <p>
       Server.js infers the response, content type and headers, so handlers just
@@ -581,12 +581,12 @@ export default server()
     <a class="button ghost" href="/documentation/reply">Read more &rarr;</a>
   </div>
   <div>
-    <pre><code class="language-js">import server, { file, status } from "@server/next";
+    <pre><code class="language-js">import server, { file } from "@server/next";
 
 server()
   .get("/text", () =&gt; "Hello")
   .get("/json", () =&gt; ({ ok: true }))
-  .get("/gone", () =&gt; status(410))
+  .get("/gone", () =&gt; 404)
   .get("/file", () =&gt; file("./a.pdf"));</code></pre>
   </div>
 </section>

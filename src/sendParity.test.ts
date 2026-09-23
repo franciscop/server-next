@@ -1,4 +1,4 @@
-import server, { send, status } from ".";
+import server, { json, send, status } from ".";
 import { cleanupBuckets, realBucket } from "./tests/realBucket";
 
 // `.send(x)` and `return x` are the two ways to answer a request, so they
@@ -127,16 +127,24 @@ describe("send() and return accept the same values", () => {
 });
 
 describe("where they deliberately differ", () => {
-  // Returning it would be ambiguous (a status or an answer?), so it throws;
-  // send() has no such doubt, since it is explicitly "this is the body"
-  it("refuses a returned number, and sends one as JSON", async () => {
-    const api = server()
-      .get("/", () => 201 as any)
-      .test();
-    expect((await api.get("/")).status).toBe(500);
+  it("a number is a status when returned, a JSON body when sent", async () => {
+    const [a, b] = await bothWays(() => 201);
+    expect(a.status).toBe(201);
+    expect(a.body).toBe("");
+    expect(b.status).toBe(200);
+    expect(b.body).toBe("201");
+  });
 
-    const sent = await send(201);
-    expect(sent.status).toBe(200);
-    expect(await sent.text()).toBe("201");
+  // A returned number is always a status, so the number itself goes through
+  // json(); one that cannot be a status says so instead of a bare RangeError
+  it("sends a number as the body with json()", async () => {
+    const api = server()
+      .get("/answer", () => json(42))
+      .get("/wrong", () => 42)
+      .test();
+    const answer = await api.get("/answer");
+    expect(answer.status).toBe(200);
+    expect(await answer.json()).toBe(42);
+    expect((await api.get("/wrong")).status).toBe(500);
   });
 });

@@ -1,4 +1,4 @@
-import server, { status, type } from "../..";
+import server, { type } from "../..";
 const URL = "https://jsonplaceholder.typicode.com";
 
 const home = `<div>
@@ -11,7 +11,7 @@ const home = `<div>
 
 // Make a simple data streaming app
 export default server()
-  .get("/favicon.ico", () => status(404))
+  .get("/favicon.ico", () => 404)
   .get("/", () => type("html").send(home))
   .get("/generator", function* () {
     const texts = ["Hello ", "World ", "Plain ", "Generator"];

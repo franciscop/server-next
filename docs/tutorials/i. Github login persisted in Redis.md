@@ -32,7 +32,7 @@ Swapping `createClient(...)` for `new Map()` gives you an in-memory version for 
 A relational database can find a row by email through an index. Redis cannot: it looks things up by key and nothing else. So the email gets its own key pointing at the id, and the id points at the record.
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 import { users, byEmail } from "./db.js";
 
 const auth = {
@@ -57,7 +57,7 @@ const auth = {
 };
 
 export default server({ auth })
-  .get('/me', (ctx) => ctx.user ?? status(401));
+  .get('/me', (ctx) => ctx.user ?? 401);
 ```
 
 ```sh
@@ -90,8 +90,8 @@ Nothing changes from the SQL version, because `ctx.user` is whatever you stored:
 
 ```js
   .get('/admin', (ctx) => {
-    if (!ctx.user) return status(401);
-    if (ctx.user.role !== 'admin') return status(403);
+    if (!ctx.user) return 401;
+    if (ctx.user.role !== 'admin') return 403;
     return 'welcome';
   })
 ```

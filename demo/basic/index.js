@@ -26,7 +26,7 @@ export default server()
 
   // Return a status code directly (201 Created, empty body)
   //   curl -i -X POST localhost:3000/users
-  .post("/users", () => status(201))
+  .post("/users", () => 201)
 
   // PUT and PATCH, using the id parameter
   //   curl -X PUT   localhost:3000/users/42

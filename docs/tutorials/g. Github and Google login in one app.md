@@ -5,7 +5,7 @@ Offering one provider is a decision you make for your users; offering two is a d
 ## 1. Name them
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 import db from "./db.js";
 
 const auth = {
@@ -67,7 +67,7 @@ Which provider signed someone in belongs to the login, not to the person, so it 
 
 ```js
   .get('/me', (ctx) => {
-    if (!ctx.user) return status(401);
+    if (!ctx.user) return 401;
     return { ...ctx.user, signedInWith: ctx.auth.provider };
   })
 ```

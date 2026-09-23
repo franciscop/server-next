@@ -1,7 +1,7 @@
 import { type } from "arktype";
 import * as v from "valibot";
 import z from "zod";
-import server, { status } from "../..";
+import server from "../..";
 
 // The generated OpenAPI spec, built from the routes and their schemas. Any
 // Standard Schema library drives it, mixed freely:
@@ -34,7 +34,7 @@ export default server({ openapi: true })
       response: User,
       schema: { tags: "users", title: "Create a user" },
     },
-    () => status(201),
+    () => 201,
   )
   .put(
     "/users/:id(number)",
@@ -45,7 +45,7 @@ export default server({ openapi: true })
     },
     (ctx) => {
       console.log(ctx.url.params.id, ctx.body);
-      return status(200);
+      return 200;
     },
   )
   // arktype
@@ -56,5 +56,5 @@ export default server({ openapi: true })
   )
   .delete("/users/:id(number)", { schema: { tags: "users" } }, (ctx) => {
     console.log(ctx.url.params.id);
-    return status(200);
+    return 200;
   });

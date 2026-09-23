@@ -24,7 +24,7 @@ node index.js   # or: bun index.js
 
 ## 2. List and create
 
-Keep the notes in a `Map` for now (swap it for a [polystore](https://polystore.dev/) store like Redis to persist them). Return a value from a handler and it is sent as JSON; return `status(404)` for a bare status code.
+Keep the notes in a `Map` for now (swap it for a [polystore](https://polystore.dev/) store like Redis to persist them). Return a value from a handler and it is sent as JSON; return a number and it becomes the status code.
 
 ```js
 import server, { status } from "@server/next";
@@ -62,7 +62,7 @@ Add a route parameter and read it from `ctx.url.params`. A missing note just ret
   // PUT /notes/:id
   .put('/notes/:id', (ctx) => {
     const note = notes.get(ctx.url.params.id);
-    if (!note) return status(404);
+    if (!note) return 404;
     note.text = ctx.body.text;
     return note;
   })
@@ -70,7 +70,7 @@ Add a route parameter and read it from `ctx.url.params`. A missing note just ret
   // DELETE /notes/:id → 204 No Content
   .delete('/notes/:id', (ctx) => {
     notes.delete(ctx.url.params.id);
-    return status(204);
+    return 204;
   });
 ```
 

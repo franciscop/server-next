@@ -7,7 +7,7 @@ Protect a machine-to-machine API with a shared secret key. No auth config needed
 Compare the `Authorization` header against a key from the environment. Read it once at startup and throw if it's missing, so a misconfigured deploy fails at boot instead of running unprotected:
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 
 // API_KEY=a-long-random-string in the environment
 const API_KEY = process.env.API_KEY;
@@ -15,11 +15,11 @@ if (!API_KEY) throw new Error('Set the API_KEY environment variable');
 
 const requireKey = (ctx) => {
   const [type, key] = String(ctx.headers.authorization || '').split(' ');
-  if (type !== 'Bearer' || key !== API_KEY) return status(401);
+  if (type !== 'Bearer' || key !== API_KEY) return 401;
 };
 ```
 
-Returning `status(401)` stops the request right there; returning nothing lets it through, like any [middleware](/documentation/router#middleware).
+Returning `401` stops the request right there; returning nothing lets it through, like any [middleware](/documentation/router#middleware).
 
 ## 2. Protect the routes
 
@@ -53,14 +53,14 @@ curl -H "Authorization: Bearer a-long-random-string" localhost:3000/data
 With the default body parsing, uploaded files stream to storage *while the request is being read*, before your middleware gets a say. For uploads that must never touch storage without a key, take the raw stream instead and write it after the check:
 
 ```js
-import server, { bucket, status } from "@server/next";
+import server, { bucket } from "@server/next";
 
 const uploads = bucket.FS('./uploads');
 
 export default server()
   .post('/upload/:name', { parser: 'stream' }, requireKey, async (ctx) => {
     await uploads.file(ctx.url.params.name).write(ctx.body);
-    return status(201);
+    return 201;
   });
 ```
 
@@ -79,7 +79,7 @@ const clients = new Map([
 const requireKey = (ctx) => {
   const [type, key] = String(ctx.headers.authorization || '').split(' ');
   const client = type === 'Bearer' && clients.get(key);
-  if (!client) return status(401);
+  if (!client) return 401;
   ctx.user = client;
 };
 

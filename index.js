@@ -2991,9 +2991,12 @@ async function parseResponse(out, ctx) {
     if (markup) return await type("html").send(out);
   }
   if (typeof out === "number") {
-    throw new Error(
-      `Cannot return a bare number (${out}): it is ambiguous. Return status(${out}) for the status code, or json(${out}) to send the number itself as the body.`
-    );
+    if (!Number.isInteger(out) || out < 200 || out > 599) {
+      throw new Error(
+        `\`return ${out}\` is read as a status code, which must be 200 to 599. To send the number itself as the body, return json(${out}).`
+      );
+    }
+    return new Response(null, { status: out });
   }
   if (!(out instanceof Response) || out.url) {
     out = await send(out);

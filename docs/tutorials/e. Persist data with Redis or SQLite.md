@@ -26,7 +26,7 @@ export default server()
   .get('/notes/:id', (ctx) => notes.get(ctx.url.params.id))
   .delete('/notes/:id', async (ctx) => {
     await notes.del(ctx.url.params.id);
-    return status(204);
+    return 204;
   });
 ```
 

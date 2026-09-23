@@ -7,7 +7,7 @@ The thing that carries that permission is the **access token**, handed over once
 ## 1. Ask for the scope
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 
 const SCOPES = ['repo', 'read:user'];
 
@@ -64,10 +64,10 @@ Some providers also return `profile.refreshToken`, for when the access token is 
 ```js
 export default server({ auth })
   .get('/repos', (ctx) => {
-    if (!ctx.user) return status(401);
+    if (!ctx.user) return 401;
 
     const stored = db.tokens.find(ctx.user.id);
-    if (!stored) return status(403);
+    if (!stored) return 403;
 
     return fetch('https://api.github.com/user/repos', {
       headers: {
@@ -90,9 +90,9 @@ The profile carries the access token, not the scopes it came with, so what you s
 
 ```js
   .get('/repos', async (ctx) => {
-    if (!ctx.user) return status(401);
+    if (!ctx.user) return 401;
     const stored = db.tokens.find(ctx.user.id);
-    if (!stored) return status(403);   // signed in before you asked for the scope
+    if (!stored) return 403;   // signed in before you asked for the scope
     // ...call the API, and treat its own 403 as "not granted"
   })
 ```

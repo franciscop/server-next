@@ -7,7 +7,7 @@ That falls apart once the frontend is a separate app, or a phone. A React Native
 ## 1. Switch the strategy
 
 ```js
-import server, { status } from "@server/next";
+import server from "@server/next";
 
 const auth = {
   providers: 'discord',
@@ -21,7 +21,7 @@ const auth = {
 };
 
 export default server({ auth })
-  .get('/api/me', (ctx) => ctx.user ?? status(401));
+  .get('/api/me', (ctx) => ctx.user ?? 401);
 ```
 
 ```sh

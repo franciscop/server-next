@@ -55,14 +55,14 @@ export default server({
   // Params too: a malformed id is a 422 before the handler ever runs
   //   curl localhost:3000/notes/not-a-uuid
   .get("/notes/:id", { params: Id }, (ctx) => {
-    return notes.get(ctx.url.params.id) ?? status(404);
+    return notes.get(ctx.url.params.id) ?? 404;
   })
   .put("/notes/:id", { params: Id, body: Note }, (ctx) => {
-    if (!notes.has(ctx.url.params.id)) return status(404);
+    if (!notes.has(ctx.url.params.id)) return 404;
     notes.set(ctx.url.params.id, ctx.body);
     return { id: ctx.url.params.id, ...ctx.body };
   })
   .delete("/notes/:id", { params: Id }, (ctx) => {
     notes.delete(ctx.url.params.id);
-    return status(204);
+    return 204;
   });
