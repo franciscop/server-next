@@ -1,4 +1,4 @@
-# Server JS [![@server/next](https://img.shields.io/npm/v/@server/next?label=@server/next&color=greenlime)](https://www.npmjs.com/package/@server/next) [![tests](https://github.com/franciscop/server-next/workflows/tests/badge.svg)](https://github.com/franciscop/server-next/actions)
+# Server JS [![npm install @server/next](https://img.shields.io/badge/npm%20install-%40server%2Fnext-blue.svg)](https://www.npmjs.com/package/@server/next) [![tests](https://github.com/franciscop/server-next/workflows/tests/badge.svg)](https://github.com/franciscop/server-next/actions)
 
 A modern web server for Bun and Node, with routing, authentication, uploads, WebSockets and testing built in.
 

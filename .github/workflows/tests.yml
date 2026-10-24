@@ -10,14 +10,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Use Node.js latest
-        uses: actions/setup-node@v6
-        with:
-          node-version: "lts/*"
       - name: Install dependencies
         run: npm install
       - name: Install the Better Auth demo dependencies
         run: npm install --prefix demo/auth-better-auth
+      - name: Run the linter
+        run: npm run lint
       - name: Run the tests
         run: npm test
         env:
