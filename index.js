@@ -1078,7 +1078,13 @@ var credentials = (name, options) => ({
   secret: options.clientSecret ?? env[`${name.toUpperCase()}_CLIENT_SECRET`]
 });
 var passthrough = (options) => {
-  const { clientId, clientSecret, scopes, issuer, ...rest } = options;
+  const {
+    clientId: _id,
+    clientSecret: _secret,
+    scopes: _scopes,
+    issuer: _issuer,
+    ...rest
+  } = options;
   return rest;
 };
 var scopeOf = (options, fallback) => toArray(options.scopes ?? fallback).join(" ");
@@ -2216,7 +2222,10 @@ var getConfig = (options = {}) => {
   }
   return config2;
 };
-var clean = ({ $schema, ...schema }) => schema;
+var clean = (schema) => {
+  const { $schema: _, ...rest } = schema;
+  return rest;
+};
 async function toJsonSchema(schema) {
   try {
     if (typeof schema?.toJsonSchema === "function") {

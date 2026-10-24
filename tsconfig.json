@@ -1,21 +1,19 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
-    "noEmit": true,
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022", "ES2021", "DOM"],
     "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "@server/next",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
     "strict": false,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "types": ["bun", "node"],
-    "typeRoots": ["./node_modules/@types", "./src/test"]
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "noEmit": true
   },
-  "include": ["src/**/*"]
+  "include": ["src"]
 }

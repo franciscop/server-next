@@ -15,7 +15,10 @@ const getConfig = (options: any = {}): any => {
 };
 
 // A JSON Schema draft marker doesn't belong inside an OpenAPI document
-const clean = ({ $schema, ...schema }: any) => schema;
+const clean = (schema: any) => {
+  const { $schema: _, ...rest } = schema;
+  return rest;
+};
 
 // Any Standard Schema becomes JSON Schema through its own vendor: arktype
 // exposes it on the instance, zod and valibot on their modules, imported

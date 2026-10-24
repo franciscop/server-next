@@ -31,7 +31,13 @@ export const credentials = (name: string, options: ProviderOptions) => ({
 // Anything we do not recognise is passed straight through to the provider,
 // which is how `prompt`, `team` and `tenant` work with no code here
 export const passthrough = (options: ProviderOptions) => {
-  const { clientId, clientSecret, scopes, issuer, ...rest } = options;
+  const {
+    clientId: _id,
+    clientSecret: _secret,
+    scopes: _scopes,
+    issuer: _issuer,
+    ...rest
+  } = options;
   return rest as Record<string, string>;
 };
 

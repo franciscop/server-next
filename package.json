@@ -13,10 +13,12 @@
     "server.js"
   ],
   "scripts": {
-    "build": "bunx tsup src/index.ts --format esm --dts --out-dir . --target node24 --external zod --external @valibot/to-json-schema",
+    "build": "npm run build:bundle && npm run build:types && npm run build:prettier",
+    "build:bundle": "bunx tsup src/index.ts --format esm --out-dir . --target node24 --external zod --external @valibot/to-json-schema",
+    "build:types": "dts-bundle-generator --out-file index.d.ts --no-check --export-referenced-types false --inline-declare-global src/index.ts",
+    "build:prettier": "prettier --write src *.ts *.json",
     "start": "bun test --watch",
-    "lint": "npm run prettier && npx tsc --noEmit && npx @biomejs/biome lint ./src --error-on-warnings",
-    "prettier": "prettier --write ./src",
+    "lint": "oxlint src --ignore-pattern \"*.test-d.ts\" && tsc --noEmit",
     "test": "bun test src demo"
   },
   "main": "index.js",
@@ -68,17 +70,19 @@
     "bucket": "^0.11.4"
   },
   "devDependencies": {
+    "@endosome/dts-bundle-generator": "9.6.0",
     "@server/next": "file:",
-    "@types/bun": "^1.3.0",
-    "@types/node": "^24.10.0",
-    "@valibot/to-json-schema": "^1.7.1",
-    "arktype": "^2.2.3",
-    "bun": "^1.4.2",
-    "check-dts": "^0.8.2",
-    "prettier": "^3.9.6",
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.2",
-    "valibot": "^1.4.2",
-    "zod": "^4.4.3"
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.5",
+    "@valibot/to-json-schema": "^1.8.0",
+    "arktype": "^2.2.9",
+    "bun": "^1.4.4",
+    "check-dts": "^2.0.1",
+    "oxlint": "^1.89.0",
+    "prettier": "^3.9.10",
+    "tsup": "^9.0.0",
+    "typescript": "^7.0.2",
+    "valibot": "^1.5.0",
+    "zod": "^4.6.7"
   }
 }
