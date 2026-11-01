@@ -509,6 +509,55 @@ describe("uploads validate", () => {
     expect(calls).toBe(0);
   });
 
+  // The global middleware answer unmatched requests with a read body, so a
+  // path with no route is no way around the check
+  it("refuses an upload to a path with no route, storing nothing", async () => {
+    const bucket = mockBucket();
+    let calls = 0;
+    const api = server({
+      uploads: {
+        bucket,
+        validate: () => {
+          calls++;
+          return false;
+        },
+      },
+    })
+      .post("/", (ctx) => ctx.body)
+      .test();
+    const { raw, contentType } = makeMultipart("a.csv", "id,name", "text/csv");
+    const res = await api.post("/nowhere", raw, {
+      headers: { "content-type": contentType },
+    });
+    expect(calls).toBe(1);
+    expect(res.status).toBe(403);
+    expect(await bucket.count()).toBe(0);
+  });
+
+  it("sees the user on a path with no route too", async () => {
+    let seen: any = "never called";
+    const api = app((ctx: any) => {
+      seen = ctx.user;
+      return true;
+    });
+    const { raw, contentType } = makeMultipart("a.csv", "id,name", "text/csv");
+    await api.post("/nowhere", raw, {
+      headers: { "content-type": contentType, "x-key": "good" },
+    });
+    expect(seen).toEqual({ id: 1 });
+  });
+
+  it("is not called on a path with no route for a body that stores no files", async () => {
+    let calls = 0;
+    const api = app(() => {
+      calls++;
+      return false;
+    });
+    const res = await api.post("/nowhere", { hello: "world" });
+    expect(calls).toBe(0);
+    expect(res.status).toBe(404);
+  });
+
   it("is called for a raw body, which is stored as one file", async () => {
     let calls = 0;
     const api = app(() => {

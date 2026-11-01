@@ -46,18 +46,20 @@ export default async function handleRequest(
   return res;
 }
 
+// Whether reading this body would store files: multipart parts, or the whole
+// raw body as one file. `uploads: false` is "no files here".
+function storesFiles(ctx: Context): boolean {
+  const { uploads, parser } = ctx.options;
+  if (!uploads || parser === "raw" || parser === "stream") return false;
+  const kind = bodyKind(String(ctx.headers["content-type"] || ""));
+  return kind === "multipart" || kind === "file";
+}
+
 // `uploads.validate`, asked once per request that would store files, after
 // `ctx.user` is known and before a byte of the body is read.
 async function checkUploads(ctx: Context): Promise<void> {
-  const { uploads, parser } = ctx.options;
-  // `false` is "no files here", so there is nothing to allow or refuse
-  if (!uploads || parser === "raw" || parser === "stream") return;
-  const { validate } = uploads;
-  if (!validate) return;
-  // Only the kinds that can become stored files: multipart parts, or the
-  // whole raw body as one file
-  const kind = bodyKind(String(ctx.headers["content-type"] || ""));
-  if (kind !== "multipart" && kind !== "file") return;
+  const validate = ctx.options.uploads ? ctx.options.uploads.validate : null;
+  if (!validate || !storesFiles(ctx)) return;
   if ((await validate(ctx)) === false) {
     throw ServerError.UPLOAD_NOT_ALLOWED();
   }
@@ -112,6 +114,13 @@ async function getResponse(app: Server, ctx: Context): Promise<Response> {
       // `.use()` middleware only run once the body has been read.
       await checkUploads(ctx);
       break;
+    }
+
+    // The global middleware answer an unmatched request with its body read
+    // too, so its files are refused the same way before they are stored
+    if (!route && storesFiles(ctx)) {
+      await resolveUser(app, ctx);
+      await checkUploads(ctx);
     }
 
     // Now that the route (and its `parser` mode) is known, read the body once.

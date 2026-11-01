@@ -3133,13 +3133,15 @@ async function handleRequest(app, reqInfo) {
   }
   return res;
 }
-async function checkUploads(ctx) {
+function storesFiles(ctx) {
   const { uploads, parser } = ctx.options;
-  if (!uploads || parser === "raw" || parser === "stream") return;
-  const { validate: validate2 } = uploads;
-  if (!validate2) return;
+  if (!uploads || parser === "raw" || parser === "stream") return false;
   const kind = bodyKind(String(ctx.headers["content-type"] || ""));
-  if (kind !== "multipart" && kind !== "file") return;
+  return kind === "multipart" || kind === "file";
+}
+async function checkUploads(ctx) {
+  const validate2 = ctx.options.uploads ? ctx.options.uploads.validate : null;
+  if (!validate2 || !storesFiles(ctx)) return;
   if (await validate2(ctx) === false) {
     throw errors_default.UPLOAD_NOT_ALLOWED();
   }
@@ -3171,6 +3173,10 @@ async function getResponse(app, ctx) {
       await resolveUser(app, ctx);
       await checkUploads(ctx);
       break;
+    }
+    if (!route && storesFiles(ctx)) {
+      await resolveUser(app, ctx);
+      await checkUploads(ctx);
     }
     ctx.body = await resolveBody(
       ctx,
