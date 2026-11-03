@@ -145,6 +145,11 @@ if (typeof runtime.Netlify !== "undefined") {
 if (typeof process !== "undefined") {
   Object.assign(runtime.env, process.env);
 }
+if (runtime.navigator?.userAgent === "Cloudflare-Workers") {
+  const name = "cloudflare:workers";
+  const { env: workers } = await import(name);
+  Object.assign(runtime.env, workers);
+}
 
 // src/body/bucket.ts
 import { FS } from "bucket";

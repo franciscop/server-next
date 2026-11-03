@@ -1,44 +1,52 @@
 # Production by default, development when told
 
-Anything other than an explicit development environment runs with production
-behavior, including no `NODE_ENV` at all. Development is `NODE_ENV=development`,
-or `NETLIFY_DEV=true` under `netlify dev`.
+One value says whether the app runs in production, `platform.production`,
+resolved once at boot and fixed for the life of the runtime. It is `false` only
+when development is explicit:
+
+- `NODE_ENV` is `development` or `test`
+- `NETLIFY_DEV` is `true`, as `netlify dev` sets it
+
+Anything else is production, including no `NODE_ENV` at all.
+
+The environment is complete at import on every platform: `polyfill.ts` merges
+Netlify's env, `process.env`, and on Cloudflare Workers the `env` from
+`cloudflare:workers`, before any other library code runs. So `platform.production`
+can be resolved when `server()` runs, on every platform.
 
 ## Plan
 
-1. **One value per runtime.** The mode is resolved once, at boot, and never
-   changes after that. The public `platform.production` holds it, and every
-   framework check reads it, replacing the scattered
-   `env.NODE_ENV === "production"` reads. On Workers the env has to be readable
-   at import time for this: verify that `process.env` is filled there under
-   `nodejs_compat` (compatibility date 2025-04-01 or later), and otherwise read it
-   from `import { env } from "cloudflare:workers"`.
-2. **`Secure` cookies unless development.** The auth cookie and the OAuth state
-   cookie (`authCookie()` in `credential.ts`). Not always on: the browser rejects
-   a `Secure` cookie over plain HTTP, and Safari does even on `localhost`, so the
-   login would break in development.
-3. **HSTS always.** Drop the production gate in `security.ts`, like Hono's
-   `secureHeaders()`. Browsers ignore it over plain HTTP.
-4. **Remove the `localhost` CORS exception.** `cors()` in `cors.ts` lets any
-   `localhost` origin through outside production. No other library does this;
-   allowed origins are the ones listed in `cors`.
-5. **The HTML error page only in development.** `defaultOnError` in `render.ts`
-   shows the message, hint and stack unless `NODE_ENV=production`, which is
-   Express's footgun when it is forgotten.
-6. **The banner only when `NODE_ENV` is unset.** `announceDevelopment()` in
-   `config.ts` becomes, once at boot: `[server:app] NODE_ENV is not set, so
-   production defaults apply. Set NODE_ENV=development when developing locally.`
-   Silent for `production`, `development` and `test`, which were all set on
-   purpose.
+1. **Resolve it once, in `getMachine()`.** It reads the merged `env` instead of
+   `process.env`, so a Worker's `NODE_ENV` counts. This is the only code that
+   reads `NODE_ENV`: the direct reads in `config.ts` and `render.ts` go through
+   `platform.production` instead.
+2. **The banner, from the same place.** When `NODE_ENV` is not set at all,
+   `getMachine()` warns once: `[server:app] NODE_ENV is not set, so production
+   defaults apply. Set NODE_ENV=development when developing locally.` Nothing is
+   printed when it is set, whatever its value. This replaces
+   `announceDevelopment()` in `config.ts`.
+3. **`Secure` cookies in production.** The auth cookie and the OAuth state
+   cookie (`authCookie()` in `credential.ts`) already follow
+   `platform.production`; they now get `Secure` by default. Not on in development:
+   the browser rejects a `Secure` cookie over plain HTTP, and Safari does even on
+   `localhost`, so the login would break.
+4. **HSTS always.** Drop the `platform.production` gate in `security.ts`, like
+   Hono's `secureHeaders()`. Browsers ignore it over plain HTTP.
+5. **Remove the `localhost` CORS exception.** `cors()` in `cors.ts` lets any
+   `localhost` origin through when not in production. No other library does
+   this; allowed origins are the ones listed in `cors`.
+6. **The HTML error page only in development.** `defaultOnError` in `render.ts`
+   shows the message, hint and stack when `platform.production` is `false`, and
+   a plain status otherwise, so a forgotten `NODE_ENV` no longer shows them to
+   visitors. That is Express's footgun.
 7. **Docs.** `docs/1. Options.md` (`cors`, `security`), `docs/3. Context.md`
    (`ctx.platform`), `docs/8. Errors.md` ("In development"), and
    `docs/0. Documentation.md` where `NODE_ENV` is mentioned.
 
 ## Undecided
 
-- **The random auth secret** (`checkAuthSecret()` in `config.ts`): allowed only in
-  development and `test`, refused at boot otherwise. On Workers this relies on
-  the same import-time env as step 1.
+- **The random auth secret** (`checkAuthSecret()` in `config.ts`): allowed when
+  `platform.production` is `false`, refused at boot otherwise.
 
 ## Breaking
 

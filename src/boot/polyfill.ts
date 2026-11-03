@@ -10,7 +10,7 @@ const runtime = globalThis as typeof globalThis & {
   Netlify?: { env: { toObject(): Record<string, string> } };
 };
 
-// Polyfill Netlify's environment variables
+// Every runtime's environment variables, merged into one `env` at import
 runtime.env = {};
 
 if (typeof runtime.Netlify !== "undefined") {
@@ -19,6 +19,14 @@ if (typeof runtime.Netlify !== "undefined") {
 
 if (typeof process !== "undefined") {
   Object.assign(runtime.env, process.env);
+}
+
+// Workers only expose their env at import time through this module. A variable
+// specifier, so bundlers for other runtimes do not try to resolve it.
+if (runtime.navigator?.userAgent === "Cloudflare-Workers") {
+  const name = "cloudflare:workers";
+  const { env: workers } = await import(name);
+  Object.assign(runtime.env, workers);
 }
 
 // Export to make this an ES module
