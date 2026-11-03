@@ -15,7 +15,7 @@ export async function resolveUser(app: Server, ctx: Context): Promise<void> {
 export default function auth(app: Server) {
   const entry = app.settings.auth!;
   // Covers requests that match no route, where `assets` and the rest of the
-  // global middleware answer; a matched route resolves it earlier than this.
+  // global middleware answer; matched routes and uploads resolve it earlier.
   app.use(async function middle(ctx: Context) {
     await resolveUser(app, ctx);
   });

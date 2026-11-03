@@ -1,3 +1,4 @@
+import server from "..";
 import pathPattern from "./pathPattern";
 
 describe("pathPattern.js", () => {
@@ -138,5 +139,35 @@ describe("a required parameter", () => {
 
   it("still matches when the segment is there", () => {
     expect(pathPattern("/users/:id", "/users/7")).toEqual({ id: "7" });
+  });
+});
+
+// Params arrive decoded; a path that cannot be decoded is the client's mistake
+describe("percent-encoding", () => {
+  it("decodes each segment into the params", () => {
+    expect(pathPattern("/users/:id", "/users/caf%C3%A9")).toEqual({
+      id: "café",
+    });
+    expect(pathPattern("/users/:id", "/users/a%2Fb")).toEqual({ id: "a/b" });
+  });
+
+  it("refuses a broken escape with a 400, not a 500", async () => {
+    const errors: any[] = [];
+    const realError = console.error;
+    console.error = (...args: any[]) => errors.push(args);
+    try {
+      const api = server({ log: false })
+        .get("/users/:id", (ctx) => ctx.url.params.id)
+        .test();
+      for (const path of ["/users/%E0%A4%A", "/nope/%E0", "/%"]) {
+        const res = await api.get(path);
+        expect(res.status).toBe(400);
+        expect(await res.text()).toBe("The URL is not validly encoded");
+      }
+      // A client's mistake is not logged as a server error
+      expect(errors).toEqual([]);
+    } finally {
+      console.error = realError;
+    }
   });
 });

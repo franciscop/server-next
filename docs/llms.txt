@@ -189,7 +189,7 @@ is 400-599; anything else, including a thrown `Response`, is a plain 500. An
 returns a non-Response falls back to the built-in handler rather than escaping.
 https://server-js.com/documentation/errors
 
-Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_PARAM`, `PATH_TRAVERSAL`,
+Registered codes: `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_URL`, `INVALID_PARAM`, `PATH_TRAVERSAL`,
 `INVALID_REQUEST`, `VALIDATION_FAILED`, `BODY_TOO_LARGE`,
 `BODY_INVALID_MULTIPART`, `UPLOAD_NOT_CONFIGURED`, `UPLOAD_TOO_LARGE`,
 `UPLOAD_TOO_MANY_FILES`, `UPLOAD_TOO_SMALL`, `UPLOAD_NOT_ALLOWED`,

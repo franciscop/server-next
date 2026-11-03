@@ -42,6 +42,11 @@ ServerError.extend({
     message: 'The HTTP method "{method}" is not supported',
     hint: "Only GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS are routed. A client sending anything else is usually a proxy or a scanner."
   },
+  INVALID_URL: {
+    status: 400,
+    message: "The URL is not validly encoded",
+    hint: "The path has a broken percent-encoding ('%E0%A4%A', a bare '%'), so it cannot be decoded to match a route. The client built the URL wrong."
+  },
   INVALID_PARAM: {
     status: 400,
     message: 'Invalid parameter "{name}": expected {type}, got "{value}"',
@@ -2355,13 +2360,20 @@ function compile(pattern) {
   compiled.set(pattern, result);
   return result;
 }
+var decode = (segment) => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    throw errors_default.INVALID_URL();
+  }
+};
 function pathPattern(pattern, path, cast = true) {
   if (pattern === "*" && path === "/") return {};
   const { path: normalized, segments, wildcardTail } = compile(pattern);
   path = path.replace(/\/$/, "") || "/";
   if (normalized === path) return {};
   const params = {};
-  const parts = path.split("/").slice(1).map((u) => decodeURIComponent(u));
+  const parts = path.split("/").slice(1).map(decode);
   let invalid = null;
   for (let i = 0; i < Math.max(parts.length, segments.length); i++) {
     const segment = segments[i];

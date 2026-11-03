@@ -98,6 +98,13 @@ ServerError.extend({
       "Only GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS are routed. A " +
       "client sending anything else is usually a proxy or a scanner.",
   },
+  INVALID_URL: {
+    status: 400,
+    message: "The URL is not validly encoded",
+    hint:
+      "The path has a broken percent-encoding ('%E0%A4%A', a bare '%'), so it " +
+      "cannot be decoded to match a route. The client built the URL wrong.",
+  },
   INVALID_PARAM: {
     status: 400,
     message: 'Invalid parameter "{name}": expected {type}, got "{value}"',

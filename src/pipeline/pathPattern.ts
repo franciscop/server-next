@@ -96,6 +96,15 @@ function compile(pattern: string): Compiled {
   return result;
 }
 
+// A broken escape ('%E0%A4%A', a bare '%') is the client's mistake, not ours
+const decode = (segment: string): string => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    throw ServerError.INVALID_URL();
+  }
+};
+
 export default function pathPattern(
   pattern: string,
   path: string,
@@ -110,10 +119,7 @@ export default function pathPattern(
   if (normalized === path) return {};
 
   const params: Record<string, any> = {};
-  const parts = path
-    .split("/")
-    .slice(1)
-    .map((u) => decodeURIComponent(u));
+  const parts = path.split("/").slice(1).map(decode);
 
   // A cast that failed, held until we know this route is the one that matched:
   // a pattern we walk past on the way to another route must not refuse it.

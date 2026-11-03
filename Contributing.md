@@ -8,6 +8,13 @@ npx tsc --noEmit   # type-check
 npm run build      # bundle index.js + index.d.ts
 ```
 
+## Design decisions
+
+When a choice would be good either way, follow the paradigm that already exists,
+in this library first and in the wider ecosystem (Hono, Fastify, Express, the web
+platform) next. People arrive knowing those, so matching them is one less thing
+to learn. Break from them only for a concrete reason, like a safer default.
+
 ## Writing docs
 
 These rules apply to the reference sections (`options.*`, `ctx.*`, the reply
