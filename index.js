@@ -385,9 +385,7 @@ function applySecurity(res, ctx) {
   for (const key in security.headers) {
     setIfAbsent(res.headers, key, security.headers[key]);
   }
-  if (ctx.platform.production) {
-    setIfAbsent(res.headers, "strict-transport-security", security.hsts);
-  }
+  setIfAbsent(res.headers, "strict-transport-security", security.hsts);
 }
 
 // src/util/isReadableStream.ts
@@ -1879,13 +1877,11 @@ function resolveCors(option) {
   }
   return settings;
 }
-var localhost = /^https?:\/\/localhost(:\d+)?$/;
-function cors(config2, origin = "", production = false) {
+function cors(config2, origin = "") {
   origin = origin?.toLowerCase();
   if (config2 === true) return origin || null;
   if (config2 === "*") return "*";
   if (!origin) return null;
-  if (!production && localhost.test(origin)) return origin;
   const arr = typeof config2 === "string" ? config2.split(/\s*,\s*/g) : [];
   if (arr.includes(origin)) return origin;
   console.warn(`CORS: Origin "${origin}" not allowed. Allowed "${config2}"`);
@@ -1895,7 +1891,7 @@ function applyCors(res, ctx) {
   const settings = ctx.options.cors;
   if (!settings) return;
   const requestOrigin = ctx.headers.origin || "";
-  const origin = cors(settings.origin, requestOrigin, ctx.platform.production);
+  const origin = cors(settings.origin, requestOrigin);
   if (!origin) return;
   res.headers.set("Access-Control-Allow-Origin", origin);
   res.headers.set("Access-Control-Allow-Methods", settings.methods);
@@ -1957,7 +1953,7 @@ function defaultOnError(thrown, ctx) {
   const claimed = Number(error?.status);
   const status2 = Number.isInteger(claimed) && claimed >= 400 && claimed <= 599 ? claimed : 500;
   if (status2 >= 500) console.error(`[server:error] ${logLines(error)}`);
-  if (env.NODE_ENV !== "production" && wantsHtml(ctx)) {
+  if (ctx?.platform?.production === false && wantsHtml(ctx)) {
     return new Response(devPage(error, ctx), {
       status: status2,
       headers: {
@@ -1974,16 +1970,6 @@ function defaultOnError(thrown, ctx) {
 }
 
 // src/boot/config.ts
-var announced = false;
-function announceDevelopment() {
-  if (announced || env.NODE_ENV === "production" || env.NODE_ENV === "test") {
-    return;
-  }
-  announced = true;
-  console.warn(
-    "[server:app] Running in development mode. Set NODE_ENV=production when you deploy."
-  );
-}
 function rejectMisplacedOptions(options) {
   const opts = options;
   if (typeof opts.body === "string") {
@@ -2026,11 +2012,11 @@ function resolveOpenapi(option) {
   if (typeof option === "string") return { path: option };
   return { path: "/openapi.json", ...option };
 }
-function checkAuthSecret(settings) {
+function checkAuthSecret(settings, production) {
   if (settings.auth?.name !== "flow") return;
   if (!settings.secrets[0].startsWith("unsafe-")) return;
   const message = "Auth needs a stable secret: credentials are signed with it, and the random per-process fallback breaks them on restart and across instances. Set the SECRETS environment variable (or the `secrets` option).";
-  if (env.NODE_ENV === "production") throw new Error(message);
+  if (production) throw new Error(message);
   console.warn(`[server:auth] ${message}`);
 }
 function logSummary(settings, options) {
@@ -2049,8 +2035,7 @@ function logSummary(settings, options) {
   if (settings.cache !== void 0) log.message("cache", loc(options.cache));
   if (settings.openapi) log.message("openapi", settings.openapi.path);
 }
-function config(options = {}) {
-  announceDevelopment();
+function config(options, platform) {
   rejectMisplacedOptions(options);
   const publicDir = options.public || env.PUBLIC;
   const auth2 = options.auth || env.AUTH;
@@ -2072,7 +2057,7 @@ function config(options = {}) {
     onError: options.onError || defaultOnError,
     onResponse: options.onResponse
   };
-  checkAuthSecret(settings);
+  checkAuthSecret(settings, platform.production);
   logSummary(settings, options);
   return settings;
 }
@@ -2119,15 +2104,21 @@ function getRuntime() {
   return null;
 }
 function getProduction() {
-  if (runtime2.Netlify) return runtime2.Netlify.env.get("NETLIFY_DEV") !== "true";
-  return process.env.NODE_ENV === "production";
+  if (env.NETLIFY_DEV === "true") return false;
+  return env.NODE_ENV !== "development" && env.NODE_ENV !== "test";
+}
+var announced = false;
+function announceDefault(production) {
+  if (announced || !production || env.NODE_ENV) return;
+  announced = true;
+  console.warn(
+    "[server:app] Running in production mode. Set NODE_ENV=development for local dev."
+  );
 }
 function getMachine() {
-  return {
-    provider: getProvider(),
-    runtime: getRuntime(),
-    production: getProduction()
-  };
+  const production = getProduction();
+  announceDefault(production);
+  return { provider: getProvider(), runtime: getRuntime(), production };
 }
 
 // src/auth/index.ts
@@ -3624,8 +3615,8 @@ var Server = class extends Router {
   port;
   constructor(options = {}) {
     super();
-    this.settings = config(options);
     this.platform = getMachine();
+    this.settings = config(options, this.platform);
     if (this.settings.port) {
       this.port = this.settings.port;
     }

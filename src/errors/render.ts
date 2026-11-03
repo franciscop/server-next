@@ -91,7 +91,7 @@ export function defaultOnError(thrown: any, ctx: Context): Response {
       : 500;
   if (status >= 500) console.error(`[server:error] ${logLines(error)}`);
 
-  if (env.NODE_ENV !== "production" && wantsHtml(ctx)) {
+  if (ctx?.platform?.production === false && wantsHtml(ctx)) {
     return new Response(devPage(error, ctx), {
       status,
       headers: {

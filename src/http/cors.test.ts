@@ -70,15 +70,19 @@ describe("cors", () => {
     expect(headers.get("access-control-allow-origin")).toBe(null);
   });
 
-  it("allows localhost only outside production", async () => {
+  it("has no exception for localhost: it must be listed like any origin", async () => {
     const local = "http://localhost:5173";
-    const app = server({ cors: "https://allowed.com" }).get("/", () => 200);
-    const dev = await app.test().get("/", { headers: { origin: local } });
-    expect(dev.headers.get("access-control-allow-origin")).toBe(local);
+    const res = await server({ cors: "https://allowed.com" })
+      .get("/", () => 200)
+      .test()
+      .get("/", { headers: { origin: local } });
+    expect(res.headers.get("access-control-allow-origin")).toBe(null);
 
-    app.platform.production = true;
-    const prod = await app.test().get("/", { headers: { origin: local } });
-    expect(prod.headers.get("access-control-allow-origin")).toBe(null);
+    const listed = await server({ cors: ["https://allowed.com", local] })
+      .get("/", () => 200)
+      .test()
+      .get("/", { headers: { origin: local } });
+    expect(listed.headers.get("access-control-allow-origin")).toBe(local);
   });
 
   it("reflects an allowed origin and sets credentials", async () => {

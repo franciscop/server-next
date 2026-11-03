@@ -63,15 +63,9 @@ export function resolveCors(
   return settings;
 }
 
-const localhost = /^https?:\/\/localhost(:\d+)?$/;
-
 // Based on https://expressjs.com/en/resources/middleware/cors.html#configuration-options
 // Arrays never arrive here: resolveCors() joins every array form to a CSV.
-function cors(
-  config: boolean | string,
-  origin: string = "",
-  production = false,
-): string | null {
+function cors(config: boolean | string, origin: string = ""): string | null {
   origin = origin?.toLowerCase();
 
   // When it's true, reflect the origin
@@ -82,10 +76,6 @@ function cors(
 
   // No origin, it's okay since that means we don't need CORS
   if (!origin) return null;
-
-  // Local development just works; in production localhost is any origin,
-  // and a page on someone's machine must not reach a credentialed API
-  if (!production && localhost.test(origin)) return origin;
 
   const arr = typeof config === "string" ? config.split(/\s*,\s*/g) : [];
   if (arr.includes(origin)) return origin;
@@ -102,7 +92,7 @@ export function applyCors(res: Response, ctx: Context): void {
   if (!settings) return;
 
   const requestOrigin = (ctx.headers.origin as string) || "";
-  const origin = cors(settings.origin, requestOrigin, ctx.platform.production);
+  const origin = cors(settings.origin, requestOrigin);
   if (!origin) return;
 
   res.headers.set("Access-Control-Allow-Origin", origin);

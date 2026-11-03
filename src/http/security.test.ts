@@ -27,12 +27,15 @@ describe("security headers", () => {
     expect(headers.get("permissions-policy")).toBe(null);
   });
 
-  it("does not send HSTS outside production", async () => {
+  // Browsers ignore it over plain HTTP, so development needs no exception
+  it("sends HSTS in development too", async () => {
     const { headers } = await server()
       .get("/", () => status(200))
       .test()
       .get("/");
-    expect(headers.get("strict-transport-security")).toBe(null);
+    expect(headers.get("strict-transport-security")).toBe(
+      "max-age=15552000; includeSubDomains",
+    );
   });
 
   it("disables every header with security: false", async () => {

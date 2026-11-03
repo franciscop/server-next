@@ -1,7 +1,7 @@
 // The globals a runtime adds to say who it is. None are in a lib we can rely
 // on here, so the shapes this file reads are declared once.
 const runtime = globalThis as typeof globalThis & {
-  Netlify?: { env: { get(name: string): string | undefined } };
+  Netlify?: unknown;
   Deno?: unknown;
   navigator?: { userAgent?: string };
   process?: { versions?: { node?: string } };
@@ -22,10 +22,22 @@ function getRuntime(): string | null {
   return null;
 }
 
+// Production unless development is explicit, so a forgotten NODE_ENV is safe.
+// `env` already holds every platform's variables, Netlify's and Workers' too.
 function getProduction(): boolean {
-  // Can I cry now?
-  if (runtime.Netlify) return runtime.Netlify.env.get("NETLIFY_DEV") !== "true";
-  return process.env.NODE_ENV === "production";
+  if (env.NETLIFY_DEV === "true") return false;
+  return env.NODE_ENV !== "development" && env.NODE_ENV !== "test";
+}
+
+// Once per process, and only when production is the default rather than chosen
+let announced = false;
+function announceDefault(production: boolean): void {
+  if (announced || !production || env.NODE_ENV) return;
+  announced = true;
+  console.warn(
+    "[server:app] Running in production mode. Set NODE_ENV=development " +
+      "for local dev.",
+  );
 }
 
 export default function getMachine(): {
@@ -33,9 +45,7 @@ export default function getMachine(): {
   runtime: string | null;
   production: boolean;
 } {
-  return {
-    provider: getProvider(),
-    runtime: getRuntime(),
-    production: getProduction(),
-  };
+  const production = getProduction();
+  announceDefault(production);
+  return { provider: getProvider(), runtime: getRuntime(), production };
 }

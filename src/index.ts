@@ -36,8 +36,8 @@ export class Server<C extends ContextTypes = {}> extends Router<C> {
   constructor(options: Options = {}) {
     super();
 
-    this.settings = config(options);
     this.platform = getMachine();
+    this.settings = config(options, this.platform);
 
     if (this.settings.port) {
       this.port = this.settings.port;

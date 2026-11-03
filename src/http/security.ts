@@ -18,7 +18,7 @@ export type SecurityOptions = {
   frameguard?: boolean | string; // X-Frame-Options, default 'SAMEORIGIN'
   noSniff?: boolean; // X-Content-Type-Options: nosniff, default on
   referrerPolicy?: boolean | string; // default 'strict-origin-when-cross-origin'
-  hsts?: boolean | string; // Strict-Transport-Security (production only)
+  hsts?: boolean | string; // Strict-Transport-Security
   xssProtection?: boolean; // X-XSS-Protection: 0, default on
   // Reject route params that climb the path ('../'), default on
   traversalProtection?: boolean;
@@ -138,9 +138,6 @@ export function applySecurity(res: Response, ctx: Context): void {
     setIfAbsent(res.headers, key, security.headers[key]);
   }
 
-  // HSTS is only meaningful over HTTPS. Gate on production (the same signal as
-  // Secure cookies), which is correct behind a TLS-terminating proxy too.
-  if (ctx.platform.production) {
-    setIfAbsent(res.headers, "strict-transport-security", security.hsts);
-  }
+  // Browsers ignore it over plain HTTP, so it needs no gate
+  setIfAbsent(res.headers, "strict-transport-security", security.hsts);
 }

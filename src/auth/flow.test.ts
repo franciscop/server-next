@@ -512,13 +512,27 @@ describe("boot-time validation", () => {
 
   it("refuses to boot in production with no stable secret", () => {
     const env2 = globalThis.env as Record<string, string | undefined>;
+    const previous = env2.NODE_ENV;
     env2.NODE_ENV = "production";
     try {
       expect(() => server({ auth: base })).toThrow(/SECRETS/);
       // With one set, it boots
       expect(() => server({ secrets: "s", auth: base })).not.toThrow();
     } finally {
-      delete env2.NODE_ENV;
+      // Restored, not deleted: unset is production too, for every later file
+      env2.NODE_ENV = previous;
+    }
+  });
+
+  it("only warns about a random secret in development", () => {
+    const warned: any[] = [];
+    const realWarn = console.warn;
+    console.warn = (...args: any[]) => warned.push(args.join(" "));
+    try {
+      expect(() => server({ auth: base })).not.toThrow();
+      expect(warned.join(" ")).toContain("SECRETS");
+    } finally {
+      console.warn = realWarn;
     }
   });
 });

@@ -6,22 +6,8 @@ import { resolveCors } from "../http/cors";
 import { resolveSecurity } from "../http/security";
 import { resolveUploads } from "../body/upload";
 
-import type { LogLevel, Options, Settings } from "..";
+import type { LogLevel, Options, Platform, Settings } from "..";
 import { defaultOnError } from "../errors/render";
-
-// One line, once, so nobody ships a development build by accident. Skipped
-// under the test runner, where it would be noise on every server built.
-let announced = false;
-function announceDevelopment(): void {
-  if (announced || env.NODE_ENV === "production" || env.NODE_ENV === "test") {
-    return;
-  }
-  announced = true;
-  console.warn(
-    "[server:app] Running in development mode. Set NODE_ENV=production when " +
-      "you deploy.",
-  );
-}
 
 // Options that were renamed, or that only exist per route, fail loudly here
 // instead of being silently ignored.
@@ -82,14 +68,14 @@ function resolveOpenapi(option: Options["openapi"]): Settings["openapi"] {
 // random `unsafe-` one is generated per process, which invalidates every
 // credential on restart and across instances: a warning in development, a
 // refusal in production.
-function checkAuthSecret(settings: Settings): void {
+function checkAuthSecret(settings: Settings, production: boolean): void {
   if (settings.auth?.name !== "flow") return;
   if (!settings.secrets[0].startsWith("unsafe-")) return;
   const message =
     "Auth needs a stable secret: credentials are signed with it, and the " +
     "random per-process fallback breaks them on restart and across " +
     "instances. Set the SECRETS environment variable (or the `secrets` option).";
-  if (env.NODE_ENV === "production") throw new Error(message);
+  if (production) throw new Error(message);
   console.warn(`[server:auth] ${message}`);
 }
 
@@ -111,8 +97,7 @@ function logSummary(settings: Settings, options: Options): void {
   if (settings.openapi) log.message("openapi", settings.openapi.path);
 }
 
-export default function config(options: Options = {}): Settings {
-  announceDevelopment();
+export default function config(options: Options, platform: Platform): Settings {
   rejectMisplacedOptions(options);
 
   const publicDir = options.public || env.PUBLIC;
@@ -136,7 +121,7 @@ export default function config(options: Options = {}): Settings {
     onError: options.onError || defaultOnError,
     onResponse: options.onResponse,
   };
-  checkAuthSecret(settings);
+  checkAuthSecret(settings, platform.production);
   logSummary(settings, options);
   return settings;
 }
