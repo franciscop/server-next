@@ -1,6 +1,9 @@
 import ValidationError from "../errors/ValidationError";
 import type { Context, RouteOptions, StandardSchemaV1 } from "../types";
 
+// Only the schemas are read, so a route's resolved options fit as well
+type Schemas = Pick<RouteOptions, "body" | "query" | "params" | "response">;
+
 // Runs a Standard Schema (https://standardschema.dev): returns the validated
 // value or throws a ValidationError (issues go to onError, never the client)
 async function run<T>(
@@ -17,7 +20,7 @@ async function run<T>(
 // mutated in place since ctx.url exposes them through getters
 export async function validateRequest(
   ctx: Context,
-  options: RouteOptions,
+  options: Schemas,
 ): Promise<void> {
   if (options.body) {
     ctx.body = await run(options.body, ctx.body ?? {}, "body");
@@ -36,7 +39,7 @@ export async function validateRequest(
 // stream isn't the resource the schema describes
 export async function validateResponse(
   out: unknown,
-  options: RouteOptions,
+  options: Schemas,
 ): Promise<unknown> {
   if (!options.response) return out;
   if (out?.constructor !== Object && !Array.isArray(out)) return out;

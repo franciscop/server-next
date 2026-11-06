@@ -9,6 +9,7 @@ import type {
   RedirectTargets,
   Strategy,
 } from "../types";
+import type { AuthContext } from "./types";
 import { clearCookie } from "../http/createCookies";
 import {
   authCookie,
@@ -173,13 +174,14 @@ export default function flowEntry(config: AuthConfig): AuthEntry {
     name: "flow",
     providers: list.map((one) => one.name),
 
-    async user(ctx: Context) {
+    async user(ctx: AuthContext) {
       const payload = await read(ctx, strategy);
       if (!payload) return;
       ctx.auth = meta(payload, strategy);
       if (payload.user) return payload.user;
       if (!payload.sub) return;
-      return getUser!(payload.sub, ctx);
+      // A socket upgrade passes only the AuthContext subset here
+      return getUser!(payload.sub, ctx as Context);
     },
 
     routes() {

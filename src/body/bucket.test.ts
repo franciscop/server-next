@@ -44,12 +44,12 @@ describe("bucket from a path", () => {
     const file = localBucket.file("testFile.txt");
     await file.write("To be deleted");
     expect(await file.exists()).toBe(true);
-    await file.remove();
+    await file.remove!();
     expect(await file.exists()).toBe(false);
   });
 
   it("scopes writes under folder()", async () => {
-    const file = localBucket.folder("sub").file("nested.txt");
+    const file = localBucket.folder!("sub").file("nested.txt");
     await file.write("nested");
     // path is the key from the original bucket, prefix included
     expect(file.path).toBe("sub/nested.txt");

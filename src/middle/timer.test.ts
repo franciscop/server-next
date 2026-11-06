@@ -17,8 +17,8 @@ describe("timer", () => {
     timer(ctx);
     expect(ctx.time).toBeDefined();
     expect(typeof ctx.time).toBe("function");
-    expect(ctx.time.times[0]).toEqual(["init", 1000]);
-    expect(typeof ctx.time.headers).toBe("function");
+    expect(ctx.time!.times[0]).toEqual(["init", 1000]);
+    expect(typeof ctx.time!.headers).toBe("function");
   });
 });
 

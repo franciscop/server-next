@@ -74,8 +74,8 @@ export const isBucketFile = (value: any): value is BucketFile =>
 //
 // FS is the provider a path resolves to; the others are only reachable through
 // a bucket instance the app built itself.
-export default function bucket(root?: string | Bucket): Bucket | null {
-  if (!root) return null;
+export default function bucket(root?: string | Bucket): Bucket | undefined {
+  if (!root) return;
   if (typeof root === "string") return FS(root) as Bucket;
   if (typeof (root as Bucket).file === "function") return root as Bucket;
   throw new Error(

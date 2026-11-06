@@ -112,7 +112,7 @@ export default function config(options: Options, platform: Platform): Settings {
     security: resolveSecurity(options.security),
     // Kept raw, resolved per request in applyCache, so a route can override it
     cache: options.cache,
-    public: publicDir ? Bucket(publicDir) : null,
+    public: publicDir ? Bucket(publicDir) : undefined,
     uploads: resolveUploads(options.uploads),
     cors: resolveCors(options.cors || env.CORS),
     // The env string is validated (and rejected) inside parseAuth

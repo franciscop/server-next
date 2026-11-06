@@ -171,5 +171,6 @@ export default async function parseBody(
       limit: String(maxFileSize),
     });
   }
-  return streamRawToBucket(toStream(input), type, bucket, limits, signal);
+  // A raw file always declared its type: no type at all is read as text
+  return streamRawToBucket(toStream(input), type!, bucket, limits, signal);
 }

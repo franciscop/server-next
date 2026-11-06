@@ -34,8 +34,8 @@ describe("pathPattern.js", () => {
   });
 
   it("can decode encoded content", () => {
-    expect(pathPattern("/:hello", "/John%20Doe").hello).toEqual("John Doe");
-    expect(pathPattern("/hello/:there", "/hello/John%20Doe").there).toEqual(
+    expect(pathPattern("/:hello", "/John%20Doe")!.hello).toEqual("John Doe");
+    expect(pathPattern("/hello/:there", "/hello/John%20Doe")!.there).toEqual(
       "John Doe",
     );
   });

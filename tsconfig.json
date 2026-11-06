@@ -8,7 +8,7 @@
     "jsxImportSource": "@server/next",
     "types": ["bun"],
     "allowImportingTsExtensions": true,
-    "strict": false,
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,

@@ -24,7 +24,8 @@ describe("onResponse", () => {
     const res = await api.get("/");
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("hi");
-    expect(contentType).toContain("text/plain"); // saw the real response
+    // Assigned inside the hook, which TypeScript cannot see from here
+    expect(contentType as string | null).toContain("text/plain"); // saw the real response
   });
 
   it("can mutate and return the original response", async () => {

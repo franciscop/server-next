@@ -1,4 +1,5 @@
-import type { AuthEntry, AuthOption, Context, Options } from "../types";
+import type { AuthEntry, AuthOption, Options } from "../types";
+import type { AuthContext } from "./types";
 import flowEntry from "./flow";
 import instanceEntry from "./instance";
 import vendorEntry, { VENDORS } from "./vendors";
@@ -7,8 +8,10 @@ import verifyEntry from "./verify";
 // Every shape of `auth` normalises to the same thing: resolve a user, and
 // optionally own routes. Each shape's entry lives in its own file; this one
 // only decides which shape it is. See docs/5. Authentication.md.
-export default function parseAuth(auth: Options["auth"]): AuthEntry | null {
-  if (!auth) return null;
+export default function parseAuth(
+  auth: Options["auth"],
+): AuthEntry | undefined {
+  if (!auth) return;
   if (Array.isArray(auth)) {
     throw new Error(
       "`auth` takes one method. For several login options, list them under " +
@@ -36,7 +39,10 @@ function fromString(auth: string): AuthEntry {
 function toEntry(auth: AuthOption): AuthEntry {
   if (typeof auth === "string") return fromString(auth);
   if (typeof auth === "function") {
-    return { name: "function", user: async (ctx: Context) => auth(ctx as any) };
+    return {
+      name: "function",
+      user: async (ctx: AuthContext) => auth(ctx as any),
+    };
   }
   if (auth && typeof auth === "object") {
     if ("issuer" in auth) return verifyEntry(auth as any);

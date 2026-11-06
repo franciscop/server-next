@@ -126,8 +126,11 @@ export type Route = {
 
 export type BasicValue = string | number | boolean | null;
 
+// An `undefined` field is valid: JSON drops it, like an optional property
 export type SerializableValue =
-  BasicValue | { [key: string]: SerializableValue } | Array<SerializableValue>;
+  | BasicValue
+  | { [key: string]: SerializableValue | undefined }
+  | Array<SerializableValue>;
 
 type OnError = (
   error: RequestError,
@@ -181,7 +184,7 @@ export type Settings = {
     description?: string;
     version?: string;
   };
-  onError?: OnError;
+  onError: OnError;
   onResponse?: OnResponse;
   log: Logger;
   security: SecuritySettings;
@@ -250,6 +253,7 @@ export type InlineReply =
   | Buffer
   | ReadableStream;
 
+// A middleware may answer or pass, so either can come from the same function
 export type Middleware<C extends ContextTypes = {}> = (
   ctx: Context<C>,
-) => InlineReply | Promise<InlineReply> | void | Promise<void>;
+) => InlineReply | void | Promise<InlineReply | void>;

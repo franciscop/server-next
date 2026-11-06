@@ -127,7 +127,8 @@ export type AuthOption =
 export type AuthContext = Pick<
   Context,
   "options" | "headers" | "cookies" | "platform" | "app"
->;
+> &
+  Partial<Pick<Context, "auth">>;
 
 // Every shape normalises to this: resolve a user, and optionally own routes
 export type AuthEntry = {

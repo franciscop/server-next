@@ -92,7 +92,7 @@ describe("auto ETag", () => {
       .test();
     const first = await api.get("/");
     const tag = first.headers.get("etag");
-    const res = await api.get("/", { headers: { "if-none-match": tag } });
+    const res = await api.get("/", { headers: { "if-none-match": tag! } });
     expect(res.status).toBe(304);
     expect(await res.text()).toBe("");
   });

@@ -16,7 +16,7 @@ describe("verifying a vendor's token by name", () => {
     env.CLERK_ISSUER = "https://touched-donkey-12.clerk.accounts.dev";
     env.CLERK_AUDIENCE = "my-api";
     const app = server({ auth: "jwt:clerk" });
-    expect(app.settings.auth.name).toBe(
+    expect(app.settings.auth!.name).toBe(
       "verify:https://touched-donkey-12.clerk.accounts.dev",
     );
   });
@@ -74,7 +74,7 @@ describe("provider and vendor names do not collide", () => {
     env2.CLERK_AUDIENCE = "https://app.example.com";
     try {
       const app = server({ auth: "jwt:clerk" });
-      expect(app.settings.auth.name).toContain("verify:");
+      expect(app.settings.auth!.name).toContain("verify:");
     } finally {
       delete env2.CLERK_ISSUER;
       delete env2.CLERK_AUDIENCE;
@@ -97,7 +97,7 @@ describe("firebase", () => {
     env2.FIREBASE_ISSUER = "https://securetoken.google.com/my-project";
     env2.FIREBASE_AUDIENCE = "my-project";
     const app = server({ auth: "jwt:firebase" });
-    expect(app.settings.auth.name).toBe(
+    expect(app.settings.auth!.name).toBe(
       "verify:https://securetoken.google.com/my-project",
     );
   });
@@ -116,6 +116,6 @@ describe("firebase", () => {
     env2.GCIP_ISSUER = "https://securetoken.google.com/my-project";
     env2.GCIP_AUDIENCE = "my-project";
     const app = server({ auth: "jwt:gcip" });
-    expect(app.settings.auth.name).toContain("securetoken.google.com");
+    expect(app.settings.auth!.name).toContain("securetoken.google.com");
   });
 });

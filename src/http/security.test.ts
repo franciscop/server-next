@@ -89,12 +89,13 @@ describe("security headers", () => {
   });
 
   it("applies headers to 404s and other non-route responses", async () => {
-    const { status, headers } = await server()
+    const res = await server()
       .get("/", () => status(200))
       .test()
       .get("/missing");
+    const { headers } = res;
 
-    expect(status).toBe(404);
+    expect(res.status).toBe(404);
     expect(headers.get("x-content-type-options")).toBe("nosniff");
   });
 

@@ -155,7 +155,7 @@ if (runtime.navigator?.userAgent === "Cloudflare-Workers") {
 import { FS } from "bucket";
 var isBucketFile = (value) => Boolean(value) && typeof value.stream === "function" && typeof value.bytes === "function" && typeof value.exists === "function" && typeof value.name === "string";
 function bucket(root) {
-  if (!root) return null;
+  if (!root) return;
   if (typeof root === "string") return FS(root);
   if (typeof root.file === "function") return root;
   throw new Error(
@@ -165,14 +165,15 @@ function bucket(root) {
 
 // src/util/duration.ts
 var times = /(-?(?:\d+\.?\d*|\d*\.?\d+)(?:e[-+]?\d+)?)\s*([\p{L}]*)/iu;
-parse.millisecond = parse.ms = 1e-3;
-parse.second = parse.sec = parse.s = parse[""] = 1;
-parse.minute = parse.min = parse.m = parse.s * 60;
-parse.hour = parse.hr = parse.h = parse.m * 60;
-parse.day = parse.d = parse.h * 24;
-parse.week = parse.wk = parse.w = parse.d * 7;
-parse.year = parse.yr = parse.y = parse.d * 365.25;
-parse.month = parse.b = parse.y / 12;
+var units = {};
+units.millisecond = units.ms = 1e-3;
+units.second = units.sec = units.s = units[""] = 1;
+units.minute = units.min = units.m = units.s * 60;
+units.hour = units.hr = units.h = units.m * 60;
+units.day = units.d = units.h * 24;
+units.week = units.wk = units.w = units.d * 7;
+units.year = units.yr = units.y = units.d * 365.25;
+units.month = units.b = units.y / 12;
 function parse(str) {
   if (str === null || str === void 0) return null;
   if (typeof str === "number") return str;
@@ -180,9 +181,9 @@ function parse(str) {
     throw new Error(`Not a string: ${str} (${typeof str})`);
   }
   str = str.toLowerCase().replace(/[,_]/g, "");
-  const [_, value, units] = times.exec(str) || [];
-  if (!units) return null;
-  const unitValue = parse[units] || parse[units.replace(/s$/, "")];
+  const [, value, unit] = times.exec(str) || [];
+  if (!unit) return null;
+  const unitValue = units[unit] || units[unit.replace(/s$/, "")];
   if (!unitValue) return null;
   const result = unitValue * parseFloat(value);
   return Math.abs(Math.round(result * 1e3));
@@ -235,7 +236,10 @@ function normalizeExpires(expires) {
   if (expires === 0) return EXPIRED;
   if (typeof expires === "string") {
     if (/^[\d._]+\w+$/.test(expires)) {
-      return new Date(Date.now() + parse(expires)).toUTCString();
+      const ms = parse(expires);
+      if (ms === null)
+        throw new Error(`Invalid cookie \`expires\`: "${expires}"`);
+      return new Date(Date.now() + ms).toUTCString();
     } else {
       return expires;
     }
@@ -304,7 +308,7 @@ function fileType(file2) {
 var UNITS = ["b", "kb", "mb", "gb", "tb"];
 function parseBytes(value) {
   if (typeof value === "number") return value;
-  const units = {
+  const units2 = {
     b: 1,
     kb: 1024,
     mb: 1024 ** 2,
@@ -313,7 +317,7 @@ function parseBytes(value) {
   };
   const match = value.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)$/);
   if (!match) throw new Error(`Invalid size: "${value}"`);
-  return parseFloat(match[1]) * (units[match[2]] ?? 1);
+  return parseFloat(match[1]) * (units2[match[2]] ?? 1);
 }
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0b";
@@ -495,6 +499,7 @@ var Reply = class _Reply {
       Object.entries(key).map(([key2, value2]) => this.headers(key2, value2));
       return this;
     }
+    if (value === void 0) return this;
     if (Array.isArray(value)) {
       this.res.headers.delete(key);
       for (const val of value) this.res.headers.append(key, val);
@@ -1217,10 +1222,10 @@ function oidcProvider(name) {
       const { id, secret } = credentials(name, options);
       const body = new URLSearchParams({
         client_id: id,
-        client_secret: secret,
         code,
         grant_type: "authorization_code"
       });
+      if (secret) body.set("client_secret", secret);
       body.set("redirect_uri", callbackUrl(ctx, name));
       const res = await fetch(doc.token_endpoint, {
         method: "POST",
@@ -1708,7 +1713,7 @@ function vendorEntry(strategy, name) {
 
 // src/auth/parse.ts
 function parseAuth(auth2) {
-  if (!auth2) return null;
+  if (!auth2) return;
   if (Array.isArray(auth2)) {
     throw new Error(
       "`auth` takes one method. For several login options, list them under `providers` instead: auth: { providers: ['github', 'google'], ... }."
@@ -1729,7 +1734,10 @@ function fromString(auth2) {
 function toEntry(auth2) {
   if (typeof auth2 === "string") return fromString(auth2);
   if (typeof auth2 === "function") {
-    return { name: "function", user: async (ctx) => auth2(ctx) };
+    return {
+      name: "function",
+      user: async (ctx) => auth2(ctx)
+    };
   }
   if (auth2 && typeof auth2 === "object") {
     if ("issuer" in auth2) return verifyEntry(auth2);
@@ -2048,7 +2056,7 @@ function config(options, platform) {
     security: resolveSecurity(options.security),
     // Kept raw, resolved per request in applyCache, so a route can override it
     cache: options.cache,
-    public: publicDir ? bucket(publicDir) : null,
+    public: publicDir ? bucket(publicDir) : void 0,
     uploads: resolveUploads(options.uploads),
     cors: resolveCors(options.cors || env.CORS),
     // The env string is validated (and rejected) inside parseAuth
@@ -3071,7 +3079,7 @@ async function finalize(out, ctx) {
   if (stale) {
     out.headers.append("set-cookie", clearCookie(stale));
   }
-  if (ctx.time?.times?.length > 1) {
+  if (ctx.time && ctx.time.times.length > 1) {
     out.headers.set("Server-Timing", ctx.time.headers());
   }
   return out;

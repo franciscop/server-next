@@ -40,7 +40,10 @@ type Exact<RO> = Options & { [K in Exclude<keyof RO, keyof Options>]: never };
 
 // A raw/stream route never parses the body, so a `body` schema is a mistake,
 // caught at boot (bare Routers have no settings, hence the .use() recheck)
-function checkParserConflict(options: Options, globalParser?: string): void {
+function checkParserConflict(
+  options: Pick<Options, "parser" | "body">,
+  globalParser?: string,
+): void {
   const parser = options.parser ?? globalParser ?? "auto";
   if (options.body && (parser === "raw" || parser === "stream")) {
     throw new Error(

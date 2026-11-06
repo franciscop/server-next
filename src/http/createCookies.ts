@@ -25,7 +25,11 @@ function normalizeExpires(
   // string → use as-is
   if (typeof expires === "string") {
     if (/^[\d._]+\w+$/.test(expires)) {
-      return new Date(Date.now() + parse(expires)).toUTCString();
+      // An unknown unit would otherwise expire the cookie on the spot
+      const ms = parse(expires);
+      if (ms === null)
+        throw new Error(`Invalid cookie \`expires\`: "${expires}"`);
+      return new Date(Date.now() + ms).toUTCString();
     } else {
       return expires;
     }
@@ -52,9 +56,10 @@ export const clearCookie = (name: string): string =>
 // A credential that can never verify again is cleared with the response.
 // Kept off the public Context via a WeakMap (same pattern as the body source),
 // so handlers never see it: auth schedules it, finalize() sends it.
-const pendingClear = new WeakMap<Context, string>();
+const pendingClear = new WeakMap<object, string>();
 
-export const clearOnSend = (ctx: Context, name: string): void => {
+// Any context will do, the socket upgrade's AuthContext included
+export const clearOnSend = (ctx: object, name: string): void => {
   pendingClear.set(ctx, name);
 };
 

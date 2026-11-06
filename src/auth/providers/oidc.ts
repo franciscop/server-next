@@ -52,12 +52,14 @@ export default function oidcProvider(name: string): Provider {
     async exchange(ctx, options, code): Promise<AuthProfile> {
       const doc = await discover(options.issuer as string);
       const { id, secret } = credentials(name, options);
+      // `check()` refused to boot without the id; a missing secret is left
+      // out rather than sent as the string "undefined"
       const body = new URLSearchParams({
-        client_id: id,
-        client_secret: secret,
+        client_id: id!,
         code,
         grant_type: "authorization_code",
       });
+      if (secret) body.set("client_secret", secret);
       body.set("redirect_uri", callbackUrl(ctx, name));
       const res = await fetch(doc.token_endpoint, {
         method: "POST",

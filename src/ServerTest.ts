@@ -3,7 +3,7 @@ import type { Method, SerializableValue, Server } from ".";
 type BodyValue = SerializableValue | BodyInit;
 
 function isSerializable(
-  body: BodyValue,
+  body?: BodyValue,
 ): body is Exclude<SerializableValue, string | null | undefined> {
   if (!body) return false;
   if (typeof body === "string") return false;

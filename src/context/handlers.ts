@@ -11,7 +11,7 @@ import chunkArray from "../util/chunkArray";
 export const Fetchable = async (
   app: Server<any>,
   request: Request,
-  env: BunEnv,
+  env?: BunEnv,
 ): Promise<Response> => {
   // A WebSocket upgrade (Bun): resolve the auth user from the request and pass
   // it along as the socket's `data`, so handlers see it as `ctx.user`. Only

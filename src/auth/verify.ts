@@ -2,6 +2,7 @@ import { clearOnSend } from "../http/createCookies";
 import { decodeJwt, unb64url } from "./jwt";
 import ServerError from "../errors";
 import type { AuthClaims, AuthEntry, AuthVerify, Context } from "../types";
+import type { AuthContext } from "./types";
 import toArray from "../util/toArray";
 import { bearer, meta } from "./credential";
 import { bare, discover } from "./discovery";
@@ -73,7 +74,7 @@ export default function verifyEntry(options: AuthVerify): AuthEntry {
 
   return {
     name: `verify:${issuer}`,
-    async user(ctx: Context) {
+    async user(ctx: AuthContext) {
       const token = options.cookie ? ctx.cookies[options.cookie] : bearer(ctx);
       if (!token) return; // anonymous, not an error
 
@@ -100,7 +101,8 @@ export default function verifyEntry(options: AuthVerify): AuthEntry {
         options.cookie ? "cookie" : "jwt",
       );
       if (!options.getUser) return claims;
-      return options.getUser(claims.sub, ctx);
+      // A socket upgrade passes only the AuthContext subset here
+      return options.getUser(claims.sub, ctx as Context);
     },
   };
 }

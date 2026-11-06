@@ -10,6 +10,7 @@ import type {
   Cookie,
   Strategy,
 } from "../types";
+import type { AuthContext } from "./types";
 
 export const NAME = "session";
 
@@ -57,7 +58,7 @@ export const authCookie = (
   sameSite: "Lax",
 });
 
-export const bearer = (ctx: Context): string | undefined => {
+export const bearer = (ctx: AuthContext): string | undefined => {
   const header = ctx.headers.authorization as string | undefined;
   if (!header) return;
   const [type, token] = header.trim().split(" ");
@@ -73,7 +74,7 @@ export const bearer = (ctx: Context): string | undefined => {
 // localhost, an expired login), so a bad cookie is just signed out; a bearer
 // token was attached deliberately, so a bad one is a 401 the client must see.
 export async function read(
-  ctx: Context,
+  ctx: AuthContext,
   strategy: Strategy,
 ): Promise<Payload | undefined> {
   const token = inCookie(strategy) ? ctx.cookies[NAME] : bearer(ctx);

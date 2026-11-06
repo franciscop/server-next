@@ -33,8 +33,8 @@ describe("null-body statuses", () => {
 
 const EXPIRED = "Thu, 01 Jan 1970 00:00:00 GMT";
 
-function getExpiresDiff(time: string): number {
-  const [, expiresStr] = time.match(/Expires=([^;]+)/);
+function getExpiresDiff(time: string | null): number {
+  const [, expiresStr] = time!.match(/Expires=([^;]+)/)!;
 
   // Returns milliseconds rounded to the nearest second when parsing a UTC string from Expires
   const expiresTime = new Date(expiresStr).getTime();
@@ -133,6 +133,11 @@ describe("Reply", () => {
       const res = await headers("link", ["<a>", "<b>"]).send("x");
       expect(res.headers.get("link")).toBe("<a>, <b>");
     });
+
+    it("sets nothing for an undefined value, not the string 'undefined'", async () => {
+      const res = await headers("x-v", undefined).send("x");
+      expect(res.headers.get("x-v")).toBe(null);
+    });
   });
 
   describe("json()", () => {
@@ -190,6 +195,12 @@ describe("Reply", () => {
       const res = await api.get("/");
       expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
       expect(res.headers.get("set-cookie")).toBe("hello=world;Path=/");
+    });
+
+    it("refuses an expires unit it does not know, instead of expiring now", () => {
+      expect(() =>
+        cookies({ hello: { value: "world", expires: "1parsec" } }),
+      ).toThrow(/expires/);
     });
 
     it("uses the header 'set-cookie'", async () => {
@@ -251,8 +262,8 @@ describe("Reply", () => {
         hello: { value: "world", expires: 0 },
       }).send();
       const [, expiresStr] = res.headers
-        .get("set-cookie")
-        .match(/Expires=([^;]+)/);
+        .get("set-cookie")!
+        .match(/Expires=([^;]+)/)!;
       // Very old one to delete/expire it
       expect(expiresStr).toBe(EXPIRED);
     });
@@ -276,8 +287,8 @@ describe("Reply", () => {
     it("can delete a cookie with null", async () => {
       const res = await cookies({ hello: null }).send();
       const [, expiresStr] = res.headers
-        .get("set-cookie")
-        .match(/Expires=([^;]+)/);
+        .get("set-cookie")!
+        .match(/Expires=([^;]+)/)!;
       // Very old one to delete/expire it
       expect(expiresStr).toBe(EXPIRED);
     });
@@ -285,8 +296,8 @@ describe("Reply", () => {
     it("can delete a cookie with null value", async () => {
       const res = await cookies({ hello: { value: null } }).send();
       const [, expiresStr] = res.headers
-        .get("set-cookie")
-        .match(/Expires=([^;]+)/);
+        .get("set-cookie")!
+        .match(/Expires=([^;]+)/)!;
       // Very old one to delete/expire it
       expect(expiresStr).toBe(EXPIRED);
     });

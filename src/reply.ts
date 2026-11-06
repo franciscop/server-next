@@ -72,6 +72,9 @@ class Reply {
       return this;
     }
 
+    // Nothing to set, rather than the literal string "undefined"
+    if (value === undefined) return this;
+
     // An array sends the header once per value, for list headers like `Link`
     if (Array.isArray(value)) {
       this.res.headers.delete(key);
