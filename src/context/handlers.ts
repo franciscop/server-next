@@ -54,6 +54,9 @@ export const Fetchable = async (
       // Bun passes its server here, which is where the socket IP comes from
       remoteAddress: env?.requestIP?.(request)?.address || "",
       body: request.body,
+      timeout: env?.timeout
+        ? (seconds: number) => env.timeout!(request, seconds)
+        : undefined,
     };
     return await handleRequest(app, reqInfo);
   } catch {

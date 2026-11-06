@@ -114,3 +114,4 @@ export type * from "./types";
 // The file-storage library, re-exported so there's nothing extra to install:
 // `bucket` holds the storage providers (`bucket.FS`, `bucket.S3`, ...).
 export { default as bucket } from "bucket";
+export type { SseSend, SseStart } from "./http/sse";

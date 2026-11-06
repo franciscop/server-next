@@ -30,7 +30,7 @@ https://server-js.com/documentation#platforms
 | `ServerError` | class | `new ServerError(code, status, message)`. For codes you reuse, register them once with `ServerError.extend({})`, then throw `ServerError.<CODE>(vars)`. https://server-js.com/documentation/errors#throwing-your-own |
 | `ValidationError` | class | Thrown by a failing route schema; has `source` and `issues` |
 | `bucket` | object | Re-export of [`bucket`](https://bucketjs.com): `bucket.FS()`, `.S3()`, `.R2()`, `.GCS()`, `.Azure()`, `.B2()`, `.Memory()` |
-| `status` `headers` `type` `cache` `download` `cookies` `send` `json` `file` `redirect` | functions | Reply helpers, chainable. https://server-js.com/documentation/reply |
+| `status` `headers` `type` `cache` `download` `cookies` `send` `json` `file` `redirect` `sse` | functions | Reply helpers, chainable. https://server-js.com/documentation/reply |
 
 Types are exported too: `Context`, `Options`, `RouteOptions`, `Settings`,
 `Middleware`, `UploadOptions`, `UploadedFile`, `UploadValidate`, `Bucket`,
@@ -173,6 +173,7 @@ Helpers, all chainable, terminal ones return a `Response`:
 | `json(body)` | terminal | https://server-js.com/documentation/reply#json |
 | `file(path \| BucketFile)` | terminal | Streams it. https://server-js.com/documentation/reply#file |
 | `redirect(path)` | terminal | `302` by default. https://server-js.com/documentation/reply#redirect |
+| `sse(fn)` | terminal | Server-sent events: `send(data)` or `send(name, data)`, the returned function runs on disconnect. https://server-js.com/documentation/reply#sse |
 | `status(code)` | chainable | https://server-js.com/documentation/reply#status |
 | `type(mime \| ext)` | chainable | https://server-js.com/documentation/reply#type |
 | `headers(obj)` | chainable | https://server-js.com/documentation/reply#headers |

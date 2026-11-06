@@ -5,6 +5,7 @@ import define from "../util/define";
 import forwarded from "../http/forwarded";
 import parseCookies from "../http/parseCookies";
 import parseHeaders from "../http/parseHeaders";
+import { setTimeoutControl } from "../http/sse";
 
 // Runtimes with no socket: the edge is the only thing that can reach the app,
 // so the header it sets is the client address. Read only on that platform,
@@ -25,6 +26,8 @@ export type ContextParts = {
   remoteAddress: string;
   // Unread; nothing may consume it before resolveBody does
   body?: ReadableStream | null;
+  // The runtime's per-request idle timeout, in seconds, where it has one (Bun)
+  timeout?: (seconds: number) => void;
 };
 
 export default function createContext(
@@ -36,6 +39,7 @@ export default function createContext(
     signal,
     remoteAddress,
     body,
+    timeout,
   }: ContextParts,
 ): Context {
   const init = performance.now();
@@ -77,5 +81,6 @@ export default function createContext(
   // The body is not read yet: handleRequest resolves it once the route (and
   // its `parser` mode) is known, so a `stream` route never buffers
   setBody(ctx, body);
+  setTimeoutControl(ctx, timeout);
   return ctx;
 }

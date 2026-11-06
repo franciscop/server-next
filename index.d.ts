@@ -268,6 +268,13 @@ export type AuthEntry = {
   routes?: () => Router;
 };
 export type AuthSettings = AuthEntry;
+export type SseSend = {
+  (data: unknown): void;
+  (event: string, data: unknown): void;
+};
+export type SseStart = (
+  send: SseSend,
+) => void | (() => unknown) | Promise<void | (() => unknown)>;
 type CookieOptions = string | string[] | Cookie | Cookie[] | null;
 type SendBody =
   | SerializableValue
@@ -299,6 +306,7 @@ declare class Reply {
     value?: CookieOptions,
   ): this;
   json(body: unknown): Promise<Response>;
+  sse(start: SseStart): Response;
   redirect(path: string): Promise<Response>;
   file(path: string | BucketFile): Promise<Response>;
   send(input?: SendBody): Promise<Response>;
@@ -318,6 +326,7 @@ export declare const file: (...args: Params<"file">) => Promise<Response>;
 export declare const redirect: (
   ...args: Params<"redirect">
 ) => Promise<Response>;
+export declare const sse: (...args: Params<"sse">) => Response;
 export type Cookie = {
   value?: string | null;
   path?: string;
@@ -488,6 +497,7 @@ export type BunEnv = Record<string, string> & {
   requestIP?: (req: Request) => {
     address: string;
   } | null;
+  timeout?: (req: Request, seconds: number) => void;
 };
 export interface ContextExtension {}
 export type Context<C extends ContextTypes = {}> = {

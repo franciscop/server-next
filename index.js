@@ -470,6 +470,87 @@ function serialize(body, headers2) {
   return payload;
 }
 
+// src/http/sse.ts
+var PING = 15e3;
+var encoder = new TextEncoder();
+function format(event, data) {
+  if (event !== void 0 && /[\r\n]/.test(event)) {
+    throw new Error(`An SSE event name cannot have line breaks: "${event}"`);
+  }
+  const text = typeof data === "string" ? data : JSON.stringify(data) ?? "";
+  let out = event === void 0 ? "" : `event: ${event}
+`;
+  for (const line of text.split(/\r\n|\r|\n/)) out += `data: ${line}
+`;
+  return `${out}
+`;
+}
+var streams = /* @__PURE__ */ new WeakMap();
+var timeouts = /* @__PURE__ */ new WeakMap();
+function setTimeoutControl(ctx, timeout) {
+  if (timeout) timeouts.set(ctx, timeout);
+}
+function createSse(start, init) {
+  let controller;
+  let closed = false;
+  let cleanup;
+  const run2 = (fn) => {
+    if (typeof fn !== "function") return;
+    Promise.resolve().then(fn).catch((error) => console.error("[server:error] sse cleanup:", error));
+  };
+  const write = (chunk) => {
+    if (closed) return;
+    try {
+      controller.enqueue(encoder.encode(chunk));
+    } catch {
+    }
+  };
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(ping);
+    try {
+      controller.close();
+    } catch {
+    }
+    run2(cleanup);
+  };
+  const fail = (error) => {
+    console.error("[server:error] sse:", error);
+    close();
+  };
+  const body = new ReadableStream({
+    start(c) {
+      controller = c;
+    },
+    cancel: close
+  });
+  const ping = setInterval(() => write(": ping\n\n"), PING);
+  const send2 = ((...args) => {
+    const [event, data] = args.length > 1 ? [args[0], args[1]] : [void 0, args[0]];
+    write(format(event, data));
+  });
+  try {
+    const result = start(send2);
+    Promise.resolve(result).then((fn) => {
+      if (closed) run2(fn ?? void 0);
+      else cleanup = fn ?? void 0;
+    }, fail);
+  } catch (error) {
+    fail(error);
+  }
+  const res = new Response(body, init);
+  streams.set(res, close);
+  return res;
+}
+function wireSse(res, ctx) {
+  const close = streams.get(res);
+  if (!close) return;
+  timeouts.get(ctx)?.(0);
+  if (ctx.signal.aborted) return close();
+  ctx.signal.addEventListener("abort", close, { once: true });
+}
+
 // src/reply.ts
 var EXPIRED2 = (/* @__PURE__ */ new Date(0)).toUTCString();
 var Reply = class _Reply {
@@ -534,6 +615,14 @@ var Reply = class _Reply {
     if (body === void 0) body = null;
     setIfAbsent(this.res.headers, "content-type", "application/json");
     return this.send(JSON.stringify(body));
+  }
+  // Server-sent events: an open stream the start callback pushes into
+  sse(start) {
+    const { status: status2 = 200, headers: headers2 } = this.res;
+    setIfAbsent(headers2, "content-type", "text/event-stream");
+    setIfAbsent(headers2, "cache-control", "no-cache");
+    setIfAbsent(headers2, "x-accel-buffering", "no");
+    return createSse(start, { status: status2, headers: headers2 });
   }
   redirect(path) {
     this.headers("location", path);
@@ -617,6 +706,7 @@ var send = (...args) => r().send(...args);
 var json = (...args) => r().json(...args);
 var file = (...args) => r().file(...args);
 var redirect = (...args) => r().redirect(...args);
+var sse = (...args) => r().sse(...args);
 
 // src/body/sniff.ts
 var ascii = (text) => [...text].map((char) => char.charCodeAt(0));
@@ -3001,7 +3091,8 @@ function createContext(app, {
   url: rawUrl,
   signal,
   remoteAddress,
-  body
+  body,
+  timeout
 }) {
   const init = performance.now();
   const method = rawMethod?.toLowerCase() || "get";
@@ -3031,6 +3122,7 @@ function createContext(app, {
     ip: clientIp(headers2, { remoteAddress, trustProxy, platformHeader })
   };
   setBody(ctx, body);
+  setTimeoutControl(ctx, timeout);
   return ctx;
 }
 
@@ -3069,6 +3161,7 @@ async function parseResponse(out, ctx) {
   if (!(out instanceof Response) || out.url) {
     out = await send(out);
   }
+  wireSse(out, ctx);
   return out;
 }
 async function finalize(out, ctx) {
@@ -3265,7 +3358,7 @@ var CONTINUATION = 0;
 var TEXT = 1;
 var BINARY = 2;
 var CLOSE = 8;
-var PING = 9;
+var PING2 = 9;
 var PONG = 10;
 function encodeFrame(payload, opcode) {
   const len = payload.length;
@@ -3380,7 +3473,7 @@ var NodeWebSocket = class {
       this.shutdown();
       return;
     }
-    if (opcode === PING) {
+    if (opcode === PING2) {
       if (!this.closed) this.socket.write(encodeFrame(payload, PONG));
       return;
     }
@@ -3488,7 +3581,8 @@ var Fetchable = async (app, request, env2) => {
       signal: request.signal,
       // Bun passes its server here, which is where the socket IP comes from
       remoteAddress: env2?.requestIP?.(request)?.address || "",
-      body: request.body
+      body: request.body,
+      timeout: env2?.timeout ? (seconds2) => env2.timeout(request, seconds2) : void 0
     };
     return await handleRequest(app, reqInfo);
   } catch {
@@ -3669,6 +3763,7 @@ export {
   redirect,
   router,
   send,
+  sse,
   status,
   type
 };

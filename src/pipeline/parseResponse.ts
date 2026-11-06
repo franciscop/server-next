@@ -3,6 +3,7 @@ import { applyCors } from "../http/cors";
 import { applySecurity } from "../http/security";
 import { clearCookie, toClear } from "../http/createCookies";
 import { send, type } from "../reply";
+import { wireSse } from "../http/sse";
 
 import type { Context } from "../index";
 
@@ -47,6 +48,8 @@ export default async function parseResponse(
     out = await send(out);
   }
 
+  // An event stream needs the request it answers: its abort, its idle timeout
+  wireSse(out, ctx);
   return out;
 }
 

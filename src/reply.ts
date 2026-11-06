@@ -7,6 +7,7 @@ import disposition from "./http/disposition";
 import fileType from "./http/fileType";
 import { CLIMBS } from "./http/security";
 import serialize from "./pipeline/serialize";
+import { createSse, type SseStart } from "./http/sse";
 import type { Readable } from "node:stream";
 import type {
   BucketFile,
@@ -136,6 +137,16 @@ class Reply {
     // and the fetch spec.
     setIfAbsent(this.res.headers, "content-type", "application/json");
     return this.send(JSON.stringify(body));
+  }
+
+  // Server-sent events: an open stream the start callback pushes into
+  sse(start: SseStart): Response {
+    const { status = 200, headers } = this.res;
+    setIfAbsent(headers, "content-type", "text/event-stream");
+    setIfAbsent(headers, "cache-control", "no-cache");
+    // Stops nginx from holding events back in its buffer
+    setIfAbsent(headers, "x-accel-buffering", "no");
+    return createSse(start, { status, headers });
   }
 
   redirect(path: string): Promise<Response> {
@@ -270,3 +281,4 @@ export const send = (...args: Params<"send">) => r().send(...args);
 export const json = (...args: Params<"json">) => r().json(...args);
 export const file = (...args: Params<"file">) => r().file(...args);
 export const redirect = (...args: Params<"redirect">) => r().redirect(...args);
+export const sse = (...args: Params<"sse">) => r().sse(...args);

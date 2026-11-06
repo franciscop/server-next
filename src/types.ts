@@ -203,6 +203,7 @@ export type Platform = {
 export type BunEnv = Record<string, string> & {
   upgrade?: (req: Request, options?: { data?: any }) => boolean;
   requestIP?: (req: Request) => { address: string } | null;
+  timeout?: (req: Request, seconds: number) => void;
 };
 
 // Augment this to type the fields your own middleware puts on `ctx`:
